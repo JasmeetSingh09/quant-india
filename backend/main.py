@@ -45,7 +45,7 @@ from commodities import (
 from news import get_stock_news, get_macro_news, get_market_wide_news, start_news_scheduler
 from sentiment import score_headline, summarise_sentiment
 from watchlist import add_to_watchlist, remove_from_watchlist, get_watchlist
-from alerts import send_test_alert, send_multi_signal_alert
+from alerts import send_test_alert, send_multi_signal_alert, start_alert_scheduler, run_watchlist_alert_check
 from alpha_model import compute_alpha_score, scan_alpha, retrain_weights, explain_signal
 from portfolio_optimizer import (
     mean_variance_optimize, black_litterman_optimize,
@@ -91,6 +91,7 @@ async def startup():
     loop = asyncio.get_event_loop()
     loop.run_in_executor(None, ensure_universe_loaded)
     start_news_scheduler()
+    start_alert_scheduler(interval_minutes=30)   # auto-check watchlists for alerts
 
 
 # ---------------------------------------------------------------------------
@@ -499,6 +500,15 @@ def alerts_test():
     if "error" in result:
         raise HTTPException(status_code=500, detail=result["error"])
     return result
+
+
+@app.post("/alerts/run-check")
+def alerts_run_check():
+    """
+    Manually trigger the watchlist alert check right now (same logic the
+    background scheduler runs every 30 min). Returns what was sent or skipped.
+    """
+    return {"results": run_watchlist_alert_check()}
 
 
 @app.post("/alerts/send")
