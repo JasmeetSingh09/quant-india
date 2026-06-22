@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+requests
+yfinance
+pandas
+numpy
+transformers
+# torch: the line below installs the CPU build. For NVIDIA GPU (e.g. RTX 4070 Super)
+# run instead:  pip install torch --index-url https://download.pytorch.org/whl/cu124
+torch
+apscheduler
+quantstats
+scipy
+statsmodels
+feedparser

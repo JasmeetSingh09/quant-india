@@ -1,0 +1,38 @@
+# ─── Secrets — NEVER commit these ───
+.env
+**/.env
+*.env
+!**/.env.example
+
+# ─── Python ───
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+*.db
+*.sqlite
+*.sqlite3
+quant_platform.db
+
+# ─── Node / frontend ───
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+
+# ─── Model cache ───
+.cache/
+models/
+*.bin
+*.safetensors
+
+# ─── Editor / OS ───
+.vscode/
+.idea/
+.claude/
+.DS_Store
+Thumbs.db
+*.log
