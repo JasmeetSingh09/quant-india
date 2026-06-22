@@ -290,6 +290,145 @@ def check_and_send_watchlist_alerts(watchlist_entries: list) -> list:
     return results
 
 
+# ---------------------------------------------------------------------------
+# Automatic alert scheduler — checks watchlists and emails on threshold breach
+# ---------------------------------------------------------------------------
+
+import sqlite3
+from apscheduler.schedulers.background import BackgroundScheduler
+
+_DB_PATH = Path(__file__).parent.parent / "quant_platform.db"
+_COOLDOWN_HOURS = 6   # don't re-alert the same ticker more than once per 6h
+_alert_scheduler = None
+_alert_scheduler_started = False
+
+
+def _init_alert_log():
+    conn = sqlite3.connect(_DB_PATH)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS alert_log (
+            ticker        TEXT PRIMARY KEY,
+            last_sent_at  TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+
+def _recently_alerted(ticker: str) -> bool:
+    """True if we already alerted this ticker within the cooldown window."""
+    conn = sqlite3.connect(_DB_PATH)
+    row = conn.execute("SELECT last_sent_at FROM alert_log WHERE ticker = ?", (ticker,)).fetchone()
+    conn.close()
+    if not row:
+        return False
+    last = datetime.fromisoformat(row[0])
+    return (datetime.now() - last).total_seconds() < _COOLDOWN_HOURS * 3600
+
+
+def _mark_alerted(ticker: str):
+    conn = sqlite3.connect(_DB_PATH)
+    conn.execute(
+        "INSERT OR REPLACE INTO alert_log (ticker, last_sent_at) VALUES (?, ?)",
+        (ticker, datetime.now().isoformat())
+    )
+    conn.commit()
+    conn.close()
+
+
+def run_watchlist_alert_check() -> list:
+    """
+    The automatic job: fetch all watchlist entries with live prices, and for any
+    that breached their price threshold (and aren't in cooldown), send a
+    multi-signal email (price + current sentiment + valuation).
+
+    Returns a list of what was sent (used by the scheduler log and the manual
+    /alerts/run-check endpoint).
+    """
+    _init_alert_log()
+    sent = []
+
+    # Pull watchlist with live prices
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        from watchlist import get_watchlist
+        entries = get_watchlist(refresh_prices=True)
+    except Exception as e:
+        return [{"error": f"could not load watchlist: {e}"}]
+
+    for entry in entries:
+        ticker = entry["ticker"]
+        if not entry.get("alert_triggered"):
+            continue
+        if _recently_alerted(ticker):
+            sent.append({"ticker": ticker, "status": "skipped (cooldown)"})
+            continue
+
+        # Enrich with current sentiment for a multi-signal alert
+        sentiment_label, confidence_pct, headline = "neutral", 0.0, ""
+        try:
+            from news import get_stock_news
+            from sentiment import summarise_sentiment
+            articles = get_stock_news(ticker, days_back=7)
+            if articles:
+                summ = summarise_sentiment(articles[:10])
+                sentiment_label = summ.get("overall_sentiment", "neutral")
+                confidence_pct  = round(summ.get("average_confidence", 0) * 100, 1)
+                headline = articles[0]["title"]
+        except Exception:
+            pass
+
+        result = send_multi_signal_alert(
+            ticker=ticker,
+            company_name=entry.get("company_name", ticker),
+            price_change_pct=entry.get("change_from_add_pct", 0),
+            current_price=entry.get("current_price", 0),
+            sentiment_label=sentiment_label,
+            confidence_pct=confidence_pct,
+            headline=headline or "Price threshold breached",
+        )
+        if result.get("status") == "sent":
+            _mark_alerted(ticker)
+        sent.append({"ticker": ticker, "status": result.get("status", "error"),
+                     "detail": result.get("error", "")})
+
+    return sent
+
+
+def _alert_job():
+    """Background wrapper with logging."""
+    try:
+        results = run_watchlist_alert_check()
+        fired = [r for r in results if r.get("status") == "sent"]
+        if fired:
+            print(f"[Alerts] {datetime.now().strftime('%H:%M')} — sent {len(fired)} alert(s): "
+                  f"{[r['ticker'] for r in fired]}")
+    except Exception as e:
+        print(f"[Alerts] check error: {e}")
+
+
+def start_alert_scheduler(interval_minutes: int = 30):
+    """
+    Start the background job that auto-checks watchlists and sends alerts.
+    Safe to call multiple times — only starts once.
+    """
+    global _alert_scheduler, _alert_scheduler_started
+    if _alert_scheduler_started:
+        return
+    if not GMAIL_SENDER or not GMAIL_PASSWORD:
+        print("[Alerts] Gmail not configured — auto-alerts disabled "
+              "(set GMAIL_ADDRESS and GMAIL_APP_PASSWORD).")
+        return
+    _init_alert_log()
+    _alert_scheduler = BackgroundScheduler()
+    _alert_scheduler.add_job(_alert_job, "interval", minutes=interval_minutes, id="watchlist_alerts")
+    _alert_scheduler.start()
+    _alert_scheduler_started = True
+    print(f"[Alerts] Auto-alert scheduler started ({interval_minutes}-min checks, "
+          f"{_COOLDOWN_HOURS}h cooldown per stock).")
+
+
 def send_test_alert() -> dict:
     """Send a test email to verify Gmail credentials are working."""
     subject = "Test Alert — Indian Stock Platform"
