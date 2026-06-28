@@ -8,6 +8,7 @@ import {
 } from 'recharts'
 import { Plus, Trash2, Dices } from 'lucide-react'
 import { InfoTip } from '../components/Term'
+import Explainer from '../components/Explainer'
 
 const fmt = n => '₹' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })
 
@@ -161,7 +162,17 @@ export default function MonteCarlo() {
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                   </AreaChart>
                 </ResponsiveContainer>
-                <p className="text-xs text-gray-500 mt-2">{d.interpretation}</p>
+                <Explainer>
+                  <p><b>What we just did:</b> instead of guessing one future, we rolled the dice
+                    <b> 10,000 times</b> — simulating 10,000 possible futures for your portfolio based on
+                    how these stocks have actually behaved.</p>
+                  <p><b>How to read the chart:</b> the green band is the lucky outcomes, the red band the
+                    unlucky ones, and the middle line is the typical (median) result. The wider the spread,
+                    the more uncertain your outcome.</p>
+                  <p><b>The result:</b> the most likely outcome is around <b>{fmt(d.median_value)}</b>, with
+                    a <b>{d.probability_of_loss_pct}%</b> chance of ending below what you put in. In a really
+                    bad year (worst 5%), you could be down to about <b>{fmt(d.percentiles.p5)}</b>.</p>
+                </Explainer>
               </div>
 
               {/* Histogram */}

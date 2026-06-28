@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { getDeflatedSharpe, getPositionSize } from '../api'
 import { InfoTip } from '../components/Term'
+import Explainer from '../components/Explainer'
 import { ShieldAlert, Loader2 } from 'lucide-react'
 
 export default function RiskLab() {
@@ -65,8 +66,21 @@ export default function RiskLab() {
             <div className="card-sm"><p className="stat-label">Deflated Sharpe</p><p className={`stat-value ${dsrColor}`}>{Math.round(d.deflated_sharpe*100)}%</p><p className="text-xs text-gray-500">prob. real</p></div>
             <div className="card-sm"><p className="stat-label">Luck benchmark</p><p className="stat-value">{d.luck_benchmark_sharpe}</p><p className="text-xs text-gray-500">SR from {d.n_trials} trials</p></div>
             <div className="card-sm"><p className="stat-label">Verdict</p><p className={`text-sm font-bold mt-1 ${dsrColor}`}>{d.edge_is_real?'LIKELY REAL':'LIKELY LUCK'}</p></div>
-            <p className="text-xs text-gray-400 col-span-4">{d.verdict}</p>
           </div>
+        )}
+        {d && (
+          <Explainer>
+            <p><b>What we just did:</b> we measured how good {d.ticker?.replace('.NS','')}'s past
+              returns were <i>for the risk taken</i> (that's the "Sharpe ratio" — higher is better),
+              then checked whether that's genuine or just luck.</p>
+            <p><b>Why "strategies tried" matters:</b> if you test {d.n_trials} different ideas,
+              some will look great purely by chance. So we raised the bar — the "luck benchmark"
+              ({d.luck_benchmark_sharpe}) is the score you'd expect from luck alone after {d.n_trials} tries.</p>
+            <p><b>The result:</b> there's about <b className={dsrColor}>{Math.round(d.deflated_sharpe*100)}%</b> chance
+              this is a <b>real edge</b>. {d.edge_is_real
+                ? 'That’s high (above 95%) — this looks genuine, not luck.'
+                : 'That’s not high enough to trust — it’s probably luck or too small a sample, not a reliable pattern. Real edges are rare, so this is the normal, honest answer for most stocks.'}</p>
+          </Explainer>
         )}
       </div>
 
@@ -92,8 +106,21 @@ export default function RiskLab() {
             <div className="card-sm"><p className="stat-label">Half-Kelly</p><p className="stat-value">{pos.data.half_kelly_weight_pct}%</p></div>
             <div className="card-sm"><p className="stat-label">Vol-target</p><p className="stat-value">{pos.data.vol_target_weight_pct}%</p></div>
             <div className="card-sm"><p className="stat-label">Recommended</p><p className="stat-value text-green-400">{pos.data.recommended_weight_pct}%</p><p className="text-xs text-gray-500">{pos.data.cash_pct}% cash</p></div>
-            <p className="text-xs text-gray-400 col-span-3">{pos.data.verdict}</p>
           </div>
+        )}
+        {pos.data && (
+          <Explainer>
+            <p><b>What we just did:</b> we worked out how much of your money to put into this one
+              position so you grow without risking ruin.</p>
+            <p><b>Two methods:</b> "Half-Kelly" ({pos.data.half_kelly_weight_pct}%) is the math-optimal
+              bet based on reward vs risk. "Vol-target" ({pos.data.vol_target_weight_pct}%) caps it so your
+              portfolio isn't too bumpy. We take the <b>smaller (safer)</b> of the two.</p>
+            <p><b>The result:</b> put about <b className="text-green-400">{pos.data.recommended_weight_pct}%</b> of
+              your capital here and keep <b>{pos.data.cash_pct}%</b> in cash.
+              {pos.data.recommended_weight_pct < 10
+                ? ' That’s small because the reward doesn’t justify the risk — betting big here would be dangerous.'
+                : ' This captures most of the growth while protecting you from a bad streak.'}</p>
+          </Explainer>
         )}
       </div>
 

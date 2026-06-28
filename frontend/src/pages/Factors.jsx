@@ -5,6 +5,7 @@ import Spinner from '../components/Spinner'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts'
 import { Layers } from 'lucide-react'
 import { InfoTip } from '../components/Term'
+import Explainer from '../components/Explainer'
 
 export default function Factors() {
   const [ticker, setTicker] = useState('HDFCBANK.NS')
@@ -106,7 +107,17 @@ export default function Factors() {
           </div>
 
           <div className="card">
-            <p className="text-sm text-gray-300">{d.interpretation}</p>
+            <Explainer>
+              <p><b>What we just did:</b> we broke this stock's returns into pieces to find out
+                <i> why</i> it made (or lost) money — was it skill, or just riding well-known patterns?</p>
+              <p><b>The factors:</b> "Market" = how much it just follows the overall market.
+                "Size" = whether it behaves like a small or large company. "Value" = whether it acts
+                like a cheap (value) or pricey (growth) stock.</p>
+              <p><b>"Real skill (alpha)":</b> the return left over <i>after</i> removing those patterns.
+                {d.alpha_significant && d.alpha_annual_pct > 0
+                  ? ' Here it is genuinely positive — a rare sign of real edge.'
+                  : ' Here there’s no proven extra skill — its returns are explained by the patterns above, which is the normal result for most stocks.'}</p>
+            </Explainer>
             <p className="text-xs text-gray-600 mt-2">{d.note}</p>
           </div>
         </>

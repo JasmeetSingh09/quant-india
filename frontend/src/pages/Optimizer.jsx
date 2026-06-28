@@ -5,6 +5,7 @@ import Spinner from '../components/Spinner'
 import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceDot, LineChart, Line } from 'recharts'
 import { Plus, Trash2 } from 'lucide-react'
 import { InfoTip } from '../components/Term'
+import Explainer from '../components/Explainer'
 
 const DEFAULT_TICKERS = ['HDFCBANK.NS','TCS.NS','RELIANCE.NS','INFY.NS','HINDUNILVR.NS','SBIN.NS']
 
@@ -157,6 +158,15 @@ export default function Optimizer() {
                 {Object.entries(mvoResult.optimal_pct || {})
                   .sort(([,a],[,b]) => b-a)
                   .map(([t,w]) => <WeightBar key={t} ticker={t} weight={w} />)}
+                <Explainer>
+                  <p><b>What we just did:</b> we found the best mix of these stocks — the split that
+                    gives the most return for the least bumpiness (risk).</p>
+                  <p><b>The numbers:</b> each % is how much of your money to put in that stock. A higher
+                    "Sharpe ratio" means a better return-for-risk trade-off. We compared it to a plain
+                    equal split to show the improvement.</p>
+                  <p className="text-gray-400">Tip: lower the "max weight per stock" slider to force more
+                    diversification if it piles too much into one name.</p>
+                </Explainer>
               </div>
             </div>
           )}
