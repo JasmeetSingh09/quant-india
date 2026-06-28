@@ -2,6 +2,9 @@ import { Routes, Route } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
 import StockExplorer from './pages/StockExplorer'
+import Screener from './pages/Screener'
+import Portfolio from './pages/Portfolio'
+import Calculators from './pages/Calculators'
 import Watchlist from './pages/Watchlist'
 import Simulator from './pages/Simulator'
 import Optimizer from './pages/Optimizer'
@@ -20,6 +23,9 @@ export default function App() {
         <Routes>
           <Route path="/"           element={<Dashboard />} />
           <Route path="/stock"      element={<StockExplorer />} />
+          <Route path="/screener"   element={<Screener />} />
+          <Route path="/portfolio"  element={<Portfolio />} />
+          <Route path="/calculators" element={<Calculators />} />
           <Route path="/watchlist"  element={<Watchlist />} />
           <Route path="/simulator"  element={<Simulator />} />
           <Route path="/optimizer"  element={<Optimizer />} />

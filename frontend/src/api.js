@@ -76,6 +76,21 @@ export const backtestPair   = body => api.post('/pairs/backtest', body)
 // Fama-French
 export const getFactorRegression = ticker => api.get(`/factors/regression?ticker=${ticker}`)
 
+// Screener
+export const runScreener     = body => api.post('/screener', body)
+export const getScreenerSectors = () => api.get('/screener/sectors')
+export const getScreenerStatus  = () => api.get('/screener/status')
+
+// Portfolio tracker
+export const getPortfolio    = () => api.get('/portfolio')
+export const addHolding      = body => api.post('/portfolio/add', body)
+export const removeHolding   = id => api.delete(`/portfolio/remove?id=${id}`)
+
+// Calculators
+export const calcSIP         = body => api.post('/calc/sip', body)
+export const calcLumpsum     = body => api.post('/calc/lumpsum', body)
+export const calcTax         = body => api.post('/calc/tax', body)
+
 // Research
 export const getSentimentAlpha  = (ticker, days=120) => api.get(`/research/sentiment-alpha?ticker=${ticker}&days_back=${days}`)
 export const getMeanReversion   = ticker => api.get(`/research/mean-reversion?ticker=${ticker}`)

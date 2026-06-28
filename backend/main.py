@@ -55,6 +55,9 @@ from portfolio_optimizer import (
 from regime_detector import detect_regime, regime_conditioned_alpha
 from monte_carlo import simulate as mc_simulate, compare_methods as mc_compare
 from garch_vol import forecast_vol as garch_forecast, test_vs_naive as garch_test
+from screener import screen as run_screen, get_sectors, get_screener_status, ensure_screener_cache, build_screener_cache
+from portfolio_tracker import add_holding, remove_holding, get_portfolio
+from calculators import sip_calculator, lumpsum_calculator, capital_gains_tax
 from pairs_trading import find_cointegrated_pairs, analyze_pair, backtest_pair
 from fama_french import factor_regression, build_factors
 from research import (
@@ -91,6 +94,7 @@ async def startup():
     # Load stock universe in background so startup is not blocked
     loop = asyncio.get_event_loop()
     loop.run_in_executor(None, ensure_universe_loaded)
+    loop.run_in_executor(None, ensure_screener_cache)   # build screener cache if empty
     start_news_scheduler()
     start_alert_scheduler(interval_minutes=30)   # auto-check watchlists for alerts
 
@@ -542,6 +546,116 @@ def alerts_send(req: MultiSignalAlertRequest):
     if "error" in result:
         raise HTTPException(status_code=500, detail=result["error"])
     return result
+
+
+# ---------------------------------------------------------------------------
+# Portfolio Tracker (real holdings)
+# ---------------------------------------------------------------------------
+
+class HoldingRequest(BaseModel):
+    ticker: str
+    quantity: float
+    buy_price: float
+
+@app.post("/portfolio/add")
+def portfolio_add(req: HoldingRequest):
+    """Add a real holding (ticker, quantity, buy price)."""
+    result = add_holding(req.ticker, req.quantity, req.buy_price)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+@app.get("/portfolio")
+def portfolio_get(refresh: bool = Query(True)):
+    """Get all holdings with live P&L, allocation, best/worst."""
+    return get_portfolio(refresh=refresh)
+
+@app.delete("/portfolio/remove")
+def portfolio_remove(id: int = Query(..., description="Holding id to remove")):
+    """Remove a holding by id."""
+    result = remove_holding(id)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Calculators (SIP / lumpsum / capital-gains tax)
+# ---------------------------------------------------------------------------
+
+class SIPRequest(BaseModel):
+    monthly_investment: float
+    annual_return_pct: float = 12.0
+    years: float = 10
+
+class LumpsumRequest(BaseModel):
+    principal: float
+    annual_return_pct: float = 12.0
+    years: float = 10
+
+class TaxRequest(BaseModel):
+    buy_price: float
+    sell_price: float
+    quantity: float
+    holding_months: float
+
+@app.post("/calc/sip")
+def calc_sip(req: SIPRequest):
+    """SIP future-value calculator."""
+    r = sip_calculator(req.monthly_investment, req.annual_return_pct, req.years)
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+@app.post("/calc/lumpsum")
+def calc_lumpsum(req: LumpsumRequest):
+    """Lumpsum future-value calculator."""
+    r = lumpsum_calculator(req.principal, req.annual_return_pct, req.years)
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+@app.post("/calc/tax")
+def calc_tax(req: TaxRequest):
+    """Indian equity capital-gains tax (STCG/LTCG, post-2024 rules)."""
+    r = capital_gains_tax(req.buy_price, req.sell_price, req.quantity, req.holding_months)
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+
+# ---------------------------------------------------------------------------
+# Screener
+# ---------------------------------------------------------------------------
+
+class ScreenRequest(BaseModel):
+    filters: dict = {}
+    sort_by: str = "market_cap"
+    descending: bool = True
+    limit: int = 50
+
+@app.post("/screener")
+def screener(req: ScreenRequest):
+    """
+    Filter the NSE universe by fundamentals.
+    filters: {"pe_max":20,"roe_min":15,"market_cap_min":1e11,"sector":"IT"}
+    """
+    return run_screen(req.filters, req.sort_by, req.descending, req.limit)
+
+@app.get("/screener/sectors")
+def screener_sectors():
+    """List sectors available for the screener filter."""
+    return {"sectors": get_sectors()}
+
+@app.get("/screener/status")
+def screener_status():
+    """How many stocks are cached + when last refreshed."""
+    return get_screener_status()
+
+@app.post("/screener/refresh")
+def screener_refresh():
+    """Force-rebuild the screener metrics cache (slow, ~5-10 min)."""
+    return build_screener_cache()
 
 
 # ---------------------------------------------------------------------------
