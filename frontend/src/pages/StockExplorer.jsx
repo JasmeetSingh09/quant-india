@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { getPrice, getMetrics, getAlphaScore, getSentiment, getStockNews, searchStocks, explainAlpha, getIntraday } from '../api'
+import { getPrice, getMetrics, getAlphaScore, getSentiment, getStockNews, searchStocks, explainAlpha, getIntraday, getVolForecast } from '../api'
 import Spinner from '../components/Spinner'
 import AlphaMeter from '../components/AlphaMeter'
 import StatCard from '../components/StatCard'
@@ -76,6 +76,13 @@ export default function StockExplorer() {
     queryFn: () => getIntraday(ticker, '5m', '1d'),
     enabled: !!ticker,
     refetchInterval: 30000,
+  })
+  // GARCH volatility forecast (validated to beat naive)
+  const { data: vol } = useQuery({
+    queryKey: ['vol', ticker],
+    queryFn: () => getVolForecast(ticker),
+    enabled: !!ticker,
+    staleTime: 300000,
   })
 
   const pos = (price?.change_pct ?? 0) >= 0
@@ -172,6 +179,18 @@ export default function StockExplorer() {
                     <div className="h-full bg-green-500 rounded-full" style={{ width: `${h.health_score}%` }} />
                   </div>
                   <p className="text-xs text-gray-500 mt-1">{h.health_score}/100</p>
+                </div>
+              )}
+              {/* GARCH volatility forecast */}
+              {vol?.forecast_annual_vol_pct != null && (
+                <div className="card-sm">
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm font-medium">Risk Forecast <span className="text-xs text-gray-500 font-normal">GARCH</span></p>
+                    <span className="text-2xl font-bold font-mono text-yellow-400">{vol.forecast_annual_vol_pct}%</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Expected annual volatility · current daily {vol.current_daily_vol_pct}%
+                  </p>
                 </div>
               )}
             </div>

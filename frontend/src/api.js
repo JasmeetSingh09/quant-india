@@ -17,6 +17,7 @@ export const getPrice       = ticker => api.get(`/stock/price?ticker=${ticker}`)
 export const getMetrics     = ticker => api.get(`/stock/metrics?ticker=${ticker}`)
 export const getStockNews   = (ticker, days=7) => api.get(`/stock/news?ticker=${ticker}&days_back=${days}`)
 export const getIntraday    = (ticker, interval='5m', period='1d') => api.get(`/stock/intraday?ticker=${ticker}&interval=${interval}&period=${period}`)
+export const getVolForecast = ticker => api.get(`/stock/volatility-forecast?ticker=${ticker}`)
 export const getSentiment   = ticker => api.get(`/stock/sentiment?ticker=${ticker}`)
 export const searchStocks   = (q, exchange='NSE') => api.get(`/stock/search?q=${q}&exchange=${exchange}`)
 

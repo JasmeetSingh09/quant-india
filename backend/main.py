@@ -54,6 +54,7 @@ from portfolio_optimizer import (
 )
 from regime_detector import detect_regime, regime_conditioned_alpha
 from monte_carlo import simulate as mc_simulate, compare_methods as mc_compare
+from garch_vol import forecast_vol as garch_forecast, test_vs_naive as garch_test
 from pairs_trading import find_cointegrated_pairs, analyze_pair, backtest_pair
 from fama_french import factor_regression, build_factors
 from research import (
@@ -238,6 +239,21 @@ def stock_intraday(
     result = get_intraday_data(ticker, interval=interval, period=period)
     if "error" in result and not result.get("candles"):
         raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+
+@app.get("/stock/volatility-forecast")
+def stock_volatility_forecast(
+    ticker: str = Query(..., description="NSE ticker e.g. RELIANCE.NS"),
+    horizon: int = Query(5, description="Days to forecast"),
+):
+    """
+    GARCH(1,1) volatility forecast — predicts upcoming risk by modelling
+    volatility clustering. Beats naive trailing-std forecasts (validated OOS).
+    """
+    result = garch_forecast(ticker, horizon=horizon)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
     return result
 
 
