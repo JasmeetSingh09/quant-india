@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Search, Star, PlayCircle,
   TrendingUp, BarChart3, FlaskConical, Newspaper,
-  Dices, GitCompareArrows, Layers, Filter, Briefcase, Calculator, Zap
+  Dices, GitCompareArrows, Layers, Filter, Briefcase, Calculator, ShieldAlert, Zap
 } from 'lucide-react'
 
 const links = [
@@ -19,6 +19,7 @@ const links = [
   { to: '/factors',     icon: Layers,          label: 'Factors'    },
   { to: '/commodities', icon: BarChart3,       label: 'Commodities'},
   { to: '/research',    icon: FlaskConical,    label: 'Research'   },
+  { to: '/risk',        icon: ShieldAlert,     label: 'Risk Lab'   },
   { to: '/news',        icon: Newspaper,       label: 'News'       },
 ]
 

@@ -91,6 +91,10 @@ export const calcSIP         = body => api.post('/calc/sip', body)
 export const calcLumpsum     = body => api.post('/calc/lumpsum', body)
 export const calcTax         = body => api.post('/calc/tax', body)
 
+// Risk Lab
+export const getDeflatedSharpe = (ticker, nTrials) => api.get(`/risk/deflated-sharpe?ticker=${ticker}&n_trials=${nTrials}`)
+export const getPositionSize   = body => api.post('/risk/position-size', body)
+
 // Research
 export const getSentimentAlpha  = (ticker, days=120) => api.get(`/research/sentiment-alpha?ticker=${ticker}&days_back=${days}`)
 export const getMeanReversion   = ticker => api.get(`/research/mean-reversion?ticker=${ticker}`)

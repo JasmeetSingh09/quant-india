@@ -5,6 +5,7 @@ import StockExplorer from './pages/StockExplorer'
 import Screener from './pages/Screener'
 import Portfolio from './pages/Portfolio'
 import Calculators from './pages/Calculators'
+import RiskLab from './pages/RiskLab'
 import Watchlist from './pages/Watchlist'
 import Simulator from './pages/Simulator'
 import Optimizer from './pages/Optimizer'
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/screener"   element={<Screener />} />
           <Route path="/portfolio"  element={<Portfolio />} />
           <Route path="/calculators" element={<Calculators />} />
+          <Route path="/risk"        element={<RiskLab />} />
           <Route path="/watchlist"  element={<Watchlist />} />
           <Route path="/simulator"  element={<Simulator />} />
           <Route path="/optimizer"  element={<Optimizer />} />

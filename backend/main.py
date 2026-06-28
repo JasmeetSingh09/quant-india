@@ -58,6 +58,8 @@ from garch_vol import forecast_vol as garch_forecast, test_vs_naive as garch_tes
 from screener import screen as run_screen, get_sectors, get_screener_status, ensure_screener_cache, build_screener_cache
 from portfolio_tracker import add_holding, remove_holding, get_portfolio
 from calculators import sip_calculator, lumpsum_calculator, capital_gains_tax
+from overfitting import analyze_ticker as deflated_sharpe_ticker
+from risk_management import recommend_position, kelly_fraction, vol_target_weight
 from pairs_trading import find_cointegrated_pairs, analyze_pair, backtest_pair
 from fama_french import factor_regression, build_factors
 from research import (
@@ -619,6 +621,45 @@ def calc_lumpsum(req: LumpsumRequest):
 def calc_tax(req: TaxRequest):
     """Indian equity capital-gains tax (STCG/LTCG, post-2024 rules)."""
     r = capital_gains_tax(req.buy_price, req.sell_price, req.quantity, req.holding_months)
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+
+# ---------------------------------------------------------------------------
+# Risk Lab — overfitting detection + position sizing (institutional rigor)
+# ---------------------------------------------------------------------------
+
+class PositionSizeRequest(BaseModel):
+    annual_return_pct: float
+    annual_vol_pct: float
+    target_vol_pct: float = 15.0
+    max_position_pct: float = 100.0
+
+@app.get("/risk/deflated-sharpe")
+def risk_deflated_sharpe(
+    ticker: str = Query(..., description="NSE ticker e.g. RELIANCE.NS"),
+    n_trials: int = Query(1, description="How many strategies were tried (multiple-testing)"),
+    years: int = Query(3, description="Lookback years"),
+):
+    """
+    Is this track record real or luck? Probabilistic + Deflated Sharpe Ratio
+    (López de Prado). Raise n_trials to see how multiple-testing destroys a
+    'good-looking' result.
+    """
+    r = deflated_sharpe_ticker(ticker, n_trials=n_trials, years=years)
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+@app.post("/risk/position-size")
+def risk_position_size(req: PositionSizeRequest):
+    """
+    How much capital to allocate — Kelly criterion + volatility targeting.
+    Returns a conservative recommended weight.
+    """
+    r = recommend_position(req.annual_return_pct, req.annual_vol_pct,
+                           req.target_vol_pct, req.max_position_pct)
     if "error" in r:
         raise HTTPException(status_code=400, detail=r["error"])
     return r
