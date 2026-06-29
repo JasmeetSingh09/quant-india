@@ -3,7 +3,14 @@ import { useMutation } from '@tanstack/react-query'
 import { calcSIP, calcLumpsum, calcTax } from '../api'
 import { Calculator } from 'lucide-react'
 
-const fmt = n => '₹' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })
+// Compact Indian formatting so big numbers don't overflow the cards
+const fmt = (n) => {
+  n = Number(n)
+  const a = Math.abs(n)
+  if (a >= 1e7) return '₹' + (n / 1e7).toFixed(2) + ' Cr'
+  if (a >= 1e5) return '₹' + (n / 1e5).toFixed(2) + ' L'
+  return '₹' + n.toLocaleString('en-IN', { maximumFractionDigits: 0 })
+}
 
 function Field({ label, value, onChange, suffix }) {
   return (

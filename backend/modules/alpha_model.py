@@ -64,6 +64,27 @@ FACTOR_WEIGHTS = {
     "value":     0.15,
 }
 
+
+def _sanitize(obj):
+    """
+    Make any result JSON-safe: NaN/inf -> None, numpy scalars -> native Python.
+    Prevents FastAPI 500s from non-finite or numpy values (e.g. a delisted peer
+    injecting a NaN). Applied to every alpha result before it's returned.
+    """
+    import math
+    if isinstance(obj, dict):
+        return {k: _sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize(v) for v in obj]
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+    if hasattr(obj, "item"):                 # numpy scalar
+        try:
+            return _sanitize(obj.item())
+        except Exception:
+            return None
+    return obj
+
 # Decay half-life for sentiment (days) — older headlines count less
 SENTIMENT_HALF_LIFE_DAYS = 3
 
@@ -181,8 +202,9 @@ def _compute_momentum_factor(ticker: str, peers: list = None) -> dict:
             try:
                 df = yf.download(t, start=start, end=end,
                                  progress=False, auto_adjust=True)
-                if not df.empty:
-                    prices[t] = df["Close"].squeeze()
+                s = df["Close"].squeeze().dropna()   # drop NaN (delisted/missing days)
+                if len(s) > 21:                       # need ~1 month of real data
+                    prices[t] = s
             except Exception:
                 pass
 
@@ -201,15 +223,19 @@ def _compute_momentum_factor(ticker: str, peers: list = None) -> dict:
                 "ret_6m":      round(ret_6m * 100, 2),
             }
 
-        # Compute composite momentum for each ticker
+        # Compute composite momentum for each ticker (skip any that come out NaN)
         composite = {}
         for t, s in prices.items():
             n = len(s)
             ret_6m = float((s.iloc[-1] / s.iloc[max(0, n-126)]) - 1) if n > 126 else 0
             ret_3m = float((s.iloc[-1] / s.iloc[max(0, n-63)])  - 1) if n > 63  else 0
             ret_1m = float((s.iloc[-1] / s.iloc[max(0, n-21)])  - 1) if n > 21  else 0
-            # 1-month return is INVERTED (reversal correction)
-            composite[t] = 0.5 * ret_6m + 0.3 * ret_3m - 0.2 * ret_1m
+            val = 0.5 * ret_6m + 0.3 * ret_3m - 0.2 * ret_1m
+            if val == val:                       # exclude NaN
+                composite[t] = val
+
+        if ticker not in composite:
+            return {"score": 0.0, "confidence": 0.0, "reason": "insufficient price data"}
 
         # Rank ticker among peers
         all_scores   = list(composite.values())
@@ -461,7 +487,7 @@ def compute_alpha_score(
         for name in w
     }
 
-    return {
+    return _sanitize({
         "ticker":        ticker,
         "alpha_score":   alpha_score,
         "signal":        signal,
@@ -478,7 +504,7 @@ def compute_alpha_score(
         ),
         "disclaimer": "Signal model only. Not financial advice.",
         "computed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    }
+    })
 
 
 _FACTOR_LABELS = {

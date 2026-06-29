@@ -26,7 +26,7 @@
   .btn-ghost    { @apply px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg font-medium transition-colors text-sm; }
   .input        { @apply bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-colors w-full; }
   .label        { @apply block text-xs font-medium text-gray-400 mb-1; }
-  .stat-value   { @apply text-2xl font-bold font-mono; }
+  .stat-value   { @apply text-2xl font-bold font-mono break-words leading-tight; }
   .stat-label   { @apply text-xs text-gray-500 mt-0.5; }
   .positive     { @apply text-green-400; }
   .negative     { @apply text-red-400; }

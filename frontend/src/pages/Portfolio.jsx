@@ -5,7 +5,13 @@ import Spinner from '../components/Spinner'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { Briefcase, Plus, Trash2 } from 'lucide-react'
 
-const fmt = n => '₹' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })
+const fmt = (n) => {
+  n = Number(n)
+  const a = Math.abs(n)
+  if (a >= 1e7) return '₹' + (n / 1e7).toFixed(2) + ' Cr'
+  if (a >= 1e5) return '₹' + (n / 1e5).toFixed(2) + ' L'
+  return '₹' + n.toLocaleString('en-IN', { maximumFractionDigits: 0 })
+}
 const COLORS = ['#22c55e','#3b82f6','#eab308','#f97316','#a855f7','#06b6d4','#ec4899','#84cc16','#ef4444','#14b8a6']
 
 export default function Portfolio() {
