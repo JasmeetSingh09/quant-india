@@ -6,6 +6,18 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { InfoTip } from '../components/Term'
 import { Plus, Trash2, RefreshCw, TrendingUp, TrendingDown } from 'lucide-react'
 
+// Commodities you can add to a simulation (friendly name → yfinance futures ticker)
+const COMMODITY_PICKS = [
+  { name: 'Gold',   ticker: 'GC=F' },
+  { name: 'Silver', ticker: 'SI=F' },
+  { name: 'Crude',  ticker: 'CL=F' },
+  { name: 'Brent',  ticker: 'BZ=F' },
+  { name: 'Nat Gas',ticker: 'NG=F' },
+  { name: 'Copper', ticker: 'HG=F' },
+]
+const COMMODITY_NAME = Object.fromEntries(COMMODITY_PICKS.map(c => [c.ticker, c.name]))
+const labelOf = t => COMMODITY_NAME[t] || t.replace('.NS', '')
+
 function HoldingsInput({ holdings, setHoldings }) {
   const [ticker, setTicker] = useState('')
   const [pct, setPct] = useState('')
@@ -17,18 +29,29 @@ function HoldingsInput({ holdings, setHoldings }) {
     setHoldings(h => ({ ...h, [t]: Number(pct) }))
     setTicker(''); setPct('')
   }
+  const addCommodity = (t) => setHoldings(h => ({ ...h, [t]: h[t] || 10 }))
 
   return (
     <div>
       <div className="flex gap-2 mb-2">
-        <input className="input" placeholder="Ticker e.g. HDFCBANK" value={ticker} onChange={e => setTicker(e.target.value)} />
+        <input className="input" placeholder="Stock e.g. HDFCBANK" value={ticker} onChange={e => setTicker(e.target.value)} />
         <input className="input w-24" type="number" placeholder="%" value={pct} onChange={e => setPct(e.target.value)} min="1" max="100" />
         <button onClick={add} className="btn-primary"><Plus size={14}/></button>
+      </div>
+      {/* Commodity quick-add */}
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        <span className="text-xs text-gray-500 self-center mr-1">Commodities:</span>
+        {COMMODITY_PICKS.map(c => (
+          <button key={c.ticker} onClick={() => addCommodity(c.ticker)}
+            className="px-2 py-0.5 rounded text-xs bg-gray-800 text-amber-300 hover:bg-gray-700 border border-gray-700">
+            + {c.name}
+          </button>
+        ))}
       </div>
       <div className="space-y-1">
         {Object.entries(holdings).map(([t, p]) => (
           <div key={t} className="flex items-center justify-between bg-gray-800 rounded px-3 py-1.5">
-            <span className="font-mono text-green-400 text-sm">{t.replace('.NS','')}</span>
+            <span className="font-mono text-green-400 text-sm">{labelOf(t)}</span>
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold">{p}%</span>
               <div className="w-20 h-1.5 bg-gray-700 rounded-full">
@@ -54,7 +77,7 @@ function PnlRow({ pos }) {
   return (
     <div className="flex items-center justify-between py-2.5 border-b border-gray-800 last:border-0">
       <div>
-        <p className="font-mono font-semibold text-sm">{pos.ticker.replace('.NS','')}</p>
+        <p className="font-mono font-semibold text-sm">{labelOf(pos.ticker)}</p>
         <p className="text-xs text-gray-500">{pos.company_name}</p>
       </div>
       <div className="text-center">
@@ -237,7 +260,7 @@ export default function Simulator() {
                       <div>
                         <p className="text-xs text-gray-500 mb-1">Profit / loss by stock</p>
                         <ResponsiveContainer width="100%" height={Math.max(80, pnlData.positions.length * 32)}>
-                          <BarChart data={pnlData.positions.map(p => ({ name: p.ticker.replace('.NS',''), pnl: p.pnl_inr }))}
+                          <BarChart data={pnlData.positions.map(p => ({ name: labelOf(p.ticker), pnl: p.pnl_inr }))}
                                     layout="vertical" margin={{ left: 10 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
                             <XAxis type="number" stroke="#6b7280" fontSize={9} tickFormatter={v => `₹${(v/1000).toFixed(1)}k`} />

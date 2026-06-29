@@ -107,11 +107,25 @@ def _init_db():
 # ---------------------------------------------------------------------------
 
 def _live_price(ticker: str) -> float | None:
-    """Fetch the latest traded price for a ticker."""
+    """
+    Fetch the latest price for a ticker. Tries fast_info first, then falls back
+    to recent history (more reliable for commodity futures and during yfinance
+    hiccups). Returns None only if both fail.
+    """
+    tk = yf.Ticker(ticker)
     try:
-        return round(float(yf.Ticker(ticker).fast_info.last_price), 4)
+        p = tk.fast_info.last_price
+        if p and p == p and p > 0:           # not None, not NaN, positive
+            return round(float(p), 4)
     except Exception:
-        return None
+        pass
+    try:
+        h = tk.history(period="5d")["Close"].dropna()
+        if len(h):
+            return round(float(h.iloc[-1]), 4)
+    except Exception:
+        pass
+    return None
 
 
 def _company_name(ticker: str) -> str:
@@ -164,8 +178,9 @@ def start_simulation(
     if abs(total_alloc - 100) > 0.01:
         return {"error": f"Allocations must sum to 100%, got {total_alloc:.1f}%"}
     for t in holdings:
-        if not t.endswith(".NS"):
-            return {"error": f"Tickers must end with .NS — got {t}"}
+        # Accept NSE/BSE stocks (.NS/.BO), commodity futures (=F), and indices (^)
+        if not (t.endswith(".NS") or t.endswith(".BO") or "=F" in t or t.startswith("^")):
+            return {"error": f"Unsupported ticker '{t}' (use .NS stocks or commodity futures like GC=F)"}
 
     now = datetime.now().isoformat()
     positions = []
