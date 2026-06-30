@@ -164,7 +164,7 @@ class MVORequest(BaseModel):
 
 class BLRequest(BaseModel):
     tickers: list
-    sentiment_views: dict   # {ticker: [expected_excess, confidence]}
+    sentiment_views: dict = {}   # {ticker: [expected_excess, confidence]}; empty = pure market equilibrium
     period_months: int = 24
     tau: float = 0.05
 

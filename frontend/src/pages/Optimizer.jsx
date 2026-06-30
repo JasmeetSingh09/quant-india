@@ -164,6 +164,11 @@ export default function Optimizer() {
                   <p><b>The numbers:</b> each % is how much of your money to put in that stock. A higher
                     "Sharpe ratio" means a better return-for-risk trade-off. We compared it to a plain
                     equal split to show the improvement.</p>
+                  <p className="text-yellow-300/90"><b>Important — what "Expected Return" means here:</b> it's
+                    the stock's <i>past average return</i> over this period, not a forecast. So if a stock
+                    recently fell, its "expected return" can be <i>negative</i> — Markowitz naively assumes
+                    fallen stocks keep falling. That's the famous weakness of this method. For sensible,
+                    market-based expected returns, use <b>Black-Litterman</b> instead.</p>
                   <p className="text-gray-400">Tip: lower the "max weight per stock" slider to force more
                     diversification if it piles too much into one name.</p>
                 </Explainer>
@@ -195,6 +200,9 @@ export default function Optimizer() {
                 <div className="mt-3 p-3 bg-gray-800 rounded-lg">
                   <p className="text-xs text-gray-300">{hrpResult.interpretation}</p>
                 </div>
+                <p className="text-xs text-yellow-300/80 mt-2">Note: "Expected Return" is the past average
+                  over this period (not a forecast) — it can be negative if these stocks recently fell.
+                  Use Black-Litterman for market-based expected returns.</p>
               </div>
             </div>
           )}

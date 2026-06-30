@@ -254,34 +254,37 @@ def black_litterman_optimize(
     # Only include views for tickers that are in our valid list
     view_tickers = [t for t in sentiment_views if t in valid]
     if not view_tickers:
-        # No valid views — fall back to MVO
-        return mean_variance_optimize(tickers, start_date, end_date, period_months)
+        # No views: use the pure market-EQUILIBRIUM implied returns π.
+        # This is the whole point of Black-Litterman — sensible, market-derived
+        # expected returns, NOT noisy historical means that punish fallen stocks
+        # (e.g. a stock down 30% does not have a -30% expected future return).
+        mu_bl = pi
+    else:
+        k = len(view_tickers)
+        P = np.zeros((k, n))   # views matrix: k views × n assets
+        Q = np.zeros(k)         # views vector: expected excess return per view
+        Omega_diag = np.zeros(k)  # view uncertainty
 
-    k = len(view_tickers)
-    P = np.zeros((k, n))   # views matrix: k views × n assets
-    Q = np.zeros(k)         # views vector: expected excess return per view
-    Omega_diag = np.zeros(k)  # view uncertainty
+        for i, t in enumerate(view_tickers):
+            j = valid.index(t)
+            P[i, j] = 1.0  # absolute view on this stock
+            expected_excess, confidence = sentiment_views[t]
+            Q[i] = expected_excess
+            # Ω_ii = (1-confidence) × (P_i Σ P_iᵀ)  — He & Litterman uncertainty
+            # High confidence → small Ω → views matter more
+            view_var       = float(P[i] @ Sigma @ P[i].T)
+            Omega_diag[i]  = max((1 - confidence) * view_var, 1e-8)
 
-    for i, t in enumerate(view_tickers):
-        j = valid.index(t)
-        P[i, j] = 1.0  # absolute view on this stock
-        expected_excess, confidence = sentiment_views[t]
-        Q[i] = expected_excess
-        # Ω_ii = (1-confidence) × (P_i Σ P_iᵀ)  — He & Litterman uncertainty
-        # High confidence → small Ω → views matter more
-        view_var       = float(P[i] @ Sigma @ P[i].T)
-        Omega_diag[i]  = max((1 - confidence) * view_var, 1e-8)
+        Omega = np.diag(Omega_diag)
 
-    Omega = np.diag(Omega_diag)
+        # ── Step 3: Black-Litterman posterior expected returns ────────────────
+        # μ_BL = [(τΣ)⁻¹ + PᵀΩ⁻¹P]⁻¹ · [(τΣ)⁻¹π + PᵀΩ⁻¹Q]
+        tau_sigma_inv = np.linalg.inv(tau * Sigma)
+        omega_inv     = np.linalg.inv(Omega)
 
-    # ── Step 3: Black-Litterman posterior expected returns ────────────────
-    # μ_BL = [(τΣ)⁻¹ + PᵀΩ⁻¹P]⁻¹ · [(τΣ)⁻¹π + PᵀΩ⁻¹Q]
-    tau_sigma_inv = np.linalg.inv(tau * Sigma)
-    omega_inv     = np.linalg.inv(Omega)
-
-    A      = tau_sigma_inv + P.T @ omega_inv @ P
-    b      = tau_sigma_inv @ pi + P.T @ omega_inv @ Q
-    mu_bl  = np.linalg.solve(A, b)
+        A      = tau_sigma_inv + P.T @ omega_inv @ P
+        b      = tau_sigma_inv @ pi + P.T @ omega_inv @ Q
+        mu_bl  = np.linalg.solve(A, b)
 
     # ── Step 4: MVO with BL returns ───────────────────────────────────────
     def neg_sharpe(w):
@@ -315,8 +318,11 @@ def black_litterman_optimize(
         for i, t in enumerate(valid)
     }
 
+    has_views = bool(view_tickers)
     return {
-        "algorithm":        "Black-Litterman (He & Litterman 1999) + FinBERT Views",
+        "algorithm":        ("Black-Litterman (He & Litterman 1999) + FinBERT Views"
+                             if has_views else
+                             "Black-Litterman (market equilibrium — no views)"),
         "tickers":          valid,
         "period":           f"{start} to {end}",
         "tau":              tau,
@@ -335,11 +341,18 @@ def black_litterman_optimize(
         "expected_annual_vol_pct":     exp_vol,
         "expected_sharpe":             sharpe,
         "interpretation": (
-            "Black-Litterman adjusted the equilibrium weights using your sentiment views. "
-            f"Stocks with positive sentiment received higher allocations. "
-            f"Largest weight increase: "
-            f"{max(weight_shifts, key=weight_shifts.get)} "
-            f"(+{max(weight_shifts.values()):.2f}%)."
+            (
+                "Black-Litterman adjusted the equilibrium weights using your sentiment views. "
+                f"Stocks with positive sentiment received higher allocations. "
+                f"Largest weight increase: {max(weight_shifts, key=weight_shifts.get)} "
+                f"(+{max(weight_shifts.values()):.2f}%)."
+            ) if has_views else
+            (
+                "No views supplied, so weights follow the market-equilibrium portfolio. "
+                "Expected returns are derived from market caps and risk (π = δΣw), not from "
+                "noisy historical averages — which is why they stay sensible even for stocks "
+                "that recently fell. Add sentiment views to tilt away from equilibrium."
+            )
         ),
     }
 
