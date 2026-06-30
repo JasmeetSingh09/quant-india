@@ -46,7 +46,7 @@ from news import get_stock_news, get_macro_news, get_market_wide_news, start_new
 from sentiment import score_headline, summarise_sentiment
 from watchlist import add_to_watchlist, remove_from_watchlist, get_watchlist
 from alerts import send_test_alert, send_multi_signal_alert, start_alert_scheduler, run_watchlist_alert_check
-from alpha_model import compute_alpha_score, scan_alpha, retrain_weights, explain_signal
+from alpha_model import compute_alpha_score, scan_alpha, retrain_weights, explain_signal, top_picks
 from portfolio_optimizer import (
     mean_variance_optimize, black_litterman_optimize,
     efficient_frontier, optimize_with_alpha_views,
@@ -868,6 +868,15 @@ def alpha_scan(req: ScanRequest):
     Body: {"tickers": ["TCS.NS", "INFY.NS", "WIPRO.NS", "HCLTECH.NS"]}
     """
     return {"rankings": scan_alpha(req.tickers, weights=req.weights)}
+
+
+@app.get("/alpha/top-picks")
+def alpha_top_picks():
+    """
+    Scan the curated universe and return the top buys / avoids by factor score.
+    Honest framing: a screen, not advice. Cached 30 min.
+    """
+    return top_picks()
 
 
 @app.get("/alpha/regime-adjusted")

@@ -53,10 +53,10 @@ function HoldingsInput({ holdings, setHoldings }) {
           <div key={t} className="flex items-center justify-between bg-gray-800 rounded px-3 py-1.5">
             <span className="font-mono text-green-400 text-sm">{labelOf(t)}</span>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold">{p}%</span>
-              <div className="w-20 h-1.5 bg-gray-700 rounded-full">
-                <div className="h-full bg-green-500 rounded-full" style={{ width: `${p}%` }} />
-              </div>
+              <input type="number" min="1" max="100" value={p}
+                className="w-16 bg-gray-900 border border-gray-700 rounded px-2 py-0.5 text-sm text-right focus:outline-none focus:border-green-500"
+                onChange={e => setHoldings(h => ({ ...h, [t]: Number(e.target.value) }))} />
+              <span className="text-xs text-gray-500">%</span>
               <button onClick={() => setHoldings(h => { const n={...h}; delete n[t]; return n })}
                 className="text-gray-600 hover:text-red-400"><Trash2 size={12}/></button>
             </div>

@@ -86,7 +86,7 @@ def build_screener_cache(limit: int = None) -> dict:
                 info.get("trailingPE"),
                 (info.get("returnOnEquity") or 0) * 100 if info.get("returnOnEquity") is not None else None,
                 (info.get("profitMargins") or 0) * 100 if info.get("profitMargins") is not None else None,
-                info.get("debtToEquity"),
+                round(info.get("debtToEquity") / 100, 2) if info.get("debtToEquity") is not None else None,
                 (info.get("revenueGrowth") or 0) * 100 if info.get("revenueGrowth") is not None else None,
                 (info.get("dividendYield") or 0) if info.get("dividendYield") is not None else None,
                 datetime.now().isoformat(),

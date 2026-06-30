@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
 import StockExplorer from './pages/StockExplorer'
+import TopPicks from './pages/TopPicks'
 import Screener from './pages/Screener'
 import Portfolio from './pages/Portfolio'
 import Calculators from './pages/Calculators'
@@ -24,6 +25,7 @@ export default function App() {
         <Routes>
           <Route path="/"           element={<Dashboard />} />
           <Route path="/stock"      element={<StockExplorer />} />
+          <Route path="/top-picks"  element={<TopPicks />} />
           <Route path="/screener"   element={<Screener />} />
           <Route path="/portfolio"  element={<Portfolio />} />
           <Route path="/calculators" element={<Calculators />} />

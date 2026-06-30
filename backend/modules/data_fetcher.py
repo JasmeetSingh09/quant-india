@@ -1,6 +1,7 @@
 import yfinance as yf
 import pandas as pd
 from datetime import datetime
+from functools import lru_cache
 
 # ---------------------------------------------------------------------------
 # Complete NSE stock universe — grouped by sector for easy lookup
@@ -384,17 +385,59 @@ def get_company_info(ticker: str) -> dict:
     }
 
 
+@lru_cache(maxsize=32)
+def _fx_rate(from_cur: str, to_cur: str) -> float | None:
+    """Spot FX rate (1 unit of from_cur in to_cur). Cached per session."""
+    if not from_cur or not to_cur or from_cur == to_cur:
+        return 1.0
+    try:
+        r = yf.Ticker(f"{from_cur}{to_cur}=X").info.get("regularMarketPrice")
+        return float(r) if r else None
+    except Exception:
+        return None
+
+
+def _ev_ebitda(info: dict, ev, ebitda_inr):
+    """
+    EV/EBITDA, currency-corrected. Uses yfinance's value if sane, else recomputes
+    enterpriseValue / EBITDA (both already in the price currency).
+    """
+    val = info.get("enterpriseToEbitda")
+    if val is not None and 0 < val <= 100:
+        return round(val, 1)
+    if not ev or not ebitda_inr:
+        return None
+    computed = ev / ebitda_inr
+    return round(computed, 1) if 0 < computed <= 100 else None
+
+
 def get_financial_metrics(ticker: str) -> dict:
     """
     Get key financial metrics for valuation analysis.
     """
     stock = yf.Ticker(ticker)
     info = stock.info
-    
+
+    # yfinance reports debtToEquity as a PERCENTAGE (e.g. 9.83 = 9.83%);
+    # convert to the conventional ratio (0.10).
+    de = info.get("debtToEquity", None)
+    debt_to_equity = round(de / 100, 2) if de is not None else None
+
+    # EV & EBITDA: yfinance reports enterpriseValue in the price currency (INR)
+    # but ebitda in the FINANCIAL currency (USD for INFY/TCS/WIPRO). Convert
+    # EBITDA to INR so both — and the EV/EBITDA ratio — are consistent.
+    enterprise_value = info.get("enterpriseValue")
+    ebitda_raw = info.get("ebitda")
+    fx = _fx_rate(info.get("financialCurrency"), info.get("currency"))
+    ebitda = round(ebitda_raw * fx) if (ebitda_raw and fx) else None
+    ev_ebitda = _ev_ebitda(info, enterprise_value, ebitda)
+
     return {
         "pe_ratio": info.get("trailingPE", None),
         "forward_pe": info.get("forwardPE", None),
-        "ev_ebitda": info.get("enterpriseToEbitda", None),
+        "ev_ebitda": ev_ebitda,
+        "enterprise_value": enterprise_value,
+        "ebitda": ebitda,
         "price_to_book": info.get("priceToBook", None),
         "price_to_sales": info.get("priceToSalesTrailing12Months", None),
         "roe": info.get("returnOnEquity", None),
@@ -402,7 +445,7 @@ def get_financial_metrics(ticker: str) -> dict:
         "profit_margin": info.get("profitMargins", None),
         "revenue_growth": info.get("revenueGrowth", None),
         "earnings_growth": info.get("earningsGrowth", None),
-        "debt_to_equity": info.get("debtToEquity", None),
+        "debt_to_equity": debt_to_equity,
         "current_ratio": info.get("currentRatio", None),
         "free_cashflow": info.get("freeCashflow", None),
         "dividend_yield": info.get("dividendYield", None),

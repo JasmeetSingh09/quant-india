@@ -33,10 +33,37 @@ from data_fetcher import (
 # Full metrics snapshot
 # ---------------------------------------------------------------------------
 
+_METRICS_CACHE: dict = {}     # ticker -> (timestamp, data)
+_METRICS_TTL = 900            # 15 min — metrics barely move intraday
+
+
 def get_full_metrics(ticker: str) -> dict:
     """
     Return a comprehensive financial metrics snapshot for an NSE ticker.
 
+    Cached for 15 min. If yfinance is rate-limiting (returns empty data), serve
+    the last good snapshot instead of a blank page — important for live demos.
+    """
+    import time
+    now = time.time()
+    cached = _METRICS_CACHE.get(ticker)
+    if cached and now - cached[0] < _METRICS_TTL:
+        return cached[1]
+    try:
+        data = _compute_full_metrics(ticker)
+    except Exception:
+        if cached:
+            return cached[1]
+        raise
+    # only cache a genuinely populated snapshot; otherwise fall back to stale
+    if data.get("pe_ratio") is not None or data.get("market_cap") is not None:
+        _METRICS_CACHE[ticker] = (now, data)
+        return data
+    return cached[1] if cached else data
+
+
+def _compute_full_metrics(ticker: str) -> dict:
+    """
     Combines data_fetcher.get_financial_metrics with additional yfinance fields
     for a complete valuation, profitability, and balance-sheet view.
     """
@@ -71,6 +98,8 @@ def get_full_metrics(ticker: str) -> dict:
         "forward_pe":         base.get("forward_pe"),
         "peg_ratio":          peg,
         "ev_ebitda":          base.get("ev_ebitda"),
+        "enterprise_value":   base.get("enterprise_value"),
+        "enterprise_value_fmt": format_large_number(base.get("enterprise_value")),
         "price_to_book":      base.get("price_to_book"),
         "price_to_sales":     base.get("price_to_sales"),
         # Profitability
@@ -88,8 +117,8 @@ def get_full_metrics(ticker: str) -> dict:
         "quick_ratio":        quick_ratio,
         "total_revenue":      total_revenue,
         "total_revenue_fmt":  format_large_number(total_revenue),
-        "ebitda":             ebitda,
-        "ebitda_fmt":         format_large_number(ebitda),
+        "ebitda":             base.get("ebitda"),
+        "ebitda_fmt":         format_large_number(base.get("ebitda")),
         "total_debt":         total_debt,
         "total_debt_fmt":     format_large_number(total_debt),
         "cash":               cash,
@@ -127,15 +156,17 @@ def peer_comparison(ticker: str, peers: list = None) -> dict:
     def _slim(t: str) -> dict:
         try:
             raw = yf.Ticker(t).info
+            de = raw.get("debtToEquity")
+            ev = raw.get("enterpriseToEbitda")
             return {
                 "ticker":        t,
                 "name":          raw.get("shortName", t),
                 "pe_ratio":      raw.get("trailingPE"),
-                "ev_ebitda":     raw.get("enterpriseToEbitda"),
+                "ev_ebitda":     ev if (ev is not None and 0 < ev <= 100) else None,
                 "roe":           raw.get("returnOnEquity"),
                 "profit_margin": raw.get("profitMargins"),
                 "revenue_growth":raw.get("revenueGrowth"),
-                "debt_to_equity":raw.get("debtToEquity"),
+                "debt_to_equity":round(de / 100, 2) if de is not None else None,
                 "market_cap":    raw.get("marketCap"),
                 "market_cap_fmt":format_large_number(raw.get("marketCap")),
             }

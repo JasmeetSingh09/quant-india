@@ -156,6 +156,8 @@ export default function StockExplorer() {
                   ['P/E Ratio',   m.pe_ratio?.toFixed(1), 'pe_ratio'],
                   ['Forward P/E', m.forward_pe?.toFixed(1), 'pe_ratio'],
                   ['EV/EBITDA',   m.ev_ebitda?.toFixed(1), 'ev_ebitda'],
+                  ['Enterprise Value', m.enterprise_value_fmt || null, null],
+                  ['EBITDA',      m.ebitda_fmt || null, null],
                   ['P/B Ratio',   m.price_to_book?.toFixed(2), null],
                   ['ROE',         m.roe ? `${(m.roe*100).toFixed(1)}%` : null, 'roe'],
                   ['ROA',         m.roa ? `${(m.roa*100).toFixed(1)}%` : null, 'roa'],

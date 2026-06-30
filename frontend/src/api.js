@@ -51,6 +51,7 @@ export const getChallenges  = () => api.get('/simulator/challenges')
 // Alpha model
 export const getAlphaScore  = ticker => api.get(`/alpha/score?ticker=${ticker}`)
 export const scanAlpha      = body => api.post('/alpha/scan', body)
+export const getTopPicks    = () => api.get('/alpha/top-picks', { timeout: 150000 })
 export const getRegimeAlpha = ticker => api.get(`/alpha/regime-adjusted?ticker=${ticker}`)
 export const explainAlpha   = ticker => api.get(`/alpha/explain?ticker=${ticker}`)
 

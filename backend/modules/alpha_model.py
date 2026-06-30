@@ -652,6 +652,47 @@ def scan_alpha(tickers: list, weights: dict = None) -> list:
     return results
 
 
+# Curated liquid universe scanned for the "Top Picks" page
+TOP_PICKS_UNIVERSE = [
+    "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ICICIBANK.NS",
+    "ITC.NS", "SBIN.NS", "LT.NS", "MARUTI.NS", "SUNPHARMA.NS",
+    "TITAN.NS", "TATASTEEL.NS",
+]
+_PICKS_CACHE: dict = {}
+_PICKS_TTL = 1800       # 30 min — alpha barely moves intraday; protects vs throttling
+
+
+def top_picks(n: int = 6) -> dict:
+    """
+    Scan the curated universe and return the best-scoring buys and worst-scoring
+    avoids by our factor model. Cached; serves last-good on yfinance throttling.
+    """
+    import time
+    now = time.time()
+    cached = _PICKS_CACHE.get("data")
+    if cached and now - cached[0] < _PICKS_TTL:
+        ranked = cached[1]
+    else:
+        ranked = [r for r in scan_alpha(TOP_PICKS_UNIVERSE)
+                  if "error" not in r and r.get("alpha_score") is not None]
+        if ranked:
+            _PICKS_CACHE["data"] = (now, ranked)
+        elif cached:
+            ranked = cached[1]
+    buys = [r for r in ranked if r["alpha_score"] > 0][:n]
+    avoids = sorted([r for r in ranked if r["alpha_score"] < 0],
+                    key=lambda x: x["alpha_score"])[:n]
+    return {
+        "buys": buys,
+        "avoids": avoids,
+        "scanned": len(ranked),
+        "universe_size": len(TOP_PICKS_UNIVERSE),
+        "as_of": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "disclaimer": "Factor-model screen, not financial advice. "
+                      "Scores reflect current factors, not a proven track record.",
+    }
+
+
 # ---------------------------------------------------------------------------
 # Factor weight retraining via OLS
 # ---------------------------------------------------------------------------
