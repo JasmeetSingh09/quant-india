@@ -1,7 +1,45 @@
 import yfinance as yf
 import pandas as pd
+import time
 from datetime import datetime
 from functools import lru_cache
+
+# ---------------------------------------------------------------------------
+# Shared price cache
+# ---------------------------------------------------------------------------
+# Many modules (optimizer, pairs, GARCH, research) download the same tickers.
+# Without a cache, requesting RELIANCE across five endpoints hits yfinance five
+# times. This module-level cache stores each (ticker, start, end) price series
+# for a short TTL so repeat requests are served from memory — one download layer
+# shared by all algorithms.
+
+_PRICE_CACHE: dict = {}
+_PRICE_TTL = 600   # seconds (10 minutes)
+
+
+def download_close(ticker: str, start: str, end: str = None) -> pd.Series:
+    """
+    Cached daily adjusted-close series for one ticker. Served from memory if
+    fetched within the last 10 minutes; otherwise downloaded and cached.
+    Returns an empty Series on failure (never raises).
+    """
+    key = (ticker, start, end)
+    now = time.time()
+    hit = _PRICE_CACHE.get(key)
+    if hit and (now - hit[0] < _PRICE_TTL):
+        return hit[1]
+    try:
+        df = yf.download(ticker, start=start, end=end, progress=False, auto_adjust=True)
+        series = df["Close"].squeeze() if not df.empty else pd.Series(dtype=float)
+    except Exception:
+        series = pd.Series(dtype=float)
+    _PRICE_CACHE[key] = (now, series)
+    return series
+
+
+def clear_price_cache():
+    """Empty the shared price cache (e.g. for a forced refresh)."""
+    _PRICE_CACHE.clear()
 
 # ---------------------------------------------------------------------------
 # Complete NSE stock universe — grouped by sector for easy lookup

@@ -36,7 +36,10 @@ def forecast_vol(ticker: str, horizon: int = 5) -> dict:
     if len(r) < 250:
         return {"error": "not enough data"}
 
-    am  = arch_model(r, vol="Garch", p=1, q=1, dist="normal")
+    # GJR-GARCH(1,1,1): the o=1 term captures the LEVERAGE EFFECT — markets
+    # react more violently to bad news than good news, so a negative return
+    # raises tomorrow's volatility more than a positive one. Plain GARCH misses this.
+    am  = arch_model(r, vol="Garch", p=1, o=1, q=1, dist="normal")
     res = am.fit(disp="off")
     fc  = res.forecast(horizon=horizon, reindex=False)
     daily_var = fc.variance.values[-1]                       # next h days, in %^2
@@ -44,18 +47,23 @@ def forecast_vol(ticker: str, horizon: int = 5) -> dict:
     annualised = round(avg_daily_vol * np.sqrt(252), 2)      # % per year
 
     cond = res.conditional_volatility
+    # Long-run (unconditional) variance for GJR-GARCH: omega / (1 - alpha - beta - gamma/2)
+    p = res.params
+    persistence = (p.get("alpha[1]", 0) + p.get("beta[1]", 0) + p.get("gamma[1]", 0) / 2)
+    long_run = float(np.sqrt(p.get("omega", 0) / max(1 - persistence, 1e-6)) * np.sqrt(252))
     return {
         "ticker": ticker,
+        "model": "GJR-GARCH(1,1,1)",
         "horizon_days": horizon,
         "forecast_daily_vol_pct": round(avg_daily_vol, 3),
         "forecast_annual_vol_pct": annualised,
         "current_daily_vol_pct": round(float(cond.iloc[-1]), 3),
-        "long_run_annual_vol_pct": round(float(np.sqrt(res.params.get("omega", 0) /
-                                          max(1 - res.params.get("alpha[1]", 0)
-                                              - res.params.get("beta[1]", 0), 1e-6)) * np.sqrt(252)), 2),
+        "long_run_annual_vol_pct": round(long_run, 2),
+        "leverage_effect": round(float(p.get("gamma[1]", 0)), 4),
         "interpretation": (
-            f"GARCH expects {ticker} to have ~{annualised}% annualised volatility over the "
-            f"next {horizon} days. Volatility clusters, so this adapts to current market stress."
+            f"GJR-GARCH expects {ticker} to have ~{annualised}% annualised volatility over the "
+            f"next {horizon} days. It captures the leverage effect — bad news raises risk more "
+            f"than good news. Volatility clusters, so this adapts to current market stress."
         ),
     }
 
@@ -76,8 +84,8 @@ def test_vs_naive(ticker: str, test_days: int = 150) -> dict:
     split_idx = len(r) - test_days
     split_obs = r.index[split_idx]
 
-    # GARCH: fit on the training portion, produce OOS 1-step forecasts over the test
-    am  = arch_model(r, vol="Garch", p=1, q=1, dist="normal")
+    # GJR-GARCH: fit on the training portion, produce OOS 1-step forecasts over the test
+    am  = arch_model(r, vol="Garch", p=1, o=1, q=1, dist="normal")
     res = am.fit(disp="off", last_obs=split_obs)
     fc  = res.forecast(horizon=1, start=split_obs, reindex=False)
     garch_var = fc.variance.values.flatten()          # predicted next-day variance

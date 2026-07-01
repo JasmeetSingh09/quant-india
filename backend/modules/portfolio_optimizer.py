@@ -72,13 +72,26 @@ RISK_FREE_RATE = 0.065   # RBI repo rate
 # ---------------------------------------------------------------------------
 
 def _get_returns(tickers: list, start: str, end: str) -> pd.DataFrame:
-    """Download and return daily log returns for a list of tickers."""
+    """Download and return daily log returns for a list of tickers.
+    Uses the shared price cache so repeated requests for the same ticker
+    (common across MVO/HRP/BL/frontier in one session) hit memory, not yfinance."""
     prices = {}
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        from data_fetcher import download_close
+    except Exception:
+        download_close = None
+
     for t in tickers:
         try:
-            df = yf.download(t, start=start, end=end, progress=False, auto_adjust=True)
-            if not df.empty:
-                prices[t] = df["Close"].squeeze()
+            if download_close:
+                s = download_close(t, start, end)
+            else:
+                df = yf.download(t, start=start, end=end, progress=False, auto_adjust=True)
+                s = df["Close"].squeeze() if not df.empty else pd.Series(dtype=float)
+            if len(s) > 0:
+                prices[t] = s
         except Exception:
             pass
     if not prices:
@@ -86,6 +99,25 @@ def _get_returns(tickers: list, start: str, end: str) -> pd.DataFrame:
     df    = pd.DataFrame(prices).ffill().dropna()
     # Log returns: r = ln(P_t / P_{t-1})
     return np.log(df / df.shift(1)).dropna()
+
+
+def _cov(log_returns: pd.DataFrame, as_frame: bool = False):
+    """
+    Annualised covariance using LEDOIT-WOLF SHRINKAGE instead of the raw sample
+    covariance. Sample covariance is noisy and unstable for optimisation
+    (it 'error-maximises'); Ledoit-Wolf shrinks it toward a structured target,
+    which real quant desks use for far more stable portfolio weights.
+    Falls back to sample covariance if sklearn isn't available.
+    """
+    try:
+        from sklearn.covariance import LedoitWolf
+        lw = LedoitWolf().fit(log_returns.values)
+        cov = lw.covariance_ * 252
+    except Exception:
+        cov = log_returns.cov().values * 252
+    if as_frame:
+        return pd.DataFrame(cov, index=log_returns.columns, columns=log_returns.columns)
+    return cov
 
 
 def _get_market_caps(tickers: list) -> dict:
@@ -139,7 +171,7 @@ def mean_variance_optimize(
 
     # Annualised parameters
     mu  = log_returns.mean().values * 252
-    cov = log_returns.cov().values  * 252
+    cov = _cov(log_returns)                       # Ledoit-Wolf shrinkage
     rf  = RISK_FREE_RATE
 
     def neg_sharpe(w):
@@ -238,8 +270,8 @@ def black_litterman_optimize(
     log_returns = log_returns[valid]
     n           = len(valid)
 
-    # Annualised covariance
-    Sigma = log_returns.cov().values * 252
+    # Annualised covariance (Ledoit-Wolf shrinkage)
+    Sigma = _cov(log_returns)
 
     # ── Step 1: Equilibrium implied returns (π) ───────────────────────────
     # Reverse-engineer expected returns from market-cap weights
@@ -389,7 +421,7 @@ def efficient_frontier(
     log_returns = log_returns[valid]
     n    = len(valid)
     mu   = log_returns.mean().values * 252
-    cov  = log_returns.cov().values  * 252
+    cov  = _cov(log_returns)                      # Ledoit-Wolf shrinkage
     rf   = RISK_FREE_RATE
 
     def port_stats(w):
@@ -554,7 +586,7 @@ def hierarchical_risk_parity(
         return {"error": f"Need >=2 tickers with data. Got: {valid}"}
 
     log_returns = log_returns[valid]
-    cov  = log_returns.cov() * 252
+    cov  = _cov(log_returns, as_frame=True)       # Ledoit-Wolf shrinkage
     corr = log_returns.corr()
 
     # Step 1: distance matrix from correlation, then hierarchical clustering
