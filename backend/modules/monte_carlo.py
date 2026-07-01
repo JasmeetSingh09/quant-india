@@ -188,13 +188,32 @@ def simulate(
         rand_returns = mu + raw * scale
         method_label = f"Student's t (fat tails, dof={t_dof})"
     elif method == "bootstrap":
-        # Resample actual historical returns with replacement
+        # Resample actual historical returns with replacement (i.i.d.)
         hist_arr     = hist.values
         idx          = np.random.randint(0, len(hist_arr), size=(n_simulations, horizon_days))
         rand_returns = hist_arr[idx]
         method_label = "Bootstrap (historical resampling)"
+    elif method == "block":
+        # BLOCK BOOTSTRAP: resample CONSECUTIVE blocks of returns instead of
+        # single days. This preserves autocorrelation and volatility clustering
+        # (calm stretches and stormy stretches stay intact) — far more realistic
+        # than i.i.d. resampling, which shuffles those patterns away.
+        hist_arr   = hist.values
+        block      = max(5, min(20, horizon_days // 10 or 5))   # ~5-20 day blocks
+        n_blocks   = int(np.ceil(horizon_days / block))
+        max_start  = len(hist_arr) - block
+        if max_start < 1:
+            return {"error": "not enough history for block bootstrap"}
+        starts     = np.random.randint(0, max_start, size=(n_simulations, n_blocks))
+        # Build each path by stitching blocks, then trim to horizon
+        rand_returns = np.empty((n_simulations, n_blocks * block))
+        for b in range(n_blocks):
+            for off in range(block):
+                rand_returns[:, b * block + off] = hist_arr[starts[:, b] + off]
+        rand_returns = rand_returns[:, :horizon_days]
+        method_label = f"Block bootstrap ({block}-day blocks — preserves vol clustering)"
     else:
-        return {"error": f"Unknown method '{method}'. Use normal | t | bootstrap."}
+        return {"error": f"Unknown method '{method}'. Use normal | t | bootstrap | block."}
 
     # Compound each path: value_t = value_0 * prod(1 + r)
     growth      = np.cumprod(1 + rand_returns, axis=1) * initial_value

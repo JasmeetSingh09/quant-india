@@ -702,9 +702,16 @@ def retrain_weights(
     start_date: str = "2019-01-01",
     end_date:   str = "2022-12-31",
     forward_days: int = 21,
+    method: str = "ridge",
 ) -> dict:
     """
-    Refit factor weights using OLS regression on historical NSE data.
+    Refit factor weights on historical NSE data.
+
+    method: "ridge" (default) | "elasticnet" | "ols"
+      Features are z-score NORMALISED first so no factor dominates by scale.
+      Ridge/ElasticNet regularise the fit for more stable, robust weights than
+      plain OLS (which over-fits noisy factor returns). OLS is still run in
+      parallel to report t-stats / p-values (statistical significance).
 
     For each ticker on each month-end date:
       X = [momentum_score, quality_score, value_score]   (sentiment excluded
@@ -764,26 +771,43 @@ def retrain_weights(
         X = np.array(X_rows)
         y = np.array(y_rows)
 
-        # OLS via normal equations: β = (XᵀX)⁻¹Xᵀy
-        X_aug = np.column_stack([np.ones(len(X)), X])
-        try:
-            beta = np.linalg.lstsq(X_aug, y, rcond=None)[0]
-        except Exception:
-            return {"error": "OLS failed — matrix may be singular"}
+        # ── Explicit z-score NORMALISATION of features (so no factor dominates
+        #    by raw scale) ──
+        mu_x, sd_x = X.mean(axis=0), X.std(axis=0)
+        sd_x[sd_x == 0] = 1.0
+        Xz = (X - mu_x) / sd_x
 
-        # R²
-        y_hat = X_aug @ beta
+        # ── Fit the chosen regularised model for the WEIGHTS ──
+        used = method
+        try:
+            if method == "ols":
+                coefs = np.linalg.lstsq(np.column_stack([np.ones(len(Xz)), Xz]), y, rcond=None)[0][1:]
+            else:
+                from sklearn.linear_model import Ridge, ElasticNet
+                mdl = (ElasticNet(alpha=0.001, l1_ratio=0.5, max_iter=5000)
+                       if method == "elasticnet" else Ridge(alpha=1.0))
+                mdl.fit(Xz, y)
+                coefs = mdl.coef_
+        except Exception:
+            # fall back to OLS on standardised features
+            used = "ols (fallback)"
+            coefs = np.linalg.lstsq(np.column_stack([np.ones(len(Xz)), Xz]), y, rcond=None)[0][1:]
+
+        # ── OLS in parallel for statistical inference (t-stats / p-values) ──
+        X_aug  = np.column_stack([np.ones(len(Xz)), Xz])
+        beta_ols = np.linalg.lstsq(X_aug, y, rcond=None)[0]
+        y_hat  = X_aug @ beta_ols
         ss_res = np.sum((y - y_hat) ** 2)
         ss_tot = np.sum((y - y.mean()) ** 2)
         r2     = 1 - ss_res / ss_tot if ss_tot != 0 else 0
+        sigma2 = np.sum((y - y_hat)**2) / max(len(y) - X_aug.shape[1], 1)
+        cov_matrix = sigma2 * np.linalg.pinv(X_aug.T @ X_aug)
+        std_errors = np.sqrt(np.diag(cov_matrix))
+        t_stats    = beta_ols / std_errors
+        p_values   = [2 * (1 - stats.t.cdf(abs(t), df=len(y)-4)) for t in t_stats]
 
-        # T-statistics for each coefficient
-        residuals   = y - y_hat
-        sigma2      = np.sum(residuals**2) / max(len(y) - X_aug.shape[1], 1)
-        cov_matrix  = sigma2 * np.linalg.pinv(X_aug.T @ X_aug)
-        std_errors  = np.sqrt(np.diag(cov_matrix))
-        t_stats     = beta / std_errors
-        p_values    = [2 * (1 - stats.t.cdf(abs(t), df=len(y)-4)) for t in t_stats]
+        # Weight coefficients: intercept (0) + the regularised model's coefs
+        beta = np.concatenate([[float(beta_ols[0])], coefs])
 
         factor_names = ["intercept", "momentum", "quality", "value"]
         fitted = {
@@ -811,13 +835,16 @@ def retrain_weights(
 
         return {
             "status":         "retrained",
+            "method":         used,
+            "features_normalised": True,
             "observations":   len(X_rows),
             "r_squared":      round(r2, 4),
             "fitted_factors": fitted,
             "new_weights":    new_weights,
             "note": (
+                f"Weights fitted with {used} on z-score-normalised factors. "
                 "Update FACTOR_WEIGHTS in alpha_model.py with new_weights "
-                "if R² > 0.05 and key factors are significant."
+                "if R² is meaningful and key factors are significant (see t-stats)."
             ),
         }
 
