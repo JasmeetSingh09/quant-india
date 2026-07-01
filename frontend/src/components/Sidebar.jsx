@@ -1,8 +1,8 @@
 import { NavLink } from 'react-router-dom'
 import {
-  LayoutDashboard, Search, Star, PlayCircle,
-  TrendingUp, BarChart3, FlaskConical, Newspaper,
-  Dices, GitCompareArrows, Layers, Filter, Briefcase, Calculator, ShieldAlert, Zap, Sparkles
+  LayoutDashboard, Search, PlayCircle,
+  TrendingUp, BarChart3, FlaskConical,
+  Filter, Briefcase, Calculator, Zap, Sparkles
 } from 'lucide-react'
 
 const links = [
@@ -10,18 +10,12 @@ const links = [
   { to: '/stock',       icon: Search,          label: 'Stocks'     },
   { to: '/top-picks',   icon: Sparkles,        label: 'Top Picks'  },
   { to: '/screener',    icon: Filter,          label: 'Screener'   },
-  { to: '/portfolio',   icon: Briefcase,       label: 'Portfolio'  },
-  { to: '/watchlist',   icon: Star,            label: 'Watchlist'  },
-  { to: '/calculators', icon: Calculator,      label: 'Calculators'},
+  { to: '/my-stocks',   icon: Briefcase,       label: 'My Stocks'  },
   { to: '/simulator',   icon: PlayCircle,      label: 'Simulator'  },
-  { to: '/optimizer',   icon: TrendingUp,      label: 'Optimizer'  },
-  { to: '/montecarlo',  icon: Dices,           label: 'Monte Carlo'},
-  { to: '/pairs',       icon: GitCompareArrows,label: 'Pairs Trade'},
-  { to: '/factors',     icon: Layers,          label: 'Factors'    },
-  { to: '/commodities', icon: BarChart3,       label: 'Commodities'},
+  { to: '/lab',         icon: TrendingUp,      label: 'Port. Lab'  },
   { to: '/research',    icon: FlaskConical,    label: 'Research'   },
-  { to: '/risk',        icon: ShieldAlert,     label: 'Risk Lab'   },
-  { to: '/news',        icon: Newspaper,       label: 'News'       },
+  { to: '/markets',     icon: BarChart3,       label: 'Markets'    },
+  { to: '/calculators', icon: Calculator,      label: 'Calculators'},
 ]
 
 export default function Sidebar() {

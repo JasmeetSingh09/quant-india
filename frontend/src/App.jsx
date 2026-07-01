@@ -1,21 +1,15 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
 import StockExplorer from './pages/StockExplorer'
 import TopPicks from './pages/TopPicks'
 import Screener from './pages/Screener'
-import Portfolio from './pages/Portfolio'
 import Calculators from './pages/Calculators'
-import RiskLab from './pages/RiskLab'
-import Watchlist from './pages/Watchlist'
 import Simulator from './pages/Simulator'
-import Optimizer from './pages/Optimizer'
-import Commodities from './pages/Commodities'
-import Research from './pages/Research'
-import MonteCarlo from './pages/MonteCarlo'
-import PairsTrading from './pages/PairsTrading'
-import Factors from './pages/Factors'
-import News from './pages/News'
+import MyStocks from './pages/MyStocks'
+import PortfolioLab from './pages/PortfolioLab'
+import QuantResearch from './pages/QuantResearch'
+import Markets from './pages/Markets'
 
 export default function App() {
   return (
@@ -23,22 +17,27 @@ export default function App() {
       <Sidebar />
       <main className="flex-1 overflow-y-auto">
         <Routes>
-          <Route path="/"           element={<Dashboard />} />
-          <Route path="/stock"      element={<StockExplorer />} />
-          <Route path="/top-picks"  element={<TopPicks />} />
-          <Route path="/screener"   element={<Screener />} />
-          <Route path="/portfolio"  element={<Portfolio />} />
+          <Route path="/"            element={<Dashboard />} />
+          <Route path="/stock"       element={<StockExplorer />} />
+          <Route path="/top-picks"   element={<TopPicks />} />
+          <Route path="/screener"    element={<Screener />} />
+          <Route path="/my-stocks"   element={<MyStocks />} />
+          <Route path="/simulator"   element={<Simulator />} />
+          <Route path="/lab"         element={<PortfolioLab />} />
+          <Route path="/research"    element={<QuantResearch />} />
+          <Route path="/markets"     element={<Markets />} />
           <Route path="/calculators" element={<Calculators />} />
-          <Route path="/risk"        element={<RiskLab />} />
-          <Route path="/watchlist"  element={<Watchlist />} />
-          <Route path="/simulator"  element={<Simulator />} />
-          <Route path="/optimizer"  element={<Optimizer />} />
-          <Route path="/commodities"element={<Commodities />} />
-          <Route path="/research"   element={<Research />} />
-          <Route path="/montecarlo" element={<MonteCarlo />} />
-          <Route path="/pairs"      element={<PairsTrading />} />
-          <Route path="/factors"    element={<Factors />} />
-          <Route path="/news"       element={<News />} />
+
+          {/* Redirects for old routes */}
+          <Route path="/portfolio"   element={<Navigate to="/my-stocks" replace />} />
+          <Route path="/watchlist"   element={<Navigate to="/my-stocks" replace />} />
+          <Route path="/optimizer"   element={<Navigate to="/lab" replace />} />
+          <Route path="/montecarlo"  element={<Navigate to="/lab" replace />} />
+          <Route path="/risk"        element={<Navigate to="/lab" replace />} />
+          <Route path="/factors"     element={<Navigate to="/research" replace />} />
+          <Route path="/pairs"       element={<Navigate to="/research" replace />} />
+          <Route path="/commodities" element={<Navigate to="/markets" replace />} />
+          <Route path="/news"        element={<Navigate to="/markets" replace />} />
         </Routes>
       </main>
     </div>
