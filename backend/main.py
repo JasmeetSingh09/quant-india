@@ -47,6 +47,7 @@ from sentiment import score_headline, summarise_sentiment
 from watchlist import add_to_watchlist, remove_from_watchlist, get_watchlist
 from alerts import send_test_alert, send_multi_signal_alert, start_alert_scheduler, run_watchlist_alert_check
 from alpha_model import compute_alpha_score, scan_alpha, retrain_weights, explain_signal, top_picks
+from prediction_tracker import snapshot as log_predictions_snapshot, evaluate as evaluate_predictions
 from portfolio_optimizer import (
     mean_variance_optimize, black_litterman_optimize,
     efficient_frontier, optimize_with_alpha_views,
@@ -99,6 +100,9 @@ async def startup():
     loop.run_in_executor(None, ensure_screener_cache)   # build screener cache if empty
     start_news_scheduler()
     start_alert_scheduler(interval_minutes=30)   # auto-check watchlists for alerts
+    from prediction_tracker import start_prediction_scheduler, snapshot as _snap
+    start_prediction_scheduler()                 # daily auto-log of picks (track record)
+    loop.run_in_executor(None, _snap)            # log one snapshot now (non-blocking)
 
 
 # ---------------------------------------------------------------------------
@@ -877,6 +881,18 @@ def alpha_top_picks():
     Honest framing: a screen, not advice. Cached 30 min.
     """
     return top_picks()
+
+
+@app.post("/predictions/snapshot")
+def predictions_snapshot():
+    """Log today's alpha picks (ticker, score, signal, price) to grade later."""
+    return log_predictions_snapshot()
+
+
+@app.get("/predictions/track")
+def predictions_track(min_days: int = 7):
+    """Honest scorecard: how have past logged picks performed vs the Nifty?"""
+    return evaluate_predictions(min_days=min_days)
 
 
 @app.get("/alpha/regime-adjusted")
