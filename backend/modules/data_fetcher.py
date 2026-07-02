@@ -379,26 +379,41 @@ def get_intraday_data(ticker: str, interval: str = "5m", period: str = "1d") -> 
     }
 
 
+def is_market_open() -> bool:
+    """
+    Is the NSE regular session open right now? Mon-Fri, 09:15-15:30 IST.
+    (Exchange holidays are not accounted for — a holiday will read as 'open'
+    by time, but yfinance simply won't have new ticks, so the price stays flat.)
+    """
+    from datetime import timezone as _tz, timedelta as _td
+    ist = datetime.now(_tz(_td(hours=5, minutes=30)))
+    if ist.weekday() >= 5:                      # Saturday / Sunday
+        return False
+    minutes = ist.hour * 60 + ist.minute
+    return (9 * 60 + 15) <= minutes <= (15 * 60 + 30)
+
+
 def get_current_price(ticker: str) -> dict:
     """
     Get the current price and today's change for a stock.
     """
     stock = yf.Ticker(ticker)
     info = stock.fast_info
-    
+
     try:
         current_price = info.last_price
         previous_close = info.previous_close
         change = current_price - previous_close
         change_pct = (change / previous_close) * 100
         volume = info.three_month_average_volume
-        
+
         return {
             "ticker": ticker,
             "price": round(current_price, 2),
             "change": round(change, 2),
             "change_pct": round(change_pct, 2),
             "volume": volume,
+            "market_open": is_market_open(),
             "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
     except Exception as e:

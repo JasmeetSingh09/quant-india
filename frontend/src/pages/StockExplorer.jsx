@@ -65,17 +65,19 @@ export default function StockExplorer() {
   const [ticker, setTicker] = useState('RELIANCE.NS')
   const explain = useMutation({ mutationFn: explainAlpha })
 
-  const { data: price,   isLoading: priceLoading }   = useQuery({ queryKey: ['price',   ticker], queryFn: () => getPrice(ticker),      enabled: !!ticker })
+  const { data: price,   isLoading: priceLoading }   = useQuery({ queryKey: ['price',   ticker], queryFn: () => getPrice(ticker),      enabled: !!ticker, refetchInterval: (q) => (q.state.data?.market_open ? 30000 : false) })
   const { data: metrics, isLoading: metricsLoading }  = useQuery({ queryKey: ['metrics', ticker], queryFn: () => getMetrics(ticker),    enabled: !!ticker, staleTime: 300000 })
   const { data: alpha,   isLoading: alphaLoading }    = useQuery({ queryKey: ['alpha',   ticker], queryFn: () => getAlphaScore(ticker), enabled: !!ticker, staleTime: 120000 })
   const { data: sent,    isLoading: sentLoading }     = useQuery({ queryKey: ['sent',    ticker], queryFn: () => getSentiment(ticker),  enabled: !!ticker, staleTime: 120000 })
   const { data: newsD,   isLoading: newsLoading }     = useQuery({ queryKey: ['news',    ticker], queryFn: () => getStockNews(ticker),  enabled: !!ticker, staleTime: 60000 })
-  // Intraday chart — auto-refreshes every 30s so it moves during market hours
+  // Intraday chart — auto-refreshes every 30s ONLY while NSE is open (9:15-15:30 IST).
+  // When the market is closed the price is frozen, so we stop polling (no more
+  // phantom movement after 3:30pm from the delayed feed jittering).
   const { data: intraday } = useQuery({
     queryKey: ['intraday', ticker],
     queryFn: () => getIntraday(ticker, '5m', '1d'),
     enabled: !!ticker,
-    refetchInterval: 30000,
+    refetchInterval: price?.market_open ? 30000 : false,
   })
   // GARCH volatility forecast (validated to beat naive)
   const { data: vol } = useQuery({
@@ -125,11 +127,18 @@ export default function StockExplorer() {
           {intraday?.candles?.length > 0 && (
             <div className="card">
               <div className="flex items-center justify-between mb-2">
-                <h2 className="font-semibold text-sm">Price Chart <span className="text-xs text-gray-500 font-normal">({intraday.resolution} · updates every 30s)</span></h2>
-                <span className="text-xs text-gray-500">
-                  <span className="inline-block w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse mr-1"></span>
-                  live · {intraday.fetched_at} · ~15 min delayed
-                </span>
+                <h2 className="font-semibold text-sm">Price Chart <span className="text-xs text-gray-500 font-normal">({intraday.resolution}{price?.market_open ? ' · updates every 30s' : ''})</span></h2>
+                {price?.market_open ? (
+                  <span className="text-xs text-gray-500">
+                    <span className="inline-block w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse mr-1"></span>
+                    live · {intraday.fetched_at} · ~15 min delayed
+                  </span>
+                ) : (
+                  <span className="text-xs text-gray-500">
+                    <span className="inline-block w-1.5 h-1.5 bg-gray-500 rounded-full mr-1"></span>
+                    Market closed · showing last close
+                  </span>
+                )}
               </div>
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={intraday.candles}>
