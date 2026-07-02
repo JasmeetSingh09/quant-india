@@ -724,6 +724,17 @@ def retrain_weights(
 
     Note: This is a simplified implementation. A production system would
     use panel regression with time and stock fixed effects.
+
+    ⚠️ KNOWN BIASES (disclosed honestly — do not present results as clean):
+      1. LOOK-AHEAD BIAS: quality/value use CURRENT fundamentals (today's ROE,
+         P/E) applied to HISTORICAL periods, because point-in-time fundamentals
+         aren't freely available. This leaks future info into past scores, so the
+         fitted weights are optimistic. (Mitigating: the weight_stability test
+         shows the fitted weights are noise regardless — see weight_stability.py.)
+      2. SURVIVORSHIP BIAS: the ticker list is today's surviving stocks; companies
+         that were delisted/failed are excluded, biasing historical fits upward.
+    For a live signal these matter less (you score today with today's data); for
+    any BACKTEST claim, state these limitations explicitly.
     """
     try:
         from scipy import stats

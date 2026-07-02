@@ -1,13 +1,15 @@
 """
-garch_vol.py — GARCH(1,1) volatility forecasting for NSE stocks.
+garch_vol.py — GJR-GARCH(1,1,1) volatility forecasting for NSE stocks.
 
 Unlike returns (near-unpredictable), VOLATILITY is genuinely forecastable: it
-clusters — calm periods follow calm, storms follow storms. GARCH models this
-explicitly and is the standard tool on every risk desk.
+clusters — calm periods follow calm, storms follow storms. We use GJR-GARCH
+(the asymmetric variant, o=1), which captures the *leverage effect*: bad news
+raises volatility more than equally-sized good news — a well-documented feature
+of equity markets. This is the standard tool on every risk desk.
 
-This module forecasts next-day volatility with GARCH(1,1) and tests it HONESTLY
-against a naive baseline (trailing rolling std) using proper out-of-sample
-1-step-ahead forecasts. Verdict = does GARCH actually beat naive?
+This module forecasts next-day volatility and tests it HONESTLY against a naive
+baseline (trailing rolling std) using proper out-of-sample 1-step-ahead
+forecasts. Verdict = does the model actually beat naive?
 """
 
 import numpy as np
