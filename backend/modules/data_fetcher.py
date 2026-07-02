@@ -379,18 +379,35 @@ def get_intraday_data(ticker: str, interval: str = "5m", period: str = "1d") -> 
     }
 
 
+def _ist_now():
+    from datetime import timezone as _tz, timedelta as _td
+    return datetime.now(_tz(_td(hours=5, minutes=30)))
+
+
 def is_market_open() -> bool:
     """
     Is the NSE regular session open right now? Mon-Fri, 09:15-15:30 IST.
     (Exchange holidays are not accounted for — a holiday will read as 'open'
     by time, but yfinance simply won't have new ticks, so the price stays flat.)
     """
-    from datetime import timezone as _tz, timedelta as _td
-    ist = datetime.now(_tz(_td(hours=5, minutes=30)))
+    ist = _ist_now()
     if ist.weekday() >= 5:                      # Saturday / Sunday
         return False
     minutes = ist.hour * 60 + ist.minute
     return (9 * 60 + 15) <= minutes <= (15 * 60 + 30)
+
+
+def is_feed_active() -> bool:
+    """
+    Should the UI keep polling? True during the session AND for ~15 min after
+    close, so the ~15-min-DELAYED yfinance feed's final ticks (3:15-3:30 trades)
+    can still arrive and the true closing price shows up before we freeze.
+    """
+    ist = _ist_now()
+    if ist.weekday() >= 5:
+        return False
+    minutes = ist.hour * 60 + ist.minute
+    return (9 * 60 + 15) <= minutes <= (15 * 60 + 45)
 
 
 def get_current_price(ticker: str) -> dict:
@@ -414,6 +431,7 @@ def get_current_price(ticker: str) -> dict:
             "change_pct": round(change_pct, 2),
             "volume": volume,
             "market_open": is_market_open(),
+            "feed_active": is_feed_active(),   # keep polling ~15 min past close (delayed feed)
             "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
     except Exception as e:

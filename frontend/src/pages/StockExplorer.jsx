@@ -65,7 +65,7 @@ export default function StockExplorer() {
   const [ticker, setTicker] = useState('RELIANCE.NS')
   const explain = useMutation({ mutationFn: explainAlpha })
 
-  const { data: price,   isLoading: priceLoading }   = useQuery({ queryKey: ['price',   ticker], queryFn: () => getPrice(ticker),      enabled: !!ticker, refetchInterval: (q) => (q.state.data?.market_open ? 30000 : false) })
+  const { data: price,   isLoading: priceLoading }   = useQuery({ queryKey: ['price',   ticker], queryFn: () => getPrice(ticker),      enabled: !!ticker, refetchInterval: (q) => (q.state.data?.feed_active ? 30000 : false) })
   const { data: metrics, isLoading: metricsLoading }  = useQuery({ queryKey: ['metrics', ticker], queryFn: () => getMetrics(ticker),    enabled: !!ticker, staleTime: 300000 })
   const { data: alpha,   isLoading: alphaLoading }    = useQuery({ queryKey: ['alpha',   ticker], queryFn: () => getAlphaScore(ticker), enabled: !!ticker, staleTime: 120000 })
   const { data: sent,    isLoading: sentLoading }     = useQuery({ queryKey: ['sent',    ticker], queryFn: () => getSentiment(ticker),  enabled: !!ticker, staleTime: 120000 })
@@ -77,7 +77,7 @@ export default function StockExplorer() {
     queryKey: ['intraday', ticker],
     queryFn: () => getIntraday(ticker, '5m', '1d'),
     enabled: !!ticker,
-    refetchInterval: price?.market_open ? 30000 : false,
+    refetchInterval: price?.feed_active ? 30000 : false,
   })
   // GARCH volatility forecast (validated to beat naive)
   const { data: vol } = useQuery({
