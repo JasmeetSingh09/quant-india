@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import {
   getPrice, getMetrics, getAlphaScore, getSentiment, getStockNews,
@@ -9,7 +9,7 @@ import {
 import Spinner from '../components/Spinner'
 import AlphaMeter from '../components/AlphaMeter'
 import StatCard from '../components/StatCard'
-import { Search, TrendingUp, TrendingDown, ArrowLeft, ExternalLink, Users, Building2, Filter, RefreshCw } from 'lucide-react'
+import { Search, TrendingUp, TrendingDown, ArrowLeft, ExternalLink, Filter, LayoutList, LayoutGrid } from 'lucide-react'
 import { InfoTip } from '../components/Term'
 import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts'
 
@@ -112,13 +112,107 @@ function BalanceItem({ label, value, highlight }) {
   )
 }
 
+// ─── Stock Box Card (grid view) ───────────────────────────────────────────────
+function StockBoxCard({ r, onSelect }) {
+  const up = (r.change_pct ?? 0) >= 0
+  const roePct = r.roe != null ? (r.roe * 100).toFixed(1) : null
+  const marginPct = r.profit_margin != null ? (r.profit_margin * 100).toFixed(1) : null
+
+  // sector → short colour pill
+  const sectorColor = {
+    'Financial Services': 'bg-blue-950/60 text-blue-300 border-blue-800/40',
+    'Technology':         'bg-violet-950/60 text-violet-300 border-violet-800/40',
+    'Energy':             'bg-orange-950/60 text-orange-300 border-orange-800/40',
+    'Healthcare':         'bg-pink-950/60 text-pink-300 border-pink-800/40',
+    'Consumer Cyclical':  'bg-yellow-950/60 text-yellow-300 border-yellow-800/40',
+    'Consumer Defensive': 'bg-teal-950/60 text-teal-300 border-teal-800/40',
+    'Industrials':        'bg-gray-800/80 text-gray-300 border-gray-600/40',
+    'Basic Materials':    'bg-lime-950/60 text-lime-300 border-lime-800/40',
+    'Utilities':          'bg-cyan-950/60 text-cyan-300 border-cyan-800/40',
+    'Real Estate':        'bg-rose-950/60 text-rose-300 border-rose-800/40',
+    'Communication Services': 'bg-indigo-950/60 text-indigo-300 border-indigo-800/40',
+  }
+  const pill = sectorColor[r.sector] || 'bg-gray-800/60 text-gray-400 border-gray-700/40'
+
+  return (
+    <button
+      onClick={() => onSelect(r.ticker)}
+      className="group text-left w-full rounded-xl border border-gray-800 bg-gray-900/50
+                 hover:border-green-700/60 hover:bg-gray-900/80 transition-all duration-150
+                 p-4 flex flex-col gap-3 focus:outline-none focus:ring-1 focus:ring-green-600"
+    >
+      {/* Top row: ticker + price */}
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="font-mono font-bold text-base text-green-400 group-hover:text-green-300 transition-colors leading-none">
+            {r.ticker.replace('.NS', '')}
+          </p>
+          <p className="text-xs text-gray-500 mt-1 leading-snug line-clamp-1">{r.company_name}</p>
+        </div>
+        <div className="text-right shrink-0 ml-2">
+          <p className="font-mono font-bold text-sm text-gray-100">
+            {r.price ? `₹${num(r.price, 0)}` : '—'}
+          </p>
+          {r.change_pct != null && (
+            <p className={`text-xs font-medium mt-0.5 flex items-center justify-end gap-0.5 ${up ? 'text-green-400' : 'text-red-400'}`}>
+              {up ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+              {up ? '+' : ''}{r.change_pct.toFixed(2)}%
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Sector pill */}
+      {r.sector && (
+        <span className={`self-start text-[10px] font-medium px-2 py-0.5 rounded-full border ${pill}`}>
+          {r.sector.replace(/_/g, ' ')}
+        </span>
+      )}
+
+      {/* Key metrics grid */}
+      <div className="grid grid-cols-3 gap-2 text-center">
+        <div className="rounded-lg bg-gray-800/50 px-2 py-1.5">
+          <p className="text-[10px] text-gray-500 mb-0.5">Mkt Cap</p>
+          <p className="text-xs font-mono font-semibold text-gray-200">{fmtCap(r.market_cap)}</p>
+        </div>
+        <div className="rounded-lg bg-gray-800/50 px-2 py-1.5">
+          <p className="text-[10px] text-gray-500 mb-0.5">P/E</p>
+          <p className="text-xs font-mono font-semibold text-gray-200">{num(r.pe_ratio)}</p>
+        </div>
+        <div className="rounded-lg bg-gray-800/50 px-2 py-1.5">
+          <p className="text-[10px] text-gray-500 mb-0.5">ROE %</p>
+          <p className={`text-xs font-mono font-semibold ${roePct != null ? (Number(roePct) >= 15 ? 'text-green-400' : 'text-gray-200') : 'text-gray-500'}`}>
+            {roePct != null ? `${roePct}%` : '—'}
+          </p>
+        </div>
+        <div className="rounded-lg bg-gray-800/50 px-2 py-1.5">
+          <p className="text-[10px] text-gray-500 mb-0.5">Margin</p>
+          <p className="text-xs font-mono font-semibold text-gray-200">
+            {marginPct != null ? `${marginPct}%` : '—'}
+          </p>
+        </div>
+        <div className="rounded-lg bg-gray-800/50 px-2 py-1.5">
+          <p className="text-[10px] text-gray-500 mb-0.5">Rev Gr</p>
+          <p className={`text-xs font-mono font-semibold ${r.revenue_growth != null ? (r.revenue_growth >= 0 ? 'text-green-400' : 'text-red-400') : 'text-gray-500'}`}>
+            {r.revenue_growth != null ? `${(r.revenue_growth * 100).toFixed(1)}%` : '—'}
+          </p>
+        </div>
+        <div className="rounded-lg bg-gray-800/50 px-2 py-1.5">
+          <p className="text-[10px] text-gray-500 mb-0.5">Div %</p>
+          <p className="text-xs font-mono font-semibold text-gray-200">{num(r.dividend_yield, 2)}</p>
+        </div>
+      </div>
+    </button>
+  )
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
-// LIST VIEW (Screener)
+// STOCKS LIST (screener with list / box toggle)
 // ═════════════════════════════════════════════════════════════════════════════
 function StocksList({ onSelect }) {
-  const navigate = useNavigate()
-  const [f, setF]       = useState({ pe_max: '', roe_min: '', market_cap_min: '', sector: '' })
-  const [sortBy, setSortBy] = useState('market_cap')
+  const [f, setF]         = useState({ pe_max: '', roe_min: '', market_cap_min: '', sector: '' })
+  const [sortBy, setSortBy]   = useState('market_cap')
+  const [viewMode, setViewMode] = useState('list')   // 'list' | 'box'
   const set = (k, v) => setF(p => ({ ...p, [k]: v }))
 
   const { data: sectors } = useQuery({ queryKey: ['scrSectors'], queryFn: getScreenerSectors })
@@ -140,14 +234,40 @@ function StocksList({ onSelect }) {
 
   return (
     <div className="p-6 space-y-5">
+
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Stocks</h1>
           <p className="text-gray-400 text-sm mt-0.5">
-            NSE universe — filter by fundamentals, click any row to open full analysis.
-            {status && <span className="text-gray-600"> · {status.cached_stocks} stocks cached</span>}
+            NSE universe — filter by fundamentals, click any stock to open full analysis.
+            {status && <span className="text-gray-600"> · {status.cached_stocks} cached</span>}
           </p>
+        </div>
+        {/* View toggle */}
+        <div className="flex items-center gap-1 shrink-0 bg-gray-800/70 rounded-lg p-1 border border-gray-700/60">
+          <button
+            onClick={() => setViewMode('list')}
+            title="List view"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+              viewMode === 'list'
+                ? 'bg-gray-700 text-gray-100 shadow-sm'
+                : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            <LayoutList size={14} /> List
+          </button>
+          <button
+            onClick={() => setViewMode('box')}
+            title="Box view"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+              viewMode === 'box'
+                ? 'bg-gray-700 text-gray-100 shadow-sm'
+                : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            <LayoutGrid size={14} /> Boxes
+          </button>
         </div>
       </div>
 
@@ -188,24 +308,32 @@ function StocksList({ onSelect }) {
         </button>
       </div>
 
-      {/* Sort */}
-      <div className="flex items-center gap-2 text-xs text-gray-400">
-        <Filter size={12} className="text-gray-600" /> Sort by:
-        {[['market_cap','Market Cap'],['pe_ratio','P/E'],['roe','ROE'],['revenue_growth','Rev Growth'],['dividend_yield','Div Yield']].map(([v, l]) => (
-          <button key={v} onClick={() => { setSortBy(v); setTimeout(run, 0) }}
-            className={`px-2.5 py-1 rounded-md ${sortBy === v ? 'bg-green-600 text-white' : 'bg-gray-800 hover:bg-gray-700'}`}>
-            {l}
-          </button>
-        ))}
+      {/* Sort row + result count */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2 text-xs text-gray-400">
+          <Filter size={12} className="text-gray-600 shrink-0" /> Sort by:
+          {[['market_cap','Market Cap'],['pe_ratio','P/E'],['roe','ROE'],['revenue_growth','Rev Growth'],['dividend_yield','Div Yield']].map(([v, l]) => (
+            <button key={v} onClick={() => { setSortBy(v); setTimeout(run, 0) }}
+              className={`px-2.5 py-1 rounded-md transition-colors ${sortBy === v ? 'bg-green-600 text-white' : 'bg-gray-800 hover:bg-gray-700 text-gray-300'}`}>
+              {l}
+            </button>
+          ))}
+        </div>
+        {rows.length > 0 && (
+          <p className="text-xs text-gray-600 shrink-0">{scr.data?.count} matches</p>
+        )}
       </div>
 
-      {/* Table */}
-      <div className="card overflow-x-auto">
-        {scr.isPending ? (
-          <div className="py-8"><Spinner /></div>
-        ) : scr.isError ? (
+      {/* Results */}
+      {scr.isPending ? (
+        <div className="card py-12"><Spinner /></div>
+      ) : scr.isError ? (
+        <div className="card">
           <p className="text-red-400 text-sm">{String(scr.error)}</p>
-        ) : (
+        </div>
+      ) : viewMode === 'list' ? (
+        /* ── LIST VIEW ── */
+        <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-gray-500 text-xs border-b border-gray-800">
@@ -228,7 +356,7 @@ function StocksList({ onSelect }) {
                   className="border-b border-gray-800 last:border-0 hover:bg-gray-800/50 cursor-pointer transition-colors group"
                 >
                   <td className="py-2.5 pr-4">
-                    <span className="font-mono text-green-400 group-hover:underline font-medium">
+                    <span className="font-mono text-green-400 group-hover:text-green-300 font-medium">
                       {r.ticker.replace('.NS', '')}
                     </span>
                     <span className="text-gray-500 text-xs block">{r.company_name}</span>
@@ -252,11 +380,21 @@ function StocksList({ onSelect }) {
               )}
             </tbody>
           </table>
-        )}
-        {rows.length > 0 && (
-          <p className="text-xs text-gray-600 mt-3">{scr.data?.count} matches</p>
-        )}
-      </div>
+        </div>
+      ) : (
+        /* ── BOX VIEW ── */
+        rows.length === 0 ? (
+          <div className="card text-center py-10 text-gray-500 text-sm">
+            No stocks match these filters.
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {rows.map(r => (
+              <StockBoxCard key={r.ticker} r={r} onSelect={onSelect} />
+            ))}
+          </div>
+        )
+      )}
     </div>
   )
 }
