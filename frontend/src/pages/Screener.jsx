@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { runScreener, getScreenerSectors, getScreenerStatus } from '../api'
 import Spinner from '../components/Spinner'
@@ -11,6 +12,7 @@ const fmtCap = v => v == null ? '—'
 const num = (v, d=1) => v == null ? '—' : Number(v).toFixed(d)
 
 export default function Screener() {
+  const navigate = useNavigate()
   const [f, setF] = useState({ pe_max: '', roe_min: '', market_cap_min: '', sector: '' })
   const [sortBy, setSortBy] = useState('market_cap')
   const set = (k, v) => setF(p => ({ ...p, [k]: v }))
@@ -37,7 +39,7 @@ export default function Screener() {
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2"><Filter size={24} className="text-green-400"/> Stock Screener</h1>
         <p className="text-gray-400 text-sm mt-0.5">
-          Filter the NSE universe by fundamentals.
+          Filter the NSE universe by fundamentals. <span className="text-gray-500">Tap any row to open its detail page →</span>
           {status && <span className="text-gray-600"> · {status.cached_stocks} stocks cached</span>}
         </p>
       </div>
@@ -98,9 +100,12 @@ export default function Screener() {
             </thead>
             <tbody>
               {rows.map(r => (
-                <tr key={r.ticker} className="border-b border-gray-800 last:border-0 hover:bg-gray-800/50">
+                <tr key={r.ticker}
+                    onClick={() => navigate(`/stock?ticker=${encodeURIComponent(r.ticker)}`)}
+                    title={`View ${r.company_name} details`}
+                    className="border-b border-gray-800 last:border-0 hover:bg-gray-800/50 cursor-pointer">
                   <td className="py-2">
-                    <span className="font-mono text-green-400">{r.ticker.replace('.NS','')}</span>
+                    <span className="font-mono text-green-400 hover:underline">{r.ticker.replace('.NS','')}</span>
                     <span className="text-gray-500 text-xs block">{r.company_name}</span>
                   </td>
                   <td className="text-gray-400 text-xs">{r.sector?.replace(/_/g,' ')}</td>
