@@ -46,7 +46,7 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent / ".env")
@@ -93,6 +93,28 @@ SENTIMENT_HALF_LIFE_DAYS = 3
 # Factor 1: Sentiment Score (-1 to +1)
 # ---------------------------------------------------------------------------
 
+def _parse_pub_date(s):
+    """Best-effort parse of a headline's publish date across common formats.
+    Returns a naive UTC datetime, or None if truly unparseable/missing."""
+    if not s or not isinstance(s, str):
+        return None
+    try:
+        from dateutil import parser as _dtp   # bundled with pandas
+        d = _dtp.parse(s)
+        if d.tzinfo is not None:
+            d = d.astimezone(timezone.utc).replace(tzinfo=None)
+        return d
+    except Exception:
+        pass
+    for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S",
+                "%Y-%m-%d", "%a, %d %b %Y %H:%M:%S %z", "%a, %d %b %Y %H:%M:%S %Z"):
+        try:
+            return datetime.strptime(s, fmt)
+        except Exception:
+            continue
+    return None
+
+
 def _compute_sentiment_factor(ticker: str, days_back: int = 14) -> dict:
     """
     Decay-weighted FinBERT sentiment score over recent headlines.
@@ -116,15 +138,18 @@ def _compute_sentiment_factor(ticker: str, days_back: int = 14) -> dict:
 
         weighted_scores = []
         weights         = []
+        undated         = 0
 
         for art in articles:
-            try:
-                pub = datetime.strptime(art["published_at"], "%Y-%m-%dT%H:%M:%SZ")
-            except Exception:
-                continue
-
-            age_days = max(0, (now - pub).total_seconds() / 86400)
-            w        = np.exp(-lam * age_days)
+            pub = _parse_pub_date(art.get("published_at") or art.get("publishedAt"))
+            if pub is None:
+                # Unknown/odd date format — DON'T discard the headline; assume it sits
+                # mid-window in recency so its sentiment still counts (just down-weighted).
+                age_days = days_back * 0.5
+                undated += 1
+            else:
+                age_days = max(0, (now - pub).total_seconds() / 86400)
+            w = np.exp(-lam * age_days)
 
             s = score_headline(art["title"])
             label = s["label"]
@@ -143,7 +168,7 @@ def _compute_sentiment_factor(ticker: str, days_back: int = 14) -> dict:
             weights.append(w)
 
         if not weights:
-            return {"score": 0.0, "confidence": 0.0, "reason": "no parseable dates",
+            return {"score": 0.0, "confidence": 0.0, "reason": "no scorable headlines",
                     "n_articles": 0}
 
         weighted_avg = sum(weighted_scores) / sum(weights)
@@ -154,6 +179,7 @@ def _compute_sentiment_factor(ticker: str, days_back: int = 14) -> dict:
             "score":      round(float(weighted_avg), 4),
             "confidence": round(float(confidence), 4),
             "n_articles": len(weights),
+            "undated_articles": undated,
             "interpretation": (
                 "Strongly positive news flow" if weighted_avg > 0.4 else
                 "Mildly positive news flow"   if weighted_avg > 0.1 else
