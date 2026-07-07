@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { getPrice, getMetrics, getAlphaScore, getSentiment, getStockNews, searchStocks, explainAlpha, getIntraday, getVolForecast } from '../api'
 import Spinner from '../components/Spinner'
@@ -62,8 +63,22 @@ function SentimentBar({ label, pct, color }) {
 }
 
 export default function StockExplorer() {
-  const [ticker, setTicker] = useState('RELIANCE.NS')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [ticker, setTicker] = useState(searchParams.get('ticker') || 'RELIANCE.NS')
   const explain = useMutation({ mutationFn: explainAlpha })
+
+  // Select a stock and keep it in the URL (?ticker=…) so it's shareable and so
+  // deep-links from other pages (e.g. the Screener) land on the right stock.
+  const selectTicker = (t) => {
+    if (!t) return
+    setTicker(t)
+    setSearchParams({ ticker: t }, { replace: true })
+  }
+  // If the URL param changes (e.g. arriving from the Screener), follow it.
+  useEffect(() => {
+    const p = searchParams.get('ticker')
+    if (p && p !== ticker) setTicker(p)
+  }, [searchParams])
 
   const { data: price,   isLoading: priceLoading }   = useQuery({ queryKey: ['price',   ticker], queryFn: () => getPrice(ticker),      enabled: !!ticker, refetchInterval: (q) => (q.state.data?.feed_active ? 30000 : false) })
   const { data: metrics, isLoading: metricsLoading }  = useQuery({ queryKey: ['metrics', ticker], queryFn: () => getMetrics(ticker),    enabled: !!ticker, staleTime: 300000 })
@@ -96,7 +111,7 @@ export default function StockExplorer() {
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold">Stock Explorer</h1>
 
-      <SearchBar onSelect={setTicker} />
+      <SearchBar onSelect={selectTicker} />
 
       {priceLoading ? <Spinner /> : price && (
         <>
