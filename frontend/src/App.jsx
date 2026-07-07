@@ -2,7 +2,6 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
 import StockExplorer from './pages/StockExplorer'
-import Screener from './pages/Screener'
 import Calculators from './pages/Calculators'
 import Simulator from './pages/Simulator'
 import MyStocks from './pages/MyStocks'
@@ -19,7 +18,7 @@ export default function App() {
           <Route path="/"            element={<Dashboard />} />
           <Route path="/stock"       element={<StockExplorer />} />
           <Route path="/top-picks"   element={<Navigate to="/" replace />} />
-          <Route path="/screener"    element={<Screener />} />
+          <Route path="/screener"    element={<Navigate to="/stock" replace />} />
           <Route path="/my-stocks"   element={<MyStocks />} />
           <Route path="/simulator"   element={<Simulator />} />
           <Route path="/lab"         element={<PortfolioLab />} />

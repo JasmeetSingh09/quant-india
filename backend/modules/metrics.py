@@ -131,6 +131,10 @@ def _compute_full_metrics(ticker: str) -> dict:
         "week_52_high":       base.get("week_52_high"),
         "week_52_low":        base.get("week_52_low"),
         "book_value":         book_value,
+        # Company profile
+        "description":        info.get("description", ""),
+        "website":            info.get("website", ""),
+        "employees":          info.get("employees", None),
         "as_of":              datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
 

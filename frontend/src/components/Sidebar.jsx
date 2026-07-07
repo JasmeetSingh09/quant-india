@@ -2,13 +2,12 @@
 import {
   LayoutDashboard, Search, PlayCircle,
   TrendingUp, BarChart3, FlaskConical,
-  Filter, Briefcase, Calculator, Zap
+  Briefcase, Calculator, Zap
 } from 'lucide-react'
 
 const links = [
   { to: '/',            icon: LayoutDashboard, label: 'Dashboard'  },
   { to: '/stock',       icon: Search,          label: 'Stocks'     },
-  { to: '/screener',    icon: Filter,          label: 'Screener'   },
   { to: '/my-stocks',   icon: Briefcase,       label: 'My Stocks'  },
   { to: '/simulator',   icon: PlayCircle,      label: 'Simulator'  },
   { to: '/lab',         icon: TrendingUp,      label: 'Port. Lab'  },
