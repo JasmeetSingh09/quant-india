@@ -86,10 +86,11 @@ export default function Calculators() {
           {lumpMut.data && !lumpMut.data.error && (
             <div className="grid grid-cols-2 gap-3 pt-2">
               <div className="card-sm"><p className="stat-label">Future value</p><p className="stat-value positive">{fmt(lumpMut.data.future_value)}</p></div>
-              <div className="card-sm"><p className="stat-label">Gains</p><p className="stat-value positive">{fmt(lumpMut.data.estimated_gains)}</p></div>
+              <div className="card-sm"><p className="stat-label">Gains</p><p className={`stat-value ${lumpMut.data.estimated_gains >= 0 ? 'positive' : 'negative'}`}>{fmt(lumpMut.data.estimated_gains)}</p></div>
               <p className="text-xs text-gray-400 col-span-2">{lumpMut.data.interpretation}</p>
             </div>
           )}
+          {lumpMut.isError && <p className="text-red-400 text-xs">{String(lumpMut.error)}</p>}
         </div>
       )}
 
@@ -109,12 +110,13 @@ export default function Calculators() {
                 <div className="card-sm"><p className="stat-label">Gain</p><p className={`stat-value ${taxMut.data.gain>=0?'positive':'negative'}`}>{fmt(taxMut.data.gain)}</p></div>
                 <div className="card-sm"><p className="stat-label">Term</p><p className="stat-value capitalize">{taxMut.data.term}</p></div>
                 <div className="card-sm"><p className="stat-label">Tax</p><p className="stat-value negative">{fmt(taxMut.data.tax)}</p></div>
-                <div className="card-sm"><p className="stat-label">Net profit</p><p className="stat-value positive">{fmt(taxMut.data.net_profit)}</p></div>
+                <div className="card-sm"><p className="stat-label">Net profit</p><p className={`stat-value ${taxMut.data.net_profit >= 0 ? 'positive' : 'negative'}`}>{fmt(taxMut.data.net_profit)}</p></div>
               </div>
               <p className="text-xs text-gray-400">{taxMut.data.note}</p>
               <p className="text-[11px] text-gray-600">Post-July-2024 rules: STCG 20%, LTCG 12.5% above ₹1.25L. Estimate only — not tax advice.</p>
             </div>
           )}
+          {taxMut.isError && <p className="text-red-400 text-xs">{String(taxMut.error)}</p>}
         </div>
       )}
     </div>

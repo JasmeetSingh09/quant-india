@@ -9,6 +9,16 @@ import PortfolioLab from './pages/PortfolioLab'
 import QuantResearch from './pages/QuantResearch'
 import Markets from './pages/Markets'
 
+function NotFound() {
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
+      <p className="text-5xl font-bold text-gray-700">404</p>
+      <p className="text-gray-400">Page not found.</p>
+      <a href="/" className="btn-primary text-sm">Go to Dashboard</a>
+    </div>
+  )
+}
+
 export default function App() {
   return (
     <div className="flex h-screen overflow-hidden bg-gray-950">
@@ -36,6 +46,7 @@ export default function App() {
           <Route path="/pairs"       element={<Navigate to="/research" replace />} />
           <Route path="/commodities" element={<Navigate to="/markets" replace />} />
           <Route path="/news"        element={<Navigate to="/markets" replace />} />
+          <Route path="*"            element={<NotFound />} />
         </Routes>
       </main>
     </div>

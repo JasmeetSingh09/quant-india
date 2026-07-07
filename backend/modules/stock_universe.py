@@ -1,3 +1,4 @@
+import os
 """
 stock_universe.py — Complete NSE + BSE stock universe with search.
 
@@ -29,7 +30,7 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-DB_PATH = Path(__file__).parent.parent / "quant_platform.db"
+DB_PATH = Path(os.environ.get("QUANT_DATA_DIR", str(Path(__file__).parent.parent))) / "quant_platform.db"
 
 # Official NSE equity list (updated every trading day by NSE)
 NSE_EQUITY_CSV_URL = "https://archives.nseindia.com/content/equities/EQUITY_L.csv"

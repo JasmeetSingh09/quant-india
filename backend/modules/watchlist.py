@@ -1,3 +1,4 @@
+import os
 """
 watchlist.py — SQLite-backed user stock watchlist for NSE tickers.
 
@@ -18,7 +19,7 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-DB_PATH = Path(__file__).parent.parent / "quant_platform.db"
+DB_PATH = Path(os.environ.get("QUANT_DATA_DIR", str(Path(__file__).parent.parent))) / "quant_platform.db"
 
 
 # ---------------------------------------------------------------------------

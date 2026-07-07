@@ -1,3 +1,4 @@
+import os
 """
 news.py — Indian financial news fetcher with SQLite caching and APScheduler refresh.
 
@@ -22,7 +23,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
-DB_PATH = Path(__file__).parent.parent / "quant_platform.db"
+DB_PATH = Path(os.environ.get("QUANT_DATA_DIR", str(Path(__file__).parent.parent))) / "quant_platform.db"
 
 # Indian financial news sources to prioritise in search
 INDIAN_FINANCE_SOURCES = [

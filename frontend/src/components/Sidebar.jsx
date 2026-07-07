@@ -10,7 +10,7 @@ const links = [
   { to: '/stock',       icon: Search,          label: 'Stocks'     },
   { to: '/my-stocks',   icon: Briefcase,       label: 'My Stocks'  },
   { to: '/simulator',   icon: PlayCircle,      label: 'Simulator'  },
-  { to: '/lab',         icon: TrendingUp,      label: 'Port. Lab'  },
+  { to: '/lab',         icon: TrendingUp,      label: 'Port. Lab'  }, // intentional abbrev — full label overflows w-56
   { to: '/research',    icon: FlaskConical,    label: 'Research'   },
   { to: '/markets',     icon: BarChart3,       label: 'Markets'    },
   { to: '/calculators', icon: Calculator,      label: 'Calculators'},

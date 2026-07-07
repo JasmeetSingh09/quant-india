@@ -16,9 +16,13 @@ import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianG
 // ─── helpers ──────────────────────────────────────────────────────────────────
 const fmtCap = v => v == null ? '—'
   : v >= 1e12 ? `₹${(v / 1e12).toFixed(2)}L Cr`
-  : v >= 1e7  ? `₹${(v / 1e7).toFixed(0)} Cr`
-  : `₹${v}`
-const num = (v, d = 1) => v == null ? '—' : Number(v).toFixed(d)
+  : v >= 1e7  ? `₹${(v / 1e7).toFixed(1)} Cr`
+  : `₹${v.toLocaleString('en-IN')}`
+const num = (v, d = 1) => {
+  if (v == null) return '—'
+  const n = Number(v)
+  return isNaN(n) ? '—' : n.toFixed(d)
+}
 const pct = (v, d = 1) => v == null ? '—' : `${(v * 100).toFixed(d)}%`
 
 // ─── SearchBar ────────────────────────────────────────────────────────────────
@@ -107,7 +111,7 @@ function BalanceItem({ label, value, highlight }) {
   return (
     <div className="flex flex-col gap-0.5">
       <p className="text-[11px] text-gray-500">{label}</p>
-      <p className={`text-sm font-mono font-semibold ${highlight || 'text-gray-200'}`}>{value || '—'}</p>
+      <p className={`text-sm font-mono font-semibold ${highlight || 'text-gray-200'}`}>{value ?? '—'}</p>
     </div>
   )
 }
@@ -219,16 +223,17 @@ function StocksList({ onSelect }) {
   const { data: status }  = useQuery({ queryKey: ['scrStatus'],  queryFn: getScreenerStatus })
   const scr = useMutation({ mutationFn: runScreener })
 
-  const run = () => {
+  const run = (overrideSortBy) => {
+    const sb = overrideSortBy ?? sortBy
     const filters = {}
     if (f.pe_max)         filters.pe_max = Number(f.pe_max)
     if (f.roe_min)        filters.roe_min = Number(f.roe_min)
     if (f.market_cap_min) filters.market_cap_min = Number(f.market_cap_min) * 1e7
     if (f.sector)         filters.sector = f.sector
-    scr.mutate({ filters, sort_by: sortBy, descending: true, limit: 50 })
+    scr.mutate({ filters, sort_by: sb, descending: true, limit: 50 })
   }
 
-  useEffect(() => { run() }, [])
+  useEffect(() => { run() }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
   const rows = scr.data?.results || []
 
@@ -313,7 +318,7 @@ function StocksList({ onSelect }) {
         <div className="flex items-center gap-2 text-xs text-gray-400">
           <Filter size={12} className="text-gray-600 shrink-0" /> Sort by:
           {[['market_cap','Market Cap'],['pe_ratio','P/E'],['roe','ROE'],['revenue_growth','Rev Growth'],['dividend_yield','Div Yield']].map(([v, l]) => (
-            <button key={v} onClick={() => { setSortBy(v); setTimeout(run, 0) }}
+            <button key={v} onClick={() => { setSortBy(v); run(v) }}
               className={`px-2.5 py-1 rounded-md transition-colors ${sortBy === v ? 'bg-green-600 text-white' : 'bg-gray-800 hover:bg-gray-700 text-gray-300'}`}>
               {l}
             </button>
@@ -414,7 +419,7 @@ function StockDetail({ ticker, onBack }) {
     queryKey: ['intraday', ticker],
     queryFn: () => getIntraday(ticker, '5m', '1d'),
     enabled: !!ticker,
-    refetchInterval: price?.feed_active ? 30000 : false,
+    refetchInterval: q => (q.state.data ? (price?.feed_active ? 30000 : false) : false),
   })
   const { data: vol } = useQuery({
     queryKey: ['vol', ticker],

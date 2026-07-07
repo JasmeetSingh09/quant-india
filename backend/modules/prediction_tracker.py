@@ -1,3 +1,4 @@
+import os
 """
 prediction_tracker.py — HONEST track record of the alpha model's picks.
 
@@ -20,7 +21,7 @@ from datetime import datetime, timedelta
 import numpy as np
 import yfinance as yf
 
-_DB_PATH = Path(__file__).parent.parent / "quant_platform.db"
+_DB_PATH = Path(os.environ.get("QUANT_DATA_DIR", str(Path(__file__).parent.parent))) / "quant_platform.db"
 BENCHMARK = "^NSEI"
 
 

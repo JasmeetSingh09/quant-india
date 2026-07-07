@@ -74,17 +74,22 @@ function PriceTag({ ticker }) {
   const { data, isLoading } = useQuery({
     queryKey: ['price', ticker],
     queryFn: () => getPrice(ticker),
-    refetchInterval: 60000,
+    // only poll while the delayed feed is active (stops ~15 min after market close)
+    refetchInterval: q => (q.state.data?.feed_active ? 60000 : false),
   })
-  if (isLoading) return <div className="card-sm animate-pulse h-20" />
-  const pos = data?.change_pct >= 0
+  if (isLoading) return (
+    <div className="card-sm h-[72px] animate-pulse bg-gray-800/40" />
+  )
+  const pos = (data?.change_pct ?? 0) >= 0
   return (
     <div className="card-sm">
-      <p className="text-xs text-gray-500">{ticker.replace('.NS','')}</p>
-      <p className="text-lg font-bold font-mono">₹{data?.price?.toLocaleString('en-IN')}</p>
-      <p className={`text-xs font-medium flex items-center gap-1 mt-0.5 ${pos ? 'text-green-400' : 'text-red-400'}`}>
-        {pos ? <TrendingUp size={11}/> : <TrendingDown size={11}/>}
-        {pos ? '+' : ''}{data?.change_pct?.toFixed(2)}%
+      <p className="text-xs text-gray-500">{ticker.replace('.NS', '')}</p>
+      <p className="text-lg font-bold font-mono leading-tight mt-0.5">
+        {data?.price != null ? `₹${data.price.toLocaleString('en-IN')}` : '—'}
+      </p>
+      <p className={`text-xs font-medium flex items-center gap-1 mt-1 ${pos ? 'text-green-400' : 'text-red-400'}`}>
+        {pos ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+        {pos ? '+' : ''}{data?.change_pct?.toFixed(2) ?? '0.00'}%
       </p>
     </div>
   )
@@ -110,7 +115,7 @@ function CommodityRow({ c }) {
 
 function NewsCard({ article }) {
   const mins = article.published_minutes_ago
-  const timeStr = mins < 60 ? `${mins}m ago` : `${Math.floor(mins/60)}h ago`
+  const timeStr = mins == null ? '' : mins < 60 ? `${mins}m ago` : `${Math.floor(mins / 60)}h ago`
   return (
     <a href={article.url} target="_blank" rel="noreferrer"
       className="block p-3 rounded-lg hover:bg-gray-800 transition-colors border border-transparent hover:border-gray-700">
@@ -234,9 +239,9 @@ function TrackRecord() {
 }
 
 export default function Dashboard() {
-  const { data: mcx,      isLoading: mcxLoading }     = useQuery({ queryKey: ['mcx'],      queryFn: getMCX,        refetchInterval: 120000 })
-  const { data: regime,   isLoading: regimeLoading }  = useQuery({ queryKey: ['regime'],   queryFn: getRegime,     staleTime: 300000 })
-  const { data: news,     isLoading: newsLoading }    = useQuery({ queryKey: ['mktNews'],  queryFn: getMarketNews, staleTime: 60000 })
+  const { data: mcx,    isLoading: mcxLoading,    isError: mcxError    } = useQuery({ queryKey: ['mcx'],     queryFn: getMCX,        refetchInterval: 120000 })
+  const { data: regime, isLoading: regimeLoading, isError: regimeError } = useQuery({ queryKey: ['regime'],  queryFn: getRegime,     staleTime: 300000 })
+  const { data: news,   isLoading: newsLoading,   isError: newsError   } = useQuery({ queryKey: ['mktNews'], queryFn: getMarketNews, staleTime: 60000 })
   const { data: picks,    isLoading: picksLoading,
           isError: picksError, refetch: refetchPicks } = useQuery({ queryKey: ['topPicks'], queryFn: getTopPicks,   staleTime: 25 * 60 * 1000, retry: 1 })
 
@@ -271,9 +276,11 @@ export default function Dashboard() {
         <div className="card col-span-1">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold">MCX Commodities</h2>
-            <Link to="/commodities" className="text-xs text-green-400 hover:text-green-300">View all →</Link>
+            <Link to="/markets" className="text-xs text-green-400 hover:text-green-300">View all →</Link>
           </div>
-          {mcxLoading ? <Spinner size="sm" /> : (
+          {mcxLoading ? <Spinner size="sm" /> : mcxError ? (
+            <p className="text-xs text-red-400 py-4 text-center">Could not load commodity data.</p>
+          ) : (
             <>
               <p className="text-xs text-gray-500 mb-3">
                 USD/INR: <span className="text-gray-300 font-mono">{mcx?.usd_inr_rate}</span>
@@ -287,9 +294,11 @@ export default function Dashboard() {
         <div className="card col-span-2">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold">Market News</h2>
-            <Link to="/news" className="text-xs text-green-400 hover:text-green-300">View all →</Link>
+            <Link to="/markets" className="text-xs text-green-400 hover:text-green-300">View all →</Link>
           </div>
-          {newsLoading ? <Spinner size="sm" /> : (
+          {newsLoading ? <Spinner size="sm" /> : newsError ? (
+            <p className="text-xs text-red-400 py-4 text-center">Could not load news.</p>
+          ) : (
             <div className="space-y-1">
               {news?.articles?.slice(0, 6).map((a, i) => <NewsCard key={i} article={a} />)}
             </div>
@@ -386,6 +395,9 @@ export default function Dashboard() {
       <TrackRecord />
 
       {/* Regime detail */}
+      {regimeError && (
+        <p className="text-xs text-red-400 text-center py-2">Could not load market regime data.</p>
+      )}
       {regime && !regimeLoading && (
         <div className="card">
           <h2 className="font-semibold mb-4">Market Regime Analysis <span className="text-xs text-gray-500 font-normal ml-2">3-State Gaussian HMM on Nifty 50</span></h2>

@@ -1,23 +1,55 @@
-# Render Blueprint — deploy the backend.
-# Note: FinBERT needs ~1.5GB RAM, so the "standard" plan (2GB) is required.
-# The free/starter (512MB) plans will crash on model load.
+## Render Blueprint — deploys both the backend API and the frontend static site.
+##
+## REQUIRED SETUP after first deploy:
+##   1. In the quant-india-backend service → Environment:
+##        NEWS_API_KEY        = <your NewsAPI key>
+##        FRONTEND_URL        = https://quant-india-frontend.onrender.com   ← your real frontend URL
+##        GMAIL_ADDRESS       = (optional, for email alerts)
+##        GMAIL_APP_PASSWORD  = (optional)
+##        GMAIL_RECEIVER      = (optional)
+##   2. In the quant-india-frontend service → Environment:
+##        VITE_API_URL        = https://quant-india-backend.onrender.com    ← your real backend URL
+##
+## NOTE: FinBERT needs ~1.5 GB RAM; the Standard plan (2 GB) is the minimum.
+## NOTE: The persistent disk keeps the SQLite database (watchlist, portfolio,
+##       simulations) across restarts. Remove it to use the free plan (data lost on redeploy).
 
 services:
+  # ── Backend (Docker / FastAPI) ────────────────────────────────────────────
   - type: web
     name: quant-india-backend
     runtime: docker
     rootDir: backend
     dockerfilePath: ./Dockerfile
-    plan: standard          # 2 GB RAM — needed for FinBERT
+    plan: standard            # 2 GB RAM — required for FinBERT
     healthCheckPath: /
     envVars:
       - key: NEWS_API_KEY
-        sync: false         # set in Render dashboard (secret)
+        sync: false
+      - key: FRONTEND_URL
+        sync: false           # set to https://quant-india-frontend.onrender.com
       - key: GMAIL_ADDRESS
         sync: false
       - key: GMAIL_APP_PASSWORD
         sync: false
       - key: GMAIL_RECEIVER
         sync: false
-      - key: FRONTEND_URL
-        sync: false         # set to your Vercel URL
+    disk:
+      name: quant-india-data
+      mountPath: /app/data
+      sizeGB: 1               # SQLite DB, screener cache, JSON state files
+
+  # ── Frontend (Vite / React static site) ──────────────────────────────────
+  - type: web
+    name: quant-india-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        sync: false           # set to https://quant-india-backend.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

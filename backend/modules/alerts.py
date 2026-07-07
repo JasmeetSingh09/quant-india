@@ -1,3 +1,4 @@
+import os
 """
 alerts.py — Gmail alert sender for the Indian stock platform.
 
@@ -297,7 +298,7 @@ def check_and_send_watchlist_alerts(watchlist_entries: list) -> list:
 import sqlite3
 from apscheduler.schedulers.background import BackgroundScheduler
 
-_DB_PATH = Path(__file__).parent.parent / "quant_platform.db"
+_DB_PATH = Path(os.environ.get("QUANT_DATA_DIR", str(Path(__file__).parent.parent))) / "quant_platform.db"
 _COOLDOWN_HOURS = 6   # don't re-alert the same ticker more than once per 6h
 _alert_scheduler = None
 _alert_scheduler_started = False

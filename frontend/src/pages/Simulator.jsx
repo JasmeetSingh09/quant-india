@@ -139,11 +139,13 @@ export default function Simulator() {
     enabled: !!activeSimName,
     refetchInterval: 60000,
   })
-  // P&L history (snapshots) for the value-over-time chart — grows each poll
+  // P&L history (snapshots) for the value-over-time chart
   const { data: histData } = useQuery({
-    queryKey: ['simHist', activeSimName, pnlData?.checked_at],
+    queryKey: ['simHist', activeSimName],
     queryFn: () => getSimHistory(activeSimName),
     enabled: !!activeSimName,
+    staleTime: 55000,
+    refetchInterval: 60000,
   })
 
   const startMut = useMutation({
@@ -153,7 +155,7 @@ export default function Simulator() {
 
   const deleteMut = useMutation({
     mutationFn: deleteSimulation,
-    onSuccess: () => { qc.invalidateQueries(['simList']); if (activeSimName) setActiveSimName('') },
+    onSuccess: (_, deletedName) => { qc.invalidateQueries(['simList']); if (activeSimName === deletedName) setActiveSimName('') },
   })
 
   const btMut = useMutation({

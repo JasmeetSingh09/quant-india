@@ -30,6 +30,12 @@ from pydantic import BaseModel
 load_dotenv(Path(__file__).parent / ".env")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
+# When a Render persistent disk is mounted at /app/data, point all state files
+# there so they survive redeploys.  Falls back to the app root locally.
+DATA_DIR = Path(os.getenv("DATA_DIR", str(Path(__file__).parent / "data")))
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+os.environ.setdefault("QUANT_DATA_DIR", str(DATA_DIR))
+
 # Ensure modules directory is on the path
 sys.path.insert(0, str(Path(__file__).parent / "modules"))
 
@@ -82,11 +88,19 @@ app = FastAPI(
     version="1.0.0",
 )
 
+_ALLOWED_ORIGINS = list(filter(None, [
+    FRONTEND_URL,
+    "http://localhost:5173",
+    "http://localhost:4173",   # vite preview
+    "http://localhost:3000",
+]))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL, "http://localhost:5173", "http://localhost:3000"],
+    allow_origins=_ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=False,
 )
 
 

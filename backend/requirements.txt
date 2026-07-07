@@ -2,13 +2,12 @@ fastapi
 uvicorn[standard]
 python-dotenv
 requests
+# torch is installed separately in the Dockerfile with the CPU-only index URL
+# so it is intentionally omitted here to avoid downloading the 2 GB CUDA build.
 yfinance
 pandas
-numpy
+numpy<2                 # many quant libs (arch, statsmodels) not yet numpy-2 stable
 transformers
-# torch: the line below installs the CPU build. For NVIDIA GPU (e.g. RTX 4070 Super)
-# run instead:  pip install torch --index-url https://download.pytorch.org/whl/cu124
-torch
 apscheduler
 quantstats
 scipy
