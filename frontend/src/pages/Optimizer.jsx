@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import usePersistentState from '../usePersistentState'
 import { useMutation } from '@tanstack/react-query'
 import { runMVO, runBL, getFrontier, autoOptimize, runHRP } from '../api'
 import Spinner from '../components/Spinner'
@@ -48,10 +49,10 @@ function WeightBar({ ticker, weight }) {
 }
 
 export default function Optimizer() {
-  const [tab, setTab]       = useState('mvo')
-  const [tickers, setTickers] = useState(DEFAULT_TICKERS)
-  const [target, setTarget]   = useState('max_sharpe')
-  const [maxWeight, setMaxWeight] = useState(35)   // cap per stock (%) to force diversification
+  const [tab, setTab]       = usePersistentState('opt.tab', 'mvo')
+  const [tickers, setTickers] = usePersistentState('opt.tickers', DEFAULT_TICKERS)
+  const [target, setTarget]   = usePersistentState('opt.target', 'max_sharpe')
+  const [maxWeight, setMaxWeight] = usePersistentState('opt.maxWeight', 35)   // cap per stock (%) to force diversification
 
   const mvoMut     = useMutation({ mutationFn: runMVO })
   const blMut      = useMutation({ mutationFn: data => runBL({ ...data, tickers }) })

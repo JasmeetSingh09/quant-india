@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import usePersistentState from '../usePersistentState'
 import { useMutation } from '@tanstack/react-query'
 import { getDeflatedSharpe, getPositionSize } from '../api'
 import { InfoTip } from '../components/Term'
@@ -7,14 +8,14 @@ import { ShieldAlert, Loader2 } from 'lucide-react'
 
 export default function RiskLab() {
   // Deflated Sharpe
-  const [ticker, setTicker] = useState('RELIANCE.NS')
-  const [trials, setTrials] = useState(1)
+  const [ticker, setTicker] = usePersistentState('risk.ticker', 'RELIANCE.NS')
+  const [trials, setTrials] = usePersistentState('risk.trials', 1)
   const dsr = useMutation({ mutationFn: ({ t, n }) => getDeflatedSharpe(t, n) })
 
   // Position sizing
-  const [ret, setRet] = useState(18)
-  const [vol, setVol] = useState(25)
-  const [tgt, setTgt] = useState(15)
+  const [ret, setRet] = usePersistentState('risk.ret', 18)
+  const [vol, setVol] = usePersistentState('risk.vol', 25)
+  const [tgt, setTgt] = usePersistentState('risk.tgt', 15)
   const pos = useMutation({ mutationFn: getPositionSize })
 
   const runDsr = () => {

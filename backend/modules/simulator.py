@@ -40,7 +40,7 @@ NIFTY_TICKER = "^NSEI"
 # ---------------------------------------------------------------------------
 
 def _init_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
 
     # Real-time simulation sessions
     conn.execute("""
@@ -208,7 +208,7 @@ def start_simulation(
     if failed:
         return {"error": f"Could not fetch prices for: {failed}. Check ticker symbols."}
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     try:
         conn.execute(
             "INSERT INTO simulations (name, initial_value, started_at, last_checked, status) "
@@ -256,7 +256,7 @@ def get_simulation_pnl(name: str) -> dict:
     Overall portfolio shows total ₹ P&L and % vs initial capital.
     """
     _init_db()
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     sim = conn.execute(
         "SELECT name, initial_value, started_at FROM simulations WHERE name = ?", (name,)
     ).fetchone()
@@ -308,7 +308,7 @@ def get_simulation_pnl(name: str) -> dict:
 
     # Save snapshot for P&L chart
     now = datetime.now().isoformat()
-    conn2 = sqlite3.connect(DB_PATH)
+    conn2 = sqlite3.connect(DB_PATH, timeout=30)
     conn2.execute(
         "INSERT INTO sim_snapshots (sim_name, snapshot_at, total_value, pnl_pct) VALUES (?, ?, ?, ?)",
         (name, now, round(total_current, 2), round(total_pnl_pct, 2))
@@ -341,7 +341,7 @@ def get_simulation_history(name: str) -> dict:
     Each row is {snapshot_at, total_value, pnl_pct}.
     """
     _init_db()
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     sim = conn.execute(
         "SELECT initial_value, started_at FROM simulations WHERE name = ?", (name,)
     ).fetchone()
@@ -366,7 +366,7 @@ def get_simulation_history(name: str) -> dict:
 def list_simulations() -> list:
     """List all active real-time simulations."""
     _init_db()
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     rows = conn.execute(
         "SELECT name, initial_value, started_at, last_checked, status FROM simulations ORDER BY started_at DESC"
     ).fetchall()
@@ -378,10 +378,151 @@ def list_simulations() -> list:
     ]
 
 
+def add_position(sim_name: str, ticker: str, amount: float) -> dict:
+    """
+    Add (buy) a stock into an ALREADY-RUNNING simulation at TODAY'S live price.
+
+    This is honest paper trading: the new holding is booked at the current market
+    price (so it starts at ~0 P&L, not the sim's original start price), funded by
+    fresh capital. The simulation's invested capital grows by `amount`, so every
+    existing position's P&L is completely unaffected.
+
+    sim_name — the running simulation
+    ticker   — stock/commodity to add (e.g. "INFY.NS", "GC=F")
+    amount   — ₹ of new capital to invest in it
+    """
+    _init_db()
+    ticker = ticker.upper()
+    if not (ticker.endswith(".NS") or ticker.endswith(".BO") or "=F" in ticker or ticker.startswith("^")):
+        return {"error": f"Unsupported ticker '{ticker}' (use .NS stocks or futures like GC=F)"}
+    if amount is None or amount <= 0:
+        return {"error": "Amount to invest must be a positive number."}
+
+    conn = sqlite3.connect(DB_PATH, timeout=30)
+    sim = conn.execute(
+        "SELECT initial_value FROM simulations WHERE name = ?", (sim_name,)
+    ).fetchone()
+    if not sim:
+        conn.close()
+        return {"error": f"Simulation '{sim_name}' not found"}
+
+    price = _live_price(ticker)
+    if price is None or price <= 0:
+        conn.close()
+        return {"error": f"Could not fetch a live price for {ticker}."}
+
+    now      = datetime.now().isoformat()
+    buy_units = amount / price
+    new_init  = sim[0] + amount
+
+    existing = conn.execute(
+        "SELECT units, entry_value FROM sim_positions WHERE sim_name = ? AND ticker = ?",
+        (sim_name, ticker)
+    ).fetchone()
+
+    if existing:
+        # Top up an already-held stock: dollar-cost-average into it, blending the
+        # entry price so P&L stays honest. This RAISES the stock's share.
+        old_units, old_entry_value = existing
+        tot_units   = old_units + buy_units
+        tot_entry   = old_entry_value + amount
+        blended     = tot_entry / tot_units if tot_units else price
+        alloc_pct   = round(tot_entry / new_init * 100, 2)
+        conn.execute(
+            "UPDATE sim_positions SET units = ?, entry_value = ?, entry_price = ?, allocation_pct = ? "
+            "WHERE sim_name = ? AND ticker = ?",
+            (tot_units, tot_entry, round(blended, 4), alloc_pct, sim_name, ticker)
+        )
+        status, note = "topped_up", (
+            f"Added ₹{amount:,.0f} more of {ticker} at ₹{price}. "
+            f"Blended entry now ₹{blended:,.2f}."
+        )
+    else:
+        # Buy a brand-new holding.
+        alloc_pct = round(amount / new_init * 100, 2)
+        conn.execute("""
+            INSERT INTO sim_positions
+              (sim_name, ticker, company_name, allocation_pct, units,
+               entry_price, entry_value, entry_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (sim_name, ticker, _company_name(ticker), alloc_pct, buy_units, price, amount, now))
+        status, note = "added", f"Bought {ticker} at ₹{price} with ₹{amount:,.0f} of new capital."
+
+    conn.execute("UPDATE simulations SET initial_value = ? WHERE name = ?", (new_init, sim_name))
+    conn.commit()
+    conn.close()
+
+    return {
+        "status":       status,
+        "sim_name":     sim_name,
+        "ticker":       ticker,
+        "entry_price":  price,
+        "units":        round(buy_units, 4),
+        "invested":     round(amount, 2),
+        "new_capital":  round(new_init, 2),
+        "note":         note,
+    }
+
+
+def remove_position(sim_name: str, ticker: str) -> dict:
+    """
+    Remove (sell) a stock from a running simulation at TODAY'S live price.
+
+    Locks in that position's realized profit/loss, then withdraws the position:
+    its invested capital is subtracted from the simulation's capital so the
+    remaining holdings' P&L stays correct. Reports the realized ₹ P&L to the user.
+    """
+    _init_db()
+    ticker = ticker.upper()
+    conn = sqlite3.connect(DB_PATH, timeout=30)
+    sim = conn.execute(
+        "SELECT initial_value FROM simulations WHERE name = ?", (sim_name,)
+    ).fetchone()
+    if not sim:
+        conn.close()
+        return {"error": f"Simulation '{sim_name}' not found"}
+    pos = conn.execute(
+        "SELECT units, entry_price, entry_value FROM sim_positions WHERE sim_name = ? AND ticker = ?",
+        (sim_name, ticker)
+    ).fetchone()
+    if not pos:
+        conn.close()
+        return {"error": f"{ticker} is not in this simulation."}
+
+    units, entry_price, entry_value = pos
+    n_positions = conn.execute(
+        "SELECT COUNT(*) FROM sim_positions WHERE sim_name = ?", (sim_name,)
+    ).fetchone()[0]
+    if n_positions <= 1:
+        conn.close()
+        return {"error": "Can't remove the last holding — delete the whole simulation instead."}
+
+    current_price = _live_price(ticker) or entry_price
+    current_value = units * current_price
+    realized_pnl  = current_value - entry_value
+    new_init      = max(sim[0] - entry_value, 0.0)
+
+    conn.execute("DELETE FROM sim_positions WHERE sim_name = ? AND ticker = ?", (sim_name, ticker))
+    conn.execute("UPDATE simulations SET initial_value = ? WHERE name = ?", (new_init, sim_name))
+    conn.commit()
+    conn.close()
+
+    return {
+        "status":        "removed",
+        "sim_name":      sim_name,
+        "ticker":        ticker,
+        "sell_price":    round(current_price, 4),
+        "realized_pnl":  round(realized_pnl, 2),
+        "realized_pct":  round(realized_pnl / entry_value * 100, 2) if entry_value else 0,
+        "new_capital":   round(new_init, 2),
+        "note":          f"Sold {ticker} at ₹{current_price}. Realized P&L ₹{realized_pnl:,.2f}.",
+    }
+
+
 def delete_simulation(name: str) -> dict:
     """Delete a simulation and all its positions/snapshots."""
     _init_db()
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     count = conn.execute("SELECT COUNT(*) FROM simulations WHERE name = ?", (name,)).fetchone()[0]
     if not count:
         conn.close()
@@ -786,7 +927,7 @@ def save_portfolio(name: str, holdings: dict) -> dict:
     if abs(total - 100) > 0.01:
         return {"error": f"Allocations must sum to 100%, got {total:.1f}%"}
     now = datetime.now().isoformat()
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     try:
         conn.execute(
             "INSERT OR REPLACE INTO portfolios (name, holdings, created_at, last_updated) VALUES (?,?,?,?)",
@@ -802,7 +943,7 @@ def save_portfolio(name: str, holdings: dict) -> dict:
 
 def load_portfolio(name: str) -> dict:
     _init_db()
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     row  = conn.execute(
         "SELECT name, holdings, created_at FROM portfolios WHERE name = ?", (name,)
     ).fetchone()
@@ -814,7 +955,7 @@ def load_portfolio(name: str) -> dict:
 
 def list_portfolios() -> list:
     _init_db()
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     rows = conn.execute(
         "SELECT name, created_at FROM portfolios ORDER BY created_at DESC"
     ).fetchall()
@@ -903,7 +1044,7 @@ def submit_challenge(challenge_id: str, user_pick: dict) -> dict:
     if not challenge:
         return {"error": f"Challenge '{challenge_id}' not found"}
     now = datetime.now().isoformat()
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.execute(
         "INSERT INTO challenge_entries (challenge_id, user_pick, submitted_at) VALUES (?,?,?)",
         (challenge_id, json.dumps(user_pick), now)

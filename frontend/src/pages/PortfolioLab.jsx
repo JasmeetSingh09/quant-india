@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import usePersistentState from '../usePersistentState'
 import Optimizer from './Optimizer'
 import MonteCarlo from './MonteCarlo'
 import RiskLab from './RiskLab'
@@ -10,7 +10,7 @@ const TABS = [
 ]
 
 export default function PortfolioLab() {
-  const [active, setActive] = useState(0)
+  const [active, setActive] = usePersistentState('lab.active', 0)
   const { Component } = TABS[active]
   return (
     <div className="flex flex-col h-full">

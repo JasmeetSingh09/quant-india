@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import usePersistentState from '../usePersistentState'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { startSimulation, getSimulationPnl, getSimulations, deleteSimulation, runBacktest, getSimHistory } from '../api'
+import { startSimulation, getSimulationPnl, getSimulations, deleteSimulation, runBacktest, getSimHistory, addSimPosition, removeSimPosition } from '../api'
 import Spinner from '../components/Spinner'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend, BarChart, Bar, Cell, ReferenceLine } from 'recharts'
 import { InfoTip } from '../components/Term'
@@ -72,7 +73,7 @@ function HoldingsInput({ holdings, setHoldings }) {
   )
 }
 
-function PnlRow({ pos }) {
+function PnlRow({ pos, onRemove, onTopUp, busy }) {
   const up = pos.pnl_inr >= 0
   return (
     <div className="flex items-center justify-between py-2.5 border-b border-gray-800 last:border-0">
@@ -96,26 +97,40 @@ function PnlRow({ pos }) {
           {up?'+':''}{pos.pnl_pct?.toFixed(2)}%
         </p>
       </div>
+      <div className="flex items-center gap-1 ml-2">
+        {onTopUp && (
+          <button onClick={() => onTopUp(pos.ticker)} disabled={busy} title="Buy more (raise this stock's share)"
+            className="text-gray-600 hover:text-green-400 disabled:opacity-40">
+            <Plus size={14}/>
+          </button>
+        )}
+        {onRemove && (
+          <button onClick={() => onRemove(pos.ticker)} disabled={busy} title="Sell & remove from simulation"
+            className="text-gray-600 hover:text-red-400 disabled:opacity-40">
+            <Trash2 size={13}/>
+          </button>
+        )}
+      </div>
     </div>
   )
 }
 
 export default function Simulator() {
-  const [tab, setTab] = useState('realtime')
+  const [tab, setTab] = usePersistentState('sim.tab', 'realtime')
   const qc = useQueryClient()
 
-  // Realtime state
-  const [simName, setSimName]     = useState('')
-  const [rtHoldings, setRtHoldings] = useState({})
-  const [rtCapital, setRtCapital] = useState(100000)
-  const [activeSimName, setActiveSimName] = useState('')
+  // Realtime state — persisted so switching modules never loses your setup
+  const [simName, setSimName]     = usePersistentState('sim.simName', '')
+  const [rtHoldings, setRtHoldings] = usePersistentState('sim.rtHoldings', {})
+  const [rtCapital, setRtCapital] = usePersistentState('sim.rtCapital', 100000)
+  const [activeSimName, setActiveSimName] = usePersistentState('sim.activeSimName', '')
 
-  // Historic state
-  const [htHoldings, setHtHoldings] = useState({})
-  const [startDate, setStartDate] = useState('2019-01-01')
-  const [endDate, setEndDate]     = useState('2022-12-31')
-  const [htCapital, setHtCapital] = useState(100000)
-  const [btResult, setBtResult]   = useState(null)
+  // Historic state — persisted
+  const [htHoldings, setHtHoldings] = usePersistentState('sim.htHoldings', {})
+  const [startDate, setStartDate] = usePersistentState('sim.startDate', '2019-01-01')
+  const [endDate, setEndDate]     = usePersistentState('sim.endDate', '2022-12-31')
+  const [htCapital, setHtCapital] = usePersistentState('sim.htCapital', 100000)
+  const [btResult, setBtResult]   = usePersistentState('sim.btResult', null)
 
   const { data: simList } = useQuery({ queryKey: ['simList'], queryFn: getSimulations })
   const { data: pnlData, isLoading: pnlLoading, refetch: refetchPnl } = useQuery({
@@ -145,6 +160,24 @@ export default function Simulator() {
     mutationFn: runBacktest,
     onSuccess: d => setBtResult(d),
   })
+
+  // Buy/sell into a RUNNING simulation (books at today's live price)
+  const [addTicker, setAddTicker] = useState('')
+  const [addAmount, setAddAmount] = useState(10000)
+  const addPosMut = useMutation({
+    mutationFn: (ticker) => addSimPosition(activeSimName, ticker, Number(addAmount)),
+    onSuccess: () => { setAddTicker(''); qc.invalidateQueries(['pnl', activeSimName]); refetchPnl() },
+  })
+  const removePosMut = useMutation({
+    mutationFn: (ticker) => removeSimPosition(activeSimName, ticker),
+    onSuccess: () => { qc.invalidateQueries(['pnl', activeSimName]); refetchPnl() },
+  })
+  const addPos = () => {
+    if (!activeSimName || !addTicker || !addAmount) return
+    const t = addTicker.toUpperCase()
+    const full = (t.endsWith('.NS') || t.includes('=F') || t.startsWith('^') || t.endsWith('.BO')) ? t : `${t}.NS`
+    addPosMut.mutate(full)
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -277,7 +310,54 @@ export default function Simulator() {
                     )}
 
                     <div className="divide-y divide-gray-800">
-                      {pnlData.positions?.map(p => <PnlRow key={p.ticker} pos={p} />)}
+                      {pnlData.positions?.map(p => (
+                        <PnlRow key={p.ticker} pos={p}
+                          onRemove={removePosMut.mutate} onTopUp={addPosMut.mutate}
+                          busy={removePosMut.isPending || addPosMut.isPending} />
+                      ))}
+                    </div>
+
+                    {/* Buy a stock into THIS running simulation, at today's price */}
+                    <div className="border-t border-gray-800 pt-4 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Plus size={13} className="text-green-400" />
+                        <p className="text-sm font-medium text-gray-200">Buy / top up in this simulation</p>
+                        <span className="text-xs text-gray-500">· new stock, or type one you already hold to raise its share</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <input className="input flex-1" placeholder="Stock e.g. INFY"
+                          value={addTicker} onChange={e => setAddTicker(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && addPos()} />
+                        <div className="relative">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-gray-500">₹</span>
+                          <input className="input w-32 pl-6" type="number" min="1" step="1000" placeholder="amount"
+                            value={addAmount} onChange={e => setAddAmount(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && addPos()} />
+                        </div>
+                        <button onClick={addPos} disabled={addPosMut.isPending || !addTicker}
+                          className="btn-primary flex items-center gap-1 whitespace-nowrap">
+                          {addPosMut.isPending ? '...' : <><Plus size={14}/> Buy</>}
+                        </button>
+                      </div>
+                      {/* Commodity quick-add */}
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className="text-xs text-gray-500 self-center mr-1">Quick add:</span>
+                        {COMMODITY_PICKS.map(c => (
+                          <button key={c.ticker} disabled={addPosMut.isPending}
+                            onClick={() => addPosMut.mutate(c.ticker)}
+                            className="px-2 py-0.5 rounded text-xs bg-gray-800 text-amber-300 hover:bg-gray-700 border border-gray-700 disabled:opacity-40">
+                            + {c.name}
+                          </button>
+                        ))}
+                      </div>
+                      {addPosMut.isError && <p className="text-red-400 text-xs">{String(addPosMut.error?.response?.data?.detail || addPosMut.error)}</p>}
+                      {addPosMut.isSuccess && addPosMut.data?.note && <p className="text-green-400 text-xs">✓ {addPosMut.data.note}</p>}
+                      {removePosMut.isError && <p className="text-red-400 text-xs">{String(removePosMut.error?.response?.data?.detail || removePosMut.error)}</p>}
+                      {removePosMut.isSuccess && removePosMut.data?.note && <p className="text-gray-400 text-xs">↩ {removePosMut.data.note}</p>}
+                      <p className="text-[11px] text-gray-600 leading-snug">
+                        On any holding: <span className="text-green-500">+</span> buys more (raises its share) · 🗑 sells it,
+                        locking in its realized P&amp;L. Other holdings are unaffected.
+                      </p>
                     </div>
                   </>
                 )}

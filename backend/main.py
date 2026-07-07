@@ -71,7 +71,7 @@ from metrics import get_full_metrics, peer_comparison, dupont_analysis, financia
 from simulator import (
     backtest, compare_scenarios,
     start_simulation, get_simulation_pnl, get_simulation_history,
-    list_simulations, delete_simulation,
+    list_simulations, delete_simulation, add_position, remove_position,
     get_challenges, submit_challenge,
     save_portfolio, load_portfolio, list_portfolios,
 )
@@ -119,6 +119,10 @@ class SimulationStartRequest(BaseModel):
     name: str
     holdings: dict
     initial_value: float = 100_000
+
+class SimAddRequest(BaseModel):
+    ticker: str
+    amount: float = 10_000
 
 class BacktestRequest(BaseModel):
     holdings: dict
@@ -394,6 +398,30 @@ def sim_history(name: str):
 def sim_list():
     """List all active real-time simulations."""
     return {"simulations": list_simulations()}
+
+
+@app.post("/simulator/realtime/{name}/add")
+def sim_add(name: str, req: SimAddRequest):
+    """
+    Add (buy) a stock into a running simulation at today's live price, funded by
+    fresh capital. Body: {"ticker": "INFY.NS", "amount": 10000}
+    """
+    result = add_position(name, req.ticker, req.amount)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.post("/simulator/realtime/{name}/remove")
+def sim_remove(name: str, req: SimAddRequest):
+    """
+    Remove (sell) a stock from a running simulation at today's live price and
+    report realized P&L. Body: {"ticker": "INFY.NS"} (amount ignored).
+    """
+    result = remove_position(name, req.ticker)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
 
 
 @app.delete("/simulator/realtime/{name}")

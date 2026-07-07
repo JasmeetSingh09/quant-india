@@ -1,10 +1,11 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getMCX, getRegime, getMarketNews, getPrice, getTopPicks } from '../api'
+import { getMCX, getRegime, getMarketNews, getPrice, getTopPicks, getPredictionTrack } from '../api'
 import Spinner from '../components/Spinner'
 import RegimeBadge from '../components/RegimeBadge'
 import Explainer from '../components/Explainer'
-import { TrendingUp, TrendingDown, Sparkles, ArrowUpRight, ArrowDownRight, RefreshCw } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { TrendingUp, TrendingDown, Sparkles, ArrowUpRight, ArrowDownRight, RefreshCw, History } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
 
 const NIFTY_STOCKS = ['RELIANCE.NS','TCS.NS','HDFCBANK.NS','INFY.NS','ICICIBANK.NS']
 
@@ -123,6 +124,112 @@ function NewsCard({ article }) {
         )}
       </div>
     </a>
+  )
+}
+
+function TrackRecord() {
+  const navigate = useNavigate()
+  const [days, setDays] = useState(3)   // shortest window so the record shows as soon as picks mature
+  const { data, isLoading } = useQuery({
+    queryKey: ['predTrack', days],
+    queryFn: () => getPredictionTrack(days),
+    staleTime: 10 * 60 * 1000,
+  })
+  const sc = data?.scorecard
+  const preds = data?.predictions || []
+  const pct = v => v == null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(2)}%`
+  const col = v => v == null ? 'text-gray-400' : v >= 0 ? 'text-green-400' : 'text-red-400'
+
+  return (
+    <div className="card space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h2 className="font-semibold flex items-center gap-2">
+          <History size={18} className="text-blue-400" /> Track Record — did past picks actually work?
+        </h2>
+        <div className="flex items-center gap-1 text-xs">
+          <span className="text-gray-500 mr-1">Held for ≥</span>
+          {[3, 7, 14].map(d => (
+            <button key={d} onClick={() => setDays(d)}
+              className={`px-2 py-1 rounded ${days === d ? 'bg-blue-600 text-white' : 'bg-gray-800 hover:bg-gray-700 text-gray-300'}`}>
+              {d}d
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {isLoading ? <Spinner size="sm" /> : !sc ? (
+        <p className="text-sm text-gray-500">{data?.status || 'No matured predictions in this window yet — check back as the record accrues.'}</p>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="card-sm">
+              <p className="stat-label">BUY-signal avg return</p>
+              <p className={`stat-value text-lg ${col(sc.buy_avg_return_pct)}`}>{pct(sc.buy_avg_return_pct)}</p>
+            </div>
+            <div className="card-sm">
+              <p className="stat-label">SELL-signal avg return</p>
+              <p className={`stat-value text-lg ${col(sc.sell_avg_return_pct)}`}>{pct(sc.sell_avg_return_pct)}</p>
+            </div>
+            <div className="card-sm">
+              <p className="stat-label">BUY − SELL spread<span className="text-gray-600"> (edge)</span></p>
+              <p className={`stat-value text-lg ${col(sc.buy_minus_sell_pct)}`}>{pct(sc.buy_minus_sell_pct)}</p>
+            </div>
+            <div className="card-sm">
+              <p className="stat-label">Avg excess vs Nifty</p>
+              <p className={`stat-value text-lg ${col(sc.avg_excess_vs_nifty_pct)}`}>{pct(sc.avg_excess_vs_nifty_pct)}</p>
+            </div>
+          </div>
+
+          <div className={`rounded-lg p-3 text-sm border ${
+            (sc.buy_minus_sell_pct ?? 0) > 0 ? 'border-green-800 bg-green-900/15 text-green-300'
+                                             : 'border-yellow-800 bg-yellow-900/15 text-yellow-200'}`}>
+            <b>Verdict:</b> {sc.verdict}
+            <span className="block text-xs text-gray-400 mt-1">
+              {sc.matured_predictions} matured picks · alpha↔return correlation {sc.alpha_vs_return_correlation ?? '—'}
+              {' '}(a value near 0 means the score barely predicts returns — expected on small samples).
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-gray-500 text-xs border-b border-gray-800">
+                  <th className="text-left py-2">Stock</th>
+                  <th className="text-left">Signal</th>
+                  <th className="text-right">Actual return</th>
+                  <th className="text-right">vs Nifty</th>
+                  <th className="text-right">Held</th>
+                  <th className="text-right">Logged</th>
+                </tr>
+              </thead>
+              <tbody>
+                {preds.slice().sort((a,b) => (b.forward_return_pct ?? 0) - (a.forward_return_pct ?? 0)).map((r, i) => {
+                  const isBuy = r.signal && r.signal.includes('BUY')
+                  const isSell = r.signal && r.signal.includes('SELL')
+                  return (
+                    <tr key={i}
+                        onClick={() => navigate(`/stock?ticker=${encodeURIComponent(r.ticker)}`)}
+                        className="border-b border-gray-800 last:border-0 hover:bg-gray-800/50 cursor-pointer">
+                      <td className="py-1.5 font-mono text-green-400 hover:underline">{r.ticker.replace('.NS','')}</td>
+                      <td><span className={`badge-${isBuy ? 'green' : isSell ? 'red' : 'yellow'}`}>{r.signal}</span></td>
+                      <td className={`text-right font-mono ${col(r.forward_return_pct)}`}>{pct(r.forward_return_pct)}</td>
+                      <td className={`text-right font-mono ${col(r.excess_pct)}`}>{pct(r.excess_pct)}</td>
+                      <td className="text-right text-gray-400">{r.days_held}d</td>
+                      <td className="text-right text-gray-500 text-xs">{r.date}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-gray-600">
+            "Actual return" = how the stock moved from the day it was logged until now. A BUY that went up
+            (green) or a SELL that went down was "right." A live, honest scorecard — small samples are noisy,
+            and it updates itself daily.
+          </p>
+        </>
+      )}
+    </div>
   )
 }
 
@@ -274,6 +381,9 @@ export default function Dashboard() {
           </>
         )}
       </div>
+
+      {/* Honest track record of past picks */}
+      <TrackRecord />
 
       {/* Regime detail */}
       {regime && !regimeLoading && (

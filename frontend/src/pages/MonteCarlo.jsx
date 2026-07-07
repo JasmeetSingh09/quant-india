@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import usePersistentState from '../usePersistentState'
 import { useMutation } from '@tanstack/react-query'
 import { runMonteCarlo, compareMonteCarlo } from '../api'
 import Spinner from '../components/Spinner'
@@ -53,10 +54,10 @@ function HoldingsInput({ holdings, setHoldings }) {
 }
 
 export default function MonteCarlo() {
-  const [holdings, setHoldings] = useState({ 'HDFCBANK.NS': 40, 'TCS.NS': 35, 'RELIANCE.NS': 25 })
-  const [capital, setCapital]   = useState(100000)
-  const [years, setYears]       = useState(1)
-  const [method, setMethod]     = useState('bootstrap')
+  const [holdings, setHoldings] = usePersistentState('mc.holdings', { 'HDFCBANK.NS': 40, 'TCS.NS': 35, 'RELIANCE.NS': 25 })
+  const [capital, setCapital]   = usePersistentState('mc.capital', 100000)
+  const [years, setYears]       = usePersistentState('mc.years', 1)
+  const [method, setMethod]     = usePersistentState('mc.method', 'bootstrap')
 
   const sim = useMutation({ mutationFn: runMonteCarlo })
   const cmp = useMutation({ mutationFn: compareMonteCarlo })

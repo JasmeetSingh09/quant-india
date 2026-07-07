@@ -1,4 +1,4 @@
-import axios from 'axios'
+﻿import axios from 'axios'
 
 // In local dev, calls go to '/api' (Vite proxies to localhost:8000).
 // In production, set VITE_API_URL to your deployed backend URL (e.g. Render/Railway).
@@ -42,6 +42,8 @@ export const getSimulationPnl  = name => api.get(`/simulator/realtime/${name}`)
 export const getSimulations    = () => api.get('/simulator/realtime')
 export const deleteSimulation  = name => api.delete(`/simulator/realtime/${name}`)
 export const getSimHistory     = name => api.get(`/simulator/realtime/${name}/history`)
+export const addSimPosition    = (name, ticker, amount) => api.post(`/simulator/realtime/${name}/add`, { ticker, amount })
+export const removeSimPosition = (name, ticker) => api.post(`/simulator/realtime/${name}/remove`, { ticker })
 
 // Simulator - historic
 export const runBacktest    = body => api.post('/simulator/historic', body)
@@ -54,6 +56,7 @@ export const scanAlpha      = body => api.post('/alpha/scan', body)
 export const getTopPicks    = () => api.get('/alpha/top-picks', { timeout: 150000 })
 export const getRegimeAlpha = ticker => api.get(`/alpha/regime-adjusted?ticker=${ticker}`)
 export const explainAlpha   = ticker => api.get(`/alpha/explain?ticker=${ticker}`)
+export const getPredictionTrack = (minDays = 7) => api.get(`/predictions/track?min_days=${minDays}`)
 
 // Optimizer
 export const runMVO         = body => api.post('/optimizer/mvo', body)
@@ -104,3 +107,5 @@ export const runCorrelation     = body => api.post('/research/correlation', body
 
 // Alerts
 export const sendTestAlert  = () => api.post('/alerts/test')
+
+
