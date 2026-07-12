@@ -67,11 +67,16 @@ MISSED|PARTIAL|UNVERIFIABLE. extraction_confidence = high|medium|low.
    or the dashboard.
 
 ## Summary spec (one .md per transcript)
-One page: headline numbers as management presented them; top 5
-promises (one line each with deadline); guidance revisions
-(reaffirmed/raised/lowered/quietly dropped vs prior quarters);
-tone notes (what was emphasized, what was dodged in Q&A); 3 most
-interesting verbatim quotes.
+One page: top 5 promises (one line each with deadline); guidance
+revisions (reaffirmed/raised/lowered/quietly dropped vs prior
+quarters); 3 most interesting verbatim quotes.
+
+Wave 1, stage 1 is **promise-only**: the schema captures promises,
+not reported financials or Q&A tone, so "headline numbers as
+management presented them" and "tone notes (what was emphasized /
+dodged)" are left as honestly-blank sections with a note. Populating
+them (a schema extension or a second summarization pass) is a
+later-wave feature — it must not block the >=95% accuracy work.
 
 ## Scorecard spec (one .md per transcript)
 Table: # | Promise (short) | Verbatim quote | Deadline | Verdict |

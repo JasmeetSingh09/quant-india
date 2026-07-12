@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quant India — Promise Ledger</title>
+<style>
+  :root {
+    --bg: #ffffff; --panel: #f6f7f9; --border: #e2e5ea; --text: #1a1d23;
+    --muted: #6b7280; --accent: #1f6feb; --pending: #8a6d3b; --pending-bg: #fdf6e3;
+    --row-hover: #eef2ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1116; --panel: #171a21; --border: #2a2f3a; --text: #e6e8ee;
+      --muted: #9aa2b1; --accent: #4d9dff; --pending: #d9b25f; --pending-bg: #241f14;
+      --row-hover: #1b2233;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 28px 20px 60px; }
+  header h1 { margin: 0 0 4px; font-size: 22px; letter-spacing: -0.01em; }
+  header .sub { color: var(--muted); font-size: 13px; margin-bottom: 4px; }
+  .note { color: var(--muted); font-size: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-top: 20px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
+  tbody tr.clickable { cursor: pointer; }
+  tbody tr.clickable:hover { background: var(--row-hover); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--pending-bg); color: var(--pending); }
+  .quote { color: var(--text); }
+  .meta { color: var(--muted); font-size: 12px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .back { display: inline-block; margin: 4px 0 8px; cursor: pointer; color: var(--accent); font-size: 14px; }
+  .scroll { overflow-x: auto; }
+  .empty { padding: 40px 20px; color: var(--muted); }
+  .empty code { background: var(--panel); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; }
+  .qtr-head { padding: 14px 14px 4px; font-weight: 600; }
+  .qtr-head .meta { font-weight: 400; }
+  h2 { font-size: 18px; margin: 6px 0 2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Quant India — Promise Ledger</h1>
+    <div class="sub">Did management do what they said? Verified management promises from Indian earnings calls.</div>
+    <div class="note" id="gen"></div>
+  </header>
+  <div id="view"></div>
+</div>
+
+<script src="ledger.js"></script>
+<script>
+(function () {
+  "use strict";
+  var LEDGER = window.LEDGER || null;
+  var view = document.getElementById("view");
+  document.getElementById("gen").textContent =
+    LEDGER && window.LEDGER_GENERATED
+      ? "Facts only — verified quotes, no buy/sell views. Bundle generated " + window.LEDGER_GENERATED + "."
+      : "";
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  // Aggregate docs by ticker into company rows.
+  function byCompany(docs) {
+    var map = {};
+    docs.forEach(function (d) {
+      var c = map[d.ticker] || (map[d.ticker] = {
+        ticker: d.ticker, company: d.company, sector: d.sector, docs: [],
+        total: 0, numeric: 0, delivered: 0, partial: 0, nonPending: 0
+      });
+      c.docs.push(d);
+      (d.promises || []).forEach(function (p) {
+        c.total++;
+        if (p.specificity === "numeric") c.numeric++;
+        var v = (p.verdict || "PENDING");
+        if (v !== "PENDING") {
+          if (p.verifiable !== false) c.nonPending++;
+          if (v === "DELIVERED") c.delivered++;
+          else if (v === "PARTIAL") c.partial++;
+        }
+      });
+    });
+    return Object.keys(map).map(function (k) { return map[k]; })
+      .sort(function (a, b) { return b.total - a.total || a.company.localeCompare(b.company); });
+  }
+
+  function pct(n, d) { return d ? Math.round((n / d) * 100) + "%" : "—"; }
+
+  function reliability(c) {
+    // (DELIVERED + 0.5*PARTIAL) / non-pending verifiable promises; "—" until verdicts exist.
+    if (!c.nonPending) return "—";
+    return Math.round(((c.delivered + 0.5 * c.partial) / c.nonPending) * 100) + "%";
+  }
+
+  function renderList(docs) {
+    view.innerHTML = "";
+    var companies = byCompany(docs);
+    var card = el("div", "card");
+    var scroll = el("div", "scroll");
+    var t = el("table");
+    var thead = el("thead");
+    var hr = el("tr");
+    ["Company", "Ticker", "Sector", "Promises", "Specificity", "Reliability"].forEach(function (h, i) {
+      var th = el("th", i >= 3 ? "num" : null, h);
+      hr.appendChild(th);
+    });
+    thead.appendChild(hr);
+    t.appendChild(thead);
+    var tb = el("tbody");
+    companies.forEach(function (c) {
+      var tr = el("tr", "clickable");
+      tr.appendChild(el("td", null, c.company));
+      tr.appendChild(el("td", null, c.ticker));
+      tr.appendChild(el("td", null, c.sector || ""));
+      tr.appendChild(el("td", "num", String(c.total)));
+      tr.appendChild(el("td", "num", pct(c.numeric, c.total)));
+      var rel = el("td", "num");
+      var r = reliability(c);
+      if (r === "—") { var s = el("span", "meta", "—"); s.title = "No resolved verdicts yet (all promises PENDING)"; rel.appendChild(s); }
+      else rel.textContent = r;
+      tr.appendChild(rel);
+      tr.addEventListener("click", function () { renderDetail(c); });
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb);
+    scroll.appendChild(t);
+    card.appendChild(scroll);
+    view.appendChild(card);
+  }
+
+  function renderDetail(c) {
+    view.innerHTML = "";
+    var back = el("span", "back", "← All companies");
+    back.addEventListener("click", function () { renderList(LEDGER); });
+    view.appendChild(back);
+
+    var h = el("h2", null, c.company + " (" + c.ticker + ")");
+    view.appendChild(h);
+    view.appendChild(el("div", "meta", (c.sector || "") + " · " + c.total + " verified promise(s) across " + c.docs.length + " quarter(s)"));
+
+    c.docs.slice().sort(function (a, b) {
+      return (b.quarter_of_call || "").localeCompare(a.quarter_of_call || "");
+    }).forEach(function (d) {
+      var card = el("div", "card");
+      var head = el("div", "qtr-head", d.quarter_of_call + " ");
+      var src = el("span", "meta");
+      src.textContent = "· source: ";
+      if (d.ir_url) {
+        var a = el("a", null, d.transcript_source);
+        a.href = d.ir_url; a.target = "_blank"; a.rel = "noopener";
+        a.title = "Investor-relations page (source filing; PDF not rehosted)";
+        src.appendChild(a);
+      } else {
+        src.appendChild(el("span", null, d.transcript_source));
+      }
+      src.appendChild(el("span", null, " · pass rate " + d.pass_rate + "%"));
+      head.appendChild(src);
+      card.appendChild(head);
+
+      var scroll = el("div", "scroll");
+      var t = el("table");
+      var thead = el("thead");
+      var hr = el("tr");
+      ["#", "Promise", "Verbatim quote", "Deadline", "Verdict"].forEach(function (x) {
+        hr.appendChild(el("th", null, x));
+      });
+      thead.appendChild(hr); t.appendChild(thead);
+      var tb = el("tbody");
+      (d.promises || []).forEach(function (p, i) {
+        var tr = el("tr");
+        tr.appendChild(el("td", "num", String(i + 1)));
+        tr.appendChild(el("td", null, p.target_metric || p.promise_type || ""));
+        var q = el("td", "quote");
+        q.appendChild(el("span", null, "“" + (p.verbatim_quote || "") + "”"));
+        var m = el("div", "meta", (p.speaker || "") + (p.quote_location ? " · p." + p.quote_location : ""));
+        q.appendChild(m);
+        tr.appendChild(q);
+        tr.appendChild(el("td", null, p.deadline || ""));
+        var vd = el("td");
+        vd.appendChild(el("span", "pill", p.verdict || "PENDING"));
+        tr.appendChild(vd);
+        tb.appendChild(tr);
+      });
+      t.appendChild(tb); scroll.appendChild(t); card.appendChild(scroll);
+      view.appendChild(card);
+    });
+  }
+
+  if (!LEDGER || !LEDGER.length) {
+    var e = el("div", "card");
+    var inner = el("div", "empty");
+    inner.appendChild(el("div", null, "No verified transcripts yet."));
+    var p = el("p");
+    p.innerHTML = "Run the pipeline, then reload:";
+    inner.appendChild(p);
+    var pre = el("p");
+    pre.innerHTML = '<code>python pipeline.py extract data/transcripts/TITAN/&lt;file&gt;.pdf</code><br>' +
+                    '<code>python pipeline.py verify data/promises/&lt;file&gt;.json</code><br>' +
+                    '<code>python pipeline.py render data/promises/&lt;file&gt;.json</code>';
+    inner.appendChild(pre);
+    inner.appendChild(el("div", "note", "render regenerates site/ledger.js, which this page reads."));
+    e.appendChild(inner);
+    view.appendChild(e);
+  } else {
+    renderList(LEDGER);
+  }
+})();
+</script>
+</body>
+</html>
