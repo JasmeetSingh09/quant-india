@@ -1,0 +1,3 @@
+# Source concall transcript PDFs, organized per ticker:
+#   data/transcripts/<TICKER>/<TICKER>_<FY>Q<n>.pdf
+# Example: data/transcripts/TITAN/TITAN_FY25Q4.pdf

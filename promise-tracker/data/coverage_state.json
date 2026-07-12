@@ -1,0 +1,5 @@
+{
+  "_note": "Mutable ingestion state written by the pipeline. companies.json stays static config; this file tracks per-ticker progress for backfill and the coverage-gap monitor.",
+  "schema_version": 1,
+  "tickers": {}
+}

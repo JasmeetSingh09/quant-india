@@ -1,0 +1,5 @@
+# Wave 1 promise-tracker — approved dependencies only.
+# Ask before adding anything beyond these.
+anthropic
+pypdf
+pdfplumber

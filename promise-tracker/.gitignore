@@ -1,0 +1,12 @@
+# Secrets
+.env
+*.key
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Source PDFs are large; keep them out of git by default.
+# Remove this line if you decide to version the raw transcripts.
+data/transcripts/**/*.pdf

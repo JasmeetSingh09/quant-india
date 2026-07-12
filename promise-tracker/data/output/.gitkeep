@@ -1,0 +1,3 @@
+# Rendered Markdown: summary + scorecard, one pair per transcript:
+#   data/output/<TICKER>_<FY>Q<n>.summary.md
+#   data/output/<TICKER>_<FY>Q<n>.scorecard.md

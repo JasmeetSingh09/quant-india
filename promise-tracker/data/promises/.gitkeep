@@ -1,0 +1,2 @@
+# Extracted + verified promises JSON, one file per transcript:
+#   data/promises/<TICKER>_<FY>Q<n>.json

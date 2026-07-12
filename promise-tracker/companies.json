@@ -1,0 +1,37 @@
+{
+  "wave": 1,
+  "stage": 1,
+  "schema_version": 1,
+  "config": {
+    "backfill_years": 4,
+    "gap_alert_days": 15,
+    "_notes": [
+      "bse_code values are best-known and MUST be verified against BSE before enabling the automated announcement fetcher.",
+      "backfill_years: how many years of past concalls to ingest on first run so Wave 1 launches with a multi-year track record, not one transcript.",
+      "gap_alert_days: if a company has reported results but no transcript has been ingested within this many days, the coverage-gap monitor flags it."
+    ]
+  },
+  "companies": [
+    { "ticker": "TITAN",      "name": "Titan Company Ltd",              "segment": "large", "sector": "Jewellery & Watches",          "nse_symbol": "TITAN",      "bse_code": "500114", "ir_url": "" },
+    { "ticker": "INFY",       "name": "Infosys Ltd",                    "segment": "large", "sector": "IT Services",                  "nse_symbol": "INFY",       "bse_code": "500209", "ir_url": "" },
+    { "ticker": "HCLTECH",    "name": "HCL Technologies Ltd",           "segment": "large", "sector": "IT Services",                  "nse_symbol": "HCLTECH",    "bse_code": "532281", "ir_url": "" },
+    { "ticker": "ASIANPAINT", "name": "Asian Paints Ltd",               "segment": "large", "sector": "Paints",                       "nse_symbol": "ASIANPAINT", "bse_code": "500820", "ir_url": "" },
+    { "ticker": "MARUTI",     "name": "Maruti Suzuki India Ltd",        "segment": "large", "sector": "Automobiles",                  "nse_symbol": "MARUTI",     "bse_code": "532500", "ir_url": "" },
+    { "ticker": "LT",         "name": "Larsen & Toubro Ltd",            "segment": "large", "sector": "Engineering & Construction",    "nse_symbol": "LT",         "bse_code": "500510", "ir_url": "" },
+    { "ticker": "HDFCBANK",   "name": "HDFC Bank Ltd",                  "segment": "large", "sector": "Banking",                      "nse_symbol": "HDFCBANK",   "bse_code": "500180", "ir_url": "" },
+    { "ticker": "DMART",      "name": "Avenue Supermarts Ltd (DMart)",  "segment": "large", "sector": "Retail",                       "nse_symbol": "DMART",      "bse_code": "540376", "ir_url": "" },
+    { "ticker": "TATAMOTORS", "name": "Tata Motors Ltd",                "segment": "large", "sector": "Automobiles",                  "nse_symbol": "TATAMOTORS", "bse_code": "500570", "ir_url": "" },
+    { "ticker": "ETERNAL",    "name": "Eternal Ltd (formerly Zomato)",  "segment": "large", "sector": "Internet / Food Delivery",      "nse_symbol": "ETERNAL",    "bse_code": "543320", "ir_url": "" },
+
+    { "ticker": "POLYCAB",    "name": "Polycab India Ltd",              "segment": "mid",   "sector": "Cables & Wires",               "nse_symbol": "POLYCAB",    "bse_code": "542652", "ir_url": "" },
+    { "ticker": "DIXON",      "name": "Dixon Technologies (India) Ltd", "segment": "mid",   "sector": "Electronics Manufacturing (EMS)","nse_symbol": "DIXON",     "bse_code": "540699", "ir_url": "" },
+    { "ticker": "PERSISTENT", "name": "Persistent Systems Ltd",         "segment": "mid",   "sector": "IT Services",                  "nse_symbol": "PERSISTENT", "bse_code": "533179", "ir_url": "" },
+    { "ticker": "ASTRAL",     "name": "Astral Ltd",                     "segment": "mid",   "sector": "Building Materials (Pipes)",    "nse_symbol": "ASTRAL",     "bse_code": "532830", "ir_url": "" },
+    { "ticker": "KEI",        "name": "KEI Industries Ltd",             "segment": "mid",   "sector": "Cables & Wires",               "nse_symbol": "KEI",        "bse_code": "517569", "ir_url": "" },
+    { "ticker": "PIIND",      "name": "PI Industries Ltd",              "segment": "mid",   "sector": "Agrochemicals",                "nse_symbol": "PIIND",      "bse_code": "523642", "ir_url": "" },
+    { "ticker": "VOLTAS",     "name": "Voltas Ltd",                     "segment": "mid",   "sector": "Consumer Durables (HVAC)",     "nse_symbol": "VOLTAS",     "bse_code": "500575", "ir_url": "" },
+    { "ticker": "KAJARIACER", "name": "Kajaria Ceramics Ltd",           "segment": "mid",   "sector": "Building Materials (Tiles)",    "nse_symbol": "KAJARIACER", "bse_code": "500233", "ir_url": "" },
+    { "ticker": "SYNGENE",    "name": "Syngene International Ltd",       "segment": "mid",   "sector": "CRAMS / Pharma Services",       "nse_symbol": "SYNGENE",    "bse_code": "539268", "ir_url": "" },
+    { "ticker": "DELHIVERY",  "name": "Delhivery Ltd",                  "segment": "mid",   "sector": "Logistics",                    "nse_symbol": "DELHIVERY",  "bse_code": "543529", "ir_url": "" }
+  ]
+}
