@@ -13,6 +13,7 @@ Database: backend/quant_platform.db
 """
 
 import sqlite3
+from db import get_conn, IntegrityError  # noqa: F401
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
@@ -28,7 +29,7 @@ DB_PATH = Path(os.environ.get("QUANT_DATA_DIR", str(Path(__file__).parent.parent
 
 def _init_db():
     """Create watchlist table if it does not exist."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS watchlist (
             id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -107,7 +108,7 @@ def add_to_watchlist(
     company_name = _get_company_name(ticker)
     now = datetime.now().isoformat()
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     try:
         conn.execute("""
             INSERT INTO watchlist
@@ -126,7 +127,7 @@ def add_to_watchlist(
             "sentiment_alert": sentiment_alert,
             "added_at": now,
         }
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         return {"error": f"{ticker} is already in your watchlist"}
     except Exception as e:
         return {"error": str(e)}
@@ -138,7 +139,7 @@ def remove_from_watchlist(ticker: str) -> dict:
     """Remove a ticker from the watchlist. Returns status."""
     _init_db()
     ticker = ticker.upper()
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     cursor = conn.execute("DELETE FROM watchlist WHERE ticker = ?", (ticker,))
     conn.commit()
     conn.close()
@@ -155,7 +156,7 @@ def get_watchlist(refresh_prices: bool = True) -> list:
     and updates the stored current_price.
     """
     _init_db()
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     rows = conn.execute("""
         SELECT id, ticker, company_name, added_price, current_price,
                price_alert_pct, sentiment_alert, added_at, last_updated
@@ -185,7 +186,7 @@ def get_watchlist(refresh_prices: bool = True) -> list:
                 entry["change_from_add_pct"] = round(change_pct, 2)
                 entry["alert_triggered"] = abs(change_pct) >= row[5]
 
-                conn2 = sqlite3.connect(DB_PATH)
+                conn2 = get_conn()
                 conn2.execute(
                     "UPDATE watchlist SET current_price = ?, last_updated = ? WHERE id = ?",
                     (live, datetime.now().isoformat(), row[0])
@@ -227,7 +228,7 @@ def update_alert_settings(
         return {"error": "No fields to update"}
 
     values.append(ticker)
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     cursor = conn.execute(
         f"UPDATE watchlist SET {', '.join(updates)} WHERE ticker = ?", values
     )

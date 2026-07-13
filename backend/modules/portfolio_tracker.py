@@ -12,6 +12,7 @@ Stored in SQLite (table: portfolio_holdings).
 """
 
 import sqlite3
+from db import get_conn, IntegrityError  # noqa: F401
 import sys
 from pathlib import Path
 from datetime import datetime
@@ -24,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 
 def _init_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS portfolio_holdings (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -77,7 +78,7 @@ def add_holding(ticker: str, quantity: float, buy_price: float) -> dict:
         return {"error": "quantity and buy_price must be greater than 0"}
 
     now = datetime.now().isoformat()
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     cur = conn.execute(
         "INSERT INTO portfolio_holdings (ticker, company_name, quantity, buy_price, added_at) "
         "VALUES (?,?,?,?,?)",
@@ -93,7 +94,7 @@ def add_holding(ticker: str, quantity: float, buy_price: float) -> dict:
 def remove_holding(holding_id: int) -> dict:
     """Remove a holding by its id."""
     _init_db()
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     cur = conn.execute("DELETE FROM portfolio_holdings WHERE id = ?", (holding_id,))
     conn.commit()
     conn.close()
@@ -107,7 +108,7 @@ def get_portfolio(refresh: bool = True) -> dict:
     Return all holdings with live P&L plus portfolio totals and allocation.
     """
     _init_db()
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     rows = conn.execute(
         "SELECT id, ticker, company_name, quantity, buy_price, added_at "
         "FROM portfolio_holdings ORDER BY added_at DESC"
@@ -168,7 +169,7 @@ if __name__ == "__main__":
     print("=" * 55)
     # clean slate for the test
     _init_db()
-    conn = sqlite3.connect(DB_PATH); conn.execute("DELETE FROM portfolio_holdings"); conn.commit(); conn.close()
+    conn = get_conn(); conn.execute("DELETE FROM portfolio_holdings"); conn.commit(); conn.close()
 
     print("\n1. Validation (bad inputs):")
     print("   no .NS :", add_holding("RELIANCE", 10, 100).get("error"))

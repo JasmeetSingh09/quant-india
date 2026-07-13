@@ -23,6 +23,7 @@ Database: backend/quant_platform.db
 
 import json
 import sqlite3
+from db import get_conn, IntegrityError  # noqa: F401
 import numpy as np
 import pandas as pd
 import yfinance as yf
@@ -41,7 +42,7 @@ NIFTY_TICKER = "^NSEI"
 # ---------------------------------------------------------------------------
 
 def _init_db():
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_conn()
 
     # Real-time simulation sessions
     conn.execute("""
@@ -209,7 +210,7 @@ def start_simulation(
     if failed:
         return {"error": f"Could not fetch prices for: {failed}. Check ticker symbols."}
 
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_conn()
     try:
         conn.execute(
             "INSERT INTO simulations (name, initial_value, started_at, last_checked, status) "
@@ -225,7 +226,7 @@ def start_simulation(
             """, (name, p["ticker"], p["company_name"], p["allocation_pct"],
                   p["units"], p["entry_price"], p["entry_value"], p["entry_date"]))
         conn.commit()
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         conn.close()
         return {"error": f"Simulation '{name}' already exists. Use a different name or delete it first."}
     finally:
@@ -257,7 +258,7 @@ def get_simulation_pnl(name: str) -> dict:
     Overall portfolio shows total ₹ P&L and % vs initial capital.
     """
     _init_db()
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_conn()
     sim = conn.execute(
         "SELECT name, initial_value, started_at FROM simulations WHERE name = ?", (name,)
     ).fetchone()
@@ -309,7 +310,7 @@ def get_simulation_pnl(name: str) -> dict:
 
     # Save snapshot for P&L chart
     now = datetime.now().isoformat()
-    conn2 = sqlite3.connect(DB_PATH, timeout=30)
+    conn2 = get_conn()
     conn2.execute(
         "INSERT INTO sim_snapshots (sim_name, snapshot_at, total_value, pnl_pct) VALUES (?, ?, ?, ?)",
         (name, now, round(total_current, 2), round(total_pnl_pct, 2))
@@ -342,7 +343,7 @@ def get_simulation_history(name: str) -> dict:
     Each row is {snapshot_at, total_value, pnl_pct}.
     """
     _init_db()
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_conn()
     sim = conn.execute(
         "SELECT initial_value, started_at FROM simulations WHERE name = ?", (name,)
     ).fetchone()
@@ -367,7 +368,7 @@ def get_simulation_history(name: str) -> dict:
 def list_simulations() -> list:
     """List all active real-time simulations."""
     _init_db()
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_conn()
     rows = conn.execute(
         "SELECT name, initial_value, started_at, last_checked, status FROM simulations ORDER BY started_at DESC"
     ).fetchall()
@@ -399,7 +400,7 @@ def add_position(sim_name: str, ticker: str, amount: float) -> dict:
     if amount is None or amount <= 0:
         return {"error": "Amount to invest must be a positive number."}
 
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_conn()
     sim = conn.execute(
         "SELECT initial_value FROM simulations WHERE name = ?", (sim_name,)
     ).fetchone()
@@ -475,7 +476,7 @@ def remove_position(sim_name: str, ticker: str) -> dict:
     """
     _init_db()
     ticker = ticker.upper()
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_conn()
     sim = conn.execute(
         "SELECT initial_value FROM simulations WHERE name = ?", (sim_name,)
     ).fetchone()
@@ -523,7 +524,7 @@ def remove_position(sim_name: str, ticker: str) -> dict:
 def delete_simulation(name: str) -> dict:
     """Delete a simulation and all its positions/snapshots."""
     _init_db()
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_conn()
     count = conn.execute("SELECT COUNT(*) FROM simulations WHERE name = ?", (name,)).fetchone()[0]
     if not count:
         conn.close()
@@ -928,12 +929,17 @@ def save_portfolio(name: str, holdings: dict) -> dict:
     if abs(total - 100) > 0.01:
         return {"error": f"Allocations must sum to 100%, got {total:.1f}%"}
     now = datetime.now().isoformat()
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    import db as _db
+    conn = get_conn()
     try:
-        conn.execute(
-            "INSERT OR REPLACE INTO portfolios (name, holdings, created_at, last_updated) VALUES (?,?,?,?)",
-            (name, json.dumps(holdings), now, now)
-        )
+        if _db.IS_POSTGRES:
+            sql = ("INSERT INTO portfolios (name, holdings, created_at, last_updated) "
+                   "VALUES (?,?,?,?) ON CONFLICT (name) DO UPDATE SET "
+                   "holdings = EXCLUDED.holdings, last_updated = EXCLUDED.last_updated")
+        else:
+            sql = ("INSERT OR REPLACE INTO portfolios (name, holdings, created_at, last_updated) "
+                   "VALUES (?,?,?,?)")
+        conn.execute(sql, (name, json.dumps(holdings), now, now))
         conn.commit()
         return {"status": "saved", "name": name, "holdings": holdings}
     except Exception as e:
@@ -944,7 +950,7 @@ def save_portfolio(name: str, holdings: dict) -> dict:
 
 def load_portfolio(name: str) -> dict:
     _init_db()
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_conn()
     row  = conn.execute(
         "SELECT name, holdings, created_at FROM portfolios WHERE name = ?", (name,)
     ).fetchone()
@@ -956,7 +962,7 @@ def load_portfolio(name: str) -> dict:
 
 def list_portfolios() -> list:
     _init_db()
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_conn()
     rows = conn.execute(
         "SELECT name, created_at FROM portfolios ORDER BY created_at DESC"
     ).fetchall()
@@ -1045,7 +1051,7 @@ def submit_challenge(challenge_id: str, user_pick: dict) -> dict:
     if not challenge:
         return {"error": f"Challenge '{challenge_id}' not found"}
     now = datetime.now().isoformat()
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_conn()
     conn.execute(
         "INSERT INTO challenge_entries (challenge_id, user_pick, submitted_at) VALUES (?,?,?)",
         (challenge_id, json.dumps(user_pick), now)

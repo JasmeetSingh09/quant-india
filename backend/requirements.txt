@@ -1,6 +1,7 @@
 fastapi
 uvicorn[standard]
 python-multipart
+psycopg2-binary
 python-dotenv
 requests
 # torch is installed separately in the Dockerfile with the CPU-only index URL

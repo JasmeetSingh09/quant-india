@@ -26,7 +26,8 @@ BENCHMARK = "^NSEI"
 
 
 def _conn():
-    return sqlite3.connect(_DB_PATH)
+    from db import get_conn      # Postgres (Supabase) if DATABASE_URL set, else SQLite
+    return get_conn()
 
 
 def init_table():
