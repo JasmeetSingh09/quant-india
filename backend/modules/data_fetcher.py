@@ -410,10 +410,25 @@ def is_feed_active() -> bool:
     return (9 * 60 + 15) <= minutes <= (15 * 60 + 45)
 
 
+# Short-lived cache for live prices. The dashboard, Top Picks and stock pages all
+# request the same tickers repeatedly; without this each call hits Yahoo (slow, and
+# Yahoo throttles cloud IPs). When the market is CLOSED the price is frozen, so we can
+# cache for much longer.
+_LIVE_CACHE: dict = {}
+_LIVE_TTL_OPEN   = 45      # seconds while NSE is open
+_LIVE_TTL_CLOSED = 900     # 15 min when closed (price doesn't change)
+
+
 def get_current_price(ticker: str) -> dict:
     """
-    Get the current price and today's change for a stock.
+    Get the current price and today's change for a stock (cached briefly).
     """
+    now = time.time()
+    ttl = _LIVE_TTL_OPEN if is_market_open() else _LIVE_TTL_CLOSED
+    hit = _LIVE_CACHE.get(ticker)
+    if hit and (now - hit[0]) < ttl:
+        return {**hit[1], "cached": True}
+
     stock = yf.Ticker(ticker)
     info = stock.fast_info
 
@@ -424,7 +439,7 @@ def get_current_price(ticker: str) -> dict:
         change_pct = (change / previous_close) * 100
         volume = info.three_month_average_volume
 
-        return {
+        result = {
             "ticker": ticker,
             "price": round(current_price, 2),
             "change": round(change, 2),
@@ -434,7 +449,12 @@ def get_current_price(ticker: str) -> dict:
             "feed_active": is_feed_active(),   # keep polling ~15 min past close (delayed feed)
             "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
+        _LIVE_CACHE[ticker] = (now, result)   # cache only successful fetches
+        return result
     except Exception as e:
+        # serve a stale cached value if we have one, rather than an error
+        if hit:
+            return {**hit[1], "cached": True, "stale": True}
         return {"ticker": ticker, "error": str(e)}
 
 
