@@ -40,7 +40,13 @@ INDIAN_FINANCE_SOURCES = [
 
 def _init_db():
     """Create the news cache table if it does not exist."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
+    # WAL lets readers and a writer coexist — the proper fix for "database is
+    # locked" when background schedulers and request handlers hit SQLite at once.
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+    except Exception:
+        pass
     conn.execute("""
         CREATE TABLE IF NOT EXISTS news_cache (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -56,7 +62,7 @@ def _init_db():
 
 def _cache_get(cache_key: str, max_age_minutes: int = 30) -> list | None:
     """Return cached articles if they are fresh enough, else None."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     row = conn.execute(
         "SELECT articles, fetched_at FROM news_cache WHERE cache_key = ? ORDER BY fetched_at DESC LIMIT 1",
         (cache_key,)
@@ -76,7 +82,7 @@ def _cache_get(cache_key: str, max_age_minutes: int = 30) -> list | None:
 
 def _cache_set(cache_key: str, articles: list):
     """Store articles in the cache."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.execute(
         "INSERT INTO news_cache (cache_key, articles, fetched_at) VALUES (?, ?, ?)",
         (cache_key, json.dumps(articles), datetime.now().isoformat())
