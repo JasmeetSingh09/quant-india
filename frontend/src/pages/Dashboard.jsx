@@ -141,7 +141,15 @@ function TrackRecord() {
     staleTime: 10 * 60 * 1000,
   })
   const sc = data?.scorecard
-  const preds = data?.predictions || []
+  const rawPreds = data?.predictions || []
+  // The model re-logs a snapshot daily, so each stock appears once per snapshot date.
+  // Collapse to ONE row per stock — keep the longest-held snapshot (most complete
+  // evaluation) — so the table reads as "one line per pick" instead of repeating.
+  const preds = Object.values(rawPreds.reduce((acc, r) => {
+    const cur = acc[r.ticker]
+    if (!cur || (r.days_held ?? 0) > (cur.days_held ?? 0)) acc[r.ticker] = r
+    return acc
+  }, {}))
   const pct = v => v == null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(2)}%`
   const col = v => v == null ? 'text-gray-400' : v >= 0 ? 'text-green-400' : 'text-red-400'
 
@@ -229,8 +237,8 @@ function TrackRecord() {
           </div>
           <p className="text-xs text-gray-600">
             "Actual return" = how the stock moved from the day it was logged until now. A BUY that went up
-            (green) or a SELL that went down was "right." A live, honest scorecard — small samples are noisy,
-            and it updates itself daily.
+            (green) or a SELL that went down was "right." One row per stock (its longest-held snapshot); the
+            model re-logs daily, so the headline stats above still use every snapshot. Small samples are noisy.
           </p>
         </>
       )}
