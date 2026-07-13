@@ -97,7 +97,11 @@ _ALLOWED_ORIGINS = list(filter(None, [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_ALLOWED_ORIGINS,
+    # Public read-only API, no cookies/credentials → safe to allow any origin.
+    # This avoids fragile exact-URL matching with Vercel's production + preview URLs.
+    # (FRONTEND_URL is still honoured above for documentation/clarity.)
+    allow_origins=["*"],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_methods=["*"],
     allow_headers=["*"],
     allow_credentials=False,
