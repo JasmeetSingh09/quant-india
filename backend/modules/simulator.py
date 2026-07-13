@@ -44,21 +44,22 @@ NIFTY_TICKER = "^NSEI"
 def _init_db():
     conn = get_conn()
 
-    # Real-time simulation sessions
+    # Real-time simulation sessions (per-user; a sim name is unique PER USER)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS simulations (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
-            name            TEXT NOT NULL UNIQUE,
+            user_id         TEXT NOT NULL DEFAULT 'public',
+            name            TEXT NOT NULL,
             initial_value   REAL NOT NULL,
             started_at      TEXT NOT NULL,
             last_checked    TEXT,
             status          TEXT DEFAULT 'active'
         )
     """)
-    # Individual stock positions inside a simulation
     conn.execute("""
         CREATE TABLE IF NOT EXISTS sim_positions (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id         TEXT NOT NULL DEFAULT 'public',
             sim_name        TEXT NOT NULL,
             ticker          TEXT NOT NULL,
             company_name    TEXT,
@@ -66,31 +67,29 @@ def _init_db():
             units           REAL NOT NULL,
             entry_price     REAL NOT NULL,
             entry_value     REAL NOT NULL,
-            entry_date      TEXT NOT NULL,
-            FOREIGN KEY(sim_name) REFERENCES simulations(name)
+            entry_date      TEXT NOT NULL
         )
     """)
-    # Historical snapshots for P&L chart over time
     conn.execute("""
         CREATE TABLE IF NOT EXISTS sim_snapshots (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     TEXT NOT NULL DEFAULT 'public',
             sim_name    TEXT NOT NULL,
             snapshot_at TEXT NOT NULL,
             total_value REAL NOT NULL,
             pnl_pct     REAL NOT NULL
         )
     """)
-    # Saved named portfolios
     conn.execute("""
         CREATE TABLE IF NOT EXISTS portfolios (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
-            name         TEXT NOT NULL UNIQUE,
+            user_id      TEXT NOT NULL DEFAULT 'public',
+            name         TEXT NOT NULL,
             holdings     TEXT NOT NULL,
             created_at   TEXT NOT NULL,
             last_updated TEXT
         )
     """)
-    # Weekly challenge submissions
     conn.execute("""
         CREATE TABLE IF NOT EXISTS challenge_entries (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -100,8 +99,51 @@ def _init_db():
             result       TEXT
         )
     """)
+    # migrate older tables that predate per-user support (best effort)
+    for tbl in ("simulations", "sim_positions", "sim_snapshots", "portfolios"):
+        try:
+            conn.execute(f"ALTER TABLE {tbl} ADD COLUMN user_id TEXT NOT NULL DEFAULT 'public'")
+        except Exception:
+            pass
+
+    # Old SQLite tables were created with a table-level UNIQUE(name) that blocks
+    # two users from sharing a sim/portfolio name. ALTER can't drop it, so rebuild
+    # the table without it. (Postgres deploys start fresh, so this only runs on
+    # legacy local SQLite DBs.)
+    import db as _db
+    if not _db.IS_POSTGRES:
+        _rebuild_if_global_unique(conn, "portfolios",
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL DEFAULT 'public', "
+            "name TEXT NOT NULL, holdings TEXT NOT NULL, created_at TEXT NOT NULL, last_updated TEXT",
+            "id, user_id, name, holdings, created_at, last_updated")
+        _rebuild_if_global_unique(conn, "simulations",
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL DEFAULT 'public', "
+            "name TEXT NOT NULL, initial_value REAL NOT NULL, started_at TEXT NOT NULL, "
+            "last_checked TEXT, status TEXT DEFAULT 'active'",
+            "id, user_id, name, initial_value, started_at, last_checked, status")
+
+    # a sim name / portfolio name is unique per user (not globally)
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_sim_user_name ON simulations(user_id, name)")
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_pf_user_name ON portfolios(user_id, name)")
     conn.commit()
     conn.close()
+
+
+def _rebuild_if_global_unique(conn, table: str, columns_ddl: str, columns_csv: str):
+    """SQLite only: if `table` was created with a table-level UNIQUE(name),
+    rebuild it without that constraint, preserving all rows."""
+    # An inline UNIQUE constraint (either `UNIQUE(name)` or `name ... UNIQUE`)
+    # creates an sqlite_autoindex_* entry. The clean rebuilt table has none.
+    has_autoindex = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='index' AND tbl_name=? "
+        "AND name LIKE 'sqlite_autoindex_%' LIMIT 1", (table,)
+    ).fetchone()
+    if not has_autoindex:
+        return
+    conn.execute(f"ALTER TABLE {table} RENAME TO {table}_old_uq")
+    conn.execute(f"CREATE TABLE {table} ({columns_ddl})")
+    conn.execute(f"INSERT INTO {table} ({columns_csv}) SELECT {columns_csv} FROM {table}_old_uq")
+    conn.execute(f"DROP TABLE {table}_old_uq")
 
 
 # ---------------------------------------------------------------------------
@@ -160,6 +202,7 @@ def start_simulation(
     name: str,
     holdings: dict,
     initial_value: float = 100_000,
+    user_id: str = "public",
 ) -> dict:
     """
     Start a real-time paper trading simulation.
@@ -213,17 +256,17 @@ def start_simulation(
     conn = get_conn()
     try:
         conn.execute(
-            "INSERT INTO simulations (name, initial_value, started_at, last_checked, status) "
-            "VALUES (?, ?, ?, ?, 'active')",
-            (name, initial_value, now, now)
+            "INSERT INTO simulations (user_id, name, initial_value, started_at, last_checked, status) "
+            "VALUES (?, ?, ?, ?, ?, 'active')",
+            (user_id, name, initial_value, now, now)
         )
         for p in positions:
             conn.execute("""
                 INSERT INTO sim_positions
-                  (sim_name, ticker, company_name, allocation_pct, units,
+                  (user_id, sim_name, ticker, company_name, allocation_pct, units,
                    entry_price, entry_value, entry_date)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (name, p["ticker"], p["company_name"], p["allocation_pct"],
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (user_id, name, p["ticker"], p["company_name"], p["allocation_pct"],
                   p["units"], p["entry_price"], p["entry_value"], p["entry_date"]))
         conn.commit()
     except IntegrityError:
@@ -242,7 +285,7 @@ def start_simulation(
     }
 
 
-def get_simulation_pnl(name: str) -> dict:
+def get_simulation_pnl(name: str, user_id: str = "public") -> dict:
     """
     Fetch live prices for all positions in a simulation and compute P&L.
 
@@ -260,7 +303,8 @@ def get_simulation_pnl(name: str) -> dict:
     _init_db()
     conn = get_conn()
     sim = conn.execute(
-        "SELECT name, initial_value, started_at FROM simulations WHERE name = ?", (name,)
+        "SELECT name, initial_value, started_at FROM simulations WHERE name = ? AND user_id = ?",
+        (name, user_id)
     ).fetchone()
     if not sim:
         conn.close()
@@ -268,7 +312,7 @@ def get_simulation_pnl(name: str) -> dict:
 
     positions_raw = conn.execute(
         "SELECT ticker, company_name, allocation_pct, units, entry_price, entry_value, entry_date "
-        "FROM sim_positions WHERE sim_name = ?", (name,)
+        "FROM sim_positions WHERE sim_name = ? AND user_id = ?", (name, user_id)
     ).fetchall()
     conn.close()
 
@@ -312,10 +356,11 @@ def get_simulation_pnl(name: str) -> dict:
     now = datetime.now().isoformat()
     conn2 = get_conn()
     conn2.execute(
-        "INSERT INTO sim_snapshots (sim_name, snapshot_at, total_value, pnl_pct) VALUES (?, ?, ?, ?)",
-        (name, now, round(total_current, 2), round(total_pnl_pct, 2))
+        "INSERT INTO sim_snapshots (user_id, sim_name, snapshot_at, total_value, pnl_pct) VALUES (?, ?, ?, ?, ?)",
+        (user_id, name, now, round(total_current, 2), round(total_pnl_pct, 2))
     )
-    conn2.execute("UPDATE simulations SET last_checked = ? WHERE name = ?", (now, name))
+    conn2.execute("UPDATE simulations SET last_checked = ? WHERE name = ? AND user_id = ?",
+                  (now, name, user_id))
     conn2.commit()
     conn2.close()
 
@@ -337,7 +382,7 @@ def get_simulation_pnl(name: str) -> dict:
     }
 
 
-def get_simulation_history(name: str) -> dict:
+def get_simulation_history(name: str, user_id: str = "public") -> dict:
     """
     Return the P&L snapshot history for a simulation — use for a portfolio value chart.
     Each row is {snapshot_at, total_value, pnl_pct}.
@@ -345,14 +390,15 @@ def get_simulation_history(name: str) -> dict:
     _init_db()
     conn = get_conn()
     sim = conn.execute(
-        "SELECT initial_value, started_at FROM simulations WHERE name = ?", (name,)
+        "SELECT initial_value, started_at FROM simulations WHERE name = ? AND user_id = ?",
+        (name, user_id)
     ).fetchone()
     if not sim:
         conn.close()
         return {"error": f"Simulation '{name}' not found"}
     rows = conn.execute(
-        "SELECT snapshot_at, total_value, pnl_pct FROM sim_snapshots WHERE sim_name = ? ORDER BY snapshot_at",
-        (name,)
+        "SELECT snapshot_at, total_value, pnl_pct FROM sim_snapshots WHERE sim_name = ? AND user_id = ? ORDER BY snapshot_at",
+        (name, user_id)
     ).fetchall()
     conn.close()
     return {
@@ -365,12 +411,13 @@ def get_simulation_history(name: str) -> dict:
     }
 
 
-def list_simulations() -> list:
-    """List all active real-time simulations."""
+def list_simulations(user_id: str = "public") -> list:
+    """List all active real-time simulations for a user."""
     _init_db()
     conn = get_conn()
     rows = conn.execute(
-        "SELECT name, initial_value, started_at, last_checked, status FROM simulations ORDER BY started_at DESC"
+        "SELECT name, initial_value, started_at, last_checked, status FROM simulations "
+        "WHERE user_id = ? ORDER BY started_at DESC", (user_id,)
     ).fetchall()
     conn.close()
     return [
@@ -380,7 +427,7 @@ def list_simulations() -> list:
     ]
 
 
-def add_position(sim_name: str, ticker: str, amount: float) -> dict:
+def add_position(sim_name: str, ticker: str, amount: float, user_id: str = "public") -> dict:
     """
     Add (buy) a stock into an ALREADY-RUNNING simulation at TODAY'S live price.
 
@@ -402,7 +449,7 @@ def add_position(sim_name: str, ticker: str, amount: float) -> dict:
 
     conn = get_conn()
     sim = conn.execute(
-        "SELECT initial_value FROM simulations WHERE name = ?", (sim_name,)
+        "SELECT initial_value FROM simulations WHERE name = ? AND user_id = ?", (sim_name, user_id)
     ).fetchone()
     if not sim:
         conn.close()
@@ -418,8 +465,8 @@ def add_position(sim_name: str, ticker: str, amount: float) -> dict:
     new_init  = sim[0] + amount
 
     existing = conn.execute(
-        "SELECT units, entry_value FROM sim_positions WHERE sim_name = ? AND ticker = ?",
-        (sim_name, ticker)
+        "SELECT units, entry_value FROM sim_positions WHERE sim_name = ? AND ticker = ? AND user_id = ?",
+        (sim_name, ticker, user_id)
     ).fetchone()
 
     if existing:
@@ -432,8 +479,8 @@ def add_position(sim_name: str, ticker: str, amount: float) -> dict:
         alloc_pct   = round(tot_entry / new_init * 100, 2)
         conn.execute(
             "UPDATE sim_positions SET units = ?, entry_value = ?, entry_price = ?, allocation_pct = ? "
-            "WHERE sim_name = ? AND ticker = ?",
-            (tot_units, tot_entry, round(blended, 4), alloc_pct, sim_name, ticker)
+            "WHERE sim_name = ? AND ticker = ? AND user_id = ?",
+            (tot_units, tot_entry, round(blended, 4), alloc_pct, sim_name, ticker, user_id)
         )
         status, note = "topped_up", (
             f"Added ₹{amount:,.0f} more of {ticker} at ₹{price}. "
@@ -444,13 +491,14 @@ def add_position(sim_name: str, ticker: str, amount: float) -> dict:
         alloc_pct = round(amount / new_init * 100, 2)
         conn.execute("""
             INSERT INTO sim_positions
-              (sim_name, ticker, company_name, allocation_pct, units,
+              (user_id, sim_name, ticker, company_name, allocation_pct, units,
                entry_price, entry_value, entry_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (sim_name, ticker, _company_name(ticker), alloc_pct, buy_units, price, amount, now))
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (user_id, sim_name, ticker, _company_name(ticker), alloc_pct, buy_units, price, amount, now))
         status, note = "added", f"Bought {ticker} at ₹{price} with ₹{amount:,.0f} of new capital."
 
-    conn.execute("UPDATE simulations SET initial_value = ? WHERE name = ?", (new_init, sim_name))
+    conn.execute("UPDATE simulations SET initial_value = ? WHERE name = ? AND user_id = ?",
+                 (new_init, sim_name, user_id))
     conn.commit()
     conn.close()
 
@@ -466,7 +514,7 @@ def add_position(sim_name: str, ticker: str, amount: float) -> dict:
     }
 
 
-def remove_position(sim_name: str, ticker: str) -> dict:
+def remove_position(sim_name: str, ticker: str, user_id: str = "public") -> dict:
     """
     Remove (sell) a stock from a running simulation at TODAY'S live price.
 
@@ -478,14 +526,14 @@ def remove_position(sim_name: str, ticker: str) -> dict:
     ticker = ticker.upper()
     conn = get_conn()
     sim = conn.execute(
-        "SELECT initial_value FROM simulations WHERE name = ?", (sim_name,)
+        "SELECT initial_value FROM simulations WHERE name = ? AND user_id = ?", (sim_name, user_id)
     ).fetchone()
     if not sim:
         conn.close()
         return {"error": f"Simulation '{sim_name}' not found"}
     pos = conn.execute(
-        "SELECT units, entry_price, entry_value FROM sim_positions WHERE sim_name = ? AND ticker = ?",
-        (sim_name, ticker)
+        "SELECT units, entry_price, entry_value FROM sim_positions WHERE sim_name = ? AND ticker = ? AND user_id = ?",
+        (sim_name, ticker, user_id)
     ).fetchone()
     if not pos:
         conn.close()
@@ -493,7 +541,7 @@ def remove_position(sim_name: str, ticker: str) -> dict:
 
     units, entry_price, entry_value = pos
     n_positions = conn.execute(
-        "SELECT COUNT(*) FROM sim_positions WHERE sim_name = ?", (sim_name,)
+        "SELECT COUNT(*) FROM sim_positions WHERE sim_name = ? AND user_id = ?", (sim_name, user_id)
     ).fetchone()[0]
     if n_positions <= 1:
         conn.close()
@@ -504,8 +552,10 @@ def remove_position(sim_name: str, ticker: str) -> dict:
     realized_pnl  = current_value - entry_value
     new_init      = max(sim[0] - entry_value, 0.0)
 
-    conn.execute("DELETE FROM sim_positions WHERE sim_name = ? AND ticker = ?", (sim_name, ticker))
-    conn.execute("UPDATE simulations SET initial_value = ? WHERE name = ?", (new_init, sim_name))
+    conn.execute("DELETE FROM sim_positions WHERE sim_name = ? AND ticker = ? AND user_id = ?",
+                 (sim_name, ticker, user_id))
+    conn.execute("UPDATE simulations SET initial_value = ? WHERE name = ? AND user_id = ?",
+                 (new_init, sim_name, user_id))
     conn.commit()
     conn.close()
 
@@ -521,17 +571,18 @@ def remove_position(sim_name: str, ticker: str) -> dict:
     }
 
 
-def delete_simulation(name: str) -> dict:
-    """Delete a simulation and all its positions/snapshots."""
+def delete_simulation(name: str, user_id: str = "public") -> dict:
+    """Delete a simulation and all its positions/snapshots (only if owned by this user)."""
     _init_db()
     conn = get_conn()
-    count = conn.execute("SELECT COUNT(*) FROM simulations WHERE name = ?", (name,)).fetchone()[0]
+    count = conn.execute("SELECT COUNT(*) FROM simulations WHERE name = ? AND user_id = ?",
+                         (name, user_id)).fetchone()[0]
     if not count:
         conn.close()
         return {"error": f"Simulation '{name}' not found"}
-    conn.execute("DELETE FROM sim_positions WHERE sim_name = ?", (name,))
-    conn.execute("DELETE FROM sim_snapshots WHERE sim_name = ?", (name,))
-    conn.execute("DELETE FROM simulations WHERE name = ?", (name,))
+    conn.execute("DELETE FROM sim_positions WHERE sim_name = ? AND user_id = ?", (name, user_id))
+    conn.execute("DELETE FROM sim_snapshots WHERE sim_name = ? AND user_id = ?", (name, user_id))
+    conn.execute("DELETE FROM simulations WHERE name = ? AND user_id = ?", (name, user_id))
     conn.commit()
     conn.close()
     return {"status": "deleted", "name": name}
@@ -923,7 +974,7 @@ def compare_scenarios(
 # Saved portfolios
 # ---------------------------------------------------------------------------
 
-def save_portfolio(name: str, holdings: dict) -> dict:
+def save_portfolio(name: str, holdings: dict, user_id: str = "public") -> dict:
     _init_db()
     total = sum(holdings.values())
     if abs(total - 100) > 0.01:
@@ -933,13 +984,16 @@ def save_portfolio(name: str, holdings: dict) -> dict:
     conn = get_conn()
     try:
         if _db.IS_POSTGRES:
-            sql = ("INSERT INTO portfolios (name, holdings, created_at, last_updated) "
-                   "VALUES (?,?,?,?) ON CONFLICT (name) DO UPDATE SET "
+            sql = ("INSERT INTO portfolios (user_id, name, holdings, created_at, last_updated) "
+                   "VALUES (?,?,?,?,?) ON CONFLICT (user_id, name) DO UPDATE SET "
                    "holdings = EXCLUDED.holdings, last_updated = EXCLUDED.last_updated")
+            conn.execute(sql, (user_id, name, json.dumps(holdings), now, now))
         else:
-            sql = ("INSERT OR REPLACE INTO portfolios (name, holdings, created_at, last_updated) "
-                   "VALUES (?,?,?,?)")
-        conn.execute(sql, (name, json.dumps(holdings), now, now))
+            # SQLite: delete-then-insert per user (INSERT OR REPLACE can't target a
+            # composite index cleanly across old schemas)
+            conn.execute("DELETE FROM portfolios WHERE user_id = ? AND name = ?", (user_id, name))
+            conn.execute("INSERT INTO portfolios (user_id, name, holdings, created_at, last_updated) "
+                         "VALUES (?,?,?,?,?)", (user_id, name, json.dumps(holdings), now, now))
         conn.commit()
         return {"status": "saved", "name": name, "holdings": holdings}
     except Exception as e:
@@ -948,11 +1002,12 @@ def save_portfolio(name: str, holdings: dict) -> dict:
         conn.close()
 
 
-def load_portfolio(name: str) -> dict:
+def load_portfolio(name: str, user_id: str = "public") -> dict:
     _init_db()
     conn = get_conn()
     row  = conn.execute(
-        "SELECT name, holdings, created_at FROM portfolios WHERE name = ?", (name,)
+        "SELECT name, holdings, created_at FROM portfolios WHERE name = ? AND user_id = ?",
+        (name, user_id)
     ).fetchone()
     conn.close()
     if not row:
@@ -960,11 +1015,12 @@ def load_portfolio(name: str) -> dict:
     return {"name": row[0], "holdings": json.loads(row[1]), "created_at": row[2]}
 
 
-def list_portfolios() -> list:
+def list_portfolios(user_id: str = "public") -> list:
     _init_db()
     conn = get_conn()
     rows = conn.execute(
-        "SELECT name, created_at FROM portfolios ORDER BY created_at DESC"
+        "SELECT name, created_at FROM portfolios WHERE user_id = ? ORDER BY created_at DESC",
+        (user_id,)
     ).fetchall()
     conn.close()
     return [{"name": r[0], "created_at": r[1]} for r in rows]

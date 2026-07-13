@@ -374,7 +374,7 @@ def watchlist_remove(ticker: str = Query(..., description="NSE ticker to remove"
 # ---------------------------------------------------------------------------
 
 @app.post("/simulator/realtime/start")
-def sim_start(req: SimulationStartRequest):
+def sim_start(req: SimulationStartRequest, user_id: str = Depends(current_user_id)):
     """
     Start a real-time paper trading simulation.
 
@@ -384,72 +384,72 @@ def sim_start(req: SimulationStartRequest):
     Body example:
       {"name": "my_hdfc_bet", "holdings": {"HDFCBANK.NS": 60, "TCS.NS": 40}, "initial_value": 100000}
     """
-    result = start_simulation(req.name, req.holdings, req.initial_value)
+    result = start_simulation(req.name, req.holdings, req.initial_value, user_id=user_id)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
 
 
 @app.get("/simulator/realtime/{name}")
-def sim_pnl(name: str):
+def sim_pnl(name: str, user_id: str = Depends(current_user_id)):
     """
     Fetch live P&L for a running simulation.
 
     Returns per-stock: entry price, current price, ₹ gain/loss, % gain/loss.
     Also returns overall portfolio value and total P&L.
     """
-    result = get_simulation_pnl(name)
+    result = get_simulation_pnl(name, user_id=user_id)
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return result
 
 
 @app.get("/simulator/realtime/{name}/history")
-def sim_history(name: str):
+def sim_history(name: str, user_id: str = Depends(current_user_id)):
     """
     P&L snapshot history for a simulation — use to draw a portfolio value chart.
     A new snapshot is saved every time you call the /pnl endpoint.
     """
-    result = get_simulation_history(name)
+    result = get_simulation_history(name, user_id=user_id)
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return result
 
 
 @app.get("/simulator/realtime")
-def sim_list():
+def sim_list(user_id: str = Depends(current_user_id)):
     """List all active real-time simulations."""
-    return {"simulations": list_simulations()}
+    return {"simulations": list_simulations(user_id=user_id)}
 
 
 @app.post("/simulator/realtime/{name}/add")
-def sim_add(name: str, req: SimAddRequest):
+def sim_add(name: str, req: SimAddRequest, user_id: str = Depends(current_user_id)):
     """
     Add (buy) a stock into a running simulation at today's live price, funded by
     fresh capital. Body: {"ticker": "INFY.NS", "amount": 10000}
     """
-    result = add_position(name, req.ticker, req.amount)
+    result = add_position(name, req.ticker, req.amount, user_id=user_id)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
 
 
 @app.post("/simulator/realtime/{name}/remove")
-def sim_remove(name: str, req: SimAddRequest):
+def sim_remove(name: str, req: SimAddRequest, user_id: str = Depends(current_user_id)):
     """
     Remove (sell) a stock from a running simulation at today's live price and
     report realized P&L. Body: {"ticker": "INFY.NS"} (amount ignored).
     """
-    result = remove_position(name, req.ticker)
+    result = remove_position(name, req.ticker, user_id=user_id)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
 
 
 @app.delete("/simulator/realtime/{name}")
-def sim_delete(name: str):
+def sim_delete(name: str, user_id: str = Depends(current_user_id)):
     """Delete a real-time simulation and all its data."""
-    result = delete_simulation(name)
+    result = delete_simulation(name, user_id=user_id)
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return result
@@ -506,27 +506,27 @@ def sim_compare(req: CompareRequest):
 # ---------------------------------------------------------------------------
 
 @app.post("/simulator/portfolio/save")
-def simulator_portfolio_save(req: PortfolioSaveRequest):
+def simulator_portfolio_save(req: PortfolioSaveRequest, user_id: str = Depends(current_user_id)):
     """Save a named portfolio for future backtesting."""
-    result = save_portfolio(req.name, req.holdings)
+    result = save_portfolio(req.name, req.holdings, user_id=user_id)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
 
 
 @app.get("/simulator/portfolio/{name}")
-def simulator_portfolio_load(name: str):
+def simulator_portfolio_load(name: str, user_id: str = Depends(current_user_id)):
     """Load a previously saved portfolio."""
-    result = load_portfolio(name)
+    result = load_portfolio(name, user_id=user_id)
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return result
 
 
 @app.get("/simulator/portfolios")
-def simulator_portfolios():
+def simulator_portfolios(user_id: str = Depends(current_user_id)):
     """List all saved portfolios."""
-    return {"portfolios": list_portfolios()}
+    return {"portfolios": list_portfolios(user_id=user_id)}
 
 
 @app.get("/simulator/challenges")
