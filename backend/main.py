@@ -23,7 +23,7 @@ import os
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -51,6 +51,7 @@ from commodities import (
 from news import get_stock_news, get_macro_news, get_market_wide_news, start_news_scheduler
 from sentiment import score_headline, summarise_sentiment
 from watchlist import add_to_watchlist, remove_from_watchlist, get_watchlist
+from auth import current_user_id   # per-user data (returns 'public' when anonymous)
 from alerts import send_test_alert, send_multi_signal_alert, start_alert_scheduler, run_watchlist_alert_check
 from alpha_model import compute_alpha_score, scan_alpha, retrain_weights, explain_signal, top_picks
 from prediction_tracker import snapshot as log_predictions_snapshot, evaluate as evaluate_predictions
@@ -338,12 +339,13 @@ def stock_sentiment(
 # ---------------------------------------------------------------------------
 
 @app.post("/watchlist/add")
-def watchlist_add(req: WatchlistAddRequest):
+def watchlist_add(req: WatchlistAddRequest, user_id: str = Depends(current_user_id)):
     """Add an NSE ticker to the watchlist with price and sentiment alert settings."""
     result = add_to_watchlist(
         ticker=req.ticker,
         price_alert_pct=req.price_alert_pct,
         sentiment_alert=req.sentiment_alert,
+        user_id=user_id,
     )
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -351,15 +353,17 @@ def watchlist_add(req: WatchlistAddRequest):
 
 
 @app.get("/watchlist")
-def watchlist_get(refresh: bool = Query(True, description="Refresh live prices")):
+def watchlist_get(refresh: bool = Query(True, description="Refresh live prices"),
+                  user_id: str = Depends(current_user_id)):
     """Return all watchlist entries with current prices and alert status."""
-    return {"watchlist": get_watchlist(refresh_prices=refresh)}
+    return {"watchlist": get_watchlist(refresh_prices=refresh, user_id=user_id)}
 
 
 @app.delete("/watchlist/remove")
-def watchlist_remove(ticker: str = Query(..., description="NSE ticker to remove")):
+def watchlist_remove(ticker: str = Query(..., description="NSE ticker to remove"),
+                     user_id: str = Depends(current_user_id)):
     """Remove a ticker from the watchlist."""
-    result = remove_from_watchlist(ticker)
+    result = remove_from_watchlist(ticker, user_id=user_id)
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return result

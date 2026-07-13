@@ -28,12 +28,13 @@ DB_PATH = Path(os.environ.get("QUANT_DATA_DIR", str(Path(__file__).parent.parent
 # ---------------------------------------------------------------------------
 
 def _init_db():
-    """Create watchlist table if it does not exist."""
+    """Create watchlist table if it does not exist (per-user)."""
     conn = get_conn()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS watchlist (
             id               INTEGER PRIMARY KEY AUTOINCREMENT,
-            ticker           TEXT NOT NULL UNIQUE,
+            user_id          TEXT NOT NULL DEFAULT 'public',
+            ticker           TEXT NOT NULL,
             company_name     TEXT,
             added_price      REAL,
             current_price    REAL,
@@ -43,6 +44,14 @@ def _init_db():
             last_updated     TEXT
         )
     """)
+    # migrate an older table that predates per-user support (best effort)
+    try:
+        conn.execute("ALTER TABLE watchlist ADD COLUMN user_id TEXT NOT NULL DEFAULT 'public'")
+    except Exception:
+        pass
+    # a stock is unique PER USER, not globally
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_watchlist_user_ticker "
+                 "ON watchlist(user_id, ticker)")
     conn.commit()
     conn.close()
 
@@ -85,6 +94,7 @@ def add_to_watchlist(
     ticker: str,
     price_alert_pct: float = 5.0,
     sentiment_alert: bool = True,
+    user_id: str = "public",
 ) -> dict:
     """
     Add an NSE ticker to the watchlist.
@@ -112,10 +122,10 @@ def add_to_watchlist(
     try:
         conn.execute("""
             INSERT INTO watchlist
-              (ticker, company_name, added_price, current_price,
+              (user_id, ticker, company_name, added_price, current_price,
                price_alert_pct, sentiment_alert, added_at, last_updated)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (ticker, company_name, current_price, current_price,
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (user_id, ticker, company_name, current_price, current_price,
               price_alert_pct, int(sentiment_alert), now, now))
         conn.commit()
         return {
@@ -135,12 +145,13 @@ def add_to_watchlist(
         conn.close()
 
 
-def remove_from_watchlist(ticker: str) -> dict:
+def remove_from_watchlist(ticker: str, user_id: str = "public") -> dict:
     """Remove a ticker from the watchlist. Returns status."""
     _init_db()
     ticker = ticker.upper()
     conn = get_conn()
-    cursor = conn.execute("DELETE FROM watchlist WHERE ticker = ?", (ticker,))
+    cursor = conn.execute("DELETE FROM watchlist WHERE user_id = ? AND ticker = ?",
+                          (user_id, ticker))
     conn.commit()
     conn.close()
     if cursor.rowcount:
@@ -148,9 +159,9 @@ def remove_from_watchlist(ticker: str) -> dict:
     return {"error": f"{ticker} not found in watchlist"}
 
 
-def get_watchlist(refresh_prices: bool = True) -> list:
+def get_watchlist(refresh_prices: bool = True, user_id: str = "public") -> list:
     """
-    Return all watchlist entries.
+    Return all watchlist entries for a user.
 
     If refresh_prices is True, fetches the latest price for each ticker
     and updates the stored current_price.
@@ -160,8 +171,8 @@ def get_watchlist(refresh_prices: bool = True) -> list:
     rows = conn.execute("""
         SELECT id, ticker, company_name, added_price, current_price,
                price_alert_pct, sentiment_alert, added_at, last_updated
-        FROM watchlist ORDER BY added_at DESC
-    """).fetchall()
+        FROM watchlist WHERE user_id = ? ORDER BY added_at DESC
+    """, (user_id,)).fetchall()
     conn.close()
 
     entries = []
@@ -210,6 +221,7 @@ def update_alert_settings(
     ticker: str,
     price_alert_pct: float = None,
     sentiment_alert: bool = None,
+    user_id: str = "public",
 ) -> dict:
     """Update alert thresholds for an existing watchlist entry."""
     _init_db()
@@ -227,10 +239,10 @@ def update_alert_settings(
     if not updates:
         return {"error": "No fields to update"}
 
-    values.append(ticker)
+    values.extend([user_id, ticker])
     conn = get_conn()
     cursor = conn.execute(
-        f"UPDATE watchlist SET {', '.join(updates)} WHERE ticker = ?", values
+        f"UPDATE watchlist SET {', '.join(updates)} WHERE user_id = ? AND ticker = ?", values
     )
     conn.commit()
     conn.close()
