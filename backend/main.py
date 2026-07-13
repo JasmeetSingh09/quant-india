@@ -614,22 +614,23 @@ class HoldingRequest(BaseModel):
     buy_price: float
 
 @app.post("/portfolio/add")
-def portfolio_add(req: HoldingRequest):
+def portfolio_add(req: HoldingRequest, user_id: str = Depends(current_user_id)):
     """Add a real holding (ticker, quantity, buy price)."""
-    result = add_holding(req.ticker, req.quantity, req.buy_price)
+    result = add_holding(req.ticker, req.quantity, req.buy_price, user_id=user_id)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
 
 @app.get("/portfolio")
-def portfolio_get(refresh: bool = Query(True)):
+def portfolio_get(refresh: bool = Query(True), user_id: str = Depends(current_user_id)):
     """Get all holdings with live P&L, allocation, best/worst."""
-    return get_portfolio(refresh=refresh)
+    return get_portfolio(refresh=refresh, user_id=user_id)
 
 @app.delete("/portfolio/remove")
-def portfolio_remove(id: int = Query(..., description="Holding id to remove")):
+def portfolio_remove(id: int = Query(..., description="Holding id to remove"),
+                     user_id: str = Depends(current_user_id)):
     """Remove a holding by id."""
-    result = remove_holding(id)
+    result = remove_holding(id, user_id=user_id)
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return result

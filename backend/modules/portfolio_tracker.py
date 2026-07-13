@@ -29,6 +29,7 @@ def _init_db():
     conn.execute("""
         CREATE TABLE IF NOT EXISTS portfolio_holdings (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id      TEXT NOT NULL DEFAULT 'public',
             ticker       TEXT NOT NULL,
             company_name TEXT,
             quantity     REAL NOT NULL,
@@ -36,6 +37,10 @@ def _init_db():
             added_at     TEXT NOT NULL
         )
     """)
+    try:
+        conn.execute("ALTER TABLE portfolio_holdings ADD COLUMN user_id TEXT NOT NULL DEFAULT 'public'")
+    except Exception:
+        pass
     conn.commit()
     conn.close()
 
@@ -61,7 +66,7 @@ def _company_name(ticker: str) -> str:
         return ticker.replace(".NS", "")
 
 
-def add_holding(ticker: str, quantity: float, buy_price: float) -> dict:
+def add_holding(ticker: str, quantity: float, buy_price: float, user_id: str = "public") -> dict:
     """Add a holding. quantity > 0, buy_price > 0, ticker must end .NS."""
     _init_db()
     ticker = (ticker or "").upper().strip()
@@ -80,9 +85,9 @@ def add_holding(ticker: str, quantity: float, buy_price: float) -> dict:
     now = datetime.now().isoformat()
     conn = get_conn()
     cur = conn.execute(
-        "INSERT INTO portfolio_holdings (ticker, company_name, quantity, buy_price, added_at) "
-        "VALUES (?,?,?,?,?)",
-        (ticker, _company_name(ticker), quantity, buy_price, now)
+        "INSERT INTO portfolio_holdings (user_id, ticker, company_name, quantity, buy_price, added_at) "
+        "VALUES (?,?,?,?,?,?)",
+        (user_id, ticker, _company_name(ticker), quantity, buy_price, now)
     )
     conn.commit()
     hid = cur.lastrowid
@@ -91,11 +96,12 @@ def add_holding(ticker: str, quantity: float, buy_price: float) -> dict:
             "quantity": quantity, "buy_price": buy_price}
 
 
-def remove_holding(holding_id: int) -> dict:
-    """Remove a holding by its id."""
+def remove_holding(holding_id: int, user_id: str = "public") -> dict:
+    """Remove a holding by its id (only if it belongs to this user)."""
     _init_db()
     conn = get_conn()
-    cur = conn.execute("DELETE FROM portfolio_holdings WHERE id = ?", (holding_id,))
+    cur = conn.execute("DELETE FROM portfolio_holdings WHERE id = ? AND user_id = ?",
+                       (holding_id, user_id))
     conn.commit()
     conn.close()
     if cur.rowcount:
@@ -103,7 +109,7 @@ def remove_holding(holding_id: int) -> dict:
     return {"error": f"No holding with id {holding_id}"}
 
 
-def get_portfolio(refresh: bool = True) -> dict:
+def get_portfolio(refresh: bool = True, user_id: str = "public") -> dict:
     """
     Return all holdings with live P&L plus portfolio totals and allocation.
     """
@@ -111,7 +117,8 @@ def get_portfolio(refresh: bool = True) -> dict:
     conn = get_conn()
     rows = conn.execute(
         "SELECT id, ticker, company_name, quantity, buy_price, added_at "
-        "FROM portfolio_holdings ORDER BY added_at DESC"
+        "FROM portfolio_holdings WHERE user_id = ? ORDER BY added_at DESC",
+        (user_id,)
     ).fetchall()
     conn.close()
 
