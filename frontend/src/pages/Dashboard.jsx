@@ -251,7 +251,9 @@ export default function Dashboard() {
   const { data: regime, isLoading: regimeLoading, isError: regimeError } = useQuery({ queryKey: ['regime'],  queryFn: getRegime,     staleTime: 300000 })
   const { data: news,   isLoading: newsLoading,   isError: newsError   } = useQuery({ queryKey: ['mktNews'], queryFn: getMarketNews, staleTime: 60000 })
   const { data: picks,    isLoading: picksLoading,
-          isError: picksError, refetch: refetchPicks } = useQuery({ queryKey: ['topPicks'], queryFn: getTopPicks,   staleTime: 25 * 60 * 1000, retry: 1 })
+          isError: picksError, refetch: refetchPicks } = useQuery({ queryKey: ['topPicks'], queryFn: getTopPicks,   staleTime: 25 * 60 * 1000, retry: 1,
+            // while the backend warms its cache it returns {warming:true}; poll until picks appear
+            refetchInterval: q => (q.state.data?.warming ? 15000 : false) })
 
   return (
     <div className="p-6 space-y-6">
@@ -355,7 +357,14 @@ export default function Dashboard() {
           </div>
         )}
 
-        {picks && (
+        {picks?.warming && (
+          <div className="flex flex-col items-center py-8 gap-2">
+            <Spinner size="sm" />
+            <p className="text-xs text-gray-500">Ranking the universe — the first scan takes a minute. Updating automatically…</p>
+          </div>
+        )}
+
+        {picks && !picks.warming && (
           <>
             <div className="grid grid-cols-2 gap-6">
               {/* Buys */}
