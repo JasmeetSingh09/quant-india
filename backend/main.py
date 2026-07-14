@@ -53,7 +53,7 @@ from sentiment import score_headline, summarise_sentiment
 from watchlist import add_to_watchlist, remove_from_watchlist, get_watchlist
 from auth import current_user_id   # per-user data (returns 'public' when anonymous)
 from alerts import send_test_alert, send_multi_signal_alert, start_alert_scheduler, run_watchlist_alert_check
-from alpha_model import compute_alpha_score, scan_alpha, retrain_weights, explain_signal, top_picks
+from alpha_model import compute_alpha_score, scan_alpha, retrain_weights, explain_signal, top_picks, warm_top_picks
 from prediction_tracker import snapshot as log_predictions_snapshot, evaluate as evaluate_predictions
 from portfolio_optimizer import (
     mean_variance_optimize, black_litterman_optimize,
@@ -109,6 +109,17 @@ app.add_middleware(
 )
 
 
+def _start_picks_scheduler():
+    """Refresh the Top Picks cache every 25 min so it stays warm (< the 30-min TTL)."""
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        sched = BackgroundScheduler(daemon=True)
+        sched.add_job(warm_top_picks, "interval", minutes=25, id="warm_top_picks")
+        sched.start()
+    except Exception:
+        pass
+
+
 @app.on_event("startup")
 async def startup():
     """On startup: load full NSE+BSE universe and start news refresh scheduler."""
@@ -122,6 +133,10 @@ async def startup():
     from prediction_tracker import start_prediction_scheduler, snapshot as _snap
     start_prediction_scheduler()                 # daily auto-log of picks (track record)
     loop.run_in_executor(None, _snap)            # log one snapshot now (non-blocking)
+    # Warm the Top Picks cache in the background so the endpoint never blocks on
+    # the slow (FinBERT + Yahoo) scan, and refresh it periodically.
+    loop.run_in_executor(None, warm_top_picks)
+    _start_picks_scheduler()
 
 
 # ---------------------------------------------------------------------------

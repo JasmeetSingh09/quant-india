@@ -686,25 +686,106 @@ TOP_PICKS_UNIVERSE = [
 ]
 _PICKS_CACHE: dict = {}
 _PICKS_TTL = 1800       # 30 min — alpha barely moves intraday; protects vs throttling
+_PICKS_WARMING = False  # guards against launching two concurrent scans
+
+
+# --- persistence: the scan is slow (FinBERT + throttled Yahoo) and the in-memory
+# cache dies on every restart. Persist the ranked list to the DB so a fresh
+# process can serve instantly instead of blocking a request on a multi-minute scan.
+
+def _persist_picks(now: float, ranked: list) -> None:
+    try:
+        import json
+        from db import get_conn
+        conn = get_conn()
+        conn.execute("CREATE TABLE IF NOT EXISTS alpha_picks_cache ("
+                     "id INTEGER PRIMARY KEY CHECK (id = 1), "
+                     "computed_at REAL NOT NULL, ranked TEXT NOT NULL)")
+        payload = json.dumps(ranked)
+        # single-row upsert (id is always 1)
+        conn.execute("DELETE FROM alpha_picks_cache WHERE id = 1")
+        conn.execute("INSERT INTO alpha_picks_cache (id, computed_at, ranked) VALUES (1, ?, ?)",
+                     (now, payload))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+def _load_persisted_picks() -> tuple | None:
+    try:
+        import json
+        from db import get_conn
+        conn = get_conn()
+        conn.execute("CREATE TABLE IF NOT EXISTS alpha_picks_cache ("
+                     "id INTEGER PRIMARY KEY CHECK (id = 1), "
+                     "computed_at REAL NOT NULL, ranked TEXT NOT NULL)")
+        row = conn.execute("SELECT computed_at, ranked FROM alpha_picks_cache WHERE id = 1").fetchone()
+        conn.close()
+        if row:
+            return (float(row[0]), json.loads(row[1]))
+    except Exception:
+        pass
+    return None
+
+
+def warm_top_picks() -> int:
+    """Run the (slow) live scan and refresh both the memory and DB caches.
+    Meant to be called from a background thread / scheduler, never inline in a
+    request. Returns the number of stocks scored."""
+    global _PICKS_WARMING
+    if _PICKS_WARMING:
+        return 0
+    _PICKS_WARMING = True
+    try:
+        import time
+        ranked = [r for r in scan_alpha(TOP_PICKS_UNIVERSE)
+                  if "error" not in r and r.get("alpha_score") is not None]
+        if ranked:
+            now = time.time()
+            _PICKS_CACHE["data"] = (now, ranked)
+            _persist_picks(now, ranked)
+        return len(ranked)
+    finally:
+        _PICKS_WARMING = False
+
+
+def _kick_background_warm() -> None:
+    import threading
+    threading.Thread(target=warm_top_picks, daemon=True).start()
 
 
 def top_picks(n: int = 6) -> dict:
     """
-    Scan the curated universe and return the best-scoring buys and worst-scoring
-    avoids by our factor model. Cached; serves last-good on yfinance throttling.
+    Return the best-scoring buys and worst-scoring avoids from the curated
+    universe. NEVER runs the slow scan inline — it serves the cache (memory, or
+    DB on a cold process) and kicks a background refresh when the cache is stale
+    or empty, so the request always returns fast.
     """
     import time
     now = time.time()
+
     cached = _PICKS_CACHE.get("data")
-    if cached and now - cached[0] < _PICKS_TTL:
-        ranked = cached[1]
-    else:
-        ranked = [r for r in scan_alpha(TOP_PICKS_UNIVERSE)
-                  if "error" not in r and r.get("alpha_score") is not None]
-        if ranked:
-            _PICKS_CACHE["data"] = (now, ranked)
-        elif cached:
-            ranked = cached[1]
+    if not cached:                        # cold process — try the persisted cache
+        cached = _load_persisted_picks()
+        if cached:
+            _PICKS_CACHE["data"] = cached
+
+    if cached and now - cached[0] >= _PICKS_TTL:
+        _kick_background_warm()           # stale: refresh in the background, serve stale now
+
+    if not cached:                        # nothing anywhere yet — warm and tell the UI to retry
+        _kick_background_warm()
+        return {
+            "buys": [], "avoids": [], "scanned": 0,
+            "universe_size": len(TOP_PICKS_UNIVERSE),
+            "warming": True,
+            "as_of": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "disclaimer": "Ranking the universe — this first scan takes a minute. "
+                          "Refresh shortly.",
+        }
+
+    ranked = cached[1]
     buys = [r for r in ranked if r["alpha_score"] > 0][:n]
     avoids = sorted([r for r in ranked if r["alpha_score"] < 0],
                     key=lambda x: x["alpha_score"])[:n]
@@ -713,7 +794,7 @@ def top_picks(n: int = 6) -> dict:
         "avoids": avoids,
         "scanned": len(ranked),
         "universe_size": len(TOP_PICKS_UNIVERSE),
-        "as_of": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "as_of": datetime.fromtimestamp(cached[0]).strftime("%Y-%m-%d %H:%M"),
         "disclaimer": "Factor-model screen, not financial advice. "
                       "Scores reflect current factors, not a proven track record.",
     }
