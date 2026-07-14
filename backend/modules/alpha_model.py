@@ -231,102 +231,84 @@ def _compute_sentiment_factor(ticker: str, days_back: int = 14) -> dict:
 
 def _compute_momentum_factor(ticker: str, peers: list = None) -> dict:
     """
-    Cross-sectional momentum rank among sector peers.
+    Absolute (time-series) 12-1 momentum, volatility-adjusted.
 
-    Uses a composite of:
-      - 6-month return (weight 0.5)
-      - 3-month return (weight 0.3)
-      - 1-month return (weight 0.2, INVERTED as short-term reversal correction)
+    Signal = the stock's own cumulative total return from ~12 months ago to
+    ~1 month ago, with the MOST RECENT MONTH SKIPPED (Jegadeesh & Titman 1993 —
+    the last month is dropped to avoid short-term reversal contaminating the
+    momentum signal). That return is divided by the stock's annualised
+    volatility, and the ratio is squashed through tanh into [-1, +1].
 
-    The final score is the ticker's percentile rank among its peers
-    mapped to [-1, +1].
+    Why this replaced the old sector-relative percentile:
+      The previous version scored each stock as a percentile rank *within its
+      own sector peer group*, so RELIANCE's -1 meant "worst energy stock" and
+      TCS's -1 meant "worst IT stock" — not comparable quantities, yet Top Picks
+      ranked all names on one score built from them. It also collapsed to the
+      -1 floor whenever peer downloads failed on a throttled cloud IP. This
+      absolute version depends ONLY on the stock's own price history: it is
+      directly comparable across stocks and sectors, needs no peer downloads,
+      and produces continuous (not 5-bucket) scores.
 
-    Academic basis: Jegadeesh & Titman (1993) adapted for NSE —
-    we found 1-month reversal applies to Indian large-caps (see mean_reversion_study).
+    Vol-adjustment is deliberate: dividing by volatility penalises junky,
+    high-beta runners — important in India where smallcap momentum gets wild —
+    and yields a Sharpe-like, cross-sectionally comparable number.
+
+    `peers` is accepted for signature compatibility but intentionally unused.
     """
     try:
-        if not peers:
-            import sys
-            sys.path.insert(0, str(Path(__file__).parent))
-            from data_fetcher import get_sector_peers
-            peers = get_sector_peers(ticker)
-
-        # Cap peers so momentum can't fan out to many slow downloads.
-        all_tickers = [ticker] + [p for p in peers if p != ticker][:4]
+        LOOKBACK = 252    # ~12 months of trading days (start of the window)
+        SKIP     = 21     # skip the most recent ~1 month (short-term reversal)
 
         end   = datetime.now().strftime("%Y-%m-%d")
-        start = (datetime.now() - timedelta(days=200)).strftime("%Y-%m-%d")
+        start = (datetime.now() - timedelta(days=430)).strftime("%Y-%m-%d")  # ~14mo buffer
 
-        # ONE batched, timeout-bounded download instead of a per-ticker loop —
-        # far fewer requests and can't hang on a throttled cloud IP.
-        prices = {}
+        # Single-ticker, timeout-bounded download — no peer fan-out, so this can't
+        # collapse under throttling the way the old peer-percentile version did.
         try:
-            data = yf.download(all_tickers, start=start, end=end, progress=False,
-                               auto_adjust=True, group_by="ticker", threads=True,
-                               timeout=15)
-            for t in all_tickers:
-                try:
-                    if len(all_tickers) == 1:
-                        s = data["Close"].squeeze().dropna()
-                    else:
-                        s = data[t]["Close"].dropna()
-                    if len(s) > 21:                   # need ~1 month of real data
-                        prices[t] = s
-                except Exception:
-                    pass
+            df = yf.download(ticker, start=start, end=end, progress=False,
+                             auto_adjust=True, threads=True, timeout=15)
+            s = df["Close"].squeeze().dropna()
         except Exception:
-            pass
+            s = None
 
-        if ticker not in prices:
+        if s is None or len(s) < 60:
             return {"score": 0.0, "confidence": 0.0, "reason": "price data unavailable"}
 
-        if len(prices) < 2:
-            # No peers — use absolute momentum (vs zero)
-            s = prices[ticker]
-            ret_6m = float((s.iloc[-1] / s.iloc[max(0, len(s)-126)]) - 1) if len(s) > 126 else 0
-            score  = max(-1, min(1, ret_6m * 5))  # scale
-            return {
-                "score":       round(score, 4),
-                "confidence":  0.4,
-                "reason":      "no peers — absolute momentum only",
-                "ret_6m":      round(ret_6m * 100, 2),
-            }
+        n = len(s)
+        start_idx = max(0, n - 1 - LOOKBACK)   # ~12 months ago (or as far back as we have)
+        end_idx   = n - 1 - SKIP               # ~1 month ago
+        if end_idx <= start_idx:
+            return {"score": 0.0, "confidence": 0.0, "reason": "insufficient price history"}
 
-        # Compute composite momentum for each ticker (skip any that come out NaN)
-        composite = {}
-        for t, s in prices.items():
-            n = len(s)
-            ret_6m = float((s.iloc[-1] / s.iloc[max(0, n-126)]) - 1) if n > 126 else 0
-            ret_3m = float((s.iloc[-1] / s.iloc[max(0, n-63)])  - 1) if n > 63  else 0
-            ret_1m = float((s.iloc[-1] / s.iloc[max(0, n-21)])  - 1) if n > 21  else 0
-            val = 0.5 * ret_6m + 0.3 * ret_3m - 0.2 * ret_1m
-            if val == val:                       # exclude NaN
-                composite[t] = val
+        # 12-1 momentum: cumulative return over the window, last month excluded
+        mom = float(s.iloc[end_idx] / s.iloc[start_idx] - 1)
 
-        if ticker not in composite:
-            return {"score": 0.0, "confidence": 0.0, "reason": "insufficient price data"}
+        # Annualised volatility of daily returns over the same window
+        rets = s.iloc[start_idx:end_idx + 1].pct_change().dropna()
+        ann_vol = float(rets.std() * np.sqrt(252)) if len(rets) > 5 else 0.0
+        risk_adj = (mom / ann_vol) if ann_vol > 1e-6 else 0.0
 
-        # Rank ticker among peers
-        all_scores   = list(composite.values())
-        ticker_score = composite.get(ticker, 0)
-        rank         = sorted(all_scores).index(ticker_score)
-        percentile   = rank / max(1, len(all_scores) - 1)   # 0 = worst, 1 = best
-        score        = (percentile - 0.5) * 2                # map to [-1, +1]
+        # tanh squashes to [-1, +1]; /1.5 keeps typical values off the rails so
+        # the score stays continuous rather than pinning at ±1.
+        score = float(np.tanh(risk_adj / 1.5))
 
-        ret_values = {t: round(v * 100, 2) for t, v in composite.items()}
+        # Confidence reflects how much of the intended 12-month window we had.
+        history_frac = min(1.0, (end_idx - start_idx) / LOOKBACK)
+        confidence = round(0.4 + 0.6 * history_frac, 3)
 
         return {
-            "score":       round(float(score), 4),
-            "confidence":  min(1.0, len(prices) / 5),
-            "rank":        f"{rank+1} of {len(all_scores)}",
-            "ret_6m_pct":  round(composite.get(ticker, 0) * 100, 2),
-            "peer_scores": ret_values,
+            "score":        round(score, 4),
+            "confidence":   confidence,
+            "mom_12_1_pct": round(mom * 100, 2),      # raw 12-1 return, interpretable on its own
+            "ann_vol_pct":  round(ann_vol * 100, 2),
+            "risk_adj":     round(risk_adj, 3),
+            "window":       f"{n - 1 - start_idx}→{SKIP} trading days ago",
             "interpretation": (
-                "Top-tier momentum among peers"    if score > 0.5 else
-                "Above-average momentum"           if score > 0.1 else
-                "Bottom-tier momentum among peers" if score < -0.5 else
-                "Below-average momentum"           if score < -0.1 else
-                "Mid-pack"
+                "Strong upward momentum"     if score > 0.5 else
+                "Positive momentum"          if score > 0.1 else
+                "Strong downward momentum"   if score < -0.5 else
+                "Negative momentum"          if score < -0.1 else
+                "Flat — no clear momentum"
             ),
         }
     except Exception as e:
