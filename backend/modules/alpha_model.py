@@ -782,12 +782,21 @@ def warm_top_picks() -> int:
     _PICKS_WARMING = True
     try:
         import time
-        ranked = [r for r in scan_alpha(TOP_PICKS_UNIVERSE)
-                  if "error" not in r and r.get("alpha_score") is not None]
-        if ranked:
+        # Score one stock at a time and publish after EACH so partial results
+        # show up right away and a mid-scan restart (common on Render) isn't
+        # wasted. Yahoo throttling makes each stock slow, so this matters.
+        ranked = []
+        for ticker in TOP_PICKS_UNIVERSE:
+            try:
+                r = compute_alpha_score(ticker)
+            except Exception:
+                continue
+            if "error" in r or r.get("alpha_score") is None:
+                continue
+            ranked.append(r)
             now = time.time()
-            _PICKS_CACHE["data"] = (now, ranked)
-            _persist_picks(now, ranked)
+            _PICKS_CACHE["data"] = (now, list(ranked))
+            _persist_picks(now, list(ranked))
         return len(ranked)
     finally:
         _PICKS_WARMING = False

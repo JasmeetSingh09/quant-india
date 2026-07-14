@@ -252,8 +252,13 @@ export default function Dashboard() {
   const { data: news,   isLoading: newsLoading,   isError: newsError   } = useQuery({ queryKey: ['mktNews'], queryFn: getMarketNews, staleTime: 60000 })
   const { data: picks,    isLoading: picksLoading,
           isError: picksError, refetch: refetchPicks } = useQuery({ queryKey: ['topPicks'], queryFn: getTopPicks,   staleTime: 25 * 60 * 1000, retry: 1,
-            // while the backend warms its cache it returns {warming:true}; poll until picks appear
-            refetchInterval: q => (q.state.data?.warming ? 15000 : false) })
+            // backend fills the scan progressively; keep polling until all stocks are scored
+            refetchInterval: q => {
+              const d = q.state.data
+              if (!d) return false
+              if (d.warming) return 15000
+              return (d.scanned < d.universe_size) ? 20000 : false
+            } })
 
   return (
     <div className="p-6 space-y-6">
