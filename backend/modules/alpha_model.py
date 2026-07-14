@@ -71,7 +71,7 @@ FACTOR_WEIGHTS = {
 # cache (fundamentals barely move intraday), degrading to {} instead of hanging.
 _INFO_CACHE: dict = {}          # ticker -> (fetched_at, info_dict)
 _INFO_TTL = 24 * 3600           # fundamentals are ~daily data
-_INFO_TIMEOUT = 8               # seconds; a slow fetch degrades to neutral
+_INFO_TIMEOUT = 6               # seconds; a slow fetch degrades to neutral
 
 
 def _ticker_info(ticker: str) -> dict:
@@ -251,21 +251,31 @@ def _compute_momentum_factor(ticker: str, peers: list = None) -> dict:
             from data_fetcher import get_sector_peers
             peers = get_sector_peers(ticker)
 
-        all_tickers = [ticker] + [p for p in peers if p != ticker]
+        # Cap peers so momentum can't fan out to many slow downloads.
+        all_tickers = [ticker] + [p for p in peers if p != ticker][:4]
 
         end   = datetime.now().strftime("%Y-%m-%d")
         start = (datetime.now() - timedelta(days=200)).strftime("%Y-%m-%d")
 
+        # ONE batched, timeout-bounded download instead of a per-ticker loop —
+        # far fewer requests and can't hang on a throttled cloud IP.
         prices = {}
-        for t in all_tickers:
-            try:
-                df = yf.download(t, start=start, end=end,
-                                 progress=False, auto_adjust=True)
-                s = df["Close"].squeeze().dropna()   # drop NaN (delisted/missing days)
-                if len(s) > 21:                       # need ~1 month of real data
-                    prices[t] = s
-            except Exception:
-                pass
+        try:
+            data = yf.download(all_tickers, start=start, end=end, progress=False,
+                               auto_adjust=True, group_by="ticker", threads=True,
+                               timeout=15)
+            for t in all_tickers:
+                try:
+                    if len(all_tickers) == 1:
+                        s = data["Close"].squeeze().dropna()
+                    else:
+                        s = data[t]["Close"].dropna()
+                    if len(s) > 21:                   # need ~1 month of real data
+                        prices[t] = s
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
         if ticker not in prices:
             return {"score": 0.0, "confidence": 0.0, "reason": "price data unavailable"}
@@ -423,7 +433,7 @@ def _compute_value_factor(ticker: str, peers: list = None) -> dict:
 
         peer_pes = []
         peer_pbs = []
-        for p in peers[:4]:            # cap peer fetches so one stock can't fan out to many slow .info calls
+        for p in peers[:3]:            # cap peer fetches so one stock can't fan out to many slow .info calls
             try:
                 pi = _ticker_info(p)
                 if pi.get("trailingPE"):  peer_pes.append(pi["trailingPE"])
