@@ -712,6 +712,9 @@ TOP_PICKS_UNIVERSE = [
 _PICKS_CACHE: dict = {}
 _PICKS_TTL = 1800       # 30 min — alpha barely moves intraday; protects vs throttling
 _PICKS_WARMING = False  # guards against launching two concurrent scans
+# Bump whenever the scoring MODEL changes so old persisted picks are discarded
+# instead of served stale. ("mom-abs" = absolute 12-1 momentum rewrite.)
+_PICKS_VERSION = "mom-abs-v2"
 
 
 # --- persistence: the scan is slow (FinBERT + throttled Yahoo) and the in-memory
@@ -726,7 +729,7 @@ def _persist_picks(now: float, ranked: list) -> None:
         conn.execute("CREATE TABLE IF NOT EXISTS alpha_picks_cache ("
                      "id INTEGER PRIMARY KEY CHECK (id = 1), "
                      "computed_at REAL NOT NULL, ranked TEXT NOT NULL)")
-        payload = json.dumps(ranked)
+        payload = json.dumps({"v": _PICKS_VERSION, "ranked": ranked})
         # single-row upsert (id is always 1)
         conn.execute("DELETE FROM alpha_picks_cache WHERE id = 1")
         conn.execute("INSERT INTO alpha_picks_cache (id, computed_at, ranked) VALUES (1, ?, ?)",
@@ -748,7 +751,12 @@ def _load_persisted_picks() -> tuple | None:
         row = conn.execute("SELECT computed_at, ranked FROM alpha_picks_cache WHERE id = 1").fetchone()
         conn.close()
         if row:
-            return (float(row[0]), json.loads(row[1]))
+            payload = json.loads(row[1])
+            # Discard caches written by a previous model version (or the old bare-list
+            # format) so a model change never serves stale, mismatched picks.
+            if not isinstance(payload, dict) or payload.get("v") != _PICKS_VERSION:
+                return None
+            return (float(row[0]), payload["ranked"])
     except Exception:
         pass
     return None
