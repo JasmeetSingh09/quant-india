@@ -65,6 +65,39 @@ FACTOR_WEIGHTS = {
 }
 
 
+# yfinance's .info is slow and can HANG for 20-30s on a throttled cloud IP, with
+# no timeout param. The Top Picks scan makes dozens of these calls, so one hung
+# fetch stalls the whole scan. Guard every .info behind a hard timeout + a long
+# cache (fundamentals barely move intraday), degrading to {} instead of hanging.
+_INFO_CACHE: dict = {}          # ticker -> (fetched_at, info_dict)
+_INFO_TTL = 24 * 3600           # fundamentals are ~daily data
+_INFO_TIMEOUT = 8               # seconds; a slow fetch degrades to neutral
+
+
+def _ticker_info(ticker: str) -> dict:
+    """Cached, timeout-guarded replacement for `yf.Ticker(ticker).info`.
+    Returns {} (never hangs) so factor code degrades gracefully."""
+    import time
+    hit = _INFO_CACHE.get(ticker)
+    now = time.time()
+    if hit and now - hit[0] < _INFO_TTL:
+        return hit[1]
+
+    import concurrent.futures as _cf
+    def _fetch():
+        return yf.Ticker(ticker).info or {}
+    info = {}
+    try:
+        with _cf.ThreadPoolExecutor(max_workers=1) as ex:
+            info = ex.submit(_fetch).result(timeout=_INFO_TIMEOUT) or {}
+    except Exception:
+        # timeout or fetch error — serve stale if we have any, else empty
+        info = hit[1] if hit else {}
+    if info:
+        _INFO_CACHE[ticker] = (now, info)
+    return info
+
+
 def _sanitize(obj):
     """
     Make any result JSON-safe: NaN/inf -> None, numpy scalars -> native Python.
@@ -313,7 +346,7 @@ def _compute_quality_factor(ticker: str) -> dict:
     try:
         from metrics import piotroski_score
 
-        info = yf.Ticker(ticker).info
+        info = _ticker_info(ticker)
 
         # Piotroski score component (0-9 mapped to 0-1)
         f_result = piotroski_score(ticker)
@@ -381,7 +414,7 @@ def _compute_value_factor(ticker: str, peers: list = None) -> dict:
             from data_fetcher import get_sector_peers
             peers = get_sector_peers(ticker)
 
-        info     = yf.Ticker(ticker).info
+        info     = _ticker_info(ticker)
         pe_self  = info.get("trailingPE")
         pb_self  = info.get("priceToBook")
 
@@ -390,9 +423,9 @@ def _compute_value_factor(ticker: str, peers: list = None) -> dict:
 
         peer_pes = []
         peer_pbs = []
-        for p in peers:
+        for p in peers[:4]:            # cap peer fetches so one stock can't fan out to many slow .info calls
             try:
-                pi = yf.Ticker(p).info
+                pi = _ticker_info(p)
                 if pi.get("trailingPE"):  peer_pes.append(pi["trailingPE"])
                 if pi.get("priceToBook"): peer_pbs.append(pi["priceToBook"])
             except Exception:
@@ -856,7 +889,7 @@ def retrain_weights(
                 if len(prices) < 60:
                     continue
 
-                info = yf.Ticker(ticker).info
+                info = _ticker_info(ticker)
 
                 # Static quality and value factors (use end-of-period values)
                 roe      = info.get("returnOnEquity", 0) or 0

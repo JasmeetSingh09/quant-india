@@ -373,12 +373,17 @@ def get_stock_news(ticker: str, company_name: str = None, days_back: int = 7) ->
         return cached
 
     if not company_name:
+        # .info can hang 20-30s on a throttled cloud IP; cap it hard and fall back
+        # to the bare ticker name (RSS search still works on the symbol).
+        company_name = ticker.replace(".NS", "")
         try:
             import yfinance as yf
-            info = yf.Ticker(ticker).info
-            company_name = info.get("longName", ticker.replace(".NS", ""))
+            import concurrent.futures as _cf
+            with _cf.ThreadPoolExecutor(max_workers=1) as _ex:
+                info = _ex.submit(lambda: yf.Ticker(ticker).info or {}).result(timeout=8)
+            company_name = info.get("longName") or company_name
         except Exception:
-            company_name = ticker.replace(".NS", "")
+            pass
 
     # 1) Try RSS first (near-real-time, filtered for this company)
     articles = []
