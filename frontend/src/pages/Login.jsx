@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../AuthContext'
 
 export default function Login() {
@@ -78,6 +79,10 @@ export default function Login() {
           >
             {mode === 'signup' ? 'Sign in' : 'Sign up'}
           </button>
+        </div>
+
+        <div className="text-center">
+          <Link to="/" className="text-xs text-gray-500 hover:text-gray-300">← Back to home</Link>
         </div>
       </div>
     </div>

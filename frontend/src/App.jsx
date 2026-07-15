@@ -9,6 +9,7 @@ import PortfolioLab from './pages/PortfolioLab'
 import QuantResearch from './pages/QuantResearch'
 import Markets from './pages/Markets'
 import Login from './pages/Login'
+import Landing from './pages/Landing'
 import { useAuth } from './AuthContext'
 
 function NotFound() {
@@ -31,7 +32,17 @@ export default function App() {
       </div>
     )
   }
-  if (!user) return <Login />
+
+  // Anonymous visitors get the public, crawlable landing page (+ the login
+  // route). The actual app tools stay gated — you must sign in to reach them.
+  if (!user) {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="*"      element={<Landing />} />
+      </Routes>
+    )
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-950">
