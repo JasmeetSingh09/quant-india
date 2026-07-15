@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import usePersistentState from '../usePersistentState'
 import { useMutation } from '@tanstack/react-query'
-import { getDeflatedSharpe, getPositionSize, runBacktest, getFactorRegression } from '../api'
+import { getDeflatedSharpe, getPositionSize, runBacktest, getFactorRegression, getRiskDecomposition } from '../api'
 import { InfoTip } from '../components/Term'
 import Explainer from '../components/Explainer'
 import { ShieldAlert, Loader2 } from 'lucide-react'
@@ -29,6 +29,7 @@ export default function RiskLab() {
   const pfTotal = Object.values(pf).reduce((a, b) => a + Number(b), 0)
   const pfOk = Math.abs(pfTotal - 100) < 0.01
   const tail = useMutation({ mutationFn: () => runBacktest({ holdings: pf, start_date: '2021-01-01' }) })
+  const decomp = useMutation({ mutationFn: () => getRiskDecomposition(pf) })
   const setPfW = (t, v) => setPf({ ...pf, [t]: Number(v) })
   const renamePf = (o, n) => { const { [o]: w, ...r } = pf; setPf({ ...r, [n.toUpperCase()]: w }) }
   const rmPf = t => { const { [t]: _, ...r } = pf; setPf(r) }
@@ -39,6 +40,7 @@ export default function RiskLab() {
 
   const td = tail.data
   const fd = fac.data
+  const rd = decomp.data
 
   const d = dsr.data
   const dsrColor = d ? (d.edge_is_real ? 'text-green-400' : 'text-red-400') : ''
@@ -162,7 +164,7 @@ export default function RiskLab() {
             ))}
             <button onClick={() => setPf({ ...pf, ['NEW.NS']: 0 })} className="text-xs text-blue-400 hover:text-blue-300">+ add stock</button>
             <p className={`text-xs ${pfOk ? 'text-green-400' : 'text-yellow-400'}`}>Total {pfTotal.toFixed(0)}% {pfOk ? '✓' : '(must be 100%)'}</p>
-            <button className="btn-primary" disabled={!pfOk || tail.isPending} onClick={() => tail.mutate()}>
+            <button className="btn-primary" disabled={!pfOk || tail.isPending} onClick={() => { tail.mutate(); decomp.mutate() }}>
               {tail.isPending ? <Loader2 className="animate-spin" size={16}/> : 'Analyse tail risk'}
             </button>
             {tail.isError && <p className="text-xs text-red-400">{String(tail.error)}</p>}
@@ -182,6 +184,53 @@ export default function RiskLab() {
           </div>
         </div>
       </div>
+
+      {/* ── Risk Decomposition ── */}
+      {(decomp.isPending || rd) && (
+        <div className="card space-y-3">
+          <div>
+            <h2 className="font-semibold">Risk Decomposition</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Which holding actually drives your portfolio's risk — often very
+              different from its capital weight. Uses the same portfolio above.
+            </p>
+          </div>
+          {decomp.isPending && <Loader2 className="animate-spin" size={16}/>}
+          {decomp.isError && <p className="text-xs text-red-400">{String(decomp.error)}</p>}
+          {rd && rd.components && (
+            <>
+              <div className="flex gap-3 text-xs">
+                <span className="text-gray-400">Portfolio vol: <b className="text-white">{rd.portfolio_vol_pct}%</b></span>
+                <span className="text-gray-400">Diversification ratio: <b className="text-white">{rd.diversification_ratio}</b></span>
+              </div>
+              <div className="space-y-2">
+                {rd.components.map(c => (
+                  <div key={c.ticker} className="text-xs">
+                    <div className="flex justify-between mb-0.5">
+                      <span className="text-gray-300">{c.ticker.replace('.NS','')}</span>
+                      <span className="text-gray-500">
+                        {c.weight_pct}% weight → <b className={c.risk_to_weight > 1.1 ? 'text-orange-400' : 'text-gray-300'}>{c.risk_contribution_pct}% risk</b>
+                        {' '}({c.risk_to_weight}×)
+                      </span>
+                    </div>
+                    {/* weight bar (grey) vs risk bar (colored) */}
+                    <div className="h-1.5 bg-gray-800 rounded relative">
+                      <div className="h-1.5 bg-gray-600 rounded absolute" style={{ width: `${Math.min(c.weight_pct, 100)}%` }} />
+                    </div>
+                    <div className="h-1.5 bg-gray-800 rounded relative mt-0.5">
+                      <div className={`h-1.5 rounded absolute ${c.risk_to_weight > 1.1 ? 'bg-orange-500' : 'bg-green-600'}`} style={{ width: `${Math.min(c.risk_contribution_pct, 100)}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400">{rd.interpretation}</p>
+              {rd.excluded_tickers?.length > 0 && (
+                <p className="text-[11px] text-yellow-400">Excluded (no price data): {rd.excluded_tickers.join(', ')}</p>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* ── Fama-French Factor Exposure ── */}
       <div className="card space-y-4">

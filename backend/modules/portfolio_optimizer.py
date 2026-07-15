@@ -120,6 +120,84 @@ def _cov(log_returns: pd.DataFrame, as_frame: bool = False):
     return cov
 
 
+def risk_decomposition(holdings: dict, period_months: int = 24) -> dict:
+    """
+    Decompose a portfolio's total volatility into each holding's RISK
+    CONTRIBUTION — the share of portfolio risk it actually drives, which is
+    usually very different from its capital weight. A 20%-weight high-beta,
+    high-correlation stock can contribute 40% of the risk.
+
+    Method (Euler / marginal risk contribution):
+      port_vol      = sqrt(w' Σ w)
+      marginal_i    = (Σ w)_i / port_vol            (∂σ_p/∂w_i)
+      risk_contrib_i= w_i · marginal_i              (these sum to port_vol)
+      pct_i         = risk_contrib_i / port_vol      (these sum to 100%)
+
+    Σ is the annualised Ledoit-Wolf covariance. Also reports a diversification
+    ratio (weighted-avg st-alone vol ÷ portfolio vol): higher = more
+    diversification benefit.
+    """
+    tickers = list(holdings.keys())
+    if len(tickers) < 2:
+        return {"error": "Need at least 2 holdings to decompose risk."}
+
+    end   = datetime.now().strftime("%Y-%m-%d")
+    start = (datetime.now() - timedelta(days=period_months * 30)).strftime("%Y-%m-%d")
+    log_returns = _get_returns(tickers, start, end)
+    valid = [t for t in tickers if t in log_returns.columns]
+    excluded = [t for t in tickers if t not in valid]
+    if len(valid) < 2:
+        return {"error": f"Need ≥2 tickers with price data. Got: {valid}"}
+
+    log_returns = log_returns[valid]
+    w = np.array([float(holdings[t]) for t in valid])
+    if w.sum() <= 0:
+        return {"error": "weights must be positive"}
+    w = w / w.sum()
+
+    cov = _cov(log_returns, as_frame=False)           # annualised
+    port_var = float(w @ cov @ w)
+    port_vol = float(np.sqrt(max(port_var, 1e-12)))
+    marginal = (cov @ w) / port_vol                   # ∂σ/∂w_i
+    risk_contrib = w * marginal                        # sums to port_vol
+    pct = risk_contrib / port_vol * 100.0
+    own_vol = np.sqrt(np.diag(cov))                    # stand-alone annualised vol
+
+    components = []
+    for i, t in enumerate(valid):
+        components.append({
+            "ticker":              t,
+            "weight_pct":          round(float(w[i] * 100), 2),
+            "standalone_vol_pct":  round(float(own_vol[i] * 100), 2),
+            "risk_contribution_pct": round(float(pct[i]), 2),
+            # >1 means it punches ABOVE its weight in risk terms
+            "risk_to_weight":      round(float(pct[i] / (w[i] * 100)) if w[i] > 0 else 0, 2),
+        })
+    components.sort(key=lambda c: c["risk_contribution_pct"], reverse=True)
+
+    wavg_vol = float(w @ own_vol)
+    div_ratio = wavg_vol / port_vol if port_vol > 0 else 1.0
+    top = components[0]
+
+    return {
+        "portfolio_vol_pct":   round(port_vol * 100, 2),
+        "diversification_ratio": round(div_ratio, 3),
+        "components":          components,
+        "excluded_tickers":    excluded,
+        "top_risk_driver":     top["ticker"],
+        "interpretation": (
+            f"{top['ticker'].replace('.NS','')} is your biggest risk driver: "
+            f"{top['weight_pct']}% of capital but {top['risk_contribution_pct']}% of "
+            f"portfolio risk ({top['risk_to_weight']}× its weight). "
+            f"Diversification ratio {round(div_ratio,2)} — "
+            + ("holdings move together, so diversification is limited."
+               if div_ratio < 1.15 else
+               "you're getting meaningful diversification benefit.")
+        ),
+        "note": "Risk contributions sum to 100%; based on annualised Ledoit-Wolf covariance.",
+    }
+
+
 def _get_market_caps(tickers: list) -> dict:
     """Get market capitalisation weights (used as BL equilibrium prior)."""
     caps = {}

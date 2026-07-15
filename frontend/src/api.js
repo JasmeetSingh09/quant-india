@@ -92,6 +92,9 @@ export const optionsAutofill = ticker => api.get(`/options/autofill?ticker=${tic
 export const getMomentumBacktest = (top=0.2, start='2019-01-01') =>
   api.get(`/research/momentum-backtest?top_fraction=${top}&start=${start}`)
 
+// Risk decomposition (which holding drives portfolio risk)
+export const getRiskDecomposition = holdings => api.post('/risk/decomposition', { holdings })
+
 // Pairs trading
 export const findPairs      = body => api.post('/pairs/find', body)
 export const analyzePair    = body => api.post('/pairs/analyze', body)

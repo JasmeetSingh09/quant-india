@@ -58,7 +58,7 @@ from prediction_tracker import snapshot as log_predictions_snapshot, evaluate as
 from portfolio_optimizer import (
     mean_variance_optimize, black_litterman_optimize,
     efficient_frontier, optimize_with_alpha_views,
-    hierarchical_risk_parity,
+    hierarchical_risk_parity, risk_decomposition,
 )
 from regime_detector import detect_regime, regime_conditioned_alpha
 from monte_carlo import simulate as mc_simulate, compare_methods as mc_compare
@@ -750,6 +750,22 @@ def risk_position_size(req: PositionSizeRequest):
     """
     r = recommend_position(req.annual_return_pct, req.annual_vol_pct,
                            req.target_vol_pct, req.max_position_pct)
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+
+class RiskDecompRequest(BaseModel):
+    holdings: dict
+    period_months: int = 24
+
+@app.post("/risk/decomposition")
+def risk_decomposition_endpoint(req: RiskDecompRequest):
+    """
+    Decompose portfolio volatility into each holding's risk contribution
+    (which stock actually drives the risk, vs its capital weight).
+    """
+    r = risk_decomposition(req.holdings, req.period_months)
     if "error" in r:
         raise HTTPException(status_code=400, detail=r["error"])
     return r
