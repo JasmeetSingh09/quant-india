@@ -8,6 +8,7 @@ import MyStocks from './pages/MyStocks'
 import PortfolioLab from './pages/PortfolioLab'
 import QuantResearch from './pages/QuantResearch'
 import Markets from './pages/Markets'
+import OptionsLab from './pages/OptionsLab'
 import Login from './pages/Login'
 import Landing from './pages/Landing'
 import { useAuth } from './AuthContext'
@@ -58,6 +59,7 @@ export default function App() {
           <Route path="/lab"         element={<PortfolioLab />} />
           <Route path="/research"    element={<QuantResearch />} />
           <Route path="/markets"     element={<Markets />} />
+          <Route path="/options"     element={<OptionsLab />} />
           <Route path="/calculators" element={<Calculators />} />
 
           {/* Redirects for old routes */}

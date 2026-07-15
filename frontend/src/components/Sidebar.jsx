@@ -2,7 +2,7 @@
 import {
   LayoutDashboard, Search, PlayCircle,
   TrendingUp, BarChart3, FlaskConical,
-  Briefcase, Calculator, Zap, LogOut
+  Briefcase, Calculator, Zap, LogOut, Sigma
 } from 'lucide-react'
 import { useAuth } from '../AuthContext'
 
@@ -12,6 +12,7 @@ const links = [
   { to: '/my-stocks',   icon: Briefcase,       label: 'My Stocks'  },
   { to: '/simulator',   icon: PlayCircle,      label: 'Simulator'  },
   { to: '/lab',         icon: TrendingUp,      label: 'Port. Lab'  }, // intentional abbrev — full label overflows w-56
+  { to: '/options',     icon: Sigma,           label: 'Options Lab'},
   { to: '/research',    icon: FlaskConical,    label: 'Research'   },
   { to: '/markets',     icon: BarChart3,       label: 'Markets'    },
   { to: '/calculators', icon: Calculator,      label: 'Calculators'},

@@ -83,6 +83,11 @@ export const getRegime      = () => api.get('/regime')
 export const runMonteCarlo  = body => api.post('/montecarlo/simulate', body)
 export const compareMonteCarlo = body => api.post('/montecarlo/compare', body)
 
+// Options Lab — Black-Scholes
+export const runBlackScholes = body => api.post('/options/black-scholes', body)
+export const runImpliedVol   = body => api.post('/options/implied-vol', body)
+export const optionsAutofill = ticker => api.get(`/options/autofill?ticker=${ticker}`)
+
 // Pairs trading
 export const findPairs      = body => api.post('/pairs/find', body)
 export const analyzePair    = body => api.post('/pairs/analyze', body)

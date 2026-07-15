@@ -62,6 +62,7 @@ from portfolio_optimizer import (
 )
 from regime_detector import detect_regime, regime_conditioned_alpha
 from monte_carlo import simulate as mc_simulate, compare_methods as mc_compare
+from black_scholes import black_scholes as bs_price, implied_volatility as bs_iv, payoff_curve as bs_payoff
 from garch_vol import forecast_vol as garch_forecast, test_vs_naive as garch_test
 from screener import screen as run_screen, get_sectors, get_screener_status, ensure_screener_cache, build_screener_cache
 from portfolio_tracker import add_holding, remove_holding, get_portfolio
@@ -243,6 +244,22 @@ class MonteCarloRequest(BaseModel):
     horizon_days:  int = 252
     n_simulations: int = 10_000
     method: str = "bootstrap"
+
+class BlackScholesRequest(BaseModel):
+    spot:        float
+    strike:      float
+    days_to_expiry: float = 30      # calendar days; converted to years server-side
+    rate_pct:    float = 6.5        # RBI repo-ish default
+    vol_pct:     float = 22.0
+    option_type: str = "call"
+
+class ImpliedVolRequest(BaseModel):
+    market_price: float
+    spot:         float
+    strike:       float
+    days_to_expiry: float = 30
+    rate_pct:     float = 6.5
+    option_type:  str = "call"
 
 class MacroSignalRequest(BaseModel):
     macro_keyword: str
@@ -1195,6 +1212,66 @@ def montecarlo_compare(req: MonteCarloRequest):
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
+
+
+# ---------------------------------------------------------------------------
+# Options Lab — Black-Scholes
+# ---------------------------------------------------------------------------
+
+@app.post("/options/black-scholes")
+def options_black_scholes(req: BlackScholesRequest):
+    """
+    Price a European option (Black-Scholes-Merton) with Greeks, risk-neutral
+    probability of finishing ITM, and a payoff-at-expiry curve for plotting.
+    """
+    t_years = max(req.days_to_expiry, 0) / 365.0
+    result = bs_price(req.spot, req.strike, t_years, req.rate_pct, req.vol_pct, req.option_type)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    result["days_to_expiry"] = req.days_to_expiry
+    result["payoff"] = bs_payoff(req.strike, result["price"], req.option_type, req.spot)
+    return result
+
+
+@app.post("/options/implied-vol")
+def options_implied_vol(req: ImpliedVolRequest):
+    """Back out the implied volatility from an observed option market price."""
+    t_years = max(req.days_to_expiry, 0) / 365.0
+    result = bs_iv(req.market_price, req.spot, req.strike, t_years, req.rate_pct, req.option_type)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.get("/options/autofill")
+def options_autofill(ticker: str = Query(..., description="NSE ticker, e.g. RELIANCE.NS")):
+    """
+    Pre-fill Black-Scholes inputs from a real NSE stock: live spot price and
+    annualised historical volatility (a proxy — reliable NSE options-implied
+    vol isn't freely available). Strike defaults to the nearest round spot.
+    """
+    import numpy as np
+    try:
+        import yfinance as yf
+        tk = ticker.upper().strip()
+        if not tk.endswith(".NS"):
+            tk += ".NS"
+        hist = yf.download(tk, period="6mo", progress=False, auto_adjust=True, timeout=15)
+        close = hist["Close"].squeeze().dropna()
+        if len(close) < 20:
+            raise HTTPException(status_code=404, detail=f"No price data for {tk}")
+        spot = float(close.iloc[-1])
+        daily = close.pct_change().dropna()
+        ann_vol = float(daily.std() * np.sqrt(252) * 100)
+        # nearest sensible round strike
+        step = 10 if spot < 500 else (50 if spot < 2000 else 100)
+        strike = round(spot / step) * step
+        return {"ticker": tk, "spot": round(spot, 2), "strike": strike,
+                "vol_pct": round(ann_vol, 2), "vol_basis": "6-month historical (annualised)"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ---------------------------------------------------------------------------
