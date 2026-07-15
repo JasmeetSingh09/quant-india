@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import usePersistentState from '../usePersistentState'
 import { useMutation } from '@tanstack/react-query'
-import { getDeflatedSharpe, getPositionSize } from '../api'
+import { getDeflatedSharpe, getPositionSize, runBacktest, getFactorRegression } from '../api'
 import { InfoTip } from '../components/Term'
 import Explainer from '../components/Explainer'
 import { ShieldAlert, Loader2 } from 'lucide-react'
@@ -23,6 +23,22 @@ export default function RiskLab() {
     setTicker(t); dsr.mutate({ t, n: Number(trials) })
   }
   const runPos = () => pos.mutate({ annual_return_pct: Number(ret), annual_vol_pct: Number(vol), target_vol_pct: Number(tgt) })
+
+  // Portfolio tail risk (surfaces VaR / CVaR / Sharpe / Sortino / Calmar from the backtester)
+  const [pf, setPf] = usePersistentState('risk.pf', { 'HDFCBANK.NS': 40, 'TCS.NS': 30, 'RELIANCE.NS': 30 })
+  const pfTotal = Object.values(pf).reduce((a, b) => a + Number(b), 0)
+  const pfOk = Math.abs(pfTotal - 100) < 0.01
+  const tail = useMutation({ mutationFn: () => runBacktest({ holdings: pf, start_date: '2021-01-01' }) })
+  const setPfW = (t, v) => setPf({ ...pf, [t]: Number(v) })
+  const renamePf = (o, n) => { const { [o]: w, ...r } = pf; setPf({ ...r, [n.toUpperCase()]: w }) }
+  const rmPf = t => { const { [t]: _, ...r } = pf; setPf(r) }
+
+  // Fama-French factor exposure (surfaces the existing regression)
+  const [facT, setFacT] = usePersistentState('risk.facT', 'HDFCBANK.NS')
+  const fac = useMutation({ mutationFn: () => getFactorRegression(facT.toUpperCase().endsWith('.NS') ? facT.toUpperCase() : `${facT.toUpperCase()}.NS`) })
+
+  const td = tail.data
+  const fd = fac.data
 
   const d = dsr.data
   const dsrColor = d ? (d.edge_is_real ? 'text-green-400' : 'text-red-400') : ''
@@ -122,6 +138,81 @@ export default function RiskLab() {
                 ? ' That’s small because the reward doesn’t justify the risk — betting big here would be dangerous.'
                 : ' This captures most of the growth while protecting you from a bad streak.'}</p>
           </Explainer>
+        )}
+      </div>
+
+      {/* ── Portfolio Tail Risk (VaR / CVaR) ── */}
+      <div className="card space-y-4">
+        <div>
+          <h2 className="font-semibold">Portfolio Tail Risk</h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Value at Risk (95%), Conditional VaR (Expected Shortfall), drawdown and
+            risk-adjusted ratios from a cost-adjusted historical backtest.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            {Object.entries(pf).map(([t, w]) => (
+              <div key={t} className="flex items-center gap-2">
+                <input className="input flex-1 text-xs" value={t} onChange={e => renamePf(t, e.target.value)} />
+                <input type="number" className="input w-16 text-xs" value={w} onChange={e => setPfW(t, e.target.value)} />
+                <span className="text-xs text-gray-500">%</span>
+                <button onClick={() => rmPf(t)} className="text-gray-600 hover:text-red-400 text-xs">✕</button>
+              </div>
+            ))}
+            <button onClick={() => setPf({ ...pf, ['NEW.NS']: 0 })} className="text-xs text-blue-400 hover:text-blue-300">+ add stock</button>
+            <p className={`text-xs ${pfOk ? 'text-green-400' : 'text-yellow-400'}`}>Total {pfTotal.toFixed(0)}% {pfOk ? '✓' : '(must be 100%)'}</p>
+            <button className="btn-primary" disabled={!pfOk || tail.isPending} onClick={() => tail.mutate()}>
+              {tail.isPending ? <Loader2 className="animate-spin" size={16}/> : 'Analyse tail risk'}
+            </button>
+            {tail.isError && <p className="text-xs text-red-400">{String(tail.error)}</p>}
+          </div>
+          <div>
+            {td && (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="card-sm" title="On a bad day (worst 5%), you lose at least this."><p className="stat-label">VaR 95% (daily)</p><p className="stat-value text-orange-400">{td.var_95_daily_pct}%</p></div>
+                <div className="card-sm" title="Average loss on the worst-5% days."><p className="stat-label">CVaR 95%</p><p className="stat-value text-red-400">{td.cvar_95_daily_pct}%</p></div>
+                <div className="card-sm"><p className="stat-label">Max drawdown</p><p className="stat-value text-red-400">{td.max_drawdown_pct}%</p></div>
+                <div className="card-sm"><p className="stat-label">Volatility</p><p className="stat-value">{td.volatility_pct}%</p></div>
+                <div className="card-sm"><p className="stat-label">Sharpe</p><p className="stat-value">{td.sharpe_ratio}</p></div>
+                <div className="card-sm"><p className="stat-label">Sortino / Calmar</p><p className="stat-value">{td.sortino_ratio} / {td.calmar_ratio}</p></div>
+              </div>
+            )}
+            {!td && <p className="text-xs text-gray-600">Enter a portfolio and analyse to see tail-risk metrics.</p>}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Fama-French Factor Exposure ── */}
+      <div className="card space-y-4">
+        <div>
+          <h2 className="font-semibold">Factor Exposure (Fama-French)</h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Decompose a stock's return into market / size / value factor betas plus
+            alpha — is the performance a real edge, or just factor exposure?
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-[140px]"><label className="label">Ticker</label>
+            <input className="input" value={facT} onChange={e => setFacT(e.target.value)} onKeyDown={e => e.key === 'Enter' && fac.mutate()} /></div>
+          <button className="btn-primary" onClick={() => fac.mutate()} disabled={fac.isPending}>
+            {fac.isPending ? <Loader2 className="animate-spin" size={16}/> : 'Run regression'}
+          </button>
+        </div>
+        {fac.isError && <p className="text-xs text-red-400">{String(fac.error)}</p>}
+        {fd && fd.coefficients && (
+          <>
+            <div className="grid grid-cols-4 gap-3">
+              {Object.entries(fd.coefficients).map(([k, c]) => (
+                <div key={k} className="card-sm" title={`t-stat ${c.t_stat ?? '—'}, p ${c.p_value ?? '—'}`}>
+                  <p className="stat-label">{k.replace(/_/g, ' ')}</p>
+                  <p className="stat-value">{c.coefficient}</p>
+                </div>
+              ))}
+            </div>
+            {fd.interpretation && <p className="text-xs text-gray-400">{fd.interpretation}</p>}
+            {fd.r_squared != null && <p className="text-[11px] text-gray-500">R² = {fd.r_squared} — higher means more of the return is explained by factor exposure, less by stock-specific alpha.</p>}
+          </>
         )}
       </div>
 

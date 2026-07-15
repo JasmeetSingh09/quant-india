@@ -88,6 +88,10 @@ export const runBlackScholes = body => api.post('/options/black-scholes', body)
 export const runImpliedVol   = body => api.post('/options/implied-vol', body)
 export const optionsAutofill = ticker => api.get(`/options/autofill?ticker=${ticker}`)
 
+// Research — honest momentum backtest
+export const getMomentumBacktest = (top=0.2, start='2019-01-01') =>
+  api.get(`/research/momentum-backtest?top_fraction=${top}&start=${start}`)
+
 // Pairs trading
 export const findPairs      = body => api.post('/pairs/find', body)
 export const analyzePair    = body => api.post('/pairs/analyze', body)

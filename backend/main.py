@@ -63,6 +63,7 @@ from portfolio_optimizer import (
 from regime_detector import detect_regime, regime_conditioned_alpha
 from monte_carlo import simulate as mc_simulate, compare_methods as mc_compare
 from black_scholes import black_scholes as bs_price, implied_volatility as bs_iv, payoff_curve as bs_payoff
+from momentum_backtest import momentum_backtest as run_momentum_backtest
 from garch_vol import forecast_vol as garch_forecast, test_vs_naive as garch_test
 from screener import screen as run_screen, get_sectors, get_screener_status, ensure_screener_cache, build_screener_cache
 from portfolio_tracker import add_holding, remove_holding, get_portfolio
@@ -1240,6 +1241,30 @@ def options_implied_vol(req: ImpliedVolRequest):
     result = bs_iv(req.market_price, req.spot, req.strike, t_years, req.rate_pct, req.option_type)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+_BACKTEST_CACHE: dict = {}
+
+@app.get("/research/momentum-backtest")
+def research_momentum_backtest(
+    start: str = Query("2019-01-01", description="Backtest start date"),
+    top_fraction: float = Query(0.2, description="Hold top X of universe by momentum"),
+):
+    """
+    Honest walk-forward backtest of the 12-1 momentum factor vs the Nifty:
+    no look-ahead, transaction costs included, with a significance t-test.
+    Heavy (downloads a full universe), so cached ~6 hours.
+    """
+    import time
+    key = f"{start}:{top_fraction}"
+    hit = _BACKTEST_CACHE.get(key)
+    if hit and time.time() - hit[0] < 6 * 3600:
+        return hit[1]
+    result = run_momentum_backtest(start=start, top_fraction=top_fraction)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    _BACKTEST_CACHE[key] = (time.time(), result)
     return result
 
 
