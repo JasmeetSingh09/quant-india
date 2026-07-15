@@ -138,6 +138,25 @@ export default function Optimizer() {
         <div className="col-span-2 space-y-4">
           {isLoading && <div className="card"><Spinner /></div>}
 
+          {/* Warn if any ticker was dropped for lack of price data (e.g. an
+              invalid symbol like ADANI.NS — the Adani group trades as
+              ADANIENT.NS / ADANIPORTS.NS / etc). */}
+          {(() => {
+            const excluded = [
+              ...(mvoResult?.excluded_tickers || []),
+              ...(hrpResult?.excluded_tickers || []),
+              ...(frontierResult?.excluded_tickers || []),
+              ...(autoResult?.bl_result?.excluded_tickers || []),
+            ]
+            const uniq = [...new Set(excluded)]
+            return uniq.length ? (
+              <div className="card border border-yellow-700/50 bg-yellow-950/30 text-sm text-yellow-300">
+                ⚠ Excluded (no price data — check the symbol): {uniq.map(t => t.replace('.NS','')).join(', ')}.
+                These were left out of the optimisation.
+              </div>
+            ) : null
+          })()}
+
           {/* MVO result */}
           {mvoResult && !mvoResult.error && (
             <div className="space-y-4">

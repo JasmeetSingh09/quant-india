@@ -215,6 +215,7 @@ def mean_variance_optimize(
 
     return {
         "algorithm":       "Mean-Variance Optimisation (Markowitz)",
+        "excluded_tickers": [t for t in tickers if t not in valid],
         "target":          target,
         "tickers":         valid,
         "period":          f"{start} to {end}",
@@ -355,6 +356,7 @@ def black_litterman_optimize(
         "algorithm":        ("Black-Litterman (He & Litterman 1999) + FinBERT Views"
                              if has_views else
                              "Black-Litterman (market equilibrium — no views)"),
+        "excluded_tickers": [t for t in tickers if t not in valid],
         "tickers":          valid,
         "period":           f"{start} to {end}",
         "tau":              tau,
@@ -468,6 +470,7 @@ def efficient_frontier(
 
     return {
         "algorithm":    "Efficient Frontier (Markowitz 1952)",
+        "excluded_tickers": [t for t in tickers if t not in valid],
         "tickers":      valid,
         "period":       f"{start} to {end}",
         "frontier":     frontier,
@@ -617,6 +620,7 @@ def hierarchical_risk_parity(
 
     return {
         "algorithm":       "Hierarchical Risk Parity (López de Prado 2016)",
+        "excluded_tickers": [t for t in tickers if t not in valid],
         "tickers":         valid,
         "period":          f"{start} to {end}",
         "optimal_weights": {t: round(float(weights[t]), 4) for t in valid},
