@@ -343,21 +343,36 @@ def get_macro_news(days_back: int = 3) -> list:
         "India inflation CPI data",
         "FII foreign investment India sell buy",
     ]
+
+    # 1) PRIMARY: RSS via Google News search — works with no API key (macro used
+    #    to be NewsAPI-only, so it showed nothing whenever NEWS_API_KEY was unset,
+    #    e.g. on the deployed backend).
     articles = []
-    for q in queries[:3]:  # limit on free tier to avoid rate limits
-        articles.extend(_fetch_from_api(q, days_back=days_back, page_size=8))
+    try:
+        from rss_news import _fetch_google_news
+        for q in queries:
+            articles.extend(_fetch_google_news(q, limit=6))
+    except Exception as e:
+        print(f"RSS macro news failed, will try NewsAPI: {e}")
+
+    # 2) FALLBACK: NewsAPI if RSS gave nothing (and a key is configured)
+    if not articles:
+        for q in queries[:3]:  # limit on free tier to avoid rate limits
+            articles.extend(_fetch_from_api(q, days_back=days_back, page_size=8))
 
     seen = set()
     unique = []
     for a in articles:
         if a["url"] not in seen:
             seen.add(a["url"])
-            impacts = get_macro_impact_on_stocks(a["title"])
-            a["macro_impacts"] = impacts
+            a["macro_impacts"] = get_macro_impact_on_stocks(a["title"])
             unique.append(a)
 
     unique.sort(key=lambda x: x["published_minutes_ago"])
-    _cache_set(cache_key, unique)
+    # Don't cache an empty result — a transient fetch failure shouldn't blank
+    # macro news for the next 30 minutes.
+    if unique:
+        _cache_set(cache_key, unique)
     return unique
 
 
