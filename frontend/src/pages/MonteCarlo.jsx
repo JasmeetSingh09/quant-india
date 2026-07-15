@@ -67,6 +67,11 @@ export default function MonteCarlo() {
     horizon_days: Math.round(years * 252), n_simulations: 10000, method,
   })
 
+  // Both endpoints require allocations to sum to 100% — gate the buttons on it
+  // so the user gets a clear hint instead of a silent/blank result.
+  const allocTotal = Object.values(holdings).reduce((a, b) => a + Number(b), 0)
+  const allocOk = Math.abs(allocTotal - 100) < 0.01
+
   const d = sim.data
   const fanData = d?.fan_chart?.map(b => ({
     day: b.day, p5: b.p5, p25: b.p25, p50: b.p50, p75: b.p75, p95: b.p95,
@@ -106,18 +111,25 @@ export default function MonteCarlo() {
               <option value="normal">Normal distribution</option>
             </select>
           </div>
-          <button className="btn-primary w-full" onClick={() => sim.mutate(body())} disabled={sim.isPending}>
+          <button className="btn-primary w-full" onClick={() => sim.mutate(body())} disabled={sim.isPending || !allocOk}>
             {sim.isPending ? 'Simulating 10,000 paths…' : 'Run Simulation'}
           </button>
-          <button className="btn-ghost w-full" onClick={() => cmp.mutate(body())} disabled={cmp.isPending}>
+          <button className="btn-ghost w-full" onClick={() => cmp.mutate(body())} disabled={cmp.isPending || !allocOk}>
             {cmp.isPending ? 'Comparing…' : 'Compare All 3 Methods'}
           </button>
+          {!allocOk && (
+            <p className="text-xs text-yellow-400 text-center">
+              Allocations total {allocTotal.toFixed(1)}% — adjust to 100% to run.
+            </p>
+          )}
         </div>
 
         {/* Results */}
         <div className="col-span-2 space-y-6">
           {sim.isPending && <div className="card"><Spinner /></div>}
           {sim.isError && <div className="card text-red-400 text-sm">{String(sim.error)}</div>}
+          {cmp.isPending && <div className="card"><Spinner /></div>}
+          {cmp.isError && <div className="card text-red-400 text-sm">{String(cmp.error)}</div>}
 
           {d && (
             <>

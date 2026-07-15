@@ -259,9 +259,13 @@ def compare_methods(
     research insight for emerging markets like India.
     """
     results = {}
+    first_error = None
     for method in ["normal", "t", "bootstrap"]:
         r = simulate(holdings, initial_value, horizon_days, n_simulations,
                      method=method, seed=42)
+        if "error" in r:
+            first_error = first_error or r["error"]
+            continue
         if "error" not in r:
             results[method] = {
                 "method_label":           r["method_label"],
@@ -271,6 +275,11 @@ def compare_methods(
                 "probability_of_loss_pct":r["probability_of_loss_pct"],
                 "worst_case_p1":          r["worst_case_p1"],
             }
+
+    # If every method failed (e.g. allocations don't sum to 100%, or no price
+    # data), surface the reason instead of returning a silently-empty table.
+    if not results:
+        return {"error": first_error or "Could not run any simulation method."}
 
     # Compute how much fatter the tail risk is under t/bootstrap vs normal
     insight = ""

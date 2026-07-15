@@ -1190,6 +1190,8 @@ def montecarlo_compare(req: MonteCarloRequest):
     vs fat-tailed and bootstrap methods.
     """
     result = mc_compare(req.holdings, req.initial_value, req.horizon_days, req.n_simulations)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
     return result
 
 
