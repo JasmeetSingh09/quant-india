@@ -38,7 +38,10 @@ EXPOSE ${PORT}
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:${PORT}/ || exit 1
 
-# 2 workers: enough for a 2-core Render Standard instance.
+# SINGLE worker on purpose: each worker loads its OWN ~1.5 GB FinBERT copy, so
+# 2 workers (~3 GB) OOM-killed the 2 GB Standard instance. The app is I/O-bound
+# (yfinance/news) and FastAPI runs sync endpoints in a threadpool, so one worker
+# handles the load fine — and it avoids duplicating the background schedulers.
 # --timeout 120 lets slow endpoints (FinBERT, backtest) finish without 502s.
 CMD ["sh", "-c", \
-    "uvicorn main:app --host 0.0.0.0 --port ${PORT} --workers 2 --timeout-keep-alive 120"]
+    "uvicorn main:app --host 0.0.0.0 --port ${PORT} --workers 1 --timeout-keep-alive 120"]

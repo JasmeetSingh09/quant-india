@@ -23,6 +23,15 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 import torch
 from transformers import pipeline as hf_pipeline
 
+# On a small CPU instance, torch's default intra-op parallelism spawns a thread
+# per core and inflates memory/CPU. Cap it so FinBERT inference stays lean and
+# doesn't starve the web worker during a Top Picks scan. (No effect on GPU.)
+if not torch.cuda.is_available():
+    try:
+        torch.set_num_threads(1)
+    except Exception:
+        pass
+
 _DEVICE = 0 if torch.cuda.is_available() else -1   # 0 = first GPU, -1 = CPU
 _DEVICE_NAME = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU"
 print(f"Loading FinBERT model on {_DEVICE_NAME} (first run downloads ~400 MB)...")
