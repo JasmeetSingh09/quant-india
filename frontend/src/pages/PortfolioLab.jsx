@@ -3,11 +3,13 @@ import Optimizer from './Optimizer'
 import MonteCarlo from './MonteCarlo'
 import RiskLab from './RiskLab'
 import Backtest from './Backtest'
+import PortfolioTest from './PortfolioTest'
 
 const TABS = [
   { label: 'Optimize', Component: Optimizer },
   { label: 'Simulate', Component: MonteCarlo },
   { label: 'Risk',     Component: RiskLab },
+  { label: 'Portfolio Test', Component: PortfolioTest },
   { label: 'Backtest', Component: Backtest },
 ]
 
