@@ -1,10 +1,21 @@
 ﻿import axios from 'axios'
+import { supabase } from './supabaseClient'
 
 // In local dev, calls go to '/api' (Vite proxies to localhost:8000).
 // In production, set VITE_API_URL to your deployed backend URL (e.g. Render/Railway).
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
   timeout: 60000,
+})
+
+// Attach the Supabase JWT so the backend can scope data (watchlist, portfolio,
+// simulations, alerts) to the signed-in user. Anonymous users send no token and
+// fall back to the shared 'public' account on the backend.
+api.interceptors.request.use(async config => {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
 })
 
 api.interceptors.response.use(

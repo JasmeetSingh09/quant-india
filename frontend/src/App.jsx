@@ -8,6 +8,8 @@ import MyStocks from './pages/MyStocks'
 import PortfolioLab from './pages/PortfolioLab'
 import QuantResearch from './pages/QuantResearch'
 import Markets from './pages/Markets'
+import Login from './pages/Login'
+import { useAuth } from './AuthContext'
 
 function NotFound() {
   return (
@@ -20,6 +22,17 @@ function NotFound() {
 }
 
 export default function App() {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-950 text-gray-400">
+        Loading…
+      </div>
+    )
+  }
+  if (!user) return <Login />
+
   return (
     <div className="flex h-screen overflow-hidden bg-gray-950">
       <Sidebar />

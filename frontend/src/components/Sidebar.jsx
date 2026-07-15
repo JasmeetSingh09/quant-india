@@ -2,8 +2,9 @@
 import {
   LayoutDashboard, Search, PlayCircle,
   TrendingUp, BarChart3, FlaskConical,
-  Briefcase, Calculator, Zap
+  Briefcase, Calculator, Zap, LogOut
 } from 'lucide-react'
+import { useAuth } from '../AuthContext'
 
 const links = [
   { to: '/',            icon: LayoutDashboard, label: 'Dashboard'  },
