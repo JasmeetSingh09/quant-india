@@ -32,27 +32,34 @@ GMAIL_RECEIVER = os.getenv("GMAIL_RECEIVER", GMAIL_SENDER)
 # Core send
 # ---------------------------------------------------------------------------
 
-def send_email(subject: str, body_html: str) -> dict:
+def send_email(subject: str, body_html: str, to_email: str = None) -> dict:
     """
     Send an HTML email via Gmail SMTP_SSL (port 465).
+
+    to_email — recipient override (e.g. the signed-in user's email). Falls back
+    to GMAIL_RECEIVER when not given.
 
     Returns {"status": "sent"} or {"error": "..."}.
     """
     if not GMAIL_SENDER or not GMAIL_PASSWORD:
         return {"error": "GMAIL_ADDRESS or GMAIL_APP_PASSWORD not set in .env"}
 
+    recipient = (to_email or GMAIL_RECEIVER or "").strip()
+    if not recipient:
+        return {"error": "No recipient: sign in, or set GMAIL_RECEIVER."}
+
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"]    = GMAIL_SENDER
-    msg["To"]      = GMAIL_RECEIVER
+    msg["To"]      = recipient
 
     msg.attach(MIMEText(body_html, "html"))
 
     try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(GMAIL_SENDER, GMAIL_PASSWORD)
-            server.sendmail(GMAIL_SENDER, GMAIL_RECEIVER, msg.as_string())
-        return {"status": "sent", "to": GMAIL_RECEIVER, "subject": subject}
+            server.sendmail(GMAIL_SENDER, recipient, msg.as_string())
+        return {"status": "sent", "to": recipient, "subject": subject}
     except smtplib.SMTPAuthenticationError:
         return {"error": "Gmail authentication failed. Check GMAIL_ADDRESS and GMAIL_APP_PASSWORD in .env."}
     except Exception as e:
@@ -245,6 +252,7 @@ def send_multi_signal_alert(
     sentiment_label: str,
     confidence_pct: float,
     headline: str,
+    to_email: str = None,
 ) -> dict:
     """Send a combined price + sentiment + valuation alert email."""
     try:
@@ -263,7 +271,7 @@ def send_multi_signal_alert(
         ticker, company_name, price_change_pct, current_price,
         sentiment_label, confidence_pct, headline, valuation
     )
-    return send_email(subject, body)
+    return send_email(subject, body, to_email=to_email)
 
 
 def check_and_send_watchlist_alerts(watchlist_entries: list) -> list:
@@ -430,7 +438,7 @@ def start_alert_scheduler(interval_minutes: int = 30):
           f"{_COOLDOWN_HOURS}h cooldown per stock).")
 
 
-def send_test_alert() -> dict:
+def send_test_alert(to_email: str = None) -> dict:
     """Send a test email to verify Gmail credentials are working."""
     subject = "Test Alert — Indian Stock Platform"
     body = f"""
@@ -438,11 +446,11 @@ def send_test_alert() -> dict:
       <h2 style="color:#16a34a">&#10003; Alert System Working</h2>
       <p>Your Gmail alert configuration is correct.</p>
       <p>Sender  : {GMAIL_SENDER}</p>
-      <p>Receiver: {GMAIL_RECEIVER}</p>
+      <p>Receiver: {to_email or GMAIL_RECEIVER}</p>
       <p>Sent at : {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
     </body></html>
     """
-    return send_email(subject, body)
+    return send_email(subject, body, to_email=to_email)
 
 
 # ---------------------------------------------------------------------------

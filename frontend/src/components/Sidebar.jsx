@@ -18,6 +18,7 @@ const links = [
 ]
 
 export default function Sidebar() {
+  const { user, signOut } = useAuth()
   return (
     <aside className="w-56 shrink-0 bg-gray-900/80 backdrop-blur-sm border-r border-gray-800 flex flex-col">
       {/* Logo */}
@@ -60,9 +61,23 @@ export default function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="px-5 py-4 border-t border-gray-800">
-        <p className="text-[11px] text-gray-600">Data via NSE · NewsAPI</p>
-        <p className="text-[11px] text-gray-600 mt-0.5">Not financial advice</p>
+      <div className="px-5 py-4 border-t border-gray-800 space-y-3">
+        {user && (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] text-gray-400 truncate" title={user.email}>{user.email}</span>
+            <button
+              onClick={() => signOut()}
+              title="Sign out"
+              className="shrink-0 p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-gray-800 transition-colors"
+            >
+              <LogOut size={14} />
+            </button>
+          </div>
+        )}
+        <div>
+          <p className="text-[11px] text-gray-600">Data via NSE · NewsAPI</p>
+          <p className="text-[11px] text-gray-600 mt-0.5">Not financial advice</p>
+        </div>
       </div>
     </aside>
   )

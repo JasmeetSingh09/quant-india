@@ -51,7 +51,7 @@ from commodities import (
 from news import get_stock_news, get_macro_news, get_market_wide_news, start_news_scheduler
 from sentiment import score_headline, summarise_sentiment
 from watchlist import add_to_watchlist, remove_from_watchlist, get_watchlist
-from auth import current_user_id   # per-user data (returns 'public' when anonymous)
+from auth import current_user_id, current_user_email   # per-user data (returns 'public'/None when anonymous)
 from alerts import send_test_alert, send_multi_signal_alert, start_alert_scheduler, run_watchlist_alert_check
 from alpha_model import compute_alpha_score, scan_alpha, retrain_weights, explain_signal, top_picks, warm_top_picks
 from prediction_tracker import snapshot as log_predictions_snapshot, evaluate as evaluate_predictions
@@ -585,9 +585,9 @@ def news_market(days_back: int = Query(3, description="Days of news to fetch")):
 # ---------------------------------------------------------------------------
 
 @app.post("/alerts/test")
-def alerts_test():
-    """Send a test Gmail alert to verify credentials are configured correctly."""
-    result = send_test_alert()
+def alerts_test(user_email: str | None = Depends(current_user_email)):
+    """Send a test Gmail alert to the signed-in user (verifies credentials)."""
+    result = send_test_alert(to_email=user_email)
     if "error" in result:
         raise HTTPException(status_code=500, detail=result["error"])
     return result
@@ -603,8 +603,9 @@ def alerts_run_check():
 
 
 @app.post("/alerts/send")
-def alerts_send(req: MultiSignalAlertRequest):
-    """Manually trigger a multi-signal alert email for a stock."""
+def alerts_send(req: MultiSignalAlertRequest,
+                user_email: str | None = Depends(current_user_email)):
+    """Manually trigger a multi-signal alert email to the signed-in user."""
     result = send_multi_signal_alert(
         ticker=req.ticker,
         company_name=req.company_name,
@@ -613,6 +614,7 @@ def alerts_send(req: MultiSignalAlertRequest):
         sentiment_label=req.sentiment_label,
         confidence_pct=req.confidence_pct,
         headline=req.headline,
+        to_email=user_email,
     )
     if "error" in result:
         raise HTTPException(status_code=500, detail=result["error"])

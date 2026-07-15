@@ -23,17 +23,27 @@ except Exception:  # pragma: no cover
     jwt = None
 
 
-def _decode(token: str) -> str | None:
+def _decode_payload(token: str) -> dict | None:
     if not (_JWT_SECRET and jwt and token):
         return None
     try:
-        payload = jwt.decode(
+        return jwt.decode(
             token, _JWT_SECRET, algorithms=["HS256"],
             audience="authenticated", options={"verify_aud": False},
         )
-        return payload.get("sub")
     except Exception:
         return None
+
+
+def _decode(token: str) -> str | None:
+    payload = _decode_payload(token)
+    return payload.get("sub") if payload else None
+
+
+def _bearer(authorization: str | None) -> str | None:
+    if authorization and authorization.lower().startswith("bearer "):
+        return authorization.split(" ", 1)[1].strip()
+    return None
 
 
 def current_user_id(authorization: str | None = Header(default=None)) -> str:
@@ -44,11 +54,15 @@ def current_user_id(authorization: str | None = Header(default=None)) -> str:
         def get_watchlist(user_id: str = Depends(current_user_id)):
             ...
     """
-    if authorization and authorization.lower().startswith("bearer "):
-        uid = _decode(authorization.split(" ", 1)[1].strip())
-        if uid:
-            return uid
-    return PUBLIC_USER
+    uid = _decode(_bearer(authorization))
+    return uid or PUBLIC_USER
+
+
+def current_user_email(authorization: str | None = Header(default=None)) -> str | None:
+    """FastAPI dependency → the signed-in user's email (from the JWT), or None
+    if anonymous. Used to route alert emails to the logged-in user."""
+    payload = _decode_payload(_bearer(authorization))
+    return payload.get("email") if payload else None
 
 
 def auth_enabled() -> bool:
