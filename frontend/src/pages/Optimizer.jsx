@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import usePersistentState from '../usePersistentState'
 import { useMutation } from '@tanstack/react-query'
-import { runMVO, runBL, getFrontier, autoOptimize, runHRP } from '../api'
+import { runMVO, runBL, getFrontier, autoOptimize, runHRP, runRiskParity, runMaxDiversification } from '../api'
 import Spinner from '../components/Spinner'
 import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceDot, LineChart, Line } from 'recharts'
 import { Plus, Trash2 } from 'lucide-react'
@@ -36,13 +36,14 @@ function TickerList({ tickers, setTickers }) {
   )
 }
 
-function WeightBar({ ticker, weight }) {
+function WeightBar({ ticker, weight, sub }) {
   return (
     <div className="flex items-center gap-3 py-1.5">
       <span className="font-mono text-green-400 text-sm w-28 shrink-0">{ticker.replace('.NS','')}</span>
       <div className="flex-1 h-2 bg-gray-800 rounded-full">
         <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${weight}%` }} />
       </div>
+      {sub && <span className="text-[11px] text-gray-500 w-16 text-right">{sub}</span>}
       <span className="text-sm font-bold w-12 text-right">{weight}%</span>
     </div>
   )
@@ -59,19 +60,25 @@ export default function Optimizer() {
   const frontierMut= useMutation({ mutationFn: getFrontier })
   const autoMut    = useMutation({ mutationFn: autoOptimize })
   const hrpMut     = useMutation({ mutationFn: runHRP })
+  const rpMut      = useMutation({ mutationFn: runRiskParity })
+  const mdMut      = useMutation({ mutationFn: runMaxDiversification })
 
   const run = () => {
     if (tab === 'mvo')      mvoMut.mutate({ tickers, target, max_weight: maxWeight / 100 })
     if (tab === 'hrp')      hrpMut.mutate({ tickers })
     if (tab === 'frontier') frontierMut.mutate({ tickers, n_points: 50 })
     if (tab === 'auto')     autoMut.mutate({ tickers })
+    if (tab === 'riskparity') rpMut.mutate({ tickers })
+    if (tab === 'maxdiv')     mdMut.mutate({ tickers })
   }
 
-  const isLoading = mvoMut.isPending || blMut.isPending || frontierMut.isPending || autoMut.isPending || hrpMut.isPending
+  const isLoading = mvoMut.isPending || blMut.isPending || frontierMut.isPending || autoMut.isPending || hrpMut.isPending || rpMut.isPending || mdMut.isPending
   const mvoResult     = mvoMut.data
   const frontierResult= frontierMut.data
   const autoResult    = autoMut.data
   const hrpResult     = hrpMut.data
+  const rpResult      = rpMut.data
+  const mdResult      = mdMut.data
 
   return (
     <div className="p-6 space-y-6">
@@ -91,6 +98,8 @@ export default function Optimizer() {
               {[
                 ['mvo',      'Markowitz (classic)',     'Best return for the risk — but can pile into one stock'],
                 ['hrp',      'Smart Diversify (HRP)',   'Spreads money sensibly by grouping similar stocks (2016)'],
+                ['riskparity','Risk Parity (ERC)',      'Each holding contributes equal RISK, not equal money (2010)'],
+                ['maxdiv',   'Max Diversification',     'Maximises the diversification ratio (Choueifaty 2008)'],
                 ['frontier', 'Risk-vs-Return Map',      'Shows every best risk/return combo on a curve'],
                 ['auto',     'AI-Guided Mix',           'Uses news sentiment to tilt the portfolio'],
               ].map(([v, l, d]) => (
@@ -147,6 +156,8 @@ export default function Optimizer() {
               ...(hrpResult?.excluded_tickers || []),
               ...(frontierResult?.excluded_tickers || []),
               ...(autoResult?.bl_result?.excluded_tickers || []),
+              ...(rpResult?.excluded_tickers || []),
+              ...(mdResult?.excluded_tickers || []),
             ]
             const uniq = [...new Set(excluded)]
             return uniq.length ? (
@@ -223,6 +234,47 @@ export default function Optimizer() {
                 <p className="text-xs text-yellow-300/80 mt-2">Note: "Expected Return" is the past average
                   over this period (not a forecast) — it can be negative if these stocks recently fell.
                   Use Black-Litterman for market-based expected returns.</p>
+              </div>
+            </div>
+          )}
+
+          {/* Risk Parity (ERC) result */}
+          {rpResult && !rpResult.error && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                {[['Expected Return', `${rpResult.expected_annual_return_pct}%`, null],
+                  ['Expected Bumpiness', `${rpResult.expected_annual_vol_pct}%`, 'volatility'],
+                  ['Sharpe Ratio', rpResult.expected_sharpe, 'sharpe']].map(([l,v,tip]) => (
+                  <div key={l} className="card-sm"><p className="stat-label">{l}{tip && <InfoTip k={tip}/>}</p><p className="stat-value">{v}</p></div>
+                ))}
+              </div>
+              <div className="card">
+                <h3 className="font-semibold mb-1">Risk Parity Weights <span className="text-xs text-gray-500 font-normal ml-2">Equal Risk Contribution (Maillard 2010)</span></h3>
+                <p className="text-xs text-gray-500 mb-3">Each holding's risk contribution is equalised (shown in %).</p>
+                {Object.entries(rpResult.optimal_pct || {}).sort(([,a],[,b])=>b-a).map(([t,w]) => (
+                  <WeightBar key={t} ticker={t} weight={w}
+                    sub={rpResult.risk_contribution_pct?.[t] != null ? `risk ${rpResult.risk_contribution_pct[t]}%` : undefined} />
+                ))}
+                <div className="mt-3 p-3 bg-gray-800 rounded-lg"><p className="text-xs text-gray-300">{rpResult.interpretation}</p></div>
+              </div>
+            </div>
+          )}
+
+          {/* Max Diversification result */}
+          {mdResult && !mdResult.error && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-4 gap-3">
+                {[['Expected Return', `${mdResult.expected_annual_return_pct}%`, null],
+                  ['Expected Bumpiness', `${mdResult.expected_annual_vol_pct}%`, 'volatility'],
+                  ['Sharpe Ratio', mdResult.expected_sharpe, 'sharpe'],
+                  ['Diversification Ratio', mdResult.diversification_ratio, null]].map(([l,v,tip]) => (
+                  <div key={l} className="card-sm"><p className="stat-label">{l}{tip && <InfoTip k={tip}/>}</p><p className="stat-value">{v}</p></div>
+                ))}
+              </div>
+              <div className="card">
+                <h3 className="font-semibold mb-1">Max Diversification Weights <span className="text-xs text-gray-500 font-normal ml-2">Choueifaty & Coignard 2008</span></h3>
+                {Object.entries(mdResult.optimal_pct || {}).sort(([,a],[,b])=>b-a).map(([t,w]) => <WeightBar key={t} ticker={t} weight={w} />)}
+                <div className="mt-3 p-3 bg-gray-800 rounded-lg"><p className="text-xs text-gray-300">{mdResult.interpretation}</p></div>
               </div>
             </div>
           )}

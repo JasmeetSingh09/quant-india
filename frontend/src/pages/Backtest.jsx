@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts'
-import { getMomentumBacktest } from '../api'
+import { getMomentumBacktest, getLowVolBacktest } from '../api'
 import Spinner from '../components/Spinner'
 
 function Row({ label, strat, bench, fmt = v => v }) {
@@ -18,9 +18,10 @@ function Row({ label, strat, bench, fmt = v => v }) {
 
 export default function Backtest() {
   const [top, setTop] = useState(0.2)
+  const [factor, setFactor] = useState('momentum')   // 'momentum' | 'lowvol'
   const { data: d, isLoading, isError, error, refetch, isFetching } = useQuery({
-    queryKey: ['momentumBacktest', top],
-    queryFn: () => getMomentumBacktest(top),
+    queryKey: ['factorBacktest', factor, top],
+    queryFn: () => (factor === 'lowvol' ? getLowVolBacktest(top) : getMomentumBacktest(top)),
     staleTime: 6 * 3600 * 1000,
     retry: 0,
   })
@@ -30,10 +31,10 @@ export default function Backtest() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Momentum Backtest — Honest Out-of-Sample</h1>
+        <h1 className="text-2xl font-bold text-white">Factor Backtest — Honest Out-of-Sample</h1>
         <p className="text-sm text-gray-400 mt-1 max-w-3xl">
-          A walk-forward test of the 12-1 momentum factor on an NSE large/mid-cap
-          universe, benchmarked against the Nifty. No look-ahead (every position is
+          A walk-forward test of a single factor ({factor === 'lowvol' ? 'low volatility' : '12-1 momentum'})
+          on an NSE universe, benchmarked against the Nifty. No look-ahead (every position is
           chosen before the return it earns), transaction costs included, with a
           significance t-test. The result is reported as-is — including when there's
           no edge.
@@ -41,7 +42,12 @@ export default function Backtest() {
       </div>
 
       <div className="flex items-center gap-3">
-        <label className="text-sm text-gray-400">Hold top</label>
+        <label className="text-sm text-gray-400">Factor</label>
+        <select className="input" value={factor} onChange={e => setFactor(e.target.value)}>
+          <option value="momentum">Momentum (12-1)</option>
+          <option value="lowvol">Low volatility</option>
+        </select>
+        <label className="text-sm text-gray-400">{factor === 'lowvol' ? 'Hold lowest' : 'Hold top'}</label>
         <select className="input" value={top} onChange={e => setTop(Number(e.target.value))}>
           <option value={0.1}>10%</option>
           <option value={0.2}>20%</option>

@@ -198,6 +198,107 @@ def risk_decomposition(holdings: dict, period_months: int = 24) -> dict:
     }
 
 
+def _perf_stats(w, log_returns, cov):
+    """Annualised expected return / vol / Sharpe for a weight vector."""
+    exp_ret = float(w @ (log_returns.mean().values * 252))
+    exp_vol = float(np.sqrt(max(w @ cov @ w, 1e-12)))
+    sharpe = (exp_ret - 0.065) / exp_vol if exp_vol > 0 else 0.0
+    return round(exp_ret * 100, 2), round(exp_vol * 100, 2), round(sharpe, 3)
+
+
+def equal_risk_contribution(tickers: list, period_months: int = 24) -> dict:
+    """
+    Risk Parity (Equal Risk Contribution): weights chosen so every holding
+    contributes the SAME amount of portfolio risk — not equal money, equal risk.
+    Distinct from HRP (which clusters) and from min-variance. Solved by
+    minimising the dispersion of risk contributions (Maillard et al. 2010).
+    """
+    from scipy.optimize import minimize
+    end   = datetime.now().strftime("%Y-%m-%d")
+    start = (datetime.now() - timedelta(days=period_months * 30)).strftime("%Y-%m-%d")
+    log_returns = _get_returns(tickers, start, end)
+    valid = [t for t in tickers if t in log_returns.columns]
+    if len(valid) < 2:
+        return {"error": f"Need ≥2 tickers with data. Got: {valid}"}
+    log_returns = log_returns[valid]
+    cov = _cov(log_returns, as_frame=False)
+    n = len(valid)
+
+    def obj(w):
+        pv = np.sqrt(max(w @ cov @ w, 1e-12))
+        rc = w * (cov @ w) / pv               # risk contributions
+        return float(np.sum((rc - rc.mean()) ** 2))
+
+    res = minimize(obj, np.repeat(1 / n, n), method="SLSQP",
+                   bounds=[(0, 1)] * n,
+                   constraints=[{"type": "eq", "fun": lambda w: w.sum() - 1}],
+                   options={"maxiter": 500, "ftol": 1e-12})
+    w = np.clip(res.x, 0, None); w = w / w.sum()
+    pv = float(np.sqrt(max(w @ cov @ w, 1e-12)))
+    rc_pct = (w * (cov @ w) / pv) / pv * 100
+    er, ev, sh = _perf_stats(w, log_returns, cov)
+    return {
+        "algorithm":        "Equal Risk Contribution (Risk Parity, Maillard 2010)",
+        "excluded_tickers": [t for t in tickers if t not in valid],
+        "tickers":          valid,
+        "optimal_weights":  {t: round(float(w[i]), 4) for i, t in enumerate(valid)},
+        "optimal_pct":      {t: round(float(w[i] * 100), 2) for i, t in enumerate(valid)},
+        "risk_contribution_pct": {t: round(float(rc_pct[i]), 2) for i, t in enumerate(valid)},
+        "expected_annual_return_pct": er,
+        "expected_annual_vol_pct":    ev,
+        "expected_sharpe":            sh,
+        "interpretation": "Every holding contributes ~equal risk, so no single name "
+                          "dominates the portfolio's volatility — robust when you "
+                          "can't forecast returns.",
+    }
+
+
+def maximum_diversification(tickers: list, period_months: int = 24) -> dict:
+    """
+    Maximum Diversification portfolio (Choueifaty & Coignard 2008): weights that
+    MAXIMISE the diversification ratio = (weighted-average stand-alone vol) /
+    (portfolio vol). Pushes toward low-correlation combinations.
+    """
+    from scipy.optimize import minimize
+    end   = datetime.now().strftime("%Y-%m-%d")
+    start = (datetime.now() - timedelta(days=period_months * 30)).strftime("%Y-%m-%d")
+    log_returns = _get_returns(tickers, start, end)
+    valid = [t for t in tickers if t in log_returns.columns]
+    if len(valid) < 2:
+        return {"error": f"Need ≥2 tickers with data. Got: {valid}"}
+    log_returns = log_returns[valid]
+    cov = _cov(log_returns, as_frame=False)
+    own_vol = np.sqrt(np.diag(cov))
+    n = len(valid)
+
+    def neg_div_ratio(w):
+        pv = np.sqrt(max(w @ cov @ w, 1e-12))
+        return -float((w @ own_vol) / pv)
+
+    res = minimize(neg_div_ratio, np.repeat(1 / n, n), method="SLSQP",
+                   bounds=[(0, 1)] * n,
+                   constraints=[{"type": "eq", "fun": lambda w: w.sum() - 1}],
+                   options={"maxiter": 500, "ftol": 1e-12})
+    w = np.clip(res.x, 0, None); w = w / w.sum()
+    pv = float(np.sqrt(max(w @ cov @ w, 1e-12)))
+    div_ratio = float((w @ own_vol) / pv)
+    er, ev, sh = _perf_stats(w, log_returns, cov)
+    return {
+        "algorithm":        "Maximum Diversification (Choueifaty & Coignard 2008)",
+        "excluded_tickers": [t for t in tickers if t not in valid],
+        "tickers":          valid,
+        "optimal_weights":  {t: round(float(w[i]), 4) for i, t in enumerate(valid)},
+        "optimal_pct":      {t: round(float(w[i] * 100), 2) for i, t in enumerate(valid)},
+        "diversification_ratio":      round(div_ratio, 3),
+        "expected_annual_return_pct": er,
+        "expected_annual_vol_pct":    ev,
+        "expected_sharpe":            sh,
+        "interpretation": f"Diversification ratio {round(div_ratio,2)} — maximises the "
+                          "gap between the holdings' own volatility and the (lower) "
+                          "portfolio volatility, i.e. the most diversification per unit of risk.",
+    }
+
+
 def _get_market_caps(tickers: list) -> dict:
     """Get market capitalisation weights (used as BL equilibrium prior)."""
     caps = {}

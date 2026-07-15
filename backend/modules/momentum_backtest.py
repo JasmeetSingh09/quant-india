@@ -209,6 +209,92 @@ def momentum_backtest(
     }
 
 
+def low_vol_backtest(
+    universe: list = None,
+    start: str = "2019-01-01",
+    end: str = None,
+    bottom_fraction: float = 0.2,
+    vol_lookback_months: int = 12,
+    cost_roundtrip_pct: float = 0.4,
+) -> dict:
+    """
+    The LOW-VOLATILITY anomaly, walk-forward: each month hold the lowest-volatility
+    fraction of the universe (trailing 12-month realised vol from monthly returns),
+    equal-weighted, rebalanced monthly, vs the Nifty. Same honest methodology as the
+    momentum backtest — no look-ahead, costs included, significance t-test.
+    """
+    import yfinance as yf
+    universe = universe or DEFAULT_UNIVERSE
+    end = end or datetime.now().strftime("%Y-%m-%d")
+    try:
+        raw = yf.download(universe + ["^NSEI"], start=start, end=end, progress=False,
+                          auto_adjust=True, group_by="ticker", threads=True)
+    except Exception as e:
+        return {"error": f"price download failed: {e}"}
+
+    monthly = {}
+    for t in universe + ["^NSEI"]:
+        try:
+            s = raw[t]["Close"].dropna()
+            if len(s) > vol_lookback_months * 21:
+                monthly[t] = s.resample("ME").last()
+        except Exception:
+            pass
+    if "^NSEI" not in monthly or len(monthly) < 6:
+        return {"error": "insufficient price data for a backtest"}
+
+    prices = pd.DataFrame(monthly).dropna(how="all")
+    nifty  = prices["^NSEI"]
+    stocks = prices.drop(columns=["^NSEI"])
+    mret   = stocks.pct_change()
+    dates  = stocks.index
+    L = vol_lookback_months
+    cost = cost_roundtrip_pct / 100.0
+
+    strat, bench, eq_dates = [], [], []
+    prev = set()
+    for i in range(L, len(dates) - 1):
+        window = mret.iloc[i - L:i]                      # only past returns → no look-ahead
+        vol = window.std().dropna()
+        if len(vol) < 5:
+            continue
+        n_hold = max(1, int(round(len(vol) * bottom_fraction)))
+        basket = list(vol.sort_values().head(n_hold).index)   # LOWEST vol
+        fwd = (stocks.iloc[i + 1][basket] / stocks.iloc[i][basket] - 1).dropna()
+        if len(fwd) == 0:
+            continue
+        turnover = len(set(basket).symmetric_difference(prev)) / (2 * max(1, len(basket)))
+        strat.append(float(fwd.mean()) - turnover * cost)
+        bench.append(float(nifty.iloc[i + 1] / nifty.iloc[i] - 1))
+        eq_dates.append(dates[i + 1].strftime("%Y-%m"))
+        prev = set(basket)
+
+    if len(strat) < 6:
+        return {"error": "not enough rebalances"}
+    strat, bench = pd.Series(strat), pd.Series(bench)
+    excess = strat - bench
+    t_stat = float(excess.mean() / (excess.std(ddof=1) / np.sqrt(len(excess)))) if excess.std(ddof=1) > 0 else 0.0
+    sc, bc = (1 + strat).cumprod(), (1 + bench).cumprod()
+    s_stats, b_stats = _annualised(strat), _annualised(bench)
+    return {
+        "strategy": "Low-volatility, long lowest {:.0%} by trailing vol, monthly".format(bottom_fraction),
+        "universe_size": len(stocks.columns),
+        "period": f"{eq_dates[0]} to {eq_dates[-1]}",
+        "costs_included": True, "cost_roundtrip_pct": cost_roundtrip_pct,
+        "strategy_stats": s_stats, "benchmark_stats": b_stats,
+        "excess_cagr_pct": round(s_stats["cagr_pct"] - b_stats["cagr_pct"], 2),
+        "t_stat_excess": round(t_stat, 2), "significant_5pct": bool(abs(t_stat) > 1.96),
+        "equity_curve": [{"date": d, "strategy": round(float(s), 4), "nifty": round(float(b), 4)}
+                         for d, s, b in zip(eq_dates, sc, bc)],
+        "verdict": _verdict(s_stats, b_stats, t_stat).replace("Momentum", "Low-vol"),
+        "caveats": [
+            "Survivorship bias: today's listed names bias returns upward.",
+            "Low-vol tends to overweight defensives (FMCG, utilities) — sector-concentrated.",
+            "Single factor; costs are a turnover approximation; monthly rebalance.",
+        ],
+    }
+
+
 def _verdict(s: dict, b: dict, t: float) -> str:
     edge = s.get("cagr_pct", 0) - b.get("cagr_pct", 0)
     sig = abs(t) > 1.96

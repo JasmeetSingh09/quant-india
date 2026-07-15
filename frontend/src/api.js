@@ -75,6 +75,8 @@ export const runBL          = body => api.post('/optimizer/black-litterman', bod
 export const getFrontier    = body => api.post('/optimizer/frontier', body)
 export const autoOptimize   = body => api.post('/optimizer/auto', body)
 export const runHRP         = body => api.post('/optimizer/hrp', body)
+export const runRiskParity  = body => api.post('/optimizer/risk-parity', body)
+export const runMaxDiversification = body => api.post('/optimizer/max-diversification', body)
 
 // Regime
 export const getRegime      = () => api.get('/regime')
@@ -94,6 +96,12 @@ export const getMomentumBacktest = (top=0.2, start='2019-01-01') =>
 
 // Risk decomposition (which holding drives portfolio risk)
 export const getRiskDecomposition = holdings => api.post('/risk/decomposition', { holdings })
+
+// Research — low-vol factor backtest + seasonality
+export const getLowVolBacktest = (bottom=0.2, start='2019-01-01') =>
+  api.get(`/research/low-vol-backtest?bottom_fraction=${bottom}&start=${start}`)
+export const getSeasonality = (ticker='^NSEI', years=20) =>
+  api.get(`/research/seasonality?ticker=${encodeURIComponent(ticker)}&years=${years}`)
 
 // Pairs trading
 export const findPairs      = body => api.post('/pairs/find', body)

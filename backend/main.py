@@ -59,11 +59,13 @@ from portfolio_optimizer import (
     mean_variance_optimize, black_litterman_optimize,
     efficient_frontier, optimize_with_alpha_views,
     hierarchical_risk_parity, risk_decomposition,
+    equal_risk_contribution, maximum_diversification,
 )
 from regime_detector import detect_regime, regime_conditioned_alpha
 from monte_carlo import simulate as mc_simulate, compare_methods as mc_compare
 from black_scholes import black_scholes as bs_price, implied_volatility as bs_iv, payoff_curve as bs_payoff
-from momentum_backtest import momentum_backtest as run_momentum_backtest
+from momentum_backtest import momentum_backtest as run_momentum_backtest, low_vol_backtest as run_low_vol_backtest
+from seasonality import seasonality_analysis
 from garch_vol import forecast_vol as garch_forecast, test_vs_naive as garch_test
 from screener import screen as run_screen, get_sectors, get_screener_status, ensure_screener_cache, build_screener_cache
 from portfolio_tracker import add_holding, remove_holding, get_portfolio
@@ -1112,6 +1114,24 @@ def optimizer_hrp(req: FrontierRequest):
     return result
 
 
+@app.post("/optimizer/risk-parity")
+def optimizer_risk_parity(req: FrontierRequest):
+    """Equal Risk Contribution (Risk Parity): every holding contributes equal risk."""
+    result = equal_risk_contribution(req.tickers, period_months=req.period_months)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.post("/optimizer/max-diversification")
+def optimizer_max_diversification(req: FrontierRequest):
+    """Maximum Diversification portfolio (Choueifaty & Coignard 2008)."""
+    result = maximum_diversification(req.tickers, period_months=req.period_months)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
 @app.post("/optimizer/auto")
 def optimizer_auto(req: AlphaViewsRequest):
     """
@@ -1278,6 +1298,42 @@ def research_momentum_backtest(
     if hit and time.time() - hit[0] < 6 * 3600:
         return hit[1]
     result = run_momentum_backtest(start=start, top_fraction=top_fraction)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    _BACKTEST_CACHE[key] = (time.time(), result)
+    return result
+
+
+@app.get("/research/low-vol-backtest")
+def research_low_vol_backtest(
+    start: str = Query("2019-01-01"),
+    bottom_fraction: float = Query(0.2, description="Hold lowest-vol X of the universe"),
+):
+    """Honest walk-forward backtest of the low-volatility anomaly vs the Nifty. Cached ~6h."""
+    import time
+    key = f"lv:{start}:{bottom_fraction}"
+    hit = _BACKTEST_CACHE.get(key)
+    if hit and time.time() - hit[0] < 6 * 3600:
+        return hit[1]
+    result = run_low_vol_backtest(start=start, bottom_fraction=bottom_fraction)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    _BACKTEST_CACHE[key] = (time.time(), result)
+    return result
+
+
+@app.get("/research/seasonality")
+def research_seasonality(
+    ticker: str = Query("^NSEI", description="Index/stock; default Nifty 50"),
+    years: int = Query(20, description="Years of history"),
+):
+    """Monthly calendar-effect (seasonality) analysis with significance and caveats."""
+    import time
+    key = f"seas:{ticker}:{years}"
+    hit = _BACKTEST_CACHE.get(key)
+    if hit and time.time() - hit[0] < 6 * 3600:
+        return hit[1]
+    result = seasonality_analysis(ticker, years)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     _BACKTEST_CACHE[key] = (time.time(), result)
