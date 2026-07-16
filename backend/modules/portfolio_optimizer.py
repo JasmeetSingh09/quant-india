@@ -64,7 +64,24 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-RISK_FREE_RATE = 0.065   # RBI repo rate
+RISK_FREE_RATE = 0.065   # default: RBI repo rate proxy
+
+
+def _rf(risk_free_pct: float = None) -> float:
+    """
+    Resolve the risk-free rate used in every Sharpe calculation.
+
+    Pass `risk_free_pct` as a PERCENT (e.g. 7.0 for a 10-year G-Sec yield) to
+    override the default RBI-repo proxy. Every Sharpe figure inherits this, so
+    it is a real assumption rather than a cosmetic setting — which is why it is
+    now caller-selectable instead of hardcoded.
+    """
+    try:
+        if risk_free_pct is not None:
+            return float(risk_free_pct) / 100.0
+    except (TypeError, ValueError):
+        pass
+    return RISK_FREE_RATE
 
 
 # ---------------------------------------------------------------------------
@@ -198,15 +215,16 @@ def risk_decomposition(holdings: dict, period_months: int = 24) -> dict:
     }
 
 
-def _perf_stats(w, log_returns, cov):
+def _perf_stats(w, log_returns, cov, risk_free_pct: float = None):
     """Annualised expected return / vol / Sharpe for a weight vector."""
     exp_ret = float(w @ (log_returns.mean().values * 252))
     exp_vol = float(np.sqrt(max(w @ cov @ w, 1e-12)))
-    sharpe = (exp_ret - RISK_FREE_RATE) / exp_vol if exp_vol > 0 else 0.0  # use the constant, not a literal
+    sharpe = (exp_ret - _rf(risk_free_pct)) / exp_vol if exp_vol > 0 else 0.0
     return round(exp_ret * 100, 2), round(exp_vol * 100, 2), round(sharpe, 3)
 
 
-def equal_risk_contribution(tickers: list, period_months: int = 24) -> dict:
+def equal_risk_contribution(tickers: list, period_months: int = 24,
+                            risk_free_pct: float = None) -> dict:
     """
     Risk Parity (Equal Risk Contribution): weights chosen so every holding
     contributes the SAME amount of portfolio risk — not equal money, equal risk.
@@ -236,7 +254,7 @@ def equal_risk_contribution(tickers: list, period_months: int = 24) -> dict:
     w = np.clip(res.x, 0, None); w = w / w.sum()
     pv = float(np.sqrt(max(w @ cov @ w, 1e-12)))
     rc_pct = (w * (cov @ w) / pv) / pv * 100
-    er, ev, sh = _perf_stats(w, log_returns, cov)
+    er, ev, sh = _perf_stats(w, log_returns, cov, risk_free_pct)
     return {
         "algorithm":        "Equal Risk Contribution (Risk Parity, Maillard 2010)",
         "excluded_tickers": [t for t in tickers if t not in valid],
@@ -253,7 +271,8 @@ def equal_risk_contribution(tickers: list, period_months: int = 24) -> dict:
     }
 
 
-def maximum_diversification(tickers: list, period_months: int = 24) -> dict:
+def maximum_diversification(tickers: list, period_months: int = 24,
+                            risk_free_pct: float = None) -> dict:
     """
     Maximum Diversification portfolio (Choueifaty & Coignard 2008): weights that
     MAXIMISE the diversification ratio = (weighted-average stand-alone vol) /
@@ -282,7 +301,7 @@ def maximum_diversification(tickers: list, period_months: int = 24) -> dict:
     w = np.clip(res.x, 0, None); w = w / w.sum()
     pv = float(np.sqrt(max(w @ cov @ w, 1e-12)))
     div_ratio = float((w @ own_vol) / pv)
-    er, ev, sh = _perf_stats(w, log_returns, cov)
+    er, ev, sh = _perf_stats(w, log_returns, cov, risk_free_pct)
     return {
         "algorithm":        "Maximum Diversification (Choueifaty & Coignard 2008)",
         "excluded_tickers": [t for t in tickers if t not in valid],
@@ -325,6 +344,7 @@ def mean_variance_optimize(
     target: str = "max_sharpe",
     min_weight: float = 0.0,
     max_weight: float = 1.0,
+    risk_free_pct: float = None,
 ) -> dict:
     """
     Find the portfolio weights that maximise Sharpe ratio (or minimise variance).
@@ -351,7 +371,7 @@ def mean_variance_optimize(
     # Annualised parameters
     mu  = log_returns.mean().values * 252
     cov = _cov(log_returns)                       # Ledoit-Wolf shrinkage
-    rf  = RISK_FREE_RATE
+    rf  = _rf(risk_free_pct)
 
     def neg_sharpe(w):
         port_ret = float(w @ mu)
@@ -425,6 +445,7 @@ def black_litterman_optimize(
     period_months: int = 24,
     tau: float = 0.05,
     max_weight: float = 0.35,
+    risk_free_pct: float = None,
 ) -> dict:
     """
     Black-Litterman optimiser with FinBERT sentiment views injected as priors.
@@ -502,7 +523,7 @@ def black_litterman_optimize(
     def neg_sharpe(w):
         port_ret = float(w @ mu_bl)
         port_vol = float(np.sqrt(w @ Sigma @ w))
-        return -(port_ret - RISK_FREE_RATE) / port_vol if port_vol > 1e-8 else 0
+        return -(port_ret - _rf(risk_free_pct)) / port_vol if port_vol > 1e-8 else 0
 
     # Cap each weight at max_weight to force diversification.
     # Must be >= 1/n or no feasible solution exists (weights can't sum to 1).
@@ -521,7 +542,7 @@ def black_litterman_optimize(
     w_bl    = result.x
     exp_ret = round(float(w_bl @ mu_bl) * 100, 2)
     exp_vol = round(float(np.sqrt(w_bl @ Sigma @ w_bl)) * 100, 2)
-    sharpe  = round((float(w_bl @ mu_bl) - RISK_FREE_RATE)
+    sharpe  = round((float(w_bl @ mu_bl) - _rf(risk_free_pct))
                     / float(np.sqrt(w_bl @ Sigma @ w_bl)), 4)
 
     # Weight shifts vs equilibrium
@@ -580,6 +601,7 @@ def efficient_frontier(
     end_date:   str = None,
     period_months: int = 24,
     n_points: int = 50,
+    risk_free_pct: float = None,
 ) -> dict:
     """
     Trace the efficient frontier for a set of NSE stocks.
@@ -603,7 +625,7 @@ def efficient_frontier(
     n    = len(valid)
     mu   = log_returns.mean().values * 252
     cov  = _cov(log_returns)                      # Ledoit-Wolf shrinkage
-    rf   = RISK_FREE_RATE
+    rf   = _rf(risk_free_pct)
 
     def port_stats(w):
         r   = float(w @ mu)
@@ -769,6 +791,7 @@ def hierarchical_risk_parity(
     start_date: str = None,
     end_date:   str = None,
     period_months: int = 24,
+    risk_free_pct: float = None,
 ) -> dict:
     """
     Hierarchical Risk Parity optimiser (López de Prado, 2016).
@@ -808,7 +831,7 @@ def hierarchical_risk_parity(
     w_arr   = weights.values
     exp_ret = round(float(w_arr @ mu) * 100, 2)
     exp_vol = round(float(np.sqrt(w_arr @ cov.values @ w_arr)) * 100, 2)
-    sharpe  = round((float(w_arr @ mu) - RISK_FREE_RATE) / float(np.sqrt(w_arr @ cov.values @ w_arr)), 4)
+    sharpe  = round((float(w_arr @ mu) - _rf(risk_free_pct)) / float(np.sqrt(w_arr @ cov.values @ w_arr)), 4)
 
     # Equal-weight baseline
     n      = len(valid)
@@ -850,6 +873,8 @@ def optimize_with_alpha_views(
     start_date: str = None,
     end_date:   str = None,
     period_months: int = 24,
+    risk_free_pct: float = None,
+    tau: float = 0.05,
 ) -> dict:
     """
     Full pipeline:
@@ -885,7 +910,8 @@ def optimize_with_alpha_views(
     if not views:
         return {"error": "Could not compute alpha scores for any ticker"}
 
-    bl_result   = black_litterman_optimize(tickers, views, start_date, end_date, period_months)
+    bl_result   = black_litterman_optimize(tickers, views, start_date, end_date, period_months,
+                                           tau=tau, risk_free_pct=risk_free_pct)
     mvo_result  = mean_variance_optimize(tickers, start_date, end_date, period_months)
 
     return {

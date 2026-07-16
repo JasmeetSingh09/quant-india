@@ -54,6 +54,11 @@ export default function Optimizer() {
   const [tickers, setTickers] = usePersistentState('opt.tickers', DEFAULT_TICKERS)
   const [target, setTarget]   = usePersistentState('opt.target', 'max_sharpe')
   const [maxWeight, setMaxWeight] = usePersistentState('opt.maxWeight', 35)   // cap per stock (%) to force diversification
+  // Risk-free rate feeds EVERY Sharpe figure — it's a real assumption, so it's
+  // selectable rather than hardcoded. Presets are static reference values, not
+  // live yields.
+  const [riskFree, setRiskFree] = usePersistentState('opt.riskFree', 6.5)
+  const [tau, setTau]           = usePersistentState('opt.tau', 0.05)   // BL prior uncertainty
 
   const mvoMut     = useMutation({ mutationFn: runMVO })
   const blMut      = useMutation({ mutationFn: data => runBL({ ...data, tickers }) })
@@ -64,12 +69,13 @@ export default function Optimizer() {
   const mdMut      = useMutation({ mutationFn: runMaxDiversification })
 
   const run = () => {
-    if (tab === 'mvo')      mvoMut.mutate({ tickers, target, max_weight: maxWeight / 100 })
-    if (tab === 'hrp')      hrpMut.mutate({ tickers })
-    if (tab === 'frontier') frontierMut.mutate({ tickers, n_points: 50 })
-    if (tab === 'auto')     autoMut.mutate({ tickers })
-    if (tab === 'riskparity') rpMut.mutate({ tickers })
-    if (tab === 'maxdiv')     mdMut.mutate({ tickers })
+    const rf = { risk_free_pct: Number(riskFree) }
+    if (tab === 'mvo')      mvoMut.mutate({ tickers, target, max_weight: maxWeight / 100, ...rf })
+    if (tab === 'hrp')      hrpMut.mutate({ tickers, ...rf })
+    if (tab === 'frontier') frontierMut.mutate({ tickers, n_points: 50, ...rf })
+    if (tab === 'auto')     autoMut.mutate({ tickers, ...rf, tau: Number(tau) })
+    if (tab === 'riskparity') rpMut.mutate({ tickers, ...rf })
+    if (tab === 'maxdiv')     mdMut.mutate({ tickers, ...rf })
   }
 
   const isLoading = mvoMut.isPending || blMut.isPending || frontierMut.isPending || autoMut.isPending || hrpMut.isPending || rpMut.isPending || mdMut.isPending
@@ -148,6 +154,39 @@ export default function Optimizer() {
                 </p>
               </div>
             </>
+          )}
+
+          {/* Risk-free rate — feeds every Sharpe number */}
+          <div>
+            <label className="label">Risk-free rate</label>
+            <div className="flex gap-2">
+              <select className="input flex-1" value={[6.5, 7.0].includes(Number(riskFree)) ? String(riskFree) : 'custom'}
+                      onChange={e => e.target.value !== 'custom' && setRiskFree(Number(e.target.value))}>
+                <option value="6.5">RBI repo (6.5%)</option>
+                <option value="7.0">10-yr G-Sec (7.0%)</option>
+                <option value="custom">Custom…</option>
+              </select>
+              <input type="number" step="0.1" min="0" max="20" className="input w-20"
+                     value={riskFree} onChange={e => setRiskFree(e.target.value)} />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Used in every Sharpe ratio. Presets are reference values, not live yields.
+            </p>
+          </div>
+
+          {/* Tau — only meaningful for the Black-Litterman pipeline */}
+          {tab === 'auto' && (
+            <div>
+              <label className="label">τ (prior uncertainty): {Number(tau).toFixed(2)}</label>
+              <input type="range" min="0.01" max="0.10" step="0.01" value={tau}
+                     onChange={e => setTau(Number(e.target.value))}
+                     className="w-full accent-green-500" />
+              <p className="text-xs text-gray-500 mt-1">
+                Black-Litterman blends the market equilibrium with your views.
+                <b> Lower τ</b> = trust the market more; <b>higher τ</b> = let the
+                sentiment views move expected returns further.
+              </p>
+            </div>
           )}
 
           <button onClick={run} disabled={isLoading || tickers.length < 2} className="btn-primary w-full">

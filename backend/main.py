@@ -213,6 +213,7 @@ class MVORequest(BaseModel):
     target: str = "max_sharpe"
     min_weight: float = 0.0
     max_weight: float = 1.0
+    risk_free_pct: float = 6.5     # RBI repo proxy; users can pick G-Sec/custom
 
 class BLRequest(BaseModel):
     tickers: list
@@ -224,10 +225,13 @@ class FrontierRequest(BaseModel):
     tickers: list
     period_months: int = 24
     n_points: int = 50
+    risk_free_pct: float = 6.5
 
 class AlphaViewsRequest(BaseModel):
     tickers: list
     period_months: int = 24
+    risk_free_pct: float = 6.5
+    tau: float = 0.05              # BL prior uncertainty: lower = trust equilibrium more
 
 class PairsFindRequest(BaseModel):
     tickers: list
@@ -1058,6 +1062,7 @@ def optimizer_mvo(req: MVORequest):
     result = mean_variance_optimize(
         req.tickers, period_months=req.period_months,
         target=req.target, min_weight=req.min_weight, max_weight=req.max_weight,
+        risk_free_pct=req.risk_free_pct,
     )
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -1097,7 +1102,8 @@ def optimizer_frontier(req: FrontierRequest):
     min-variance portfolio, and equal-weight position for comparison.
     Use the frontier array to draw the classic Markowitz curve.
     """
-    result = efficient_frontier(req.tickers, period_months=req.period_months, n_points=req.n_points)
+    result = efficient_frontier(req.tickers, period_months=req.period_months, n_points=req.n_points,
+                                risk_free_pct=req.risk_free_pct)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -1114,7 +1120,8 @@ def optimizer_hrp(req: FrontierRequest):
 
     Body: {"tickers": ["HDFCBANK.NS","TCS.NS","RELIANCE.NS","INFY.NS"]}
     """
-    result = hierarchical_risk_parity(req.tickers, period_months=req.period_months)
+    result = hierarchical_risk_parity(req.tickers, period_months=req.period_months,
+                                      risk_free_pct=req.risk_free_pct)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -1123,7 +1130,8 @@ def optimizer_hrp(req: FrontierRequest):
 @app.post("/optimizer/risk-parity")
 def optimizer_risk_parity(req: FrontierRequest):
     """Equal Risk Contribution (Risk Parity): every holding contributes equal risk."""
-    result = equal_risk_contribution(req.tickers, period_months=req.period_months)
+    result = equal_risk_contribution(req.tickers, period_months=req.period_months,
+                                     risk_free_pct=req.risk_free_pct)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -1132,7 +1140,8 @@ def optimizer_risk_parity(req: FrontierRequest):
 @app.post("/optimizer/max-diversification")
 def optimizer_max_diversification(req: FrontierRequest):
     """Maximum Diversification portfolio (Choueifaty & Coignard 2008)."""
-    result = maximum_diversification(req.tickers, period_months=req.period_months)
+    result = maximum_diversification(req.tickers, period_months=req.period_months,
+                                     risk_free_pct=req.risk_free_pct)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -1148,7 +1157,8 @@ def optimizer_auto(req: AlphaViewsRequest):
 
     Body: {"tickers": ["HDFCBANK.NS","TCS.NS","RELIANCE.NS","INFY.NS"]}
     """
-    result = optimize_with_alpha_views(req.tickers, period_months=req.period_months)
+    result = optimize_with_alpha_views(req.tickers, period_months=req.period_months,
+                                       risk_free_pct=req.risk_free_pct, tau=req.tau)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result

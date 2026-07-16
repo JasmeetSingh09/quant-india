@@ -13,8 +13,10 @@ python tests/test_modules_integration.py     # import-safety + integration
 ```
 
 **~168,000 assertions total, currently passing.** These are property/edge-case
-tests (invariants over randomised inputs), not just smoke tests. Network calls are
-monkeypatched so the suite is deterministic and offline.
+tests (invariants over randomised inputs), not just smoke tests. Both RNGs (numpy
+and the stdlib `random`) are seeded and all network calls are monkeypatched, so
+the suite is **deterministic** — repeated runs produce an identical check count
+and result, which is what makes the numbers above checkable rather than asserted.
 
 ---
 
@@ -61,8 +63,8 @@ mu_BL  = [ (tau*Sigma)^-1 + Pᵀ Omega^-1 P ]^-1 · [ (tau*Sigma)^-1 pi + Pᵀ O
 
 - `w_mkt` comes from **actual market caps** (not equal weights).
 - `delta = 2.5` (He & Litterman 1999 market risk-aversion).
-- **tau = 0.05, a fixed constant.** It is a function parameter but is **not currently
-  exposed through the API or UI** — users cannot tune it. It is not adaptive.
+- **tau defaults to 0.05** and is now **user-selectable** (API `tau`, and a slider in
+  the optimiser UI, range 0.01-0.10). It is not adaptive — it does not auto-fit to data.
 - Views are absolute (P is an identity-style selector); **relative views are not supported.**
 - Default `max_weight = 0.35`.
 
@@ -111,11 +113,17 @@ per calendar day, rho per +1% rate).
 - **Limitation:** no dividends; American exercise is not modelled. A European put
   can legitimately trade below intrinsic value (the discounting effect) — the tests
   use the correct European lower bound, not the American one.
+- **Implied volatility is ill-posed for near-worthless options.** As vega -> 0 the
+  price stops responding to sigma (a 2.6-vol-point range can map to prices of
+  0.0002 vs 0.0079), so the vol cannot be recovered from the price. This is a
+  property of the inverse problem, not of the solver; the round-trip test asserts
+  recovery only where vega is meaningful.
 
 ### Risk-free rate
-**Fixed constant: 6.5%** (`RISK_FREE_RATE`, an RBI repo-rate proxy). It is **not**
-pulled from the live Indian government bond yield. Every Sharpe/Kelly figure in the
-app inherits this assumption.
+**Default 6.5%** (`RISK_FREE_RATE`, an RBI repo-rate proxy), now **user-selectable**
+per request (API `risk_free_pct`; UI offers RBI repo / 10-yr G-Sec / custom).
+Every Sharpe figure inherits whichever value is chosen. The presets are **static
+reference values — not live yields**; nothing is fetched from a bond feed.
 
 ### Constraints
 | Constraint | Supported |
