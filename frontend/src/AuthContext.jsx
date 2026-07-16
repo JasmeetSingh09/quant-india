@@ -23,7 +23,15 @@ export function AuthProvider({ children }) {
     user: session?.user ?? null,
     loading,
     signIn:  (email, password) => supabase.auth.signInWithPassword({ email, password }),
-    signUp:  (email, password) => supabase.auth.signUp({ email, password }),
+    // Send the confirmation link back to THIS site. Without emailRedirectTo,
+    // Supabase falls back to its project "Site URL" — which defaults to
+    // http://localhost:3000, so the emailed link opens a dead page for real users.
+    // NOTE: the origin must also be in Supabase → Auth → URL Configuration →
+    // Redirect URLs, or Supabase ignores it and uses the Site URL anyway.
+    signUp:  (email, password) => supabase.auth.signUp({
+      email, password,
+      options: { emailRedirectTo: window.location.origin },
+    }),
     signOut: () => supabase.auth.signOut(),
   }
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
