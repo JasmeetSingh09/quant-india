@@ -1,18 +1,28 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
+import { Eye, EyeOff, Check, X } from 'lucide-react'
 import { useAuth } from '../AuthContext'
+import { passwordStrength, STRENGTH_COLORS, STRENGTH_TEXT } from '../passwordStrength'
 
 export default function Login() {
   const { signIn, signUp } = useAuth()
   const [mode, setMode]   = useState('signin')   // 'signin' | 'signup'
   const [email, setEmail] = useState('')
   const [pw, setPw]       = useState('')
+  const [showPw, setShowPw] = useState(false)
   const [busy, setBusy]   = useState(false)
   const [msg, setMsg]     = useState(null)
   const [err, setErr]     = useState(null)
 
+  const strength = useMemo(() => passwordStrength(pw, email), [pw, email])
+  const isSignup = mode === 'signup'
+  // Only gate SIGNUP on strength — never block an existing user from signing in
+  // just because the password they already have is weak.
+  const blocked = isSignup && !strength.ok
+
   const submit = async e => {
     e.preventDefault()
+    if (blocked) { setErr('Please choose a stronger password.'); return }
     setBusy(true); setErr(null); setMsg(null)
     try {
       if (mode === 'signup') {
@@ -56,18 +66,59 @@ export default function Login() {
           </div>
           <div>
             <label className="text-xs text-gray-400">Password</label>
-            <input
-              type="password" required minLength={6} value={pw} onChange={e => setPw(e.target.value)}
-              className="input w-full" placeholder="••••••••"
-              autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-            />
+            <div className="relative">
+              <input
+                type={showPw ? 'text' : 'password'} required
+                minLength={isSignup ? 8 : undefined}
+                value={pw} onChange={e => setPw(e.target.value)}
+                className="input w-full pr-9" placeholder="••••••••"
+                autoComplete={isSignup ? 'new-password' : 'current-password'}
+              />
+              <button
+                type="button" onClick={() => setShowPw(s => !s)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                title={showPw ? 'Hide password' : 'Show password'}
+              >
+                {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </div>
+
+            {/* Strength meter — signup only */}
+            {isSignup && pw && (
+              <div className="mt-2 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 flex gap-1">
+                    {[0, 1, 2, 3].map(i => (
+                      <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${
+                        i < strength.score ? STRENGTH_COLORS[strength.score] : 'bg-gray-700'
+                      }`} />
+                    ))}
+                  </div>
+                  <span className={`text-[11px] font-medium ${STRENGTH_TEXT[strength.score]}`}>
+                    {strength.label}
+                  </span>
+                </div>
+                <ul className="space-y-0.5">
+                  {strength.issues.map((iss, i) => (
+                    <li key={i} className="flex items-center gap-1.5 text-[11px] text-gray-500">
+                      <X size={11} className="text-red-400 shrink-0" /> {iss}
+                    </li>
+                  ))}
+                  {strength.ok && (
+                    <li className="flex items-center gap-1.5 text-[11px] text-green-400">
+                      <Check size={11} className="shrink-0" /> Password looks good
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
           </div>
 
           {err && <p className="text-sm text-red-400">{err}</p>}
           {msg && <p className="text-sm text-green-400">{msg}</p>}
 
-          <button type="submit" disabled={busy} className="btn-primary w-full">
-            {busy ? 'Please wait…' : mode === 'signup' ? 'Create account' : 'Sign in'}
+          <button type="submit" disabled={busy || blocked} className="btn-primary w-full">
+            {busy ? 'Please wait…' : isSignup ? 'Create account' : 'Sign in'}
           </button>
         </form>
 
