@@ -5,6 +5,11 @@ import {
 import { runBacktest } from '../api'
 import Spinner from '../components/Spinner'
 import usePersistentState from '../usePersistentState'
+import HoldingsEditor, { newRow, rowsToHoldings, rowsValid } from '../components/HoldingsEditor'
+
+const DEFAULT_ROWS = [
+  newRow('HDFCBANK.NS', 40), newRow('TCS.NS', 30), newRow('RELIANCE.NS', 30),
+]
 
 function Tile({ label, value, accent }) {
   return (
@@ -16,17 +21,14 @@ function Tile({ label, value, accent }) {
 }
 
 export default function PortfolioTest() {
-  const [pf, setPf]   = usePersistentState('ptest.pf', { 'HDFCBANK.NS': 40, 'TCS.NS': 30, 'RELIANCE.NS': 30 })
+  const [rows, setRows]   = usePersistentState('ptest.rows', DEFAULT_ROWS)
   const [start, setStart] = usePersistentState('ptest.start', '2021-01-01')
 
-  const total = Object.values(pf).reduce((a, b) => a + Number(b), 0)
-  const ok = Math.abs(total - 100) < 0.01
-  const bt = useMutation({ mutationFn: () => runBacktest({ holdings: pf, start_date: start }) })
+  const ok = rowsValid(rows)
+  const bt = useMutation({
+    mutationFn: () => runBacktest({ holdings: rowsToHoldings(rows), start_date: start }),
+  })
   const d = bt.data
-
-  const setW = (t, v) => setPf({ ...pf, [t]: Number(v) })
-  const rename = (o, n) => { const { [o]: w, ...r } = pf; setPf({ ...r, [n.toUpperCase()]: w }) }
-  const rm = t => { const { [t]: _, ...r } = pf; setPf(r) }
 
   return (
     <div className="p-6 space-y-6">
@@ -43,16 +45,7 @@ export default function PortfolioTest() {
         {/* Input */}
         <div className="card space-y-3">
           <h3 className="text-sm font-semibold text-white">Portfolio</h3>
-          {Object.entries(pf).map(([t, w]) => (
-            <div key={t} className="flex items-center gap-2">
-              <input className="input flex-1 text-xs" value={t} onChange={e => rename(t, e.target.value)} />
-              <input type="number" className="input w-16 text-xs" value={w} onChange={e => setW(t, e.target.value)} />
-              <span className="text-xs text-gray-500">%</span>
-              <button onClick={() => rm(t)} className="text-gray-600 hover:text-red-400 text-xs">✕</button>
-            </div>
-          ))}
-          <button onClick={() => setPf({ ...pf, ['NEW.NS']: 0 })} className="text-xs text-blue-400 hover:text-blue-300">+ add stock</button>
-          <p className={`text-xs ${ok ? 'text-green-400' : 'text-yellow-400'}`}>Total {total.toFixed(0)}% {ok ? '✓' : '(must be 100%)'}</p>
+          <HoldingsEditor rows={rows} setRows={setRows} />
           <div>
             <label className="text-xs text-gray-400">Start date</label>
             <input className="input w-full text-xs" value={start} onChange={e => setStart(e.target.value)} placeholder="YYYY-MM-DD" />

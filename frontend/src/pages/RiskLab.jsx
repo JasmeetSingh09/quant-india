@@ -5,6 +5,11 @@ import { getDeflatedSharpe, getPositionSize, runBacktest, getFactorRegression, g
 import { InfoTip } from '../components/Term'
 import Explainer from '../components/Explainer'
 import { ShieldAlert, Loader2 } from 'lucide-react'
+import HoldingsEditor, { newRow, rowsToHoldings, rowsValid } from '../components/HoldingsEditor'
+
+const DEFAULT_RISK_ROWS = [
+  newRow('HDFCBANK.NS', 40), newRow('TCS.NS', 30), newRow('RELIANCE.NS', 30),
+]
 
 export default function RiskLab() {
   // Deflated Sharpe
@@ -25,14 +30,12 @@ export default function RiskLab() {
   const runPos = () => pos.mutate({ annual_return_pct: Number(ret), annual_vol_pct: Number(vol), target_vol_pct: Number(tgt) })
 
   // Portfolio tail risk (surfaces VaR / CVaR / Sharpe / Sortino / Calmar from the backtester)
-  const [pf, setPf] = usePersistentState('risk.pf', { 'HDFCBANK.NS': 40, 'TCS.NS': 30, 'RELIANCE.NS': 30 })
-  const pfTotal = Object.values(pf).reduce((a, b) => a + Number(b), 0)
-  const pfOk = Math.abs(pfTotal - 100) < 0.01
-  const tail = useMutation({ mutationFn: () => runBacktest({ holdings: pf, start_date: '2021-01-01' }) })
-  const decomp = useMutation({ mutationFn: () => getRiskDecomposition(pf) })
-  const setPfW = (t, v) => setPf({ ...pf, [t]: Number(v) })
-  const renamePf = (o, n) => { const { [o]: w, ...r } = pf; setPf({ ...r, [n.toUpperCase()]: w }) }
-  const rmPf = t => { const { [t]: _, ...r } = pf; setPf(r) }
+  const [pfRows, setPfRows] = usePersistentState('risk.rows', DEFAULT_RISK_ROWS)
+  const pfOk = rowsValid(pfRows)
+  const tail = useMutation({
+    mutationFn: () => runBacktest({ holdings: rowsToHoldings(pfRows), start_date: '2021-01-01' }),
+  })
+  const decomp = useMutation({ mutationFn: () => getRiskDecomposition(rowsToHoldings(pfRows)) })
 
   // Fama-French factor exposure (surfaces the existing regression)
   const [facT, setFacT] = usePersistentState('risk.facT', 'HDFCBANK.NS')
@@ -154,16 +157,7 @@ export default function RiskLab() {
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            {Object.entries(pf).map(([t, w]) => (
-              <div key={t} className="flex items-center gap-2">
-                <input className="input flex-1 text-xs" value={t} onChange={e => renamePf(t, e.target.value)} />
-                <input type="number" className="input w-16 text-xs" value={w} onChange={e => setPfW(t, e.target.value)} />
-                <span className="text-xs text-gray-500">%</span>
-                <button onClick={() => rmPf(t)} className="text-gray-600 hover:text-red-400 text-xs">✕</button>
-              </div>
-            ))}
-            <button onClick={() => setPf({ ...pf, ['NEW.NS']: 0 })} className="text-xs text-blue-400 hover:text-blue-300">+ add stock</button>
-            <p className={`text-xs ${pfOk ? 'text-green-400' : 'text-yellow-400'}`}>Total {pfTotal.toFixed(0)}% {pfOk ? '✓' : '(must be 100%)'}</p>
+            <HoldingsEditor rows={pfRows} setRows={setPfRows} />
             <button className="btn-primary" disabled={!pfOk || tail.isPending} onClick={() => { tail.mutate(); decomp.mutate() }}>
               {tail.isPending ? <Loader2 className="animate-spin" size={16}/> : 'Analyse tail risk'}
             </button>
