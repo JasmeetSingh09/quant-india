@@ -458,13 +458,45 @@ def get_current_price(ticker: str) -> dict:
         return {"ticker": ticker, "error": str(e)}
 
 
+_INFO_CACHE: dict = {}       # ticker -> (fetched_at, info)
+_INFO_TTL = 6 * 3600         # fundamentals are daily data — no need to refetch per page load
+_INFO_MIN_KEYS = 20          # a healthy .info has ~170 keys; far fewer == throttled/partial
+
+
+def get_info(ticker: str) -> dict:
+    """
+    Cached yfinance `.info`.
+
+    Yahoo rate-limits cloud IPs (Render) and then returns a PARTIAL payload
+    instead of an error — which silently blanked whole sections of the stock
+    page (EBITDA / FCF / ROE / D-E showing N/A while the same fields loaded
+    fine for other stocks moments earlier). Every page load previously fired
+    several uncached .info calls, making a throttle almost guaranteed.
+
+    So: cache good responses for 6h, and if a fetch comes back suspiciously
+    truncated, serve the last GOOD payload rather than caching the junk.
+    """
+    import time
+    now = time.time()
+    hit = _INFO_CACHE.get(ticker)
+    if hit and now - hit[0] < _INFO_TTL:
+        return hit[1]
+    try:
+        info = yf.Ticker(ticker).info or {}
+    except Exception:
+        info = {}
+    if len(info) >= _INFO_MIN_KEYS:          # looks complete → cache it
+        _INFO_CACHE[ticker] = (now, info)
+        return info
+    return hit[1] if hit else info           # throttled → last good beats truncated
+
+
 def get_company_info(ticker: str) -> dict:
     """
     Get company metadata - name, sector, industry, market cap.
     """
-    stock = yf.Ticker(ticker)
-    info = stock.info
-    
+    info = get_info(ticker)
+
     return {
         "name": info.get("longName", ticker),
         "sector": info.get("sector", "Unknown"),
@@ -506,8 +538,7 @@ def get_financial_metrics(ticker: str) -> dict:
     """
     Get key financial metrics for valuation analysis.
     """
-    stock = yf.Ticker(ticker)
-    info = stock.info
+    info = get_info(ticker)   # cached; a throttled partial payload would blank these
 
     # yfinance reports debtToEquity as a PERCENTAGE (e.g. 9.83 = 9.83%);
     # convert to the conventional ratio (0.10).
@@ -582,7 +613,7 @@ def get_sector_peers(ticker: str) -> list:
 
     # Fallback: try to match by yfinance sector label
     try:
-        info   = yf.Ticker(ticker).info
+        info   = get_info(ticker)
         sector = info.get("sector", "")
         # Map yfinance sector strings to our sector groups
         sector_map = {

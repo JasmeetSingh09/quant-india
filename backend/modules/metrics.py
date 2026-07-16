@@ -26,6 +26,7 @@ from data_fetcher import (
     get_sector_peers,
     get_company_info,
     format_large_number,
+    get_info,          # cached .info — a throttled partial payload blanks metrics
 )
 
 
@@ -71,7 +72,7 @@ def _compute_full_metrics(ticker: str) -> dict:
     info = get_company_info(ticker)
 
     try:
-        raw = yf.Ticker(ticker).info
+        raw = get_info(ticker)
         # Yahoo omits pegRatio for many NSE names; data_fetcher computes a
         # P/E ÷ earnings-growth fallback, so prefer that when Yahoo has nothing.
         peg              = raw.get("pegRatio") or base.get("peg_ratio")
@@ -161,7 +162,7 @@ def peer_comparison(ticker: str, peers: list = None) -> dict:
 
     def _slim(t: str) -> dict:
         try:
-            raw = yf.Ticker(t).info
+            raw = get_info(t)
             de = raw.get("debtToEquity")
             ev = raw.get("enterpriseToEbitda")
             return {
@@ -221,7 +222,7 @@ def dupont_analysis(ticker: str) -> dict:
     Each component is returned with an interpretation label.
     """
     try:
-        raw = yf.Ticker(ticker).info
+        raw = get_info(ticker)
 
         net_profit_margin = raw.get("profitMargins")
         total_assets      = raw.get("totalAssets")
@@ -294,7 +295,7 @@ def piotroski_score(ticker: str) -> dict:
     statements are not provided.
     """
     try:
-        info = yf.Ticker(ticker).info
+        info = get_info(ticker)
 
         roa           = info.get("returnOnAssets", 0) or 0
         cfo           = info.get("operatingCashflow", 0) or 0
@@ -369,7 +370,7 @@ def financial_health_score(ticker: str) -> dict:
     Returns score, point breakdown, and letter grade A-F.
     """
     try:
-        raw   = yf.Ticker(ticker).info
+        raw   = get_info(ticker)
         piotr = piotroski_score(ticker)
 
         # Piotroski component (0-40)
