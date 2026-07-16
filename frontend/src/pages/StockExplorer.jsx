@@ -498,7 +498,9 @@ function StockDetail({ ticker, onBack }) {
               {m.dividend_yield && (
                 <div>
                   <p className="text-[11px] text-gray-500">Div Yield</p>
-                  <p className="text-sm font-semibold font-mono text-green-400">{pct(m.dividend_yield)}</p>
+                  {/* dividend_yield is already a PERCENT from the backend — do NOT
+                      use pct(), which multiplies by 100 (that showed 0.32% as 33%). */}
+                  <p className="text-sm font-semibold font-mono text-green-400">{Number(m.dividend_yield).toFixed(2)}%</p>
                 </div>
               )}
             </div>

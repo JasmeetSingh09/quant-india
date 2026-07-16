@@ -72,7 +72,9 @@ def _compute_full_metrics(ticker: str) -> dict:
 
     try:
         raw = yf.Ticker(ticker).info
-        peg              = raw.get("pegRatio")
+        # Yahoo omits pegRatio for many NSE names; data_fetcher computes a
+        # P/E ÷ earnings-growth fallback, so prefer that when Yahoo has nothing.
+        peg              = raw.get("pegRatio") or base.get("peg_ratio")
         quick_ratio      = raw.get("quickRatio")
         gross_margin     = raw.get("grossMargins")
         operating_margin = raw.get("operatingMargins")

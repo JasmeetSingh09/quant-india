@@ -523,6 +523,26 @@ def get_financial_metrics(ticker: str) -> dict:
     ebitda = round(ebitda_raw * fx) if (ebitda_raw and fx) else None
     ev_ebitda = _ev_ebitda(info, enterprise_value, ebitda)
 
+    # Dividend yield — reported as a PERCENT (0.32 means 0.32%).
+    # yfinance's `dividendYield` units are unreliable (it has returned a decimal
+    # fraction in some versions and a percent in others), which showed TITAN as
+    # yielding 33% instead of 0.32%. Derive it from dividendRate/price, which is
+    # unambiguous, and fall back to the raw field only if that isn't available.
+    _rate  = info.get("dividendRate")
+    _price = info.get("currentPrice") or info.get("regularMarketPrice")
+    if _rate and _price:
+        dividend_yield = round(_rate / _price * 100, 3)
+    else:
+        dividend_yield = info.get("dividendYield", None)
+
+    # PEG — Yahoo often omits pegRatio for NSE names (None for TITAN). Compute
+    # the textbook fallback: trailing P/E divided by the earnings growth rate.
+    peg = info.get("pegRatio") or info.get("trailingPegRatio")
+    if peg is None:
+        _pe, _g = info.get("trailingPE"), info.get("earningsGrowth")
+        if _pe and _g and _g > 0:
+            peg = round(_pe / (_g * 100), 2)
+
     return {
         "pe_ratio": info.get("trailingPE", None),
         "forward_pe": info.get("forwardPE", None),
@@ -539,7 +559,8 @@ def get_financial_metrics(ticker: str) -> dict:
         "debt_to_equity": debt_to_equity,
         "current_ratio": info.get("currentRatio", None),
         "free_cashflow": info.get("freeCashflow", None),
-        "dividend_yield": info.get("dividendYield", None),
+        "dividend_yield": dividend_yield,   # PERCENT (0.32 == 0.32%)
+        "peg_ratio": peg,
         "week_52_high": info.get("fiftyTwoWeekHigh", None),
         "week_52_low": info.get("fiftyTwoWeekLow", None),
     }
