@@ -854,6 +854,10 @@ def top_picks(n: int = 10) -> dict:
         "avoids": avoids,
         "scanned": len(ranked),
         "universe_size": len(TOP_PICKS_UNIVERSE),
+        # True while a background rescan is in flight. The picks below are the
+        # previous (still valid) results, served instantly — the user never waits
+        # for the scan. The UI uses this to show an "updating" hint and re-poll.
+        "refreshing": bool(_PICKS_WARMING),
         "as_of": datetime.fromtimestamp(cached[0]).strftime("%Y-%m-%d %H:%M"),
         "disclaimer": "Factor-model screen, not financial advice. "
                       "Scores reflect current factors, not a proven track record.",

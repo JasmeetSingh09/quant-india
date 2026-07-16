@@ -252,11 +252,11 @@ export default function Dashboard() {
   const { data: news,   isLoading: newsLoading,   isError: newsError   } = useQuery({ queryKey: ['mktNews'], queryFn: getMarketNews, staleTime: 60000 })
   const { data: picks,    isLoading: picksLoading,
           isError: picksError, refetch: refetchPicks } = useQuery({ queryKey: ['topPicks'], queryFn: getTopPicks,   staleTime: 25 * 60 * 1000, retry: 1,
-            // backend fills the scan progressively; keep polling until all stocks are scored
             refetchInterval: q => {
               const d = q.state.data
               if (!d) return false
-              if (d.warming) return 15000
+              if (d.warming) return 15000              // first-ever scan: no picks yet
+              if (d.refreshing) return 30000           // rescan in flight: current picks shown, poll for the new ones
               return (d.scanned < d.universe_size) ? 20000 : false
             } })
 
@@ -334,6 +334,15 @@ export default function Dashboard() {
           </div>
           {picks && (
             <div className="flex items-center gap-3">
+              {picks.refreshing && (
+                <span
+                  className="flex items-center gap-1.5 text-xs text-blue-400"
+                  title="A fresh scan is running in the background. These picks are still valid — the new ones will appear here automatically."
+                >
+                  <RefreshCw size={11} className="animate-spin" />
+                  Updating in background
+                </span>
+              )}
               <p className="text-xs text-gray-600">
                 {picks.scanned}/{picks.universe_size} scanned · {picks.as_of}
               </p>
