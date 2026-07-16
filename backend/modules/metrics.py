@@ -371,6 +371,22 @@ def financial_health_score(ticker: str) -> dict:
     """
     try:
         raw   = get_info(ticker)
+
+        # NEVER grade on missing data. Every component below reads a field and
+        # falls back to 0, so a throttled/partial payload scored ~0 on everything
+        # and branded a healthy company "F" — DIVISLAB (ROE 16%, margin 24%,
+        # D/E 0.04) was shown as "F 17/100" purely because the fetch was
+        # rate-limited. "We don't know" must not render as "it's bad".
+        _core = ("returnOnEquity", "profitMargins", "trailingPE", "totalRevenue")
+        if sum(raw.get(k) is not None for k in _core) < 2:
+            return {
+                "ticker": ticker,
+                "health_score": None,     # key must match the populated path below
+                "grade": None,
+                "status": "insufficient data — the data source did not return this "
+                          "company's financials; try again shortly",
+            }
+
         piotr = piotroski_score(ticker)
 
         # Piotroski component (0-40)

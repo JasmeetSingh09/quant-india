@@ -460,7 +460,19 @@ def get_current_price(ticker: str) -> dict:
 
 _INFO_CACHE: dict = {}       # ticker -> (fetched_at, info)
 _INFO_TTL = 6 * 3600         # fundamentals are daily data — no need to refetch per page load
-_INFO_MIN_KEYS = 20          # a healthy .info has ~170 keys; far fewer == throttled/partial
+
+# A throttled Yahoo response can still carry plenty of quote/price keys while the
+# FINANCIAL modules are missing — so a bare key-count check isn't enough (that let
+# a partial payload through and cached it, blanking Revenue/EBITDA/ROE for 6h).
+# Require at least one real financial field before trusting a payload.
+_INFO_FIN_FIELDS = ("totalRevenue", "ebitda", "returnOnEquity",
+                    "profitMargins", "totalDebt", "totalCash")
+
+
+def _info_looks_complete(info: dict) -> bool:
+    if not info or len(info) < 20:
+        return False
+    return any(info.get(k) is not None for k in _INFO_FIN_FIELDS)
 
 
 def get_info(ticker: str) -> dict:
@@ -485,10 +497,10 @@ def get_info(ticker: str) -> dict:
         info = yf.Ticker(ticker).info or {}
     except Exception:
         info = {}
-    if len(info) >= _INFO_MIN_KEYS:          # looks complete → cache it
+    if _info_looks_complete(info):            # has the financial block → cache it
         _INFO_CACHE[ticker] = (now, info)
         return info
-    return hit[1] if hit else info           # throttled → last good beats truncated
+    return hit[1] if hit else info            # throttled → last good beats truncated
 
 
 def get_company_info(ticker: str) -> dict:
