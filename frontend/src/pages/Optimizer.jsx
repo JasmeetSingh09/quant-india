@@ -126,6 +126,18 @@ export default function Optimizer() {
                   <option value="max_return">Maximise Return</option>
                 </select>
               </div>
+              {target === 'max_return' && (
+                <div className="border border-yellow-700/50 bg-yellow-950/30 rounded-lg p-2.5">
+                  <p className="text-xs text-yellow-300">⚠ "Maximise Return" concentrates.</p>
+                  <p className="text-[11px] text-yellow-300/70 mt-1">
+                    Maximising return is a linear objective, so the answer is always a single
+                    stock — whichever rose most in the past window (capped only by the slider
+                    below). It uses PAST returns, not a forecast, so this is just "buy last
+                    year's winner" with no diversification. Prefer <b>Maximise Sharpe</b>, or
+                    <b> Black-Litterman</b> to express a real return view.
+                  </p>
+                </div>
+              )}
               <div>
                 <label className="label">Max weight per stock: {maxWeight}%</label>
                 <input type="range" min="10" max="100" step="5" value={maxWeight}
