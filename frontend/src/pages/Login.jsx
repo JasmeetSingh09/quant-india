@@ -26,9 +26,23 @@ export default function Login() {
     setBusy(true); setErr(null); setMsg(null)
     try {
       if (mode === 'signup') {
-        const { error } = await signUp(email.trim(), pw)
+        const { data, error } = await signUp(email.trim(), pw)
         if (error) throw error
-        setMsg('Account created. Check your email to confirm, then sign in.')
+
+        // Supabase hides "email already registered" behind an empty identities
+        // array (to prevent account enumeration) rather than erroring.
+        if (data?.user && data.user.identities?.length === 0) {
+          setErr('That email is already registered — try signing in instead.')
+          setMode('signin')
+          return
+        }
+        // If the project has "Confirm email" OFF, signUp returns a session and
+        // the user is ALREADY signed in — don't tell them to check their inbox.
+        // AuthProvider picks the session up and App swaps to the app view.
+        if (data?.session) return
+
+        // Otherwise confirmation genuinely is required.
+        setMsg('Account created. Check your email for the confirmation link, then sign in.')
         setMode('signin')
       } else {
         const { error } = await signIn(email.trim(), pw)
