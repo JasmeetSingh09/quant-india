@@ -97,12 +97,21 @@ def momentum_backtest(
     lookback_months: int = 12,
     skip_months: int = 1,
     cost_roundtrip_pct: float = 0.4,
+    pit_universe_size: int = None,
+    liquidity_lookback_months: int = 6,
 ) -> dict:
     """
     Walk-forward long-only 12-1 momentum, monthly rebalanced, vs Nifty.
 
     top_fraction        — hold the top X of the universe by momentum (0.2 = top 20%)
     cost_roundtrip_pct  — round-trip transaction cost per name traded (%)
+    pit_universe_size   — if set, apply a POINT-IN-TIME universe screen: at each
+                          rebalance keep only the N most liquid names by trailing
+                          turnover computed from data available AT THAT DATE.
+                          This removes look-ahead in universe SELECTION (otherwise
+                          you are trading 2020 using a list of who is liquid in
+                          2026). It does NOT fix delisting survivorship — names
+                          that died are absent from the data source entirely.
     """
     import yfinance as yf
     universe = universe or DEFAULT_UNIVERSE
@@ -115,6 +124,18 @@ def momentum_backtest(
                           threads=True)
     except Exception as e:
         return {"error": f"price download failed: {e}"}
+
+    # Monthly average traded value (Close x Volume) — the point-in-time
+    # liquidity proxy. Only used with data strictly before each rebalance.
+    turnover_m = {}
+    if pit_universe_size:
+        for t in universe:
+            try:
+                tv = (raw[t]["Close"] * raw[t]["Volume"]).dropna()
+                if len(tv):
+                    turnover_m[t] = tv.resample("ME").mean()
+            except Exception:
+                pass
 
     monthly = {}
     for t in universe + ["^NSEI"]:
@@ -131,13 +152,19 @@ def momentum_backtest(
     nifty  = prices["^NSEI"]
     stocks = prices.drop(columns=["^NSEI"])
 
+    # NB: named *_df to avoid shadowing the per-rebalance `turnover` cost variable
+    turnover_df = (pd.DataFrame(turnover_m).reindex(prices.index)
+                   if turnover_m else None)
+
     dates = stocks.index
     L, K = lookback_months, skip_months
     cost = cost_roundtrip_pct / 100.0
+    LQ = liquidity_lookback_months
 
     strat_returns, bench_returns, eq_dates = [], [], []
     prev_basket = set()
     holdings_log = []
+    pit_sizes = []
 
     # Need L months of history to form the first signal; hold the following month.
     for i in range(L, len(dates) - 1):
@@ -146,6 +173,18 @@ def momentum_backtest(
         past = stocks.iloc[i - L]
         recent = stocks.iloc[i - K]
         mom = (recent / past - 1).dropna()
+
+        # POINT-IN-TIME universe screen: rank by trailing turnover using ONLY
+        # data before this rebalance, so a name is eligible only once it was
+        # actually liquid then — not because it is liquid today.
+        if pit_universe_size and turnover_df is not None:
+            tw = turnover_df.iloc[max(0, i - LQ):i].mean().dropna()
+            if len(tw) >= 5:
+                eligible = set(tw.sort_values(ascending=False)
+                                 .head(pit_universe_size).index)
+                mom = mom[mom.index.isin(eligible)]
+                pit_sizes.append(len(eligible))
+
         if len(mom) < 5:
             continue
         n_hold = max(1, int(round(len(mom) * top_fraction)))
@@ -186,8 +225,12 @@ def momentum_backtest(
     b_stats = _annualised(bench)
 
     return {
-        "strategy":  "12-1 momentum, long top {:.0%}, monthly rebalanced".format(top_fraction),
+        "strategy":  "12-1 momentum, long top {:.0%}, monthly rebalanced".format(top_fraction)
+                     + (f", point-in-time top-{pit_universe_size} liquidity universe"
+                        if pit_universe_size else ""),
         "universe_size": len(stocks.columns),
+        "point_in_time_universe": bool(pit_universe_size),
+        "avg_eligible_per_rebalance": (round(float(np.mean(pit_sizes)), 1) if pit_sizes else None),
         "period":    f"{eq_dates[0]} to {eq_dates[-1]}",
         "costs_included": True,
         "cost_roundtrip_pct": cost_roundtrip_pct,
@@ -201,7 +244,14 @@ def momentum_backtest(
         "final_holdings":  holdings_log[-1],
         "verdict": _verdict(s_stats, b_stats, t_stat),
         "caveats": [
-            "Survivorship bias: the universe is today's listed names, which biases returns up.",
+            ("Universe membership is point-in-time (ranked by trailing liquidity at each "
+             "rebalance), so there is no look-ahead in SELECTION."
+             if pit_universe_size else
+             "Look-ahead in universe selection: the list is today's liquid names, applied "
+             "retroactively — this biases returns up."),
+            "Survivorship bias REMAINS: delisted/failed companies are absent from the data "
+            "source entirely, so the surviving-names-only universe still flatters returns. "
+            "Not fixable without a point-in-time constituent database.",
             "Single factor (momentum only) — not the full alpha model.",
             "Costs are a turnover approximation, not a live fill simulation.",
             "Monthly rebalance; no intra-month risk management.",
