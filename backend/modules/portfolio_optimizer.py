@@ -215,6 +215,67 @@ def risk_decomposition(holdings: dict, period_months: int = 24) -> dict:
     }
 
 
+def _explain_weights(valid, w, log_returns, cov) -> dict:
+    """
+    Explain WHY each holding got its weight, grounded in the optimiser's ACTUAL
+    inputs — expected return, volatility, average correlation to the rest, and
+    realised risk contribution. Deliberately rule-based rather than LLM-written:
+    a number the user can check beats a fluent guess.
+
+    Returns {ticker: "Overweight because ..."}.
+    """
+    n = len(valid)
+    if n == 0:
+        return {}
+    w = np.asarray(w, dtype=float)
+    mu  = log_returns.mean().values * 252          # annualised historical mean
+    vol = np.sqrt(np.diag(cov))
+    with np.errstate(invalid="ignore", divide="ignore"):
+        corr = cov / np.outer(vol, vol)
+    corr = np.array(corr, dtype=float)
+    np.fill_diagonal(corr, np.nan)
+    avg_corr = np.nanmean(corr, axis=1) if n > 1 else np.zeros(n)
+
+    port_vol = float(np.sqrt(max(w @ cov @ w, 1e-12)))
+    rc_pct = (w * (cov @ w) / port_vol) / port_vol * 100 if port_vol > 0 else np.zeros(n)
+
+    mu_bar, vol_bar = float(np.mean(mu)), float(np.mean(vol))
+    corr_bar = float(np.nanmean(avg_corr)) if n > 1 else 0.0
+    eq = 1.0 / n
+
+    out = {}
+    for i, t in enumerate(valid):
+        stance = ("Overweight"  if w[i] > eq * 1.15 else
+                  "Underweight" if w[i] < eq * 0.85 else
+                  "Roughly equal weight")
+        drivers = []
+        if n > 1 and avg_corr[i] < corr_bar - 0.05:
+            drivers.append(f"it moves relatively independently of the rest "
+                           f"(avg correlation {avg_corr[i]:.2f} vs {corr_bar:.2f} portfolio average), "
+                           f"so it adds diversification")
+        elif n > 1 and avg_corr[i] > corr_bar + 0.05:
+            drivers.append(f"it overlaps heavily with the other holdings "
+                           f"(avg correlation {avg_corr[i]:.2f} vs {corr_bar:.2f} average), "
+                           f"so extra exposure adds little diversification")
+        if mu[i] > mu_bar + 1e-9:
+            drivers.append(f"its historical return is above the group "
+                           f"({mu[i]*100:.1f}% vs {mu_bar*100:.1f}%)")
+        elif mu[i] < mu_bar - 1e-9:
+            drivers.append(f"its historical return trails the group "
+                           f"({mu[i]*100:.1f}% vs {mu_bar*100:.1f}%)")
+        if vol[i] < vol_bar:
+            drivers.append(f"it is less volatile than average "
+                           f"({vol[i]*100:.1f}% vs {vol_bar*100:.1f}%)")
+        else:
+            drivers.append(f"it is more volatile than average "
+                           f"({vol[i]*100:.1f}% vs {vol_bar*100:.1f}%)")
+
+        risk_note = (f" It drives {rc_pct[i]:.0f}% of portfolio risk on "
+                     f"{w[i]*100:.0f}% of the capital.")
+        out[t] = f"{stance}: " + "; ".join(drivers[:2]) + "." + risk_note
+    return out
+
+
 def _perf_stats(w, log_returns, cov, risk_free_pct: float = None):
     """Annualised expected return / vol / Sharpe for a weight vector."""
     exp_ret = float(w @ (log_returns.mean().values * 252))
@@ -257,6 +318,7 @@ def equal_risk_contribution(tickers: list, period_months: int = 24,
     er, ev, sh = _perf_stats(w, log_returns, cov, risk_free_pct)
     return {
         "algorithm":        "Equal Risk Contribution (Risk Parity, Maillard 2010)",
+        "explanations":     _explain_weights(valid, w, log_returns, cov),
         "excluded_tickers": [t for t in tickers if t not in valid],
         "tickers":          valid,
         "optimal_weights":  {t: round(float(w[i]), 4) for i, t in enumerate(valid)},
@@ -304,6 +366,7 @@ def maximum_diversification(tickers: list, period_months: int = 24,
     er, ev, sh = _perf_stats(w, log_returns, cov, risk_free_pct)
     return {
         "algorithm":        "Maximum Diversification (Choueifaty & Coignard 2008)",
+        "explanations":     _explain_weights(valid, w, log_returns, cov),
         "excluded_tickers": [t for t in tickers if t not in valid],
         "tickers":          valid,
         "optimal_weights":  {t: round(float(w[i]), 4) for i, t in enumerate(valid)},
@@ -414,6 +477,7 @@ def mean_variance_optimize(
 
     return {
         "algorithm":       "Mean-Variance Optimisation (Markowitz)",
+        "explanations":    _explain_weights(valid, w_opt, log_returns, cov),
         "excluded_tickers": [t for t in tickers if t not in valid],
         "target":          target,
         "tickers":         valid,
@@ -553,6 +617,7 @@ def black_litterman_optimize(
 
     has_views = bool(view_tickers)
     return {
+        "explanations":     _explain_weights(valid, w_bl, log_returns, Sigma),
         "algorithm":        ("Black-Litterman (He & Litterman 1999) + FinBERT Views"
                              if has_views else
                              "Black-Litterman (market equilibrium — no views)"),
@@ -840,6 +905,7 @@ def hierarchical_risk_parity(
 
     return {
         "algorithm":       "Hierarchical Risk Parity (López de Prado 2016)",
+        "explanations":    _explain_weights(valid, w_arr, log_returns, cov.values),
         "excluded_tickers": [t for t in tickers if t not in valid],
         "tickers":         valid,
         "period":          f"{start} to {end}",

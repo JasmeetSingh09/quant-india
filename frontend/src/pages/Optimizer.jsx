@@ -36,15 +36,19 @@ function TickerList({ tickers, setTickers }) {
   )
 }
 
-function WeightBar({ ticker, weight, sub }) {
+function WeightBar({ ticker, weight, sub, explain }) {
   return (
-    <div className="flex items-center gap-3 py-1.5">
-      <span className="font-mono text-green-400 text-sm w-28 shrink-0">{ticker.replace('.NS','')}</span>
-      <div className="flex-1 h-2 bg-gray-800 rounded-full">
-        <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${weight}%` }} />
+    <div className="py-1.5">
+      <div className="flex items-center gap-3">
+        <span className="font-mono text-green-400 text-sm w-28 shrink-0">{ticker.replace('.NS','')}</span>
+        <div className="flex-1 h-2 bg-gray-800 rounded-full">
+          <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${weight}%` }} />
+        </div>
+        {sub && <span className="text-[11px] text-gray-500 w-16 text-right">{sub}</span>}
+        <span className="text-sm font-bold w-12 text-right">{weight}%</span>
       </div>
-      {sub && <span className="text-[11px] text-gray-500 w-16 text-right">{sub}</span>}
-      <span className="text-sm font-bold w-12 text-right">{weight}%</span>
+      {/* WHY this weight — grounded in the optimiser's real inputs, not a guess */}
+      {explain && <p className="text-[11px] text-gray-500 mt-0.5 ml-[7.75rem] leading-snug">{explain}</p>}
     </div>
   )
 }
@@ -160,31 +164,42 @@ export default function Optimizer() {
           <div>
             <label className="label">Risk-free rate</label>
             <div className="flex gap-2">
-              <select className="input flex-1" value={[6.5, 7.0].includes(Number(riskFree)) ? String(riskFree) : 'custom'}
+              <select className="input flex-1" value={[6.5, 6.87].includes(Number(riskFree)) ? String(riskFree) : 'custom'}
                       onChange={e => e.target.value !== 'custom' && setRiskFree(Number(e.target.value))}>
-                <option value="6.5">RBI repo (6.5%)</option>
-                <option value="7.0">10-yr G-Sec (7.0%)</option>
+                <option value="6.5">RBI repo</option>
+                <option value="6.87">10-yr G-Sec</option>
                 <option value="custom">Custom…</option>
               </select>
               <input type="number" step="0.1" min="0" max="20" className="input w-20"
                      value={riskFree} onChange={e => setRiskFree(e.target.value)} />
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Used in every Sharpe ratio. Presets are reference values, not live yields.
-            </p>
+            {/* Show the actual values, so if these are ever fetched live the UI
+                shape doesn't change — only the source and the "as of" line. */}
+            <div className="mt-1.5 text-[11px] text-gray-500 space-y-0.5">
+              <div className="flex justify-between"><span>RBI repo</span><span className="font-mono">6.50%</span></div>
+              <div className="flex justify-between"><span>10-yr G-Sec</span><span className="font-mono">6.87%</span></div>
+              <div className="flex justify-between text-gray-600">
+                <span>Source</span><span>static reference · not live</span>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Used in every Sharpe ratio.</p>
           </div>
 
           {/* Tau — only meaningful for the Black-Litterman pipeline */}
           {tab === 'auto' && (
             <div>
-              <label className="label">τ (prior uncertainty): {Number(tau).toFixed(2)}</label>
+              <label className="label">How much to trust the AI's views</label>
               <input type="range" min="0.01" max="0.10" step="0.01" value={tau}
                      onChange={e => setTau(Number(e.target.value))}
                      className="w-full accent-green-500" />
-              <p className="text-xs text-gray-500 mt-1">
-                Black-Litterman blends the market equilibrium with your views.
-                <b> Lower τ</b> = trust the market more; <b>higher τ</b> = let the
-                sentiment views move expected returns further.
+              <div className="flex justify-between text-[11px] text-gray-500 -mt-0.5">
+                <span>← Trust the market</span>
+                <span className="font-mono text-gray-400">τ = {Number(tau).toFixed(2)}</span>
+                <span>Trust the views →</span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1.5">
+                Black-Litterman blends the market's equilibrium returns with the
+                sentiment views. Slide right and the views move expected returns further.
               </p>
             </div>
           )}
@@ -239,7 +254,7 @@ export default function Optimizer() {
                 <h3 className="font-semibold mb-3">Optimal Weights</h3>
                 {Object.entries(mvoResult.optimal_pct || {})
                   .sort(([,a],[,b]) => b-a)
-                  .map(([t,w]) => <WeightBar key={t} ticker={t} weight={w} />)}
+                  .map(([t,w]) => <WeightBar key={t} ticker={t} weight={w} explain={mvoResult.explanations?.[t]} />)}
                 <Explainer>
                   <p><b>What we just did:</b> we found the best mix of these stocks — the split that
                     gives the most return for the least bumpiness (risk).</p>
@@ -278,7 +293,7 @@ export default function Optimizer() {
                 <p className="text-xs text-gray-500 mb-3">Cluster order: {hrpResult.cluster_order?.map(t=>t.replace('.NS','')).join(' → ')}</p>
                 {Object.entries(hrpResult.optimal_pct || {})
                   .sort(([,a],[,b]) => b-a)
-                  .map(([t,w]) => <WeightBar key={t} ticker={t} weight={w} />)}
+                  .map(([t,w]) => <WeightBar key={t} ticker={t} weight={w} explain={hrpResult.explanations?.[t]} />)}
                 <div className="mt-3 p-3 bg-gray-800 rounded-lg">
                   <p className="text-xs text-gray-300">{hrpResult.interpretation}</p>
                 </div>
@@ -304,7 +319,8 @@ export default function Optimizer() {
                 <p className="text-xs text-gray-500 mb-3">Each holding's risk contribution is equalised (shown in %).</p>
                 {Object.entries(rpResult.optimal_pct || {}).sort(([,a],[,b])=>b-a).map(([t,w]) => (
                   <WeightBar key={t} ticker={t} weight={w}
-                    sub={rpResult.risk_contribution_pct?.[t] != null ? `risk ${rpResult.risk_contribution_pct[t]}%` : undefined} />
+                    sub={rpResult.risk_contribution_pct?.[t] != null ? `risk ${rpResult.risk_contribution_pct[t]}%` : undefined}
+                    explain={rpResult.explanations?.[t]} />
                 ))}
                 <div className="mt-3 p-3 bg-gray-800 rounded-lg"><p className="text-xs text-gray-300">{rpResult.interpretation}</p></div>
                 <p className="text-xs text-yellow-300/80 mt-2">Note: Risk Parity uses only the
@@ -328,7 +344,7 @@ export default function Optimizer() {
               </div>
               <div className="card">
                 <h3 className="font-semibold mb-1">Max Diversification Weights <span className="text-xs text-gray-500 font-normal ml-2">Choueifaty & Coignard 2008</span></h3>
-                {Object.entries(mdResult.optimal_pct || {}).sort(([,a],[,b])=>b-a).map(([t,w]) => <WeightBar key={t} ticker={t} weight={w} />)}
+                {Object.entries(mdResult.optimal_pct || {}).sort(([,a],[,b])=>b-a).map(([t,w]) => <WeightBar key={t} ticker={t} weight={w} explain={mdResult.explanations?.[t]} />)}
                 <div className="mt-3 p-3 bg-gray-800 rounded-lg"><p className="text-xs text-gray-300">{mdResult.interpretation}</p></div>
                 <p className="text-xs text-yellow-300/80 mt-2">Note: Max Diversification uses only the
                   covariance matrix — it never looks at returns. "Expected Return" here is the past
