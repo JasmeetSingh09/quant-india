@@ -256,6 +256,10 @@ export default function Optimizer() {
                     sub={rpResult.risk_contribution_pct?.[t] != null ? `risk ${rpResult.risk_contribution_pct[t]}%` : undefined} />
                 ))}
                 <div className="mt-3 p-3 bg-gray-800 rounded-lg"><p className="text-xs text-gray-300">{rpResult.interpretation}</p></div>
+                <p className="text-xs text-yellow-300/80 mt-2">Note: Risk Parity uses only the
+                  covariance matrix — it never looks at returns. "Expected Return" here is the past
+                  average over this period (not a forecast) and can be negative if these stocks fell;
+                  it is a description, not something this algorithm optimised for.</p>
               </div>
             </div>
           )}
@@ -275,6 +279,11 @@ export default function Optimizer() {
                 <h3 className="font-semibold mb-1">Max Diversification Weights <span className="text-xs text-gray-500 font-normal ml-2">Choueifaty & Coignard 2008</span></h3>
                 {Object.entries(mdResult.optimal_pct || {}).sort(([,a],[,b])=>b-a).map(([t,w]) => <WeightBar key={t} ticker={t} weight={w} />)}
                 <div className="mt-3 p-3 bg-gray-800 rounded-lg"><p className="text-xs text-gray-300">{mdResult.interpretation}</p></div>
+                <p className="text-xs text-yellow-300/80 mt-2">Note: Max Diversification uses only the
+                  covariance matrix — it never looks at returns. "Expected Return" here is the past
+                  average over this period (not a forecast) and can be negative if these stocks fell;
+                  it is a description, not something this algorithm optimised for. Use Black-Litterman
+                  for market-based expected returns.</p>
               </div>
             </div>
           )}
