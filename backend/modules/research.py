@@ -54,27 +54,82 @@ RISK_FREE_RATE = 0.065   # RBI repo rate as proxy
 # Shared helpers
 # ---------------------------------------------------------------------------
 
+def _naive_date(x):
+    """
+    Parse a timestamp and return it tz-NAIVE, normalised to midnight.
+
+    News `published_at` values are usually tz-aware ISO strings (e.g.
+    "...T00:00:00+00:00") while the yfinance price index is tz-naive. Comparing
+    the two raises "Cannot compare tz-naive and tz-aware datetime-like objects"
+    and 500s the endpoint, so every date is flattened to a naive UTC day before
+    it ever touches the price index.
+    """
+    ts = pd.Timestamp(x)
+    if ts.tzinfo is not None or getattr(ts, "tz", None) is not None:
+        ts = ts.tz_convert("UTC").tz_localize(None)
+    return ts.normalize()
+
+
+def _naive_index(obj):
+    """Force a Series/DataFrame's DatetimeIndex to be tz-naive and normalised."""
+    try:
+        idx = obj.index
+        if getattr(idx, "tz", None) is not None:
+            obj.index = idx.tz_convert("UTC").tz_localize(None).normalize()
+        else:
+            obj.index = idx.normalize()
+    except Exception:
+        pass
+    return obj
+
+
 def _download(ticker: str, start: str, end: str) -> pd.Series:
-    """Download adjusted close prices for one ticker."""
+    """Download adjusted close prices for one ticker (tz-naive index)."""
     try:
         df = yf.download(ticker, start=start, end=end, progress=False, auto_adjust=True)
-        return df["Close"].squeeze().dropna()
+        s = df["Close"].squeeze().dropna()
+        return _naive_index(s)   # keep comparable with news dates
     except Exception:
         return pd.Series(dtype=float)
 
 
 def _t_test_mean(series: pd.Series) -> dict:
-    """One-sample t-test: is the mean significantly different from zero?"""
+    """One-sample t-test: is the mean significantly different from zero?
+
+    A t-test needs at least 2 observations (and a non-zero spread). Buckets are
+    often empty — e.g. a stock with no high-confidence negative headlines in the
+    window — and handing scipy an empty series raised an AttributeError that
+    500'd the whole study. Report "insufficient sample" instead of exploding.
+    """
+    s = pd.Series(series).dropna()
+    if len(s) < 2:
+        return {
+            "t_statistic": None, "p_value": None, "significant": False,
+            "n": int(len(s)),
+            "note": "insufficient sample for a t-test (need at least 2 observations)",
+        }
+    if float(s.std(ddof=1)) == 0:
+        return {
+            "t_statistic": None, "p_value": None, "significant": False,
+            "n": int(len(s)), "note": "zero variance — t-test undefined",
+        }
     try:
         from scipy import stats
-        t, p = stats.ttest_1samp(series.dropna(), 0)
+        t, p = stats.ttest_1samp(s, 0)
+        if not np.isfinite(t) or not np.isfinite(p):
+            return {"t_statistic": None, "p_value": None, "significant": False,
+                    "n": int(len(s)), "note": "t-test did not converge"}
         return {
             "t_statistic": round(float(t), 4),
             "p_value":     round(float(p), 4),
             "significant": bool(p < 0.05),
+            "n":           int(len(s)),
         }
     except ImportError:
         return {"note": "Install scipy for significance tests: pip install scipy"}
+    except Exception as e:
+        return {"t_statistic": None, "p_value": None, "significant": False,
+                "n": int(len(s)), "note": f"t-test failed: {e}"}
 
 
 # ---------------------------------------------------------------------------
@@ -120,7 +175,7 @@ def sentiment_alpha_study(
     events = []
     for art in articles:
         try:
-            pub_date = pd.Timestamp(art["published_at"]).normalize()
+            pub_date = _naive_date(art["published_at"])
         except Exception:
             continue
         score = score_headline(art["title"])
@@ -535,7 +590,7 @@ def macro_sector_signal_study(
         title_lower = art["title"].lower()
         if kw_lower in title_lower:
             try:
-                pub_date = pd.Timestamp(art["published_at"]).normalize()
+                pub_date = _naive_date(art["published_at"])
                 signal_dates.append(pub_date)
             except Exception:
                 pass
