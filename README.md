@@ -2,6 +2,23 @@
 
 A full-stack NSE stock intelligence platform. Combines live market data, quantitative alpha scoring, news sentiment analysis, and portfolio tools in a single dark-mode dashboard.
 
+**Validation:** the quantitative models are covered by **~168,000 property/edge-case
+assertions** (currently passing) — put-call parity, optimiser weight constraints,
+Black-Litterman view responsiveness, HRP clustering behaviour, Monte Carlo
+percentile ordering, and more. The suites are deterministic and offline:
+
+```bash
+cd backend
+python tests/test_core_properties.py         # ~81,000 assertions
+python tests/test_new_algorithms_stress.py   # ~87,000 assertions
+python tests/test_modules_integration.py     # import-safety + integration
+```
+
+See **[VALIDATION.md](VALIDATION.md)** for each model's formulation, how it was
+validated, its assumptions, and its known limitations — and
+**[RESEARCH_momentum.md](RESEARCH_momentum.md)** for an honest backtest write-up
+(where correcting a look-ahead flaw erased half the measured edge).
+
 ---
 
 ## Features

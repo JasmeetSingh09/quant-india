@@ -202,7 +202,7 @@ def _perf_stats(w, log_returns, cov):
     """Annualised expected return / vol / Sharpe for a weight vector."""
     exp_ret = float(w @ (log_returns.mean().values * 252))
     exp_vol = float(np.sqrt(max(w @ cov @ w, 1e-12)))
-    sharpe = (exp_ret - 0.065) / exp_vol if exp_vol > 0 else 0.0
+    sharpe = (exp_ret - RISK_FREE_RATE) / exp_vol if exp_vol > 0 else 0.0  # use the constant, not a literal
     return round(exp_ret * 100, 2), round(exp_vol * 100, 2), round(sharpe, 3)
 
 
