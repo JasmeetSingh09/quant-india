@@ -638,6 +638,21 @@ def efficient_frontier(
                 "sharpe":     round(s, 4),
             })
 
+    # Keep ONLY the efficient arm. Sweeping target returns from min to max traces
+    # the whole minimum-variance bullet, whose LOWER arm (below the min-variance
+    # point) is inefficient: those portfolios are dominated — same volatility,
+    # less return — so no rational investor holds them and they don't belong on
+    # something labelled "efficient frontier". Previously ~2/3 of the plotted
+    # points were on that dominated arm, which made volatility appear to FALL as
+    # return rose.
+    if frontier:
+        mv_idx = min(range(len(frontier)), key=lambda i: frontier[i]["vol_pct"])
+        mv_ret = frontier[mv_idx]["return_pct"]
+        inefficient = [p for p in frontier if p["return_pct"] < mv_ret]
+        frontier = [p for p in frontier if p["return_pct"] >= mv_ret]
+    else:
+        inefficient = []
+
     # Tangency (max Sharpe)
     tang = mean_variance_optimize(valid, start_date, end_date, period_months)
     # Min variance
@@ -652,7 +667,10 @@ def efficient_frontier(
         "excluded_tickers": [t for t in tickers if t not in valid],
         "tickers":      valid,
         "period":       f"{start} to {end}",
-        "frontier":     frontier,
+        "frontier":     frontier,          # EFFICIENT arm only (min-variance point and above)
+        "inefficient_arm_points": len(inefficient),  # dominated portfolios, excluded from the plot
+        "note": "Only the efficient arm is returned: portfolios below the "
+                "minimum-variance point are dominated (same risk, less return).",
         "tangency_portfolio": {
             "weights":     tang.get("optimal_pct", {}),
             "return_pct":  tang.get("expected_annual_return_pct"),
