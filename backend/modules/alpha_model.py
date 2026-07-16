@@ -785,9 +785,19 @@ def warm_top_picks() -> int:
     _PICKS_WARMING = True
     try:
         import time
-        # Score one stock at a time and publish after EACH so partial results
-        # show up right away and a mid-scan restart (common on Render) isn't
-        # wasted. Yahoo throttling makes each stock slow, so this matters.
+        # Do we already have a usable set of picks to keep serving?
+        have_previous = bool(_PICKS_CACHE.get("data") or _load_persisted_picks())
+
+        # Build the new scan in a BUFFER and swap it in atomically at the end.
+        #
+        # Publishing after every stock (the old behaviour) meant a routine rescan
+        # replaced a complete "10 buys / 9 avoids" with "1/30 scanned" and one
+        # lonely stock — the user saw the app get *worse* for 25 minutes. The
+        # previous picks are still perfectly valid (the factors are daily data),
+        # so keep serving them and switch only when the new scan is done.
+        #
+        # The ONE exception is the very first scan ever: with nothing to show,
+        # partial results beat an empty page, so publish incrementally then.
         ranked = []
         for ticker in TOP_PICKS_UNIVERSE:
             try:
@@ -797,9 +807,16 @@ def warm_top_picks() -> int:
             if "error" in r or r.get("alpha_score") is None:
                 continue
             ranked.append(r)
+            if not have_previous:                      # cold start only
+                now = time.time()
+                _PICKS_CACHE["data"] = (now, list(ranked))
+                _persist_picks(now, list(ranked))
+
+        # Atomic swap — one complete set replaces the previous complete set.
+        if ranked:
             now = time.time()
-            _PICKS_CACHE["data"] = (now, list(ranked))
-            _persist_picks(now, list(ranked))
+            _PICKS_CACHE["data"] = (now, ranked)
+            _persist_picks(now, ranked)
         return len(ranked)
     finally:
         _PICKS_WARMING = False
