@@ -704,17 +704,30 @@ def scan_alpha(tickers: list, weights: dict = None) -> list:
 
 
 # Curated liquid universe scanned for the "Top Picks" page
+# 30 liquid NSE names across sectors. Was 12, which meant well-scoring stocks
+# (e.g. the Adani names) could never appear in Top Picks simply because they were
+# never scanned — and 12 stocks can't be split into 10 buys + 10 avoids.
 TOP_PICKS_UNIVERSE = [
     "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ICICIBANK.NS",
     "ITC.NS", "SBIN.NS", "LT.NS", "MARUTI.NS", "SUNPHARMA.NS",
     "TITAN.NS", "TATASTEEL.NS",
+    "ADANIENT.NS", "ADANIPORTS.NS", "BHARTIARTL.NS", "KOTAKBANK.NS",
+    "AXISBANK.NS", "BAJFINANCE.NS", "HINDUNILVR.NS", "ASIANPAINT.NS",
+    "WIPRO.NS", "HCLTECH.NS", "ULTRACEMCO.NS", "NESTLEIND.NS",
+    "POWERGRID.NS", "NTPC.NS", "ONGC.NS", "M&M.NS", "JSWSTEEL.NS",
+    "COALINDIA.NS",
 ]
 _PICKS_CACHE: dict = {}
-_PICKS_TTL = 1800       # 30 min — alpha barely moves intraday; protects vs throttling
+# 6h. The universe is 30 stocks and each score costs a FinBERT pass + several
+# throttled Yahoo calls (~25 min for a full scan on Render). A short TTL would
+# leave the box scanning almost continuously and risk the OOM we just fixed.
+# Momentum/quality/value are daily-frequency data and sentiment moves slowly, so
+# a 6-hour refresh loses nothing real.
+_PICKS_TTL = 6 * 3600
 _PICKS_WARMING = False  # guards against launching two concurrent scans
 # Bump whenever the scoring MODEL changes so old persisted picks are discarded
 # instead of served stale. ("mom-abs" = absolute 12-1 momentum rewrite.)
-_PICKS_VERSION = "mom-abs-v2"
+_PICKS_VERSION = "mom-abs-v3-u30"   # bumped: 30-stock universe invalidates old picks
 
 
 # --- persistence: the scan is slow (FinBERT + throttled Yahoo) and the in-memory
@@ -797,7 +810,7 @@ def _kick_background_warm() -> None:
     threading.Thread(target=warm_top_picks, daemon=True).start()
 
 
-def top_picks(n: int = 6) -> dict:
+def top_picks(n: int = 10) -> dict:
     """
     Return the best-scoring buys and worst-scoring avoids from the curated
     universe. NEVER runs the slow scan inline — it serves the cache (memory, or

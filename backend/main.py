@@ -114,11 +114,17 @@ app.add_middleware(
 
 
 def _start_picks_scheduler():
-    """Refresh the Top Picks cache every 25 min so it stays warm (< the 30-min TTL)."""
+    """Refresh the Top Picks cache every 6h, matching its TTL.
+
+    A full scan of the 30-stock universe costs ~25 min on Render (FinBERT +
+    throttled Yahoo), so a short interval would leave the instance scanning
+    almost continuously and risk an OOM restart. The factors are daily-frequency
+    data, so 6h loses nothing.
+    """
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
         sched = BackgroundScheduler(daemon=True)
-        sched.add_job(warm_top_picks, "interval", minutes=25, id="warm_top_picks")
+        sched.add_job(warm_top_picks, "interval", hours=6, id="warm_top_picks")
         sched.start()
     except Exception:
         pass
