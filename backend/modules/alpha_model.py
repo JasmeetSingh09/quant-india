@@ -841,9 +841,14 @@ def top_picks(n: int = 10) -> dict:
         }
 
     ranked = cached[1]
-    buys = [r for r in ranked if r["alpha_score"] > 0][:n]
+    # Sort BEFORE slicing. `ranked` arrives in universe order (the scan publishes
+    # incrementally), so taking [:n] unsorted returned "the first n positive
+    # stocks in list order" — not the top n. A high-scoring name late in the
+    # universe was silently dropped.
+    buys = sorted([r for r in ranked if r["alpha_score"] > 0],
+                  key=lambda x: x["alpha_score"], reverse=True)[:n]   # best first
     avoids = sorted([r for r in ranked if r["alpha_score"] < 0],
-                    key=lambda x: x["alpha_score"])[:n]
+                    key=lambda x: x["alpha_score"])[:n]               # worst first
     return {
         "buys": buys,
         "avoids": avoids,
