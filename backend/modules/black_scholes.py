@@ -172,12 +172,19 @@ def implied_volatility(
             break
 
     # Bisection fallback if Newton wandered out of a sane range
-    if not (1e-4 < sig < 5.0):
-        lo, hi = 1e-4, 5.0
+    # Bisection fallback if Newton left the sane range OR converged to a value
+    # whose price doesn't actually match the target (Newton can stall on
+    # low-vol / low-price options where vega is tiny). Bisection is slower but
+    # globally convergent on the monotonic price-vs-vol curve.
+    def _price_at(s):
+        return black_scholes(S, K, T, r * 100, s * 100, option_type)["price"]
+
+    newton_ok = (1e-4 < sig < 5.0) and abs(_price_at(sig) - target) < max(1e-3, 1e-3 * target)
+    if not newton_ok:
+        lo, hi = 1e-6, 5.0
         for _ in range(200):
             mid = 0.5 * (lo + hi)
-            p = black_scholes(S, K, T, r * 100, mid * 100, option_type)["price"]
-            if p > target:
+            if _price_at(mid) > target:
                 hi = mid
             else:
                 lo = mid
