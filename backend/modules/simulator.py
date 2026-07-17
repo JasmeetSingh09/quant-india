@@ -23,6 +23,7 @@ Database: backend/quant_platform.db
 
 import json
 import sqlite3
+import threading
 from db import get_conn, IntegrityError  # noqa: F401
 import numpy as np
 import pandas as pd
@@ -41,7 +42,34 @@ NIFTY_TICKER = "^NSEI"
 # Database schema
 # ---------------------------------------------------------------------------
 
+_DB_READY = False
+_DB_INIT_LOCK = threading.Lock()
+
+
 def _init_db():
+    """
+    Create/migrate the schema — ONCE per process.
+
+    This used to run on EVERY simulator call (12 call sites), issuing ~10 DDL
+    statements (CREATE TABLE / ALTER / CREATE INDEX). Those are all WRITES, so
+    every read request was taking write locks and contending with the background
+    Top Picks scan, prediction snapshots and the news cache. Under that
+    contention reads hit SQLite's 30s lock timeout and the endpoint 500'd —
+    which looked like "my simulations vanished".
+
+    The schema does not change at runtime, so do it once and let reads be reads.
+    """
+    global _DB_READY
+    if _DB_READY:
+        return
+    with _DB_INIT_LOCK:
+        if _DB_READY:            # another thread won the race
+            return
+        _init_db_locked()
+        _DB_READY = True
+
+
+def _init_db_locked():
     conn = get_conn()
 
     # Real-time simulation sessions (per-user; a sim name is unique PER USER)
