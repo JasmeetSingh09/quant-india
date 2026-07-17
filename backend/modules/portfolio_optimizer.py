@@ -382,16 +382,35 @@ def maximum_diversification(tickers: list, period_months: int = 24,
 
 
 def _get_market_caps(tickers: list) -> dict:
-    """Get market capitalisation weights (used as BL equilibrium prior)."""
+    """
+    Market-cap weights for the Black-Litterman equilibrium prior.
+
+    Prefers the shared cached `.info` (free once warm) over a fresh per-ticker
+    network call — on a throttled cloud IP these round-trips dominated the BL
+    endpoint's latency. Falls back to fast_info, then to a neutral placeholder.
+    """
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        from data_fetcher import get_info
+    except Exception:
+        get_info = None
+
     caps = {}
     for t in tickers:
-        try:
-            mc = yf.Ticker(t).fast_info.market_cap
-            if mc:
-                caps[t] = float(mc)
-        except Exception:
-            caps[t] = 1e10   # fallback
-    total = sum(caps.values())
+        mc = None
+        if get_info:
+            try:
+                mc = (get_info(t) or {}).get("marketCap")
+            except Exception:
+                mc = None
+        if not mc:
+            try:
+                mc = yf.Ticker(t).fast_info.market_cap
+            except Exception:
+                mc = None
+        caps[t] = float(mc) if mc else 1e10   # neutral fallback keeps BL usable
+    total = sum(caps.values()) or 1.0
     return {t: v / total for t, v in caps.items()}
 
 
@@ -952,15 +971,24 @@ def optimize_with_alpha_views(
     This is the complete original algorithm:
       FinBERT → sentiment score → BL view → optimal portfolio weights
     """
-    from alpha_model import compute_alpha_score
+    from alpha_model import compute_alpha_score, get_cached_alpha
 
     views = {}
     alpha_scores = {}
+    from_cache = []
 
     print(f"  Computing alpha scores for {len(tickers)} tickers...")
     for ticker in tickers:
         try:
-            result = compute_alpha_score(ticker)
+            # Each fresh alpha score costs a FinBERT pass + several throttled
+            # Yahoo calls (~50s on Render), so scoring 6 tickers inline made this
+            # endpoint spin for minutes. The Top Picks scan already caches these
+            # for the whole universe — reuse them and only compute the misses.
+            result = get_cached_alpha(ticker)
+            if result is not None:
+                from_cache.append(ticker)
+            else:
+                result = compute_alpha_score(ticker)
             score  = result["alpha_score"]  # -100 to +100
             conf   = result["confidence"]
             alpha_scores[ticker] = score
@@ -983,6 +1011,10 @@ def optimize_with_alpha_views(
     return {
         "pipeline":     "Alpha Score → Black-Litterman → Optimal Weights",
         "alpha_scores": alpha_scores,
+        # Which scores were reused from the Top Picks scan vs freshly computed.
+        # Fresh ones are the slow path (FinBERT + throttled Yahoo).
+        "alpha_from_cache": from_cache,
+        "alpha_computed_live": [t for t in alpha_scores if t not in from_cache],
         "bl_result":    bl_result,
         "mvo_result":   {
             "weights": mvo_result.get("optimal_pct"),

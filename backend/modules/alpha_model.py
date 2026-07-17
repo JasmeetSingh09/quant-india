@@ -822,6 +822,28 @@ def warm_top_picks() -> int:
         _PICKS_WARMING = False
 
 
+def get_cached_alpha(ticker: str, max_age_s: int = None):
+    """
+    Return a previously computed alpha result for `ticker`, or None.
+
+    A full alpha score costs a FinBERT pass plus several throttled Yahoo calls
+    (~50s on Render), so any endpoint that scores several tickers inline blocks
+    for minutes. The Top Picks scan already computes and caches exactly this for
+    the whole universe every 6h — reuse it instead of recomputing.
+    """
+    import time
+    cached = _PICKS_CACHE.get("data") or _load_persisted_picks()
+    if not cached:
+        return None
+    ts, ranked = cached
+    if time.time() - ts > (max_age_s if max_age_s is not None else _PICKS_TTL * 4):
+        return None
+    for r in ranked:
+        if r.get("ticker") == ticker:
+            return r
+    return None
+
+
 def _kick_background_warm() -> None:
     import threading
     threading.Thread(target=warm_top_picks, daemon=True).start()
