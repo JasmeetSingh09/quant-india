@@ -18,7 +18,37 @@ from pathlib import Path
 
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 IS_POSTGRES = DATABASE_URL.startswith("postgres")
-_SQLITE_PATH = Path(__file__).parent.parent / "quant_platform.db"
+
+
+def _resolve_sqlite_path() -> Path:
+    """
+    Where the SQLite file lives.
+
+    main.py sets QUANT_DATA_DIR (from DATA_DIR) precisely so state can sit on a
+    Render persistent disk — but this module used to hardcode
+    backend/quant_platform.db and ignore it. That put the database INSIDE the
+    container image, so every redeploy silently destroyed watchlists, portfolios,
+    simulations and the prediction track record.
+
+    Honour the data dir when set, and migrate an existing legacy file across once
+    so nobody loses local data when the path moves.
+    """
+    legacy = Path(__file__).parent.parent / "quant_platform.db"
+    data_dir = os.getenv("QUANT_DATA_DIR") or os.getenv("DATA_DIR")
+    if not data_dir:
+        return legacy
+    try:
+        target = Path(data_dir) / "quant_platform.db"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if legacy.exists() and not target.exists():
+            import shutil
+            shutil.copy2(legacy, target)      # one-time move to the durable dir
+        return target
+    except Exception:
+        return legacy                          # never break startup over this
+
+
+_SQLITE_PATH = _resolve_sqlite_path()
 
 if IS_POSTGRES:
     import psycopg2  # noqa: E402  (only needed when Postgres is configured)

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import usePersistentState from '../usePersistentState'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { startSimulation, getSimulationPnl, getSimulations, deleteSimulation, runBacktest, getSimHistory, addSimPosition, removeSimPosition } from '../api'
@@ -133,6 +133,15 @@ export default function Simulator() {
   const [btResult, setBtResult]   = usePersistentState('sim.btResult', null)
 
   const { data: simList } = useQuery({ queryKey: ['simList'], queryFn: getSimulations })
+
+  // activeSimName is persisted in localStorage, so it can outlive the simulation
+  // it points at (e.g. the row is gone after a redeploy wiped the DB). Left
+  // alone it wedges the panel on a sim that will never load — clear it instead.
+  useEffect(() => {
+    if (!activeSimName || !simList?.simulations) return
+    if (!simList.simulations.some(s => s.name === activeSimName)) setActiveSimName('')
+  }, [simList, activeSimName])
+
   const { data: pnlData, isLoading: pnlLoading, refetch: refetchPnl } = useQuery({
     queryKey: ['pnl', activeSimName],
     queryFn: () => getSimulationPnl(activeSimName),
