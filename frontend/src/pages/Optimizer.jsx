@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import usePersistentState from '../usePersistentState'
 import { useMutation } from '@tanstack/react-query'
-import { runMVO, runBL, getFrontier, autoOptimize, runHRP, runRiskParity, runMaxDiversification } from '../api'
+import { runMVO, runBL, getFrontier, autoOptimize, runHRP, runRiskParity, runMaxDiversification, runMinCVaR, runRegimeAdaptive } from '../api'
 import Spinner from '../components/Spinner'
 import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceDot, LineChart, Line } from 'recharts'
 import { Plus, Trash2 } from 'lucide-react'
@@ -63,6 +63,7 @@ export default function Optimizer() {
   // live yields.
   const [riskFree, setRiskFree] = usePersistentState('opt.riskFree', 6.5)
   const [tau, setTau]           = usePersistentState('opt.tau', 0.05)   // BL prior uncertainty
+  const [turnoverLambda, setTurnoverLambda] = usePersistentState('opt.turnover', 0)   // L1 turnover penalty
 
   const mvoMut     = useMutation({ mutationFn: runMVO })
   const blMut      = useMutation({ mutationFn: data => runBL({ ...data, tickers }) })
@@ -71,24 +72,37 @@ export default function Optimizer() {
   const hrpMut     = useMutation({ mutationFn: runHRP })
   const rpMut      = useMutation({ mutationFn: runRiskParity })
   const mdMut      = useMutation({ mutationFn: runMaxDiversification })
+  const cvarMut    = useMutation({ mutationFn: runMinCVaR })
+  const regimeMut  = useMutation({ mutationFn: runRegimeAdaptive })
 
   const run = () => {
     const rf = { risk_free_pct: Number(riskFree) }
-    if (tab === 'mvo')      mvoMut.mutate({ tickers, target, max_weight: maxWeight / 100, ...rf })
+    if (tab === 'mvo') {
+      // Turnover discipline: penalise straying from an equal-weight starting
+      // point (the neutral no-information prior). lambda 0 = ignore.
+      const eq = 100 / tickers.length
+      const current_weights = turnoverLambda > 0 ? Object.fromEntries(tickers.map(t => [t, eq])) : null
+      mvoMut.mutate({ tickers, target, max_weight: maxWeight / 100, ...rf,
+                      current_weights, turnover_lambda: Number(turnoverLambda) })
+    }
     if (tab === 'hrp')      hrpMut.mutate({ tickers, ...rf })
     if (tab === 'frontier') frontierMut.mutate({ tickers, n_points: 50, ...rf })
     if (tab === 'auto')     autoMut.mutate({ tickers, ...rf, tau: Number(tau) })
     if (tab === 'riskparity') rpMut.mutate({ tickers, ...rf })
     if (tab === 'maxdiv')     mdMut.mutate({ tickers, ...rf })
+    if (tab === 'mincvar')    cvarMut.mutate({ tickers, ...rf })
+    if (tab === 'regime')     regimeMut.mutate({ tickers, ...rf })
   }
 
-  const isLoading = mvoMut.isPending || blMut.isPending || frontierMut.isPending || autoMut.isPending || hrpMut.isPending || rpMut.isPending || mdMut.isPending
+  const isLoading = mvoMut.isPending || blMut.isPending || frontierMut.isPending || autoMut.isPending || hrpMut.isPending || rpMut.isPending || mdMut.isPending || cvarMut.isPending || regimeMut.isPending
   const mvoResult     = mvoMut.data
   const frontierResult= frontierMut.data
   const autoResult    = autoMut.data
   const hrpResult     = hrpMut.data
   const rpResult      = rpMut.data
   const mdResult      = mdMut.data
+  const cvarResult    = cvarMut.data
+  const regimeResult  = regimeMut.data
 
   return (
     <div className="p-6 space-y-6">
@@ -110,6 +124,8 @@ export default function Optimizer() {
                 ['hrp',      'Smart Diversify (HRP)',   'Spreads money sensibly by grouping similar stocks (2016)'],
                 ['riskparity','Risk Parity (ERC)',      'Each holding contributes equal RISK, not equal money (2010)'],
                 ['maxdiv',   'Max Diversification',     'Maximises the diversification ratio (Choueifaty 2008)'],
+                ['mincvar',  'Min Tail-Risk (CVaR)',    'Minimises loss in the worst 5% of days, not just variance'],
+                ['regime',   'Regime-Adaptive',         'Reads the market regime, then picks the fitting optimiser'],
                 ['frontier', 'Risk-vs-Return Map',      'Shows every best risk/return combo on a curve'],
                 ['auto',     'AI-Guided Mix',           'Uses news sentiment to tilt the portfolio'],
               ].map(([v, l, d]) => (
@@ -155,6 +171,17 @@ export default function Optimizer() {
                        className="w-full accent-green-500" />
                 <p className="text-xs text-gray-500 mt-1">
                   Lower = more diversified. 100% lets it concentrate in one stock.
+                </p>
+              </div>
+              <div>
+                <label className="label">Trading discipline (turnover penalty): {Number(turnoverLambda).toFixed(2)}</label>
+                <input type="range" min="0" max="1" step="0.05" value={turnoverLambda}
+                       onChange={e => setTurnoverLambda(Number(e.target.value))}
+                       className="w-full accent-green-500" />
+                <p className="text-xs text-gray-500 mt-1">
+                  An L1 penalty on moving away from an equal-weight start. <b>0</b> = ignore
+                  costs (may churn on noise); <b>higher</b> = only trade when the gain beats
+                  the cost, so weights stay steadier.
                 </p>
               </div>
             </>
@@ -224,6 +251,8 @@ export default function Optimizer() {
               ...(autoResult?.bl_result?.excluded_tickers || []),
               ...(rpResult?.excluded_tickers || []),
               ...(mdResult?.excluded_tickers || []),
+              ...(cvarResult?.excluded_tickers || []),
+              ...(regimeResult?.excluded_tickers || []),
             ]
             const uniq = [...new Set(excluded)]
             return uniq.length ? (
@@ -351,6 +380,49 @@ export default function Optimizer() {
                   average over this period (not a forecast) and can be negative if these stocks fell;
                   it is a description, not something this algorithm optimised for. Use Black-Litterman
                   for market-based expected returns.</p>
+              </div>
+            </div>
+          )}
+
+          {/* Min-CVaR result */}
+          {cvarResult && !cvarResult.error && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-4 gap-3">
+                {[['Expected Return', `${cvarResult.expected_annual_return_pct}%`, null],
+                  ['Daily VaR', `${cvarResult.var_daily_pct}%`, 'volatility'],
+                  ['Daily CVaR', `${cvarResult.cvar_daily_pct}%`, null],
+                  ['Sharpe', cvarResult.expected_sharpe, 'sharpe']].map(([l,v,tip]) => (
+                  <div key={l} className="card-sm"><p className="stat-label">{l}{tip && <InfoTip k={tip}/>}</p>
+                    <p className={`stat-value ${l.includes('CVaR')||l.includes('VaR') ? 'text-red-400' : ''}`}>{v}</p></div>
+                ))}
+              </div>
+              <div className="card">
+                <h3 className="font-semibold mb-1">Min Tail-Risk Weights <span className="text-xs text-gray-500 font-normal ml-2">Minimum-CVaR · Rockafellar-Uryasev 2000</span></h3>
+                {Object.entries(cvarResult.optimal_pct || {}).sort(([,a],[,b])=>b-a).map(([t,w]) => <WeightBar key={t} ticker={t} weight={w} explain={cvarResult.explanations?.[t]} />)}
+                <div className="mt-3 p-3 bg-gray-800 rounded-lg"><p className="text-xs text-gray-300">{cvarResult.interpretation}</p></div>
+              </div>
+            </div>
+          )}
+
+          {/* Regime-Adaptive result */}
+          {regimeResult && !regimeResult.error && (
+            <div className="space-y-4">
+              <div className="card-sm flex items-center justify-between">
+                <div>
+                  <p className="stat-label">Detected market regime</p>
+                  <p className={`text-lg font-bold ${regimeResult.regime === 'Bull' ? 'text-green-400' : regimeResult.regime === 'Bear' ? 'text-red-400' : 'text-yellow-400'}`}>
+                    {regimeResult.regime}{regimeResult.regime_probability != null && <span className="text-xs text-gray-500 font-normal ml-2">{Math.round(regimeResult.regime_probability*100)}% conf.</span>}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="stat-label">Chosen optimiser</p>
+                  <p className="text-sm font-semibold text-white">{regimeResult.chosen_optimizer}</p>
+                </div>
+              </div>
+              <p className="text-xs text-gray-400">{regimeResult.regime_rationale}</p>
+              <div className="card">
+                <h3 className="font-semibold mb-1">Weights <span className="text-xs text-gray-500 font-normal ml-2">via {regimeResult.chosen_optimizer}</span></h3>
+                {Object.entries(regimeResult.optimal_pct || {}).sort(([,a],[,b])=>b-a).map(([t,w]) => <WeightBar key={t} ticker={t} weight={w} explain={regimeResult.explanations?.[t]} />)}
               </div>
             </div>
           )}

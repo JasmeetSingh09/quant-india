@@ -59,7 +59,7 @@ from portfolio_optimizer import (
     mean_variance_optimize, black_litterman_optimize,
     efficient_frontier, optimize_with_alpha_views,
     hierarchical_risk_parity, risk_decomposition,
-    equal_risk_contribution, maximum_diversification,
+    equal_risk_contribution, maximum_diversification, min_cvar_optimize,
 )
 from regime_detector import detect_regime, regime_conditioned_alpha
 from monte_carlo import simulate as mc_simulate, compare_methods as mc_compare
@@ -214,6 +214,8 @@ class MVORequest(BaseModel):
     min_weight: float = 0.0
     max_weight: float = 1.0
     risk_free_pct: float = 6.5     # RBI repo proxy; users can pick G-Sec/custom
+    current_weights: dict = None   # {ticker: weight%} of the portfolio you hold now
+    turnover_lambda: float = 0.0   # >0 penalises trading away from current_weights
 
 class BLRequest(BaseModel):
     tickers: list
@@ -1063,6 +1065,7 @@ def optimizer_mvo(req: MVORequest):
         req.tickers, period_months=req.period_months,
         target=req.target, min_weight=req.min_weight, max_weight=req.max_weight,
         risk_free_pct=req.risk_free_pct,
+        current_weights=req.current_weights, turnover_lambda=req.turnover_lambda,
     )
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -1127,6 +1130,47 @@ def optimizer_hrp(req: FrontierRequest):
     return result
 
 
+@app.post("/optimizer/regime-adaptive")
+def optimizer_regime_adaptive(req: FrontierRequest):
+    """
+    Regime-adaptive optimiser: read the current market regime from the HMM,
+    then pick the optimiser that suits it.
+
+      Bull / stable  → Markowitz max-Sharpe (chase risk-adjusted return)
+      Bear / stressed→ Minimum-CVaR         (protect the crash tail)
+      Sideways/mixed → Hierarchical Risk Parity (robust, no return estimates)
+
+    Uses the existing Gaussian-HMM regime detector; the portfolio engine simply
+    reacts to the state instead of using one fixed model through all conditions.
+    """
+    regime_info = detect_regime("^NSEI", lookback_days=252)
+    regime = (regime_info.get("current_regime") or "Sideways") if "error" not in regime_info else "Sideways"
+
+    if regime == "Bull":
+        chosen, why = "Markowitz (max Sharpe)", "stable/bull regime — chase risk-adjusted return"
+        result = mean_variance_optimize(req.tickers, period_months=req.period_months,
+                                        target="max_sharpe", max_weight=0.35,
+                                        risk_free_pct=req.risk_free_pct)
+    elif regime == "Bear":
+        chosen, why = "Minimum-CVaR", "high-stress/bear regime — protect the crash tail"
+        result = min_cvar_optimize(req.tickers, period_months=req.period_months,
+                                   max_weight=0.35, risk_free_pct=req.risk_free_pct)
+    else:
+        chosen, why = "Hierarchical Risk Parity", "mixed/sideways regime — robust, no return forecast"
+        result = hierarchical_risk_parity(req.tickers, period_months=req.period_months,
+                                          risk_free_pct=req.risk_free_pct)
+
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    result["regime"] = regime
+    result["regime_probability"] = regime_info.get("current_proba")
+    result["chosen_optimizer"] = chosen
+    result["regime_rationale"] = (
+        f"Market regime detected as {regime}. Using {chosen}: {why}."
+    )
+    return result
+
+
 @app.post("/optimizer/risk-parity")
 def optimizer_risk_parity(req: FrontierRequest):
     """Equal Risk Contribution (Risk Parity): every holding contributes equal risk."""
@@ -1142,6 +1186,16 @@ def optimizer_max_diversification(req: FrontierRequest):
     """Maximum Diversification portfolio (Choueifaty & Coignard 2008)."""
     result = maximum_diversification(req.tickers, period_months=req.period_months,
                                      risk_free_pct=req.risk_free_pct)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.post("/optimizer/min-cvar")
+def optimizer_min_cvar(req: FrontierRequest):
+    """Minimum-CVaR (Expected Shortfall) portfolio — optimises the crash tail."""
+    result = min_cvar_optimize(req.tickers, period_months=req.period_months,
+                               risk_free_pct=req.risk_free_pct)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result

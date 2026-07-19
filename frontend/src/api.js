@@ -77,6 +77,8 @@ export const autoOptimize   = body => api.post('/optimizer/auto', body)
 export const runHRP         = body => api.post('/optimizer/hrp', body)
 export const runRiskParity  = body => api.post('/optimizer/risk-parity', body)
 export const runMaxDiversification = body => api.post('/optimizer/max-diversification', body)
+export const runMinCVaR      = body => api.post('/optimizer/min-cvar', body)
+export const runRegimeAdaptive = body => api.post('/optimizer/regime-adaptive', body)
 
 // Regime
 export const getRegime      = () => api.get('/regime')

@@ -381,6 +381,84 @@ def maximum_diversification(tickers: list, period_months: int = 24,
     }
 
 
+def min_cvar_optimize(tickers: list, period_months: int = 24,
+                      confidence: float = 0.95, max_weight: float = 1.0,
+                      risk_free_pct: float = None) -> dict:
+    """
+    Minimum-CVaR (Expected Shortfall) portfolio — Rockafellar & Uryasev (2000).
+
+    Markowitz minimises VARIANCE, which penalises big up-days as much as big
+    down-days. This instead minimises the average loss in the worst (1-confidence)
+    tail — i.e. it optimises directly for the crash scenario. Solved as a linear
+    program over historical daily-return scenarios:
+
+      min_{w,α,u}  α + 1/((1-β)·T) · Σ u_t
+      s.t.         u_t ≥ -(r_t·w) - α,   u_t ≥ 0,   Σw = 1,   0 ≤ w ≤ max_weight
+
+    where β = confidence, r_t is day t's return vector, α is the VaR level and the
+    objective value is the CVaR. No distributional assumption — the tail is taken
+    straight from the data.
+    """
+    from scipy.optimize import linprog
+    end   = datetime.now().strftime("%Y-%m-%d")
+    start = (datetime.now() - timedelta(days=period_months * 30)).strftime("%Y-%m-%d")
+    log_returns = _get_returns(tickers, start, end)
+    valid = [t for t in tickers if t in log_returns.columns]
+    if len(valid) < 2:
+        return {"error": f"Need ≥2 tickers with data. Got: {valid}"}
+    log_returns = log_returns[valid]
+    R = log_returns.values                       # (T, n) daily returns
+    T, n = R.shape
+    beta = float(confidence)
+
+    # Decision vector x = [w (n), alpha (1), u (T)]
+    c = np.concatenate([np.zeros(n), [1.0], np.full(T, 1.0 / ((1 - beta) * T))])
+    # Tail constraints: -R_t·w - alpha - u_t <= 0
+    A_ub = np.hstack([-R, -np.ones((T, 1)), -np.eye(T)])
+    b_ub = np.zeros(T)
+    # Weights sum to 1
+    A_eq = np.concatenate([np.ones(n), [0.0], np.zeros(T)]).reshape(1, -1)
+    b_eq = [1.0]
+    bounds = [(0.0, max_weight)] * n + [(None, None)] + [(0.0, None)] * T
+
+    res = linprog(c, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
+                  bounds=bounds, method="highs")
+    if not res.success:
+        return {"error": f"CVaR optimisation failed: {res.message}"}
+
+    w = np.clip(res.x[:n], 0, None)
+    w = w / w.sum() if w.sum() > 0 else np.full(n, 1 / n)
+    cov = _cov(log_returns, as_frame=False)
+    er, ev, sh = _perf_stats(w, log_returns, cov, risk_free_pct)
+
+    # Realised tail stats of the chosen portfolio (daily), for reporting
+    port_daily = R @ w
+    var_d  = float(np.percentile(port_daily, (1 - beta) * 100))
+    tail   = port_daily[port_daily <= var_d]
+    cvar_d = float(tail.mean()) if len(tail) else var_d
+
+    return {
+        "algorithm":        f"Minimum-CVaR / Expected Shortfall (Rockafellar-Uryasev, {int(beta*100)}%)",
+        "excluded_tickers": [t for t in tickers if t not in valid],
+        "tickers":          valid,
+        "optimal_weights":  {t: round(float(w[i]), 4) for i, t in enumerate(valid)},
+        "optimal_pct":      {t: round(float(w[i] * 100), 2) for i, t in enumerate(valid)},
+        "explanations":     _explain_weights(valid, w, log_returns, cov),
+        "expected_annual_return_pct": er,
+        "expected_annual_vol_pct":    ev,
+        "expected_sharpe":            sh,
+        "var_daily_pct":   round(var_d * 100, 2),
+        "cvar_daily_pct":  round(cvar_d * 100, 2),
+        "confidence_pct":  int(beta * 100),
+        "interpretation": (
+            f"Weights chosen to minimise the average loss in the worst "
+            f"{int((1-beta)*100)}% of days. Realised daily CVaR {cvar_d*100:.2f}% "
+            f"(VaR {var_d*100:.2f}%). Unlike Markowitz, this ignores upside "
+            f"volatility and targets the crash tail directly."
+        ),
+    }
+
+
 def _get_market_caps(tickers: list) -> dict:
     """
     Market-cap weights for the Black-Litterman equilibrium prior.
@@ -427,6 +505,8 @@ def mean_variance_optimize(
     min_weight: float = 0.0,
     max_weight: float = 1.0,
     risk_free_pct: float = None,
+    current_weights: dict = None,
+    turnover_lambda: float = 0.0,
 ) -> dict:
     """
     Find the portfolio weights that maximise Sharpe ratio (or minimise variance).
@@ -468,9 +548,25 @@ def mean_variance_optimize(
     def neg_return(w):
         return -float(w @ mu)
 
-    obj = {"max_sharpe": neg_sharpe,
-           "min_variance": port_variance,
-           "max_return": neg_return}[target]
+    base_obj = {"max_sharpe": neg_sharpe,
+                "min_variance": port_variance,
+                "max_return": neg_return}[target]
+
+    # Turnover penalty (L1). With a current portfolio and turnover_lambda > 0,
+    # add λ·Σ|w_i - w_current_i| to the objective so the optimiser only trades
+    # when the improvement outweighs the transaction cost — otherwise it churns
+    # the whole book on tiny estimation noise. λ is roughly the round-trip cost
+    # you're willing to pay per unit of turnover.
+    w_cur = None
+    if current_weights and turnover_lambda and turnover_lambda > 0:
+        total = sum(current_weights.values()) or 1.0
+        w_cur = np.array([float(current_weights.get(t, 0.0)) / total for t in valid])
+
+    def obj(w):
+        val = base_obj(w)
+        if w_cur is not None:
+            val = val + float(turnover_lambda) * float(np.abs(w - w_cur).sum())
+        return val
 
     constraints = [{"type": "eq", "fun": lambda w: np.sum(w) - 1}]
     bounds      = [(min_weight, max_weight)] * n
@@ -497,6 +593,9 @@ def mean_variance_optimize(
     return {
         "algorithm":       "Mean-Variance Optimisation (Markowitz)",
         "explanations":    _explain_weights(valid, w_opt, log_returns, cov),
+        "turnover_pct":     (round(float(np.abs(w_opt - w_cur).sum()) * 100, 1)
+                             if w_cur is not None else None),
+        "turnover_penalised": bool(w_cur is not None),
         "excluded_tickers": [t for t in tickers if t not in valid],
         "target":          target,
         "tickers":         valid,
