@@ -180,14 +180,28 @@ def _rebuild_if_global_unique(conn, table: str, columns_ddl: str, columns_csv: s
 
 def _live_price(ticker: str) -> float | None:
     """
-    Fetch the latest price for a ticker. Tries fast_info first, then falls back
-    to recent history (more reliable for commodity futures and during yfinance
-    hiccups). Returns None only if both fail.
+    Fetch the latest price for a ticker.
+
+    Prefers the shared cached price feed (data_fetcher.get_current_price), which
+    caches for 45s-15min and serves stale on a Yahoo throttle. Starting a
+    simulation calls this once PER HOLDING, and raw yfinance fast_info/history
+    have no timeout and hang for 10s+ each on Render's throttled IP — five
+    holdings ran past the 60s request timeout. Fall back to raw yfinance only if
+    the cached feed has nothing.
     """
+    try:
+        from data_fetcher import get_current_price
+        r = get_current_price(ticker)
+        p = r.get("price")
+        if p and p > 0:
+            return round(float(p), 4)
+    except Exception:
+        pass
+    # Fallbacks (used mainly for commodity futures the cache may not hold)
     tk = yf.Ticker(ticker)
     try:
         p = tk.fast_info.last_price
-        if p and p == p and p > 0:           # not None, not NaN, positive
+        if p and p == p and p > 0:
             return round(float(p), 4)
     except Exception:
         pass
@@ -201,10 +215,17 @@ def _live_price(ticker: str) -> float | None:
 
 
 def _company_name(ticker: str) -> str:
+    # Use the shared CACHED .info (data_fetcher.get_info) rather than a fresh
+    # yf.Ticker(...).info per call — the latter is a full, slow fetch just for a
+    # cosmetic name, and starting a sim called it once per holding.
     try:
-        return yf.Ticker(ticker).info.get("shortName", ticker.replace(".NS", ""))
+        from data_fetcher import get_info
+        nm = (get_info(ticker) or {}).get("shortName")
+        if nm:
+            return nm
     except Exception:
-        return ticker.replace(".NS", "")
+        pass
+    return ticker.replace(".NS", "").replace(".BO", "")
 
 
 def _download_prices(tickers: list, start: str, end: str) -> pd.DataFrame:
@@ -259,8 +280,20 @@ def start_simulation(
     positions = []
     failed    = []
 
+    # Resolve every holding's live price + name IN PARALLEL. Doing this
+    # sequentially meant N slow (throttled) network round-trips back-to-back,
+    # which pushed a 5-stock sim past the 60s request timeout. Now the wall time
+    # is roughly one fetch, not the sum.
+    import concurrent.futures as _cf
+    def _resolve(t):
+        return t, _live_price(t), _company_name(t)
+    resolved = {}
+    with _cf.ThreadPoolExecutor(max_workers=min(8, len(holdings) * 2 or 1)) as _ex:
+        for t, p, nm in _ex.map(_resolve, list(holdings.keys())):
+            resolved[t] = (p, nm)
+
     for ticker, pct in holdings.items():
-        price = _live_price(ticker)
+        price, cname = resolved.get(ticker, (None, ticker))
         if price is None or price <= 0:
             failed.append(ticker)
             continue
@@ -268,7 +301,7 @@ def start_simulation(
         units       = alloc_value / price
         positions.append({
             "ticker":        ticker,
-            "company_name":  _company_name(ticker),
+            "company_name":  cname,
             "allocation_pct":pct,
             "units":         units,
             "entry_price":   price,
