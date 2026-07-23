@@ -171,7 +171,19 @@ function TrackRecord() {
       </div>
 
       {isLoading ? <Spinner size="sm" /> : !sc ? (
-        <p className="text-sm text-gray-500">{data?.status || 'No matured predictions in this window yet — check back as the record accrues.'}</p>
+        <div className="space-y-2">
+          <p className="text-sm text-gray-500">{data?.status || 'No matured predictions in this window yet — check back as the record accrues.'}</p>
+          {data?.days_of_history != null && (
+            <p className="text-xs text-gray-600">
+              {data.total_logged} logged · {data.distinct_days} distinct day(s) · {data.days_of_history} day(s) of history · DB: {data.db_backend}
+            </p>
+          )}
+          {data?.diagnostic && (
+            <div className="text-xs text-yellow-300 border border-yellow-700/40 bg-yellow-950/20 rounded-lg p-2.5">
+              ⚠ {data.diagnostic}
+            </div>
+          )}
+        </div>
       ) : (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

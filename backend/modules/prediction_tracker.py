@@ -130,9 +130,34 @@ def evaluate(min_days: int = 7) -> dict:
         matured.append((alpha, fwd, bench, signal))
 
     if not matured:
-        return {"status": f"predictions logged, but none are {min_days}+ days old yet — "
-                          "check back after the holding window matures",
-                "total_logged": len(rows)}
+        # Diagnostic: is the history actually accumulating, or does it reset every
+        # deploy? total_logged not growing past one day's universe and
+        # days_of_history staying ~0 means the database is NOT persisting across
+        # redeploys (ephemeral disk / no DATABASE_URL) — the real reason the track
+        # record never fills, not a maturity issue.
+        try:
+            from db import backend_name
+            db = backend_name()
+        except Exception:
+            db = "unknown"
+        dates = sorted({r[1] for r in rows})
+        oldest = dates[0] if dates else None
+        days_hist = (datetime.now() - datetime.strptime(oldest, "%Y-%m-%d")).days if oldest else 0
+        durable = db == "postgres" or days_hist >= min_days
+        return {
+            "status": f"predictions logged, but none are {min_days}+ days old yet — "
+                      "check back after the holding window matures",
+            "total_logged":   len(rows),
+            "distinct_days":  len(dates),
+            "oldest_snapshot": oldest,
+            "days_of_history": days_hist,
+            "db_backend":     db,
+            "persistence_ok": bool(durable),
+            "diagnostic": (None if durable else
+                "History isn't accumulating across deploys — the database is being "
+                "wiped on each redeploy. Set DATABASE_URL (Supabase Postgres) on the "
+                "backend, or attach a Render persistent disk, so the track record can build."),
+        }
 
     alphas = np.array([m[0] for m in matured if m[0] is not None], dtype=float)
     fwds   = np.array([m[1] for m in matured if m[0] is not None], dtype=float)
