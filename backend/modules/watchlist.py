@@ -44,11 +44,16 @@ def _init_db():
             last_updated     TEXT
         )
     """)
-    # migrate an older table that predates per-user support (best effort)
-    try:
-        conn.execute("ALTER TABLE watchlist ADD COLUMN user_id TEXT NOT NULL DEFAULT 'public'")
-    except Exception:
-        pass
+    # Migrate an older SQLite table that predates per-user support (best effort).
+    # SKIP on Postgres: the CREATE TABLE above already includes user_id there, and
+    # a failing ALTER aborts the whole Postgres transaction (poisoning every
+    # statement after it), which 500'd this endpoint after the Supabase switch.
+    from db import IS_POSTGRES
+    if not IS_POSTGRES:
+        try:
+            conn.execute("ALTER TABLE watchlist ADD COLUMN user_id TEXT NOT NULL DEFAULT 'public'")
+        except Exception:
+            pass
     # a stock is unique PER USER, not globally
     conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_watchlist_user_ticker "
                  "ON watchlist(user_id, ticker)")

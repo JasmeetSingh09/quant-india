@@ -127,18 +127,22 @@ def _init_db_locked():
             result       TEXT
         )
     """)
-    # migrate older tables that predate per-user support (best effort)
-    for tbl in ("simulations", "sim_positions", "sim_snapshots", "portfolios"):
-        try:
-            conn.execute(f"ALTER TABLE {tbl} ADD COLUMN user_id TEXT NOT NULL DEFAULT 'public'")
-        except Exception:
-            pass
+    # migrate older SQLite tables that predate per-user support (best effort).
+    # SKIP on Postgres: the CREATE TABLEs above already include user_id, and a
+    # failing ALTER aborts the Postgres transaction — which 500'd the simulator
+    # endpoints after the Supabase switch.
+    import db as _db
+    if not _db.IS_POSTGRES:
+        for tbl in ("simulations", "sim_positions", "sim_snapshots", "portfolios"):
+            try:
+                conn.execute(f"ALTER TABLE {tbl} ADD COLUMN user_id TEXT NOT NULL DEFAULT 'public'")
+            except Exception:
+                pass
 
     # Old SQLite tables were created with a table-level UNIQUE(name) that blocks
     # two users from sharing a sim/portfolio name. ALTER can't drop it, so rebuild
     # the table without it. (Postgres deploys start fresh, so this only runs on
     # legacy local SQLite DBs.)
-    import db as _db
     if not _db.IS_POSTGRES:
         _rebuild_if_global_unique(conn, "portfolios",
             "id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL DEFAULT 'public', "

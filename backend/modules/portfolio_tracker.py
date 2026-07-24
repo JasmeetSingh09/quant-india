@@ -37,10 +37,14 @@ def _init_db():
             added_at     TEXT NOT NULL
         )
     """)
-    try:
-        conn.execute("ALTER TABLE portfolio_holdings ADD COLUMN user_id TEXT NOT NULL DEFAULT 'public'")
-    except Exception:
-        pass
+    # Legacy SQLite migration only — on Postgres the column already exists and a
+    # failing ALTER would abort the transaction (see watchlist.py).
+    from db import IS_POSTGRES
+    if not IS_POSTGRES:
+        try:
+            conn.execute("ALTER TABLE portfolio_holdings ADD COLUMN user_id TEXT NOT NULL DEFAULT 'public'")
+        except Exception:
+            pass
     conn.commit()
     conn.close()
 
