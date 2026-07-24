@@ -96,6 +96,40 @@ def _fetch_commodity_price(ticker: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Unit conversion — international commodities quote in troy oz / lb, which are
+# unfamiliar in India. Convert precious metals to per-10g and base metals /
+# cotton to per-kg so the numbers read naturally for an NSE audience.
+# ---------------------------------------------------------------------------
+
+_GRAMS_PER_TROY_OZ = 31.1034768
+_KG_PER_LB         = 0.45359237
+
+
+def _to_indian_units(price_data: dict, unit: str):
+    """
+    Convert a price dict (price/prev_close/change in the source unit) into the
+    India-friendly unit. Returns (converted_price_data, display_unit).
+    change_pct is unchanged (it's a ratio). Non oz/lb units pass through.
+    """
+    if "error" in price_data:
+        return price_data, unit
+    factor, new_unit = 1.0, unit
+    if "troy oz" in unit:
+        factor  = 10.0 / _GRAMS_PER_TROY_OZ      # per troy oz -> per 10 grams
+        new_unit = unit.replace("troy oz", "10g")
+    elif "/lb" in unit:
+        factor  = 1.0 / _KG_PER_LB               # per pound -> per kg
+        new_unit = unit.replace("lb", "kg")
+    if factor == 1.0:
+        return price_data, new_unit
+    out = dict(price_data)
+    for k in ("price", "prev_close", "change"):
+        if out.get(k) is not None:
+            out[k] = round(out[k] * factor, 4)
+    return out, new_unit
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -117,11 +151,13 @@ def get_commodity_price(commodity_key: str) -> dict:
     if "error" in result:
         return {"commodity": commodity_key, **meta, **result}
 
+    result, disp_unit = _to_indian_units(result, meta["unit"])
+
     output = {
         "commodity":  commodity_key,
         "name":       meta["name"],
         "ticker":     meta["ticker"],
-        "unit":       meta["unit"],
+        "unit":       disp_unit,
         "category":   meta["category"],
         **result,
         "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -148,11 +184,12 @@ def get_all_commodities() -> dict:
 
     for key, meta in COMMODITIES.items():
         price_data = _fetch_commodity_price(meta["ticker"])
+        price_data, disp_unit = _to_indian_units(price_data, meta["unit"])
         entry = {
             "key":      key,
             "name":     meta["name"],
             "ticker":   meta["ticker"],
-            "unit":     meta["unit"],
+            "unit":     disp_unit,
             **price_data,
         }
         if meta["category"] != "india_etf" and "error" not in price_data:
@@ -240,10 +277,11 @@ def get_mcx_summary() -> dict:
         meta  = COMMODITIES[key]
         price = _fetch_commodity_price(meta["ticker"])
         if "error" not in price:
+            price, disp_unit = _to_indian_units(price, meta["unit"])
             summary["commodities"].append({
                 "name":       meta["name"],
                 "key":        key,
-                "unit":       meta["unit"],
+                "unit":       disp_unit,
                 "price_usd":  price["price"],
                 "price_inr":  round(price["price"] * usd_inr, 2),
                 "change_pct": price["change_pct"],
