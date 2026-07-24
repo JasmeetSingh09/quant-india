@@ -56,7 +56,7 @@ COMMODITIES = {
     "cotton":      {"ticker": "CT=F",  "name": "Cotton",        "unit": "USD/lb",       "category": "agricultural"},
     # Indian NSE ETFs (INR-denominated)
     "gold_etf_india":   {"ticker": "GOLDBEES.NS",   "name": "Gold ETF (India)",   "unit": "INR/unit", "category": "india_etf"},
-    "silver_etf_india": {"ticker": "SILVERETF.NS",  "name": "Silver ETF (India)", "unit": "INR/unit", "category": "india_etf"},
+    "silver_etf_india": {"ticker": "SILVERBEES.NS", "name": "Silver ETF (India)", "unit": "INR/unit", "category": "india_etf"},
     "oil_etf_india":    {"ticker": "OILIETF.NS",    "name": "Oil ETF (India)",    "unit": "INR/unit", "category": "india_etf"},
 }
 
@@ -129,6 +129,29 @@ def _to_indian_units(price_data: dict, unit: str):
     return out, new_unit
 
 
+# Indian landed cost over international spot: import duty + GST. Approximate and
+# it changes with each budget — this is an ESTIMATE of the domestic price, NOT a
+# live MCX futures quote (MCX has no free public feed).
+_INDIA_IMPORT_DUTY = 0.06     # ~6% customs duty on gold/silver
+_INDIA_GST         = 0.03     # 3% GST
+
+
+def india_estimate_per_10g(spot_usd_per_oz: float, usd_inr: float) -> dict:
+    """
+    Estimate the Indian domestic price per 10g from international spot:
+    spot (USD/oz) -> INR/10g, then add import duty + GST. Clearly an estimate.
+    """
+    if not spot_usd_per_oz or not usd_inr:
+        return {}
+    inr_per_10g_spot = spot_usd_per_oz * usd_inr * (10.0 / _GRAMS_PER_TROY_OZ)
+    landed = inr_per_10g_spot * (1 + _INDIA_IMPORT_DUTY + _INDIA_GST)
+    return {
+        "spot_inr_per_10g":     round(inr_per_10g_spot, 0),
+        "india_est_inr_per_10g": round(landed, 0),
+        "india_basis": f"spot + {int(_INDIA_IMPORT_DUTY*100)}% duty + {int(_INDIA_GST*100)}% GST — estimate, not a live MCX quote",
+    }
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -151,6 +174,7 @@ def get_commodity_price(commodity_key: str) -> dict:
     if "error" in result:
         return {"commodity": commodity_key, **meta, **result}
 
+    spot_oz = result.get("price")                 # original USD/oz (pre-conversion)
     result, disp_unit = _to_indian_units(result, meta["unit"])
 
     output = {
@@ -168,6 +192,9 @@ def get_commodity_price(commodity_key: str) -> dict:
         usd_inr = _get_usd_inr()
         output["usd_inr_rate"] = usd_inr
         output["price_inr"]    = round(result["price"] * usd_inr, 2)
+        # Estimated Indian domestic price for gold & silver (spot + duty + GST)
+        if meta["category"] == "precious_metals" and spot_oz:
+            output["india"] = india_estimate_per_10g(spot_oz, usd_inr)
 
     return output
 
@@ -184,6 +211,7 @@ def get_all_commodities() -> dict:
 
     for key, meta in COMMODITIES.items():
         price_data = _fetch_commodity_price(meta["ticker"])
+        spot_oz = price_data.get("price") if "error" not in price_data else None
         price_data, disp_unit = _to_indian_units(price_data, meta["unit"])
         entry = {
             "key":      key,
@@ -194,6 +222,8 @@ def get_all_commodities() -> dict:
         }
         if meta["category"] != "india_etf" and "error" not in price_data:
             entry["price_inr"] = round(price_data.get("price", 0) * usd_inr, 2)
+            if meta["category"] == "precious_metals" and spot_oz:
+                entry["india"] = india_estimate_per_10g(spot_oz, usd_inr)
 
         cat = meta["category"]
         results["categories"].setdefault(cat, []).append(entry)
