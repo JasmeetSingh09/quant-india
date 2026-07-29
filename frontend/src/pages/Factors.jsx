@@ -24,7 +24,7 @@ export default function Factors() {
   ] : []
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2"><Layers size={24} className="text-green-400"/> Fama-French Factor Model</h1>
         <p className="text-gray-400 text-sm mt-0.5">
@@ -49,7 +49,7 @@ export default function Factors() {
 
       {d && (
         <>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div className={`card-sm border ${d.alpha_significant && d.alpha_annual_pct>0?'border-green-700':d.alpha_significant?'border-red-700':'border-gray-800'}`}>
               <p className="stat-label">Real skill (alpha)<InfoTip k="alpha" /></p>
               <p className={`stat-value ${d.alpha_annual_pct>=0?'positive':'negative'}`}>{d.alpha_annual_pct>0?'+':''}{d.alpha_annual_pct}%</p>
@@ -60,7 +60,7 @@ export default function Factors() {
             <div className="card-sm"><p className="stat-label">Market link<InfoTip k="market_beta" /></p><p className="stat-value">{d.coefficients.market_beta.coefficient}</p><p className="text-xs text-gray-500">{d.factor_tilts.market}</p></div>
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {/* Factor loadings chart */}
             <div className="card">
               <h3 className="font-semibold mb-3">Factor Loadings (β)</h3>
@@ -81,7 +81,8 @@ export default function Factors() {
             {/* Detail table */}
             <div className="card">
               <h3 className="font-semibold mb-3">Regression Detail</h3>
-              <table className="w-full text-sm">
+              <div className="table-wrap">
+                <table className="w-full min-w-[34rem] text-sm">
                 <thead><tr className="text-gray-500 text-xs border-b border-gray-800">
                   <th className="text-left py-2">Factor</th>
                   <th className="text-right">β<InfoTip k="beta" /></th>
@@ -98,7 +99,8 @@ export default function Factors() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
               <div className="mt-3 flex gap-2 text-xs">
                 <span className="badge-blue">{d.factor_tilts.size}</span>
                 <span className="badge-blue">{d.factor_tilts.value}</span>

@@ -74,7 +74,7 @@ export default function TopPicks() {
   })
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Sparkles size={24} className="text-green-400" /> Top Picks
@@ -92,7 +92,7 @@ export default function TopPicks() {
 
       {data && (
         <>
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div className="space-y-3">
               <h2 className="font-semibold flex items-center gap-2 text-green-400">
                 <TrendingUp size={18} /> Looks strong ({data.buys?.length || 0})

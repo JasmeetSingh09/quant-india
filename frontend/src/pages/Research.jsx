@@ -37,7 +37,7 @@ function StudyResult({ data }) {
       {data.results && Object.entries(data.results).map(([window, r]) => (
         <div key={window} className="card-sm">
           <p className="text-xs font-semibold text-gray-400 mb-2">Day +{r.forward_window_days} Forward Return</p>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {['positive_sentiment','neutral_sentiment','negative_sentiment'].map(k => {
               const s = r[k]; if (!s) return null
               const label = k.replace('_sentiment','').replace('_',' ')
@@ -61,7 +61,7 @@ function StudyResult({ data }) {
 
       {/* Momentum results */}
       {data.results?.avg_monthly_spread_pct != null && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
             ['Winner Avg Return/month', `${data.results.avg_winner_return_pct?.toFixed(3)}%`],
             ['Loser Avg Return/month',  `${data.results.avg_loser_return_pct?.toFixed(3)}%`],
@@ -131,7 +131,7 @@ export default function Research() {
   const result    = sentMut.data || momMut.data || revMut.data || corrMut.data
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div className="flex items-center gap-3">
         <FlaskConical size={22} className="text-green-400" />
         <div>
@@ -140,7 +140,7 @@ export default function Research() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Controls */}
         <div className="card space-y-5">
           <div>

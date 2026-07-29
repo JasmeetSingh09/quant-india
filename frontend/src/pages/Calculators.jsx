@@ -40,7 +40,7 @@ export default function Calculators() {
   const tabs = [['sip','SIP'],['lumpsum','Lumpsum'],['tax','Capital Gains Tax']]
 
   return (
-    <div className="p-6 space-y-6 max-w-3xl">
+    <div className="p-4 sm:p-6 space-y-6 max-w-3xl">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2"><Calculator size={24} className="text-green-400"/> Calculators</h1>
         <p className="text-gray-400 text-sm mt-0.5">Plan your investing — SIP, lumpsum, and Indian capital-gains tax.</p>
@@ -56,14 +56,14 @@ export default function Calculators() {
       {/* SIP */}
       {tab==='sip' && (
         <div className="card space-y-4">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <Field label="Monthly investment" value={sip.monthly_investment} onChange={v=>setSip(s=>({...s,monthly_investment:v}))} suffix="₹" />
             <Field label="Expected return" value={sip.annual_return_pct} onChange={v=>setSip(s=>({...s,annual_return_pct:v}))} suffix="%/yr" />
             <Field label="Duration" value={sip.years} onChange={v=>setSip(s=>({...s,years:v}))} suffix="yrs" />
           </div>
           <button className="btn-primary" onClick={()=>sipMut.mutate({...sip, monthly_investment:Number(sip.monthly_investment), annual_return_pct:Number(sip.annual_return_pct), years:Number(sip.years)})}>Calculate</button>
           {sipMut.data && !sipMut.data.error && (
-            <div className="grid grid-cols-3 gap-3 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
               <div className="card-sm"><p className="stat-label">You invest</p><p className="stat-value">{fmt(sipMut.data.total_invested)}</p></div>
               <div className="card-sm"><p className="stat-label">Future value</p><p className="stat-value positive">{fmt(sipMut.data.future_value)}</p></div>
               <div className="card-sm"><p className="stat-label">Gains</p><p className="stat-value positive">{fmt(sipMut.data.estimated_gains)}</p></div>
@@ -77,14 +77,14 @@ export default function Calculators() {
       {/* Lumpsum */}
       {tab==='lumpsum' && (
         <div className="card space-y-4">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <Field label="Amount" value={lump.principal} onChange={v=>setLump(s=>({...s,principal:v}))} suffix="₹" />
             <Field label="Expected return" value={lump.annual_return_pct} onChange={v=>setLump(s=>({...s,annual_return_pct:v}))} suffix="%/yr" />
             <Field label="Duration" value={lump.years} onChange={v=>setLump(s=>({...s,years:v}))} suffix="yrs" />
           </div>
           <button className="btn-primary" onClick={()=>lumpMut.mutate({...lump, principal:Number(lump.principal), annual_return_pct:Number(lump.annual_return_pct), years:Number(lump.years)})}>Calculate</button>
           {lumpMut.data && !lumpMut.data.error && (
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
               <div className="card-sm"><p className="stat-label">Future value</p><p className="stat-value positive">{fmt(lumpMut.data.future_value)}</p></div>
               <div className="card-sm"><p className="stat-label">Gains</p><p className={`stat-value ${lumpMut.data.estimated_gains >= 0 ? 'positive' : 'negative'}`}>{fmt(lumpMut.data.estimated_gains)}</p></div>
               <p className="text-xs text-gray-400 col-span-2">{lumpMut.data.interpretation}</p>
@@ -97,7 +97,7 @@ export default function Calculators() {
       {/* Tax */}
       {tab==='tax' && (
         <div className="card space-y-4">
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Field label="Buy price" value={tax.buy_price} onChange={v=>setTax(s=>({...s,buy_price:v}))} suffix="₹" />
             <Field label="Sell price" value={tax.sell_price} onChange={v=>setTax(s=>({...s,sell_price:v}))} suffix="₹" />
             <Field label="Quantity" value={tax.quantity} onChange={v=>setTax(s=>({...s,quantity:v}))} />
@@ -106,7 +106,7 @@ export default function Calculators() {
           <button className="btn-primary" onClick={()=>taxMut.mutate({buy_price:Number(tax.buy_price), sell_price:Number(tax.sell_price), quantity:Number(tax.quantity), holding_months:Number(tax.holding_months)})}>Calculate Tax</button>
           {taxMut.data && !taxMut.data.error && (
             <div className="space-y-3 pt-2">
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="card-sm"><p className="stat-label">Gain</p><p className={`stat-value ${taxMut.data.gain>=0?'positive':'negative'}`}>{fmt(taxMut.data.gain)}</p></div>
                 <div className="card-sm"><p className="stat-label">Term</p><p className="stat-value capitalize">{taxMut.data.term}</p></div>
                 <div className="card-sm"><p className="stat-label">Tax</p><p className="stat-value negative">{fmt(taxMut.data.tax)}</p></div>

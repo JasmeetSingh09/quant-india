@@ -65,13 +65,13 @@ export default function News() {
   const { data: market, isLoading: mkl } = useQuery({ queryKey: ['marketNews'], queryFn: getMarketNews, refetchInterval: 300000 })
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <h1 className="text-2xl font-bold">Financial News</h1>
       <p className="text-xs text-gray-500">
         NewsAPI free tier has ~60 min delay. Published times shown above articles.
       </p>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <div>
           <h2 className="font-semibold mb-3 flex items-center gap-2">
             <span className="w-2 h-2 bg-yellow-400 rounded-full"></span>

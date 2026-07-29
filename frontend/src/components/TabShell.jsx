@@ -23,13 +23,15 @@ export default function TabShell({ tabs, persistKey }) {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Tab bar */}
-      <div className="flex gap-1 px-6 pt-5 pb-0 border-b border-gray-800 bg-gray-950/80">
+      {/* Tab bar — scrolls horizontally on phones rather than wrapping or
+          squashing. `scrollbar-none` keeps it clean; it's swipeable by touch. */}
+      <div className="flex gap-1 px-4 sm:px-6 pt-4 sm:pt-5 pb-0 border-b border-gray-800 bg-gray-950/80
+                      overflow-x-auto scrollbar-none">
         {tabs.map(({ label }) => (
           <button
             key={label}
             onClick={() => setActiveLabel(label)}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+            className={`shrink-0 whitespace-nowrap px-3 sm:px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
               label === tabs[safeIdx].label
                 ? 'bg-gray-900 text-green-400 border border-b-0 border-gray-800 shadow-[0_1px_0_#030712]'
                 : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/40'

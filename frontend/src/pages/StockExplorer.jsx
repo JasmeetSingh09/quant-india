@@ -174,7 +174,7 @@ function StockBoxCard({ r, onSelect }) {
       )}
 
       {/* Key metrics grid */}
-      <div className="grid grid-cols-3 gap-2 text-center">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-center">
         <div className="rounded-lg bg-gray-800/50 px-2 py-1.5">
           <p className="text-[10px] text-gray-500 mb-0.5">Mkt Cap</p>
           <p className="text-xs font-mono font-semibold text-gray-200">{fmtCap(r.market_cap)}</p>
@@ -238,7 +238,7 @@ function StocksList({ onSelect }) {
   const rows = scr.data?.results || []
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-4 sm:p-6 space-y-5">
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
@@ -283,7 +283,7 @@ function StocksList({ onSelect }) {
       />
 
       {/* Filters */}
-      <div className="card grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
+      <div className="card grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 items-end">
         <div>
           <label className="label">Max P/E</label>
           <input className="input" type="number" placeholder="e.g. 25" value={f.pe_max}
@@ -339,7 +339,8 @@ function StocksList({ onSelect }) {
       ) : viewMode === 'list' ? (
         /* ── LIST VIEW ── */
         <div className="card overflow-x-auto">
-          <table className="w-full text-sm">
+          <div className="table-wrap">
+            <table className="w-full min-w-[34rem] text-sm">
             <thead>
               <tr className="text-gray-500 text-xs border-b border-gray-800">
                 <th className="text-left py-2.5 pr-4">Stock</th>
@@ -384,7 +385,8 @@ function StocksList({ onSelect }) {
                 </tr>
               )}
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
       ) : (
         /* ── BOX VIEW ── */
@@ -393,7 +395,7 @@ function StocksList({ onSelect }) {
             No stocks match these filters.
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {rows.map(r => (
               <StockBoxCard key={r.ticker} r={r} onSelect={onSelect} />
             ))}
@@ -434,7 +436,7 @@ function StockDetail({ ticker, onBack }) {
   const s   = sent?.summary    || {}
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
 
       {/* Back + title row */}
       <div className="flex items-center gap-4">
@@ -476,7 +478,7 @@ function StockDetail({ ticker, onBack }) {
                 </p>
               )}
             </div>
-            <div className="shrink-0 grid grid-cols-2 gap-3 text-right">
+            <div className="shrink-0 grid grid-cols-1 sm:grid-cols-2 gap-3 text-right">
               {m.market_cap_fmt && (
                 <div>
                   <p className="text-[11px] text-gray-500">Market Cap</p>
@@ -598,7 +600,7 @@ function StockDetail({ ticker, onBack }) {
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
                 Balance Sheet Snapshot
               </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 divide-x divide-gray-800">
+              <div className="grid grid-cols-1 sm:grid-cols-2 sm:grid-cols-5 gap-4 divide-x divide-gray-800">
                 <BalanceItem label="Total Revenue"  value={m.total_revenue_fmt}  />
                 <div className="pl-4"><BalanceItem label="EBITDA"         value={m.ebitda_fmt}         /></div>
                 <div className="pl-4"><BalanceItem label="Total Debt"     value={m.total_debt_fmt}     highlight="text-red-300" /></div>
@@ -629,12 +631,12 @@ function StockDetail({ ticker, onBack }) {
           )}
 
           {/* Three-column analysis */}
-          <div className="grid grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 
             {/* Column 1 — Valuation & Health */}
             <div className="space-y-3">
               <h2 className="font-semibold text-sm text-gray-400 uppercase tracking-wider">Valuation</h2>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {[
                   ['P/E Ratio',      m.pe_ratio?.toFixed(1),        'pe_ratio'],
                   ['Forward P/E',    m.forward_pe?.toFixed(1),       'pe_ratio'],

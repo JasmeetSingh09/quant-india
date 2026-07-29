@@ -29,7 +29,7 @@ export default function Backtest() {
   const s = d?.strategy_stats, b = d?.benchmark_stats
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Factor Backtest — Honest Out-of-Sample</h1>
         <p className="text-sm text-gray-400 mt-1 max-w-3xl">
@@ -73,10 +73,11 @@ export default function Backtest() {
             </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Stats table */}
             <div className="card col-span-1">
-              <table className="w-full text-sm">
+              <div className="table-wrap">
+                <table className="w-full min-w-[34rem] text-sm">
                 <thead>
                   <tr className="text-xs text-gray-500 uppercase">
                     <th className="text-left font-medium">Metric</th>
@@ -92,7 +93,8 @@ export default function Backtest() {
                   <Row label="Max drawdown" strat={s.max_drawdown_pct} bench={b.max_drawdown_pct} fmt={v => `${v}%`} />
                   <Row label="Hit rate" strat={s.hit_rate_pct} bench={b.hit_rate_pct} fmt={v => `${v}%`} />
                 </tbody>
-              </table>
+                </table>
+              </div>
               <div className="mt-4 pt-3 border-t border-gray-800 text-xs space-y-1">
                 <p className="text-gray-400">Excess CAGR: <span className="text-white">{d.excess_cagr_pct}%/yr</span></p>
                 <p className="text-gray-400">Monthly excess t-stat: <span className={Math.abs(d.t_stat_excess) > 1.96 ? 'text-green-400' : 'text-gray-300'}>{d.t_stat_excess}</span> {d.significant_5pct ? '(significant)' : '(not significant)'}</p>

@@ -186,7 +186,7 @@ function TrackRecord() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             <div className="card-sm">
               <p className="stat-label">BUY-signal avg return</p>
               <p className={`stat-value text-lg ${col(sc.buy_avg_return_pct)}`}>{pct(sc.buy_avg_return_pct)}</p>
@@ -216,7 +216,8 @@ function TrackRecord() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <div className="table-wrap">
+              <table className="w-full min-w-[34rem] text-sm">
               <thead>
                 <tr className="text-gray-500 text-xs border-b border-gray-800">
                   <th className="text-left py-2">Stock</th>
@@ -245,7 +246,8 @@ function TrackRecord() {
                   )
                 })}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
           <p className="text-xs text-gray-600">
             "Actual return" = how the stock moved from the day it was logged until now. A BUY that went up
@@ -273,7 +275,7 @@ export default function Dashboard() {
             } })
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -293,12 +295,12 @@ export default function Dashboard() {
       {/* Nifty 50 stocks */}
       <div>
         <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Nifty 50 — Top Holdings</h2>
-        <div className="grid grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {NIFTY_STOCKS.map(t => <PriceTag key={t} ticker={t} />)}
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* MCX Commodities */}
         <div className="card col-span-1">
           <div className="flex items-center justify-between mb-4">
@@ -392,14 +394,14 @@ export default function Dashboard() {
 
         {picks && !picks.warming && (
           <>
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {/* Buys */}
               <div>
                 <h3 className="text-xs font-semibold text-green-400 uppercase tracking-wider flex items-center gap-1.5 mb-3">
                   <TrendingUp size={13} /> Looks strong ({picks.buys?.length || 0})
                 </h3>
                 {picks.buys?.length ? (
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {picks.buys.map(r => <PickCard key={r.ticker} r={r} buy />)}
                   </div>
                 ) : (
@@ -412,7 +414,7 @@ export default function Dashboard() {
                   <TrendingDown size={13} /> Looks weak ({picks.avoids?.length || 0})
                 </h3>
                 {picks.avoids?.length ? (
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {picks.avoids.map(r => <PickCard key={r.ticker} r={r} buy={false} />)}
                   </div>
                 ) : (
@@ -444,7 +446,7 @@ export default function Dashboard() {
       {regime && !regimeLoading && (
         <div className="card">
           <h2 className="font-semibold mb-4">Market Regime Analysis <span className="text-xs text-gray-500 font-normal ml-2">3-State Gaussian HMM on Nifty 50</span></h2>
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {Object.entries(regime.regime_stats || {}).map(([label, stats]) => (
               <div key={label} className={`card-sm border ${
                 label==='Bull'?'border-green-800/50':label==='Bear'?'border-red-800/50':'border-yellow-800/50'

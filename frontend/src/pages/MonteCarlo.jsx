@@ -79,7 +79,7 @@ export default function MonteCarlo() {
   }))
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2"><Dices size={24} className="text-green-400"/> Monte Carlo Simulation</h1>
         <p className="text-gray-400 text-sm mt-0.5">
@@ -87,7 +87,7 @@ export default function MonteCarlo() {
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Controls */}
         <div className="card col-span-1 space-y-4">
           <div>
@@ -134,7 +134,7 @@ export default function MonteCarlo() {
           {d && (
             <>
               {/* Key stats */}
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="card-sm">
                   <p className="stat-label">Median Outcome</p>
                   <p className="stat-value">{fmt(d.median_value)}</p>
@@ -209,7 +209,8 @@ export default function MonteCarlo() {
           {cmp.data && (
             <div className="card">
               <h2 className="font-semibold mb-3">Method Comparison — Tail-Risk Study</h2>
-              <table className="w-full text-sm">
+              <div className="table-wrap">
+                <table className="w-full min-w-[34rem] text-sm">
                 <thead>
                   <tr className="text-gray-500 text-xs border-b border-gray-800">
                     <th className="text-left py-2">Method</th>
@@ -230,7 +231,8 @@ export default function MonteCarlo() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
               <div className="mt-3 p-3 bg-yellow-900/20 border border-yellow-800/40 rounded-lg">
                 <p className="text-xs text-yellow-300 leading-relaxed">💡 {cmp.data.key_insight}</p>
               </div>

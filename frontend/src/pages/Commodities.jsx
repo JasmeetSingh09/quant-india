@@ -93,7 +93,7 @@ export default function Commodities() {
   const catData = data?.categories?.[selectedCat] || []
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Commodities</h1>
         {data?.usd_inr_rate && (
@@ -118,7 +118,7 @@ export default function Commodities() {
 
       {isLoading ? <Spinner /> : (
         <>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {catData.map(c => (
               <CommodityCard key={c.key} c={c} selected={selectedKey===c.key}
                 onClick={() => setSelectedKey(c.key)} />

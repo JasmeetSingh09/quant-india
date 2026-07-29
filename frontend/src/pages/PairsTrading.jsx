@@ -48,7 +48,7 @@ export default function PairsTrading() {
   const actionColor = act => act==='long'?'text-green-400':act==='short'?'text-red-400':'text-gray-400'
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2"><GitCompareArrows size={24} className="text-green-400"/> Pairs Trading</h1>
         <p className="text-gray-400 text-sm mt-0.5">
@@ -56,7 +56,7 @@ export default function PairsTrading() {
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Left: find pairs */}
         <div className="card space-y-4">
           <div>
@@ -103,7 +103,7 @@ export default function PairsTrading() {
             {/* Signal */}
             {ana.data && (
               <div className="space-y-4">
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   <div className="card-sm"><p className="stat-label">Hedge ratio<InfoTip k="hedge_ratio" /></p><p className="stat-value">{ana.data.hedge_ratio}</p></div>
                   <div className="card-sm"><p className="stat-label">Linkage test<InfoTip k="cointegration" /></p><p className="stat-value">{ana.data.cointegration_pvalue}</p>
                     <p className={`text-xs ${ana.data.is_cointegrated?'positive':'negative'}`}>{ana.data.is_cointegrated?'linked ✓ (tradeable)':'not linked'}</p></div>
@@ -134,7 +134,7 @@ export default function PairsTrading() {
             {bt.data && (
               <div className="mt-6 pt-6 border-t border-gray-800 space-y-3">
                 <h3 className="font-semibold text-sm">Backtest (market-neutral)</h3>
-                <div className="grid grid-cols-5 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                   {[['Return',`${bt.data.total_return_pct}%`,null],['Sharpe',bt.data.sharpe_ratio,'sharpe'],['Max drop',`${bt.data.max_drawdown_pct}%`,'max_drawdown'],['Trades',bt.data.num_trades,null],['Win rate',`${bt.data.win_rate_pct}%`,null]].map(([l,v,tip])=>(
                     <div key={l} className="card-sm"><p className="stat-label">{l}{tip&&<InfoTip k={tip} />}</p><p className="text-lg font-bold font-mono">{v}</p></div>
                   ))}

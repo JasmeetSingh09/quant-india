@@ -34,7 +34,7 @@ export default function Watchlist() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <h1 className="text-2xl font-bold">Watchlist</h1>
 
       {/* Add form */}
@@ -72,7 +72,8 @@ export default function Watchlist() {
               <p className="text-sm mt-1">Add a ticker above to start tracking.</p>
             </div>
           ) : (
-            <table className="w-full">
+            <div className="table-wrap">
+              <table className="w-full min-w-[34rem]">
               <thead className="border-b border-gray-800">
                 <tr className="text-left">
                   {['Stock','Added Price','Current Price','Change','Alert Threshold','Alert',''].map(h => (
@@ -120,7 +121,8 @@ export default function Watchlist() {
                   )
                 })}
               </tbody>
-            </table>
+              </table>
+            </div>
           )}
         </div>
       )}

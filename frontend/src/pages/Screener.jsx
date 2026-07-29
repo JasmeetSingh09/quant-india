@@ -35,7 +35,7 @@ export default function Screener() {
   const rows = scr.data?.results || []
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2"><Filter size={24} className="text-green-400"/> Stock Screener</h1>
         <p className="text-gray-400 text-sm mt-0.5">
@@ -45,7 +45,7 @@ export default function Screener() {
       </div>
 
       {/* Filters */}
-      <div className="card grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
+      <div className="card grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 items-end">
         <div>
           <label className="label">Max P/E</label>
           <input className="input" type="number" placeholder="e.g. 25" value={f.pe_max} onChange={e=>set('pe_max',e.target.value)} />
@@ -84,7 +84,8 @@ export default function Screener() {
         {scr.isPending ? <Spinner /> : scr.isError ? (
           <p className="text-red-400 text-sm">{String(scr.error)}</p>
         ) : (
-          <table className="w-full text-sm">
+          <div className="table-wrap">
+            <table className="w-full min-w-[34rem] text-sm">
             <thead>
               <tr className="text-gray-500 text-xs border-b border-gray-800">
                 <th className="text-left py-2">Stock</th>
@@ -122,7 +123,8 @@ export default function Screener() {
                 <tr><td colSpan="9" className="text-center text-gray-500 py-8">No stocks match these filters.</td></tr>
               )}
             </tbody>
-          </table>
+            </table>
+          </div>
         )}
         {rows.length > 0 && <p className="text-xs text-gray-600 mt-3">{scr.data.count} matches</p>}
       </div>

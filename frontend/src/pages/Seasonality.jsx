@@ -15,7 +15,7 @@ export default function Seasonality() {
   })
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Seasonality — Calendar Effects</h1>
         <p className="text-sm text-gray-400 mt-1 max-w-3xl">
@@ -56,7 +56,7 @@ export default function Seasonality() {
             <p className="text-[11px] text-gray-500 mt-1">Solid bars = statistically significant (|t|&gt;1.96). Best: {d.best_month} · Worst: {d.worst_month}.</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="card-sm">
               <p className="stat-label">"Sell in May" — winter − summer</p>
               <p className={`stat-value ${d.sell_in_may.winter_minus_summer_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>

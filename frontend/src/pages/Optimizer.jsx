@@ -105,10 +105,10 @@ export default function Optimizer() {
   const regimeResult  = regimeMut.data
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <h1 className="text-2xl font-bold">Portfolio Optimizer</h1>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Left panel */}
         <div className="card space-y-5">
           <div>
@@ -266,7 +266,7 @@ export default function Optimizer() {
           {/* MVO result */}
           {mvoResult && !mvoResult.error && (
             <div className="space-y-4">
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {[
                   ['Expected Return', `${mvoResult.expected_annual_return_pct}%`, null],
                   ['Expected Bumpiness', `${mvoResult.expected_annual_vol_pct}%`, 'volatility'],
@@ -305,7 +305,7 @@ export default function Optimizer() {
           {/* HRP result */}
           {hrpResult && !hrpResult.error && (
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {[
                   ['Expected Return', `${hrpResult.expected_annual_return_pct}%`, null],
                   ['Expected Bumpiness', `${hrpResult.expected_annual_vol_pct}%`, 'volatility'],
@@ -336,7 +336,7 @@ export default function Optimizer() {
           {/* Risk Parity (ERC) result */}
           {rpResult && !rpResult.error && (
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {[['Expected Return', `${rpResult.expected_annual_return_pct}%`, null],
                   ['Expected Bumpiness', `${rpResult.expected_annual_vol_pct}%`, 'volatility'],
                   ['Sharpe Ratio', rpResult.expected_sharpe, 'sharpe']].map(([l,v,tip]) => (
@@ -363,7 +363,7 @@ export default function Optimizer() {
           {/* Max Diversification result */}
           {mdResult && !mdResult.error && (
             <div className="space-y-4">
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {[['Expected Return', `${mdResult.expected_annual_return_pct}%`, null],
                   ['Expected Bumpiness', `${mdResult.expected_annual_vol_pct}%`, 'volatility'],
                   ['Sharpe Ratio', mdResult.expected_sharpe, 'sharpe'],
@@ -387,7 +387,7 @@ export default function Optimizer() {
           {/* Min-CVaR result */}
           {cvarResult && !cvarResult.error && (
             <div className="space-y-4">
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {[['Expected Return', `${cvarResult.expected_annual_return_pct}%`, null],
                   ['Daily VaR', `${cvarResult.var_daily_pct}%`, 'volatility'],
                   ['Daily CVaR', `${cvarResult.cvar_daily_pct}%`, null],
@@ -458,7 +458,7 @@ export default function Optimizer() {
               <div className="card">
                 <h3 className="font-semibold mb-1">Alpha Scores → Black-Litterman Weights</h3>
                 <p className="text-xs text-gray-500 mb-4">FinBERT sentiment views automatically converted to portfolio weights</p>
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div>
                     <p className="text-xs text-gray-500 mb-2 uppercase tracking-wider">Alpha Scores</p>
                     {Object.entries(autoResult.alpha_scores || {}).sort(([,a],[,b])=>b-a).map(([t,s]) => (

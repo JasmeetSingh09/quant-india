@@ -191,7 +191,7 @@ export default function Simulator() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div className="flex items-center gap-4">
         <h1 className="text-2xl font-bold">Simulator</h1>
         <div className="flex bg-gray-800 rounded-lg p-1">
@@ -205,7 +205,7 @@ export default function Simulator() {
       </div>
 
       {tab === 'realtime' && (
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {/* Start simulation */}
           <div className="card space-y-4">
             <h2 className="font-semibold">Start Paper Trade</h2>
@@ -380,10 +380,10 @@ export default function Simulator() {
 
       {tab === 'historic' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="card space-y-4">
               <h2 className="font-semibold">Backtest Setup</h2>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="label">Start date</label>
                   <input className="input" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
@@ -412,7 +412,7 @@ export default function Simulator() {
             {/* Metrics */}
             {btResult && (
               <div className="col-span-2 space-y-4">
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   {[
                     ['Total Return', `${btResult.total_return_pct > 0 ? '+' : ''}${btResult.total_return_pct}%`, btResult.total_return_pct >= 0 ? 'text-green-400' : 'text-red-400', null],
                     ['Yearly growth', `${btResult.cagr_pct}%`, 'text-white', 'cagr'],
@@ -432,7 +432,7 @@ export default function Simulator() {
 
                 {btResult.benchmark && (
                   <div className="card-sm">
-                    <div className="grid grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                       <div><p className="stat-label">Beat the index by<InfoTip k="alpha" /></p>
                         <p className={`stat-value ${btResult.benchmark.alpha>=0?'text-green-400':'text-red-400'}`}>
                           {btResult.benchmark.alpha>0?'+':''}{btResult.benchmark.alpha}%
@@ -489,7 +489,7 @@ export default function Simulator() {
 
           {/* In/out of sample */}
           {btResult && (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[btResult.in_sample, btResult.out_of_sample].map(s => s && (
                 <div key={s.label} className="card-sm">
                   <p className="text-xs text-gray-500 mb-1">{s.label}</p>

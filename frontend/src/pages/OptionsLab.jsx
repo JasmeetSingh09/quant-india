@@ -54,7 +54,7 @@ export default function OptionsLab() {
   const g = d?.greeks
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Options Lab — Black-Scholes</h1>
         <p className="text-sm text-gray-400 mt-1">
@@ -64,7 +64,7 @@ export default function OptionsLab() {
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Inputs */}
         <div className="card space-y-4">
           <div>
@@ -81,7 +81,7 @@ export default function OptionsLab() {
             {autoMsg && <p className="text-[11px] text-gray-500 mt-1">{autoMsg}</p>}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-gray-400">Spot (₹)</label>
               <input type="number" className="input w-full" value={spot} onChange={e => setSpot(e.target.value)} />
@@ -123,14 +123,14 @@ export default function OptionsLab() {
 
           {d && (
             <>
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <Stat label="Fair value" value={`₹${d.price}`} accent="text-green-400" />
                 <Stat label="Moneyness" value={d.moneyness} />
                 <Stat label="Intrinsic" value={`₹${d.intrinsic}`} />
                 <Stat label="Time value" value={`₹${d.time_value}`} />
               </div>
 
-              <div className="grid grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                 <Stat label="Delta" value={g.delta} tip={GREEK_HELP.delta} />
                 <Stat label="Gamma" value={g.gamma} tip={GREEK_HELP.gamma} />
                 <Stat label="Vega"  value={g.vega}  tip={GREEK_HELP.vega} />

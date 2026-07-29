@@ -20,6 +20,26 @@
   *:focus-visible {
     @apply outline-none ring-2 ring-green-500/70 ring-offset-1 ring-offset-gray-950;
   }
+
+  /* iOS zooms the page when a <16px input is focused. Keep form text at 16px on
+     phones; the desktop breakpoint restores the denser 14px scale. */
+  @media (max-width: 767px) {
+    input, select, textarea { font-size: 16px; }
+  }
+
+  /* Never let a wide child (table, chart) scroll the whole page sideways. */
+  html, body { @apply overflow-x-hidden; }
+
+  /* Honour the OS "reduce motion" setting — the sidebar slide/width animations
+     are decorative, so drop them rather than animate through them. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 @layer components {
@@ -69,6 +89,26 @@
   .positive     { @apply text-green-400; }
   .negative     { @apply text-red-400; }
   .neutral      { @apply text-gray-400; }
+
+  /* Hide the scrollbar but keep the element scrollable (swipeable tab bars). */
+  .scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
+  .scrollbar-none::-webkit-scrollbar { display: none; }
+
+  /* Wrap any wide table/chart so IT scrolls, not the page.
+     `-webkit-overflow-scrolling` keeps momentum scroll on iOS. */
+  .table-wrap {
+    @apply w-full overflow-x-auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Standard page padding: tighter on phones, roomy from `sm` up. */
+  .page { @apply p-4 sm:p-6; }
+
+  /* Comfortable touch targets on coarse pointers (WCAG 2.5.5 ~44px). */
+  @media (pointer: coarse) {
+    button, a, [role="button"], select { min-height: 40px; }
+    .btn-primary, .btn-ghost, .btn-danger { @apply py-2.5; }
+  }
 
   /* Inline error / warning banners */
   .banner-error {

@@ -43,7 +43,7 @@ export default function Portfolio() {
   const pieData = (data?.holdings || []).map(h => ({ name: h.ticker.replace('.NS',''), value: h.current_value }))
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2"><Briefcase size={24} className="text-green-400"/> My Portfolio</h1>
         <p className="text-gray-400 text-sm mt-0.5">Track your real holdings with live profit/loss.</p>
@@ -79,7 +79,7 @@ export default function Portfolio() {
       ) : (
         <>
           {/* Summary */}
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="card-sm"><p className="stat-label">Invested</p><p className="stat-value">{fmt(data.total_invested)}</p></div>
             <div className="card-sm"><p className="stat-label">Current Value</p><p className="stat-value">{fmt(data.total_current_value)}</p></div>
             <div className="card-sm">
@@ -94,7 +94,7 @@ export default function Portfolio() {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Allocation pie */}
             <div className="card">
               <h3 className="font-semibold mb-2">Allocation</h3>
@@ -111,7 +111,8 @@ export default function Portfolio() {
             {/* Holdings table */}
             <div className="card col-span-2 overflow-x-auto">
               <h3 className="font-semibold mb-3">Holdings</h3>
-              <table className="w-full text-sm">
+              <div className="table-wrap">
+                <table className="w-full min-w-[34rem] text-sm">
                 <thead><tr className="text-gray-500 text-xs border-b border-gray-800">
                   <th className="text-left py-2">Stock</th><th className="text-right">Qty</th>
                   <th className="text-right">Buy</th><th className="text-right">Now</th>
@@ -136,7 +137,8 @@ export default function Portfolio() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
             </div>
           </div>
         </>

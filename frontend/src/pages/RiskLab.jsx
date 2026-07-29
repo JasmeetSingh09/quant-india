@@ -49,7 +49,7 @@ export default function RiskLab() {
   const dsrColor = d ? (d.edge_is_real ? 'text-green-400' : 'text-red-400') : ''
 
   return (
-    <div className="p-6 space-y-6 max-w-4xl">
+    <div className="p-4 sm:p-6 space-y-6 max-w-4xl">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2"><ShieldAlert size={24} className="text-green-400"/> Risk Lab</h1>
         <p className="text-gray-400 text-sm mt-0.5">
@@ -83,7 +83,7 @@ export default function RiskLab() {
         </div>
         {dsr.isError && <p className="text-red-400 text-xs">{String(dsr.error)}</p>}
         {d && (
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="card-sm"><p className="stat-label">Annual Sharpe</p><p className="stat-value">{d.annualised_sharpe}</p></div>
             <div className="card-sm"><p className="stat-label">Deflated Sharpe</p><p className={`stat-value ${dsrColor}`}>{Math.round(d.deflated_sharpe*100)}%</p><p className="text-xs text-gray-500">prob. real</p></div>
             <div className="card-sm"><p className="stat-label">Luck benchmark</p><p className="stat-value">{d.luck_benchmark_sharpe}</p><p className="text-xs text-gray-500">SR from {d.n_trials} trials</p></div>
@@ -114,7 +114,7 @@ export default function RiskLab() {
             Kelly criterion + volatility targeting — how much of your capital to risk on one position.
           </p>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <div><label className="label">Expected return %/yr</label><input className="input" type="number" value={ret} onChange={e=>setRet(e.target.value)} /></div>
           <div><label className="label">Volatility %/yr<InfoTip k="volatility" /></label><input className="input" type="number" value={vol} onChange={e=>setVol(e.target.value)} /></div>
           <div><label className="label">Target volatility %</label><input className="input" type="number" value={tgt} onChange={e=>setTgt(e.target.value)} /></div>
@@ -124,7 +124,7 @@ export default function RiskLab() {
         </button>
         {pos.isError && <p className="text-red-400 text-xs">{String(pos.error)}</p>}
         {pos.data && (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <div className="card-sm"><p className="stat-label">Half-Kelly</p><p className="stat-value">{pos.data.half_kelly_weight_pct}%</p></div>
             <div className="card-sm"><p className="stat-label">Vol-target</p><p className="stat-value">{pos.data.vol_target_weight_pct}%</p></div>
             <div className="card-sm"><p className="stat-label">Recommended</p><p className="stat-value text-green-400">{pos.data.recommended_weight_pct}%</p><p className="text-xs text-gray-500">{pos.data.cash_pct}% cash</p></div>
@@ -155,7 +155,7 @@ export default function RiskLab() {
             risk-adjusted ratios from a cost-adjusted historical backtest.
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <HoldingsEditor rows={pfRows} setRows={setPfRows} />
             <button className="btn-primary" disabled={!pfOk || tail.isPending} onClick={() => { tail.mutate(); decomp.mutate() }}>
@@ -165,7 +165,7 @@ export default function RiskLab() {
           </div>
           <div>
             {td && (
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="card-sm" title="On a bad day (worst 5%), you lose at least this."><p className="stat-label">VaR 95% (daily)</p><p className="stat-value text-orange-400">{td.var_95_daily_pct}%</p></div>
                 <div className="card-sm" title="Average loss on the worst-5% days."><p className="stat-label">CVaR 95%</p><p className="stat-value text-red-400">{td.cvar_95_daily_pct}%</p></div>
                 <div className="card-sm"><p className="stat-label">Max drawdown</p><p className="stat-value text-red-400">{td.max_drawdown_pct}%</p></div>
@@ -245,7 +245,7 @@ export default function RiskLab() {
         {fac.isError && <p className="text-xs text-red-400">{String(fac.error)}</p>}
         {fd && fd.coefficients && (
           <>
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {Object.entries(fd.coefficients).map(([k, c]) => (
                 <div key={k} className="card-sm" title={`t-stat ${c.t_stat ?? '—'}, p ${c.p_value ?? '—'}`}>
                   <p className="stat-label">{k.replace(/_/g, ' ')}</p>

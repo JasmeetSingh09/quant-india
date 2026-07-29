@@ -31,7 +31,7 @@ export default function PortfolioTest() {
   const d = bt.data
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Portfolio Test — Historical Backtest</h1>
         <p className="text-sm text-gray-400 mt-1 max-w-3xl">
@@ -41,7 +41,7 @@ export default function PortfolioTest() {
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Input */}
         <div className="card space-y-3">
           <h3 className="text-sm font-semibold text-white">Portfolio</h3>
@@ -61,7 +61,7 @@ export default function PortfolioTest() {
           {bt.isPending && <div className="card"><Spinner /></div>}
           {d && (
             <>
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <Tile label="Total return" value={`${d.total_return_pct}%`} accent={d.total_return_pct >= 0 ? 'text-green-400' : 'text-red-400'} />
                 <Tile label="CAGR" value={`${d.cagr_pct}%`} />
                 <Tile label="Sharpe" value={d.sharpe_ratio} />
@@ -69,7 +69,7 @@ export default function PortfolioTest() {
               </div>
 
               {d.benchmark && (
-                <div className="card-sm grid grid-cols-4 gap-4">
+                <div className="card-sm grid grid-cols-2 lg:grid-cols-4 gap-4">
                   <div><p className="stat-label">Beat the Nifty by</p>
                     <p className={`stat-value ${d.benchmark.alpha >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                       {d.benchmark.alpha > 0 ? '+' : ''}{d.benchmark.alpha}%
@@ -85,7 +85,7 @@ export default function PortfolioTest() {
               )}
 
               {/* In / out of sample — the honesty */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {[['In-sample', d.in_sample], ['Out-of-sample', d.out_of_sample]].map(([lbl, s]) => s && (
                   <div key={lbl} className="card-sm">
                     <p className="stat-label">{lbl} Sharpe</p>
@@ -125,7 +125,8 @@ export default function PortfolioTest() {
               {d.stock_contributions?.length > 0 && (
                 <div className="card">
                   <h3 className="text-sm font-semibold text-white mb-2">Per-stock contribution</h3>
-                  <table className="w-full text-xs">
+                  <div className="table-wrap">
+                    <table className="w-full min-w-[34rem] text-xs">
                     <thead><tr className="text-gray-500 text-left">
                       <th className="font-medium">Stock</th><th className="font-medium text-right">Weight</th>
                       <th className="font-medium text-right">Return</th><th className="font-medium text-right">Contribution</th>
@@ -140,7 +141,8 @@ export default function PortfolioTest() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                    </table>
+                  </div>
                 </div>
               )}
             </>

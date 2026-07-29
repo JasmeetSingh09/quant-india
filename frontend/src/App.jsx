@@ -1,5 +1,9 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { Menu, Zap } from 'lucide-react'
 import Sidebar from './components/Sidebar'
+import useMediaQuery from './hooks/useMediaQuery'
+import usePersistentState from './usePersistentState'
 import Dashboard from './pages/Dashboard'
 import StockExplorer from './pages/StockExplorer'
 import Calculators from './pages/Calculators'
@@ -25,6 +29,17 @@ function NotFound() {
 
 export default function App() {
   const { user, loading } = useAuth()
+  const isMobile = useMediaQuery('(max-width: 1023px)')
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  // Desktop collapse is a preference, so it survives reloads. The mobile drawer
+  // deliberately does not — a phone should always open on the content.
+  const [collapsed, setCollapsed] = usePersistentState('ui.sidebarCollapsed', false)
+  const location = useLocation()
+
+  // Close the drawer on navigation, and whenever we grow past the mobile
+  // breakpoint (otherwise it stays mounted-open behind the desktop layout).
+  useEffect(() => { setDrawerOpen(false) }, [location.pathname])
+  useEffect(() => { if (!isMobile) setDrawerOpen(false) }, [isMobile])
 
   if (loading) {
     return (
@@ -46,9 +61,37 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-950">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto">
+    <div className="flex h-[100dvh] overflow-hidden bg-gray-950">
+      <Sidebar
+        isMobile={isMobile}
+        open={drawerOpen}
+        collapsed={collapsed}
+        onClose={() => setDrawerOpen(false)}
+        onToggleCollapse={() => setCollapsed(c => !c)}
+      />
+
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Mobile top bar — the only way to reach nav on a phone */}
+        {isMobile && (
+          <header className="flex items-center gap-3 px-4 h-14 shrink-0 border-b border-gray-800 bg-gray-900/90 backdrop-blur-sm pt-[env(safe-area-inset-top)]">
+            <button
+              onClick={() => setDrawerOpen(true)}
+              aria-label="Open navigation"
+              aria-expanded={drawerOpen}
+              className="-ml-2 p-2 rounded-lg text-gray-300 hover:text-white hover:bg-gray-800 transition-colors"
+            >
+              <Menu size={20} />
+            </button>
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-6 h-6 shrink-0 bg-gradient-to-br from-green-400 to-emerald-600 rounded-md flex items-center justify-center">
+                <Zap size={12} className="text-white" />
+              </div>
+              <span className="font-bold text-sm text-white tracking-tight truncate">Quant India</span>
+            </div>
+          </header>
+        )}
+
+        <main className="flex-1 overflow-y-auto overflow-x-hidden">
         <Routes>
           <Route path="/"            element={<Dashboard />} />
           <Route path="/stock"       element={<StockExplorer />} />
@@ -74,7 +117,8 @@ export default function App() {
           <Route path="/news"        element={<Navigate to="/markets" replace />} />
           <Route path="*"            element={<NotFound />} />
         </Routes>
-      </main>
+        </main>
+      </div>
     </div>
   )
 }
