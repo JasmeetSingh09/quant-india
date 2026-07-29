@@ -43,14 +43,21 @@
 }
 
 @layer components {
+  /* min-w-0 on both cards: as grid/flex children they default to
+     min-width:auto (= min-content), so a long unbroken value would widen the
+     card past its track instead of wrapping inside it.
+     container-type: inline-size makes each card a query container so .stat-value
+     can size itself in cqi against the card rather than the viewport. */
+  .card, .card-sm { container-type: inline-size; }
+
   .card {
-    @apply bg-gray-900/70 border border-gray-800 rounded-xl p-5 backdrop-blur-sm transition-colors duration-150;
+    @apply bg-gray-900/70 border border-gray-800 rounded-xl p-4 sm:p-5 backdrop-blur-sm transition-colors duration-150 min-w-0;
     box-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
   }
   .card:hover { @apply border-gray-700; }
 
   .card-sm {
-    @apply bg-gray-900/70 border border-gray-800 rounded-lg p-4 backdrop-blur-sm transition-colors duration-150;
+    @apply bg-gray-900/70 border border-gray-800 rounded-lg p-3 sm:p-4 backdrop-blur-sm transition-colors duration-150 min-w-0;
   }
   .card-sm:hover { @apply border-gray-700; }
 
@@ -84,7 +91,21 @@
   }
   .label        { @apply block text-xs font-medium text-gray-400 mb-1; }
   .section-title{ @apply text-xs font-semibold text-gray-400 uppercase tracking-wider; }
-  .stat-value   { @apply text-2xl font-bold font-mono leading-tight; }
+  /* Long Indian-format values (₹1,23,45,678 — lakh/crore grouping is wordier
+     than thousands) overflowed their card: a fixed 24px mono value needs up to
+     169px, but a 2-up cell on a 375px phone has ~132px, and a 4-up cell at
+     1024px has ~151px once the sidebar docks.
+     Sized in cqi (percent of the CARD's width, not the viewport) because the
+     constraint is the container — the viewport alone can't know whether the
+     sidebar is docked or how many columns the grid is running. 13cqi keeps the
+     widest realistic value inside its cell; the clamp caps it at the original
+     24px so desktop is visually unchanged. */
+  .stat-value {
+    @apply font-bold font-mono leading-tight;
+    font-size: clamp(1.05rem, 13cqi, 1.5rem);
+    overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
+  }
   .stat-label   { @apply text-xs text-gray-500 mt-0.5; }
   .positive     { @apply text-green-400; }
   .negative     { @apply text-red-400; }
