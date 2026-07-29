@@ -13,7 +13,8 @@ Database: backend/quant_platform.db
 """
 
 import sqlite3
-from db import get_conn, IntegrityError  # noqa: F401
+from concurrent.futures import ThreadPoolExecutor
+from db import get_conn, IntegrityError, legacy_add_column  # noqa: F401
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
@@ -44,16 +45,9 @@ def _init_db():
             last_updated     TEXT
         )
     """)
-    # Migrate an older SQLite table that predates per-user support (best effort).
-    # SKIP on Postgres: the CREATE TABLE above already includes user_id there, and
-    # a failing ALTER aborts the whole Postgres transaction (poisoning every
-    # statement after it), which 500'd this endpoint after the Supabase switch.
-    from db import IS_POSTGRES
-    if not IS_POSTGRES:
-        try:
-            conn.execute("ALTER TABLE watchlist ADD COLUMN user_id TEXT NOT NULL DEFAULT 'public'")
-        except Exception:
-            pass
+    # Migrate an older SQLite table that predates per-user support (best effort;
+    # no-ops on Postgres — see db.legacy_add_column).
+    legacy_add_column(conn, "watchlist", "user_id")
     # a stock is unique PER USER, not globally
     conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_watchlist_user_ticker "
                  "ON watchlist(user_id, ticker)")
@@ -180,7 +174,18 @@ def get_watchlist(refresh_prices: bool = True, user_id: str = "public") -> list:
     """, (user_id,)).fetchall()
     conn.close()
 
+    # Fetch all live prices in parallel — doing this one ticker at a time was the
+    # same serial-network-call pattern that caused the "Start Simulation" 60s
+    # timeout (fixed in b73ecb2); a watchlist with several tickers would hit it too.
+    live_prices = {}
+    if refresh_prices and rows:
+        with ThreadPoolExecutor(max_workers=min(8, len(rows) * 2 or 1)) as ex:
+            for row, live in zip(rows, ex.map(lambda r: _get_current_price(r[1]), rows)):
+                live_prices[row[0]] = live
+
     entries = []
+    now_iso = datetime.now().isoformat()
+    updates = []  # (live, now_iso, id) batched into one connection below
     for row in rows:
         entry = {
             "id":               row[0],
@@ -195,20 +200,13 @@ def get_watchlist(refresh_prices: bool = True, user_id: str = "public") -> list:
         }
 
         if refresh_prices:
-            live = _get_current_price(row[1])
+            live = live_prices.get(row[0])
             if live is not None:
                 entry["current_price"] = live
                 change_pct = ((live - row[3]) / row[3]) * 100 if row[3] else 0
                 entry["change_from_add_pct"] = round(change_pct, 2)
                 entry["alert_triggered"] = abs(change_pct) >= row[5]
-
-                conn2 = get_conn()
-                conn2.execute(
-                    "UPDATE watchlist SET current_price = ?, last_updated = ? WHERE id = ?",
-                    (live, datetime.now().isoformat(), row[0])
-                )
-                conn2.commit()
-                conn2.close()
+                updates.append((live, now_iso, row[0]))
             else:
                 entry["change_from_add_pct"] = None
                 entry["alert_triggered"] = False
@@ -218,6 +216,15 @@ def get_watchlist(refresh_prices: bool = True, user_id: str = "public") -> list:
             entry["alert_triggered"] = abs(change_pct) >= row[5]
 
         entries.append(entry)
+
+    if updates:
+        conn2 = get_conn()
+        conn2.executemany(
+            "UPDATE watchlist SET current_price = ?, last_updated = ? WHERE id = ?",
+            updates
+        )
+        conn2.commit()
+        conn2.close()
 
     return entries
 

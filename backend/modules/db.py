@@ -52,8 +52,12 @@ _SQLITE_PATH = _resolve_sqlite_path()
 
 if IS_POSTGRES:
     import psycopg2  # noqa: E402  (only needed when Postgres is configured)
+    from psycopg2.pool import SimpleConnectionPool
     IntegrityError = psycopg2.IntegrityError
     OperationalError = psycopg2.OperationalError
+    # A fresh psycopg2.connect() per request means a TCP+TLS handshake to Supabase
+    # every time. Pool them instead so requests reuse warm connections.
+    _POOL = SimpleConnectionPool(1, 10, DATABASE_URL, connect_timeout=10)
 else:
     IntegrityError = sqlite3.IntegrityError
     OperationalError = sqlite3.OperationalError
@@ -126,13 +130,18 @@ class _PgConn:
         self._raw.rollback()
 
     def close(self):
-        self._raw.close()
+        # Return the connection to the pool instead of tearing down the socket,
+        # so the next get_conn() reuses it instead of re-handshaking with Supabase.
+        try:
+            _POOL.putconn(self._raw)
+        except Exception:
+            self._raw.close()
 
 
 def get_conn():
     """Return a connection usable exactly like sqlite3.connect()."""
     if IS_POSTGRES:
-        return _PgConn(psycopg2.connect(DATABASE_URL, connect_timeout=10))
+        return _PgConn(_POOL.getconn())
     conn = sqlite3.connect(_SQLITE_PATH, timeout=30)
     try:
         conn.execute("PRAGMA journal_mode=WAL")
@@ -143,3 +152,21 @@ def get_conn():
 
 def backend_name() -> str:
     return "postgres" if IS_POSTGRES else "sqlite"
+
+
+def legacy_add_column(conn, table: str, column: str, coltype_ddl: str = "TEXT NOT NULL DEFAULT 'public'"):
+    """
+    Best-effort SQLite migration for a table created before `column` existed
+    (e.g. adding user_id to a pre-multi-user table).
+
+    No-ops on Postgres: fresh Postgres tables are created with the column
+    already in the DDL, and a failing ALTER there aborts the whole transaction,
+    poisoning every statement after it (see commit 8ea5310). Centralised here so
+    every module gets that guard automatically instead of re-implementing it.
+    """
+    if IS_POSTGRES:
+        return
+    try:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {coltype_ddl}")
+    except Exception:
+        pass

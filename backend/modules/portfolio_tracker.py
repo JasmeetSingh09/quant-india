@@ -12,7 +12,8 @@ Stored in SQLite (table: portfolio_holdings).
 """
 
 import sqlite3
-from db import get_conn, IntegrityError  # noqa: F401
+from concurrent.futures import ThreadPoolExecutor
+from db import get_conn, IntegrityError, legacy_add_column  # noqa: F401
 import sys
 from pathlib import Path
 from datetime import datetime
@@ -37,14 +38,8 @@ def _init_db():
             added_at     TEXT NOT NULL
         )
     """)
-    # Legacy SQLite migration only — on Postgres the column already exists and a
-    # failing ALTER would abort the transaction (see watchlist.py).
-    from db import IS_POSTGRES
-    if not IS_POSTGRES:
-        try:
-            conn.execute("ALTER TABLE portfolio_holdings ADD COLUMN user_id TEXT NOT NULL DEFAULT 'public'")
-        except Exception:
-            pass
+    # Legacy SQLite migration only (no-ops on Postgres — see db.legacy_add_column).
+    legacy_add_column(conn, "portfolio_holdings", "user_id")
     conn.commit()
     conn.close()
 
@@ -130,9 +125,17 @@ def get_portfolio(refresh: bool = True, user_id: str = "public") -> dict:
     total_invested = 0.0
     total_current  = 0.0
 
+    # Fetch all live prices in parallel (was one network round-trip per holding,
+    # serially — the same pattern that caused the "Start Simulation" timeout).
+    live_prices = {}
+    if refresh and rows:
+        with ThreadPoolExecutor(max_workers=min(8, len(rows) * 2 or 1)) as ex:
+            for row, live in zip(rows, ex.map(lambda r: _live_price(r[1]), rows)):
+                live_prices[row[0]] = live
+
     for hid, ticker, cname, qty, buy, added in rows:
         invested = qty * buy
-        live = _live_price(ticker) if refresh else buy
+        live = live_prices.get(hid) if refresh else buy
         if live is None:
             live = buy   # fall back so we never crash
         current = qty * live

@@ -24,7 +24,7 @@ Database: backend/quant_platform.db
 import json
 import sqlite3
 import threading
-from db import get_conn, IntegrityError  # noqa: F401
+from db import get_conn, IntegrityError, legacy_add_column  # noqa: F401
 import numpy as np
 import pandas as pd
 import yfinance as yf
@@ -127,17 +127,11 @@ def _init_db_locked():
             result       TEXT
         )
     """)
-    # migrate older SQLite tables that predate per-user support (best effort).
-    # SKIP on Postgres: the CREATE TABLEs above already include user_id, and a
-    # failing ALTER aborts the Postgres transaction — which 500'd the simulator
-    # endpoints after the Supabase switch.
+    # migrate older SQLite tables that predate per-user support (best effort;
+    # no-ops on Postgres — see db.legacy_add_column).
     import db as _db
-    if not _db.IS_POSTGRES:
-        for tbl in ("simulations", "sim_positions", "sim_snapshots", "portfolios"):
-            try:
-                conn.execute(f"ALTER TABLE {tbl} ADD COLUMN user_id TEXT NOT NULL DEFAULT 'public'")
-            except Exception:
-                pass
+    for tbl in ("simulations", "sim_positions", "sim_snapshots", "portfolios"):
+        legacy_add_column(conn, tbl, "user_id")
 
     # Old SQLite tables were created with a table-level UNIQUE(name) that blocks
     # two users from sharing a sim/portfolio name. ALTER can't drop it, so rebuild
@@ -387,9 +381,20 @@ def get_simulation_pnl(name: str, user_id: str = "public") -> dict:
     total_current = 0.0
     total_entry   = 0.0
 
+    # Resolve every position's live price in parallel — same fix as
+    # start_simulation's _resolve() below; a sim with several holdings was
+    # re-hitting the serial-fetch timeout on every P&L check.
+    import concurrent.futures as _cf
+    live_by_ticker = {}
+    if positions_raw:
+        tickers = [row[0] for row in positions_raw]
+        with _cf.ThreadPoolExecutor(max_workers=min(8, len(tickers) * 2 or 1)) as _ex:
+            for t, p in zip(tickers, _ex.map(_live_price, tickers)):
+                live_by_ticker[t] = p
+
     for row in positions_raw:
         ticker, cname, alloc_pct, units, entry_price, entry_value, entry_date = row
-        current_price = _live_price(ticker)
+        current_price = live_by_ticker.get(ticker)
         if current_price is None:
             current_price = entry_price   # fallback
 
