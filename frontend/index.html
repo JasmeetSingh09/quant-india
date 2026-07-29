@@ -2,7 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Google reads the rel="icon" on the home page and needs a square icon
+         comfortably larger than 48x48. The PNG is listed first because it is the
+         most broadly supported format; the SVG stays for crisp browser tabs.
+         /favicon.ico must be a real image file — the SPA catch-all used to answer
+         that path with index.html, so the default favicon lookup got HTML. -->
+    <link rel="icon" type="image/png" sizes="96x96" href="/icon-96.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#16a34a" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Quant India — AI Stock Intelligence for the NSE</title>
     <meta name="description" content="Quant India brings institutional quant tools to Indian (NSE) investors: a 4-factor alpha model, FinBERT news sentiment, portfolio optimisation, Monte Carlo simulation, and risk analytics — explained in plain English." />
@@ -15,7 +26,12 @@
     <meta property="og:title" content="Quant India — AI Stock Intelligence for the NSE" />
     <meta property="og:description" content="Institutional quant tools for Indian markets: alpha model, FinBERT sentiment, portfolio optimisation, Monte Carlo & risk — in plain English." />
     <meta property="og:url" content="https://www.quantindia.app/" />
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:image" content="https://www.quantindia.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Quant India — AI stock intelligence for the NSE" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://www.quantindia.app/og-image.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
