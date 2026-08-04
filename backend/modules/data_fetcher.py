@@ -514,7 +514,10 @@ def get_company_info(ticker: str) -> dict:
         "sector": info.get("sector", "Unknown"),
         "industry": info.get("industry", "Unknown"),
         "market_cap": info.get("marketCap", 0),
-        "description": info.get("longBusinessSummary", "")[:300],
+        # Was [:300], which sliced Reliance's 1,790-char summary mid-word
+        # ("...Retail, Di"). Keep the whole thing and let the UI decide how much
+        # to show — a clamp in CSS can be expanded, a truncated string cannot.
+        "description": info.get("longBusinessSummary", "") or "",
         "website": info.get("website", ""),
         "employees": info.get("fullTimeEmployees", 0)
     }
@@ -586,6 +589,12 @@ def get_financial_metrics(ticker: str) -> dict:
         if _pe and _g and _g > 0:
             peg = round(_pe / (_g * 100), 2)
 
+    # Yahoo simply does not return returnOnEquity / returnOnAssets /
+    # currentRatio / quickRatio / freeCashflow for NSE tickers — verified
+    # against RELIANCE.NS, where all five are absent while the underlying
+    # statements carry every input needed. Derive them rather than render "—".
+    derived = _derived_fundamentals(ticker, info)
+
     return {
         "pe_ratio": info.get("trailingPE", None),
         "forward_pe": info.get("forwardPE", None),
@@ -594,19 +603,110 @@ def get_financial_metrics(ticker: str) -> dict:
         "ebitda": ebitda,
         "price_to_book": info.get("priceToBook", None),
         "price_to_sales": info.get("priceToSalesTrailing12Months", None),
-        "roe": info.get("returnOnEquity", None),
-        "roa": info.get("returnOnAssets", None),
+        "roe": info.get("returnOnEquity") if info.get("returnOnEquity") is not None else derived.get("roe"),
+        "roa": info.get("returnOnAssets") if info.get("returnOnAssets") is not None else derived.get("roa"),
         "profit_margin": info.get("profitMargins", None),
         "revenue_growth": info.get("revenueGrowth", None),
         "earnings_growth": info.get("earningsGrowth", None),
         "debt_to_equity": debt_to_equity,
-        "current_ratio": info.get("currentRatio", None),
-        "free_cashflow": info.get("freeCashflow", None),
+        "current_ratio": info.get("currentRatio") if info.get("currentRatio") is not None else derived.get("current_ratio"),
+        "quick_ratio": info.get("quickRatio") if info.get("quickRatio") is not None else derived.get("quick_ratio"),
+        "free_cashflow": info.get("freeCashflow") if info.get("freeCashflow") is not None else derived.get("free_cashflow"),
+        "derived_fields": derived.get("_derived", []),   # so the UI can label these
         "dividend_yield": dividend_yield,   # PERCENT (0.32 == 0.32%)
         "peg_ratio": peg,
         "week_52_high": info.get("fiftyTwoWeekHigh", None),
         "week_52_low": info.get("fiftyTwoWeekLow", None),
     }
+
+
+_FUND_CACHE: dict = {}
+_FUND_TTL = 24 * 60 * 60      # statements are annual/quarterly — a day is plenty
+
+
+def _row(df, *names):
+    """First matching row's most recent value from a yfinance statement frame."""
+    if df is None or getattr(df, "empty", True):
+        return None
+    for want in names:
+        for idx in df.index:
+            if str(idx).strip().lower() == want.strip().lower():
+                try:
+                    series = df.loc[idx].dropna()
+                    if len(series):
+                        return float(series.iloc[0])
+                except Exception:
+                    pass
+    return None
+
+
+def _derived_fundamentals(ticker: str, info: dict) -> dict:
+    """
+    Reconstruct the ratios Yahoo omits for NSE tickers from the statements.
+
+      ROE           = net income / shareholders' equity
+      ROA           = net income / total assets
+      current ratio = current assets / current liabilities
+      quick ratio   = (current assets - inventory) / current liabilities
+      free cashflow = operating cash flow - capital expenditure
+
+    ROE prefers info-only inputs (bookValue x sharesOutstanding) so the common
+    case costs no extra request. Everything else needs the balance sheet /
+    cash-flow statement, which is fetched once per day per ticker.
+
+    Never raises: any missing input just leaves that ratio out.
+    """
+    out = {"_derived": []}
+    now = time.time()
+    hit = _FUND_CACHE.get(ticker)
+    if hit and now - hit[0] < _FUND_TTL:
+        return hit[1]
+
+    net_income = info.get("netIncomeToCommon")
+
+    # ROE straight from .info — no network call needed
+    bv, shares = info.get("bookValue"), info.get("sharesOutstanding")
+    if net_income and bv and shares:
+        equity = bv * shares
+        if equity > 0:
+            out["roe"] = round(net_income / equity, 4)
+            out["_derived"].append("roe")
+
+    try:
+        tk = yf.Ticker(ticker)
+        bs = tk.balance_sheet
+        cf = tk.cashflow
+
+        total_assets = _row(bs, "Total Assets")
+        if net_income and total_assets and total_assets > 0:
+            out["roa"] = round(net_income / total_assets, 4)
+            out["_derived"].append("roa")
+
+        cur_assets = _row(bs, "Current Assets", "Total Current Assets")
+        cur_liabs  = _row(bs, "Current Liabilities", "Total Current Liabilities")
+        if cur_assets and cur_liabs and cur_liabs > 0:
+            out["current_ratio"] = round(cur_assets / cur_liabs, 2)
+            out["_derived"].append("current_ratio")
+            inventory = _row(bs, "Inventory") or 0.0
+            out["quick_ratio"] = round((cur_assets - inventory) / cur_liabs, 2)
+            out["_derived"].append("quick_ratio")
+
+        ocf   = _row(cf, "Operating Cash Flow", "Total Cash From Operating Activities")
+        capex = _row(cf, "Capital Expenditure", "Capital Expenditures")
+        if ocf is not None and capex is not None:
+            out["free_cashflow"] = round(ocf + capex, 2)   # capex is negative
+            out["_derived"].append("free_cashflow")
+        # ROE fallback if bookValue was unavailable above
+        if "roe" not in out and net_income:
+            eq = _row(bs, "Stockholders Equity", "Total Stockholder Equity")
+            if eq and eq > 0:
+                out["roe"] = round(net_income / eq, 4)
+                out["_derived"].append("roe")
+    except Exception:
+        pass      # statements unavailable (throttled//delisted) — return what we have
+
+    _FUND_CACHE[ticker] = (now, out)
+    return out
 
 
 def get_sector_peers(ticker: str) -> list:

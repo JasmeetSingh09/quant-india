@@ -76,7 +76,9 @@ def _compute_full_metrics(ticker: str) -> dict:
         # Yahoo omits pegRatio for many NSE names; data_fetcher computes a
         # P/E ÷ earnings-growth fallback, so prefer that when Yahoo has nothing.
         peg              = raw.get("pegRatio") or base.get("peg_ratio")
-        quick_ratio      = raw.get("quickRatio")
+        # Same story as pegRatio: Yahoo omits quickRatio for NSE names, so fall
+        # back to the value data_fetcher derives from the balance sheet.
+        quick_ratio      = raw.get("quickRatio") or base.get("quick_ratio")
         gross_margin     = raw.get("grossMargins")
         operating_margin = raw.get("operatingMargins")
         total_revenue    = raw.get("totalRevenue")
@@ -297,12 +299,22 @@ def piotroski_score(ticker: str) -> dict:
     try:
         info = get_info(ticker)
 
-        roa           = info.get("returnOnAssets", 0) or 0
+        # Yahoo returns none of returnOnAssets / totalAssets /
+        # totalStockholderEquity / currentRatio for NSE tickers. Reading them
+        # straight from .info scored every Indian stock as roa=0 (losing F1/F3),
+        # current_ratio=0 (losing F6) and total_equity=1, which made leverage
+        # astronomically large and lost F5 too — a structural 3-point penalty
+        # that had nothing to do with the company. Fall back to the values
+        # derived from the statements.
+        from data_fetcher import _derived_fundamentals
+        der = _derived_fundamentals(ticker, info)
+
+        roa           = info.get("returnOnAssets") or der.get("roa") or 0
         cfo           = info.get("operatingCashflow", 0) or 0
-        total_assets  = info.get("totalAssets", 1) or 1
+        total_assets  = info.get("totalAssets") or None
         long_term_debt= info.get("longTermDebt", 0) or 0
-        total_equity  = info.get("totalStockholderEquity", 1) or 1
-        current_ratio = info.get("currentRatio", 0) or 0
+        total_equity  = info.get("totalStockholderEquity") or None
+        current_ratio = info.get("currentRatio") or der.get("current_ratio") or 0
         gross_margin  = info.get("grossMargins", 0) or 0
         revenue_growth= info.get("revenueGrowth", 0) or 0
 
@@ -310,11 +322,14 @@ def piotroski_score(ticker: str) -> dict:
         f1_roa_positive   = 1 if roa > 0 else 0
         f2_cfo_positive   = 1 if cfo > 0 else 0
         f3_roa_strong     = 1 if roa > 0.05 else 0      # proxy: ROA > 5 %
-        f4_cfo_beats_roa  = 1 if (cfo / total_assets) > roa else 0
+        # Without total_assets this used to divide by a placeholder 1, making
+        # cfo/total_assets enormous and handing out a free point. Score it only
+        # when the denominator is real.
+        f4_cfo_beats_roa  = 1 if (total_assets and (cfo / total_assets) > roa) else 0
 
         # Leverage & Liquidity
-        leverage_ratio    = long_term_debt / total_equity if total_equity else 0
-        f5_low_leverage   = 1 if leverage_ratio < 0.5 else 0
+        leverage_ratio    = (long_term_debt / total_equity) if total_equity else None
+        f5_low_leverage   = 1 if (leverage_ratio is not None and leverage_ratio < 0.5) else 0
         f6_good_liquidity = 1 if current_ratio > 1.0 else 0
         # Share dilution proxy: we assume no dilution (yfinance lacks prior-year share count easily)
         f7_no_dilution    = 1
