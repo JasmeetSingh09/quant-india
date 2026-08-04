@@ -218,6 +218,15 @@ def simulate(
     n_simulations = min(n_simulations, 50_000)
     horizon_days  = min(horizon_days, 2_520)      # 10 years
 
+    # Capping the two independently is NOT enough — the working set is their
+    # PRODUCT. 50,000 paths x 2,520 days is 126M cells (~1 GB in float64),
+    # which killed the worker even though each value was within its own limit.
+    # Keep the full horizon the user asked for and trim the path count instead;
+    # percentiles converge on paths, so 8k paths still gives stable bands.
+    MAX_CELLS = 20_000_000
+    if n_simulations * horizon_days > MAX_CELLS:
+        n_simulations = max(1_000, MAX_CELLS // horizon_days)
+
     total = sum(holdings.values())
     if abs(total - 100) > 0.01:
         return {"error": f"Allocations must sum to 100%, got {total:.1f}%"}
@@ -258,7 +267,7 @@ def simulate(
             return {"error": "not enough history for block bootstrap"}
         starts     = np.random.randint(0, max_start, size=(n_simulations, n_blocks))
         # Build each path by stitching blocks, then trim to horizon
-        rand_returns = np.empty((n_simulations, n_blocks * block))
+        rand_returns = np.empty((n_simulations, n_blocks * block), dtype=np.float32)
         for b in range(n_blocks):
             for off in range(block):
                 rand_returns[:, b * block + off] = hist_arr[starts[:, b] + off]
@@ -267,14 +276,22 @@ def simulate(
     else:
         return {"error": f"Unknown method '{method}'. Use normal | t | bootstrap | block."}
 
+    # float32 halves the working set. Returns are ~1e-2 and we only report
+    # percentiles to 2 dp, so float32's ~7 significant digits is far more
+    # precision than the output carries.
+    if rand_returns.dtype != np.float32:
+        rand_returns = rand_returns.astype(np.float32, copy=False)
+
     # Compound each path in place: value_t = value_0 * prod(1 + r).
     # Reusing rand_returns' buffer avoids holding a second full-size array —
     # at 50k x 252 each copy is ~100 MB.
-    np.add(rand_returns, 1.0, out=rand_returns)
+    np.add(rand_returns, np.float32(1.0), out=rand_returns)
     np.cumprod(rand_returns, axis=1, out=rand_returns)
-    rand_returns *= initial_value
+    rand_returns *= np.float32(initial_value)
     paths        = rand_returns
-    final_values = paths[:, -1].copy()
+    # Summary stats go back to float64 — this vector is only n_simulations long,
+    # so the precision is free.
+    final_values = paths[:, -1].astype(np.float64)
 
     summary = _summarise_paths(final_values, initial_value, horizon_days)
 
