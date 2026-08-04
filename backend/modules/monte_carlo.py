@@ -30,9 +30,12 @@ For each method we run N simulations (default 10,000) over a horizon
 final outcomes: median, percentiles, probability of loss, worst case.
 """
 
+import time
+import threading
 import numpy as np
 import pandas as pd
 import yfinance as yf
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
@@ -44,22 +47,43 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 # Data helper
 # ---------------------------------------------------------------------------
 
+_HIST_CACHE: dict = {}          # (tickers, lookback) -> (timestamp, Series)
+_HIST_TTL = 30 * 60             # 30 min — intraday drift is irrelevant to a 1y sim
+_HIST_LOCK = threading.Lock()
+
+
 def _portfolio_daily_returns(holdings: dict, lookback_days: int = 504) -> pd.Series:
     """
     Build the historical daily return series for a weighted portfolio.
     holdings: {ticker: allocation_pct} summing to 100.
+
+    Cached and fetched in parallel: compare_methods runs three simulations off
+    the SAME history, and this used to re-download every ticker sequentially for
+    each one (a 4-stock compare = 12 serial Yahoo round-trips). On a throttled
+    cloud IP that download, not the simulation maths, was the entire wait.
     """
+    key = (tuple(sorted(holdings)), lookback_days)
+    now = time.time()
+    with _HIST_LOCK:
+        hit = _HIST_CACHE.get(key)
+        if hit and now - hit[0] < _HIST_TTL:
+            return hit[1]
+
     end   = datetime.now().strftime("%Y-%m-%d")
     start = (datetime.now() - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
 
-    prices = {}
-    for t in holdings:
+    def _one(t):
         try:
             df = yf.download(t, start=start, end=end, progress=False, auto_adjust=True)
-            if not df.empty:
-                prices[t] = df["Close"].squeeze()
+            return t, (df["Close"].squeeze() if not df.empty else None)
         except Exception:
-            pass
+            return t, None
+
+    prices = {}
+    with ThreadPoolExecutor(max_workers=min(8, max(1, len(holdings)))) as pool:
+        for t, s in pool.map(_one, list(holdings)):
+            if s is not None:
+                prices[t] = s
 
     if not prices:
         return pd.Series(dtype=float)
@@ -70,7 +94,10 @@ def _portfolio_daily_returns(holdings: dict, lookback_days: int = 504) -> pd.Ser
     weights  = weights / weights.sum()
 
     returns  = df[valid].pct_change().dropna()
-    return pd.Series((returns.values * weights).sum(axis=1), index=returns.index)
+    series   = pd.Series((returns.values * weights).sum(axis=1), index=returns.index)
+    with _HIST_LOCK:
+        _HIST_CACHE[key] = (time.time(), series)
+    return series
 
 
 def _summarise_paths(final_values: np.ndarray, initial_value: float, horizon_days: int) -> dict:
@@ -113,27 +140,37 @@ def _summarise_paths(final_values: np.ndarray, initial_value: float, horizon_day
     }
 
 
-def _sample_fan_chart(paths: np.ndarray, n_sample: int = 50) -> list:
+def _sample_fan_chart(paths: np.ndarray, n_sample: int = 50, initial_value: float = None) -> list:
     """
-    Return a sample of simulated paths + percentile bands for the fan chart.
-    paths shape: (n_simulations, horizon_days+1)
+    Return percentile bands for the fan chart.
+    paths shape: (n_simulations, horizon_days) — day 1 onwards.
+
+    Day 0 is identical for every path (everyone starts at initial_value), so it
+    is prepended as a constant rather than stored as a column.
     """
     n_sims, n_days = paths.shape
-    # Percentile bands across all simulations at each time step
-    bands = []
-    for d in range(n_days):
-        col = paths[:, d]
-        bands.append({
-            "day": d,
-            "p5":  round(float(np.percentile(col, 5)), 2),
-            "p25": round(float(np.percentile(col, 25)), 2),
-            "p50": round(float(np.percentile(col, 50)), 2),
-            "p75": round(float(np.percentile(col, 75)), 2),
-            "p95": round(float(np.percentile(col, 95)), 2),
-        })
-    # Downsample bands if too many days (keep ~120 points)
-    step = max(1, len(bands) // 120)
-    return bands[::step]
+    # Downsample FIRST, then take all five percentiles in one vectorised call.
+    # The old version ran 5 separate np.percentile calls for every one of ~253
+    # days (≈1,265 sorts of the full column) and then discarded half the result.
+    step = max(1, n_days // 120)
+    days = np.arange(0, n_days, step)
+    if days[-1] != n_days - 1:          # always land on the horizon's final day
+        days = np.append(days, n_days - 1)
+    qs   = np.percentile(paths[:, days], [5, 25, 50, 75, 95], axis=0)
+    out  = []
+    if initial_value is not None:
+        iv = round(float(initial_value), 2)
+        out.append({"day": 0, "p5": iv, "p25": iv, "p50": iv, "p75": iv, "p95": iv})
+    out += [
+        {"day": int(d) + 1,
+         "p5":  round(float(qs[0, i]), 2),
+         "p25": round(float(qs[1, i]), 2),
+         "p50": round(float(qs[2, i]), 2),
+         "p75": round(float(qs[3, i]), 2),
+         "p95": round(float(qs[4, i]), 2)}
+        for i, d in enumerate(days)
+    ]
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -148,6 +185,7 @@ def simulate(
     method: str = "bootstrap",
     t_dof: int = 5,
     seed: int = None,
+    with_charts: bool = True,
 ) -> dict:
     """
     Run a Monte Carlo simulation of a portfolio's future value.
@@ -165,6 +203,20 @@ def simulate(
     """
     if seed is not None:
         np.random.seed(seed)
+
+    # Guard rails. The working set is n_simulations x horizon_days float64s and
+    # numpy holds a few copies of it at once, so an unbounded request is a
+    # memory spike, not just a slow one. These caps are far above any useful
+    # setting — 50k paths already pins the percentiles to 2 decimal places.
+    try:
+        n_simulations = int(n_simulations)
+        horizon_days  = int(horizon_days)
+    except (TypeError, ValueError):
+        return {"error": "n_simulations and horizon_days must be whole numbers"}
+    if n_simulations < 100 or horizon_days < 1:
+        return {"error": "Need at least 100 simulations and a 1-day horizon"}
+    n_simulations = min(n_simulations, 50_000)
+    horizon_days  = min(horizon_days, 2_520)      # 10 years
 
     total = sum(holdings.values())
     if abs(total - 100) > 0.01:
@@ -215,22 +267,28 @@ def simulate(
     else:
         return {"error": f"Unknown method '{method}'. Use normal | t | bootstrap | block."}
 
-    # Compound each path: value_t = value_0 * prod(1 + r)
-    growth      = np.cumprod(1 + rand_returns, axis=1) * initial_value
-    # Prepend initial value as day 0
-    paths       = np.column_stack([np.full(n_simulations, initial_value), growth])
-    final_values = paths[:, -1]
+    # Compound each path in place: value_t = value_0 * prod(1 + r).
+    # Reusing rand_returns' buffer avoids holding a second full-size array —
+    # at 50k x 252 each copy is ~100 MB.
+    np.add(rand_returns, 1.0, out=rand_returns)
+    np.cumprod(rand_returns, axis=1, out=rand_returns)
+    rand_returns *= initial_value
+    paths        = rand_returns
+    final_values = paths[:, -1].copy()
 
     summary = _summarise_paths(final_values, initial_value, horizon_days)
-    fan     = _sample_fan_chart(paths)
 
-    # Histogram of final values (for distribution chart)
-    hist_counts, hist_edges = np.histogram(final_values, bins=40)
-    histogram = [
-        {"value": round(float((hist_edges[i] + hist_edges[i+1]) / 2), 0),
-         "count": int(hist_counts[i])}
-        for i in range(len(hist_counts))
-    ]
+    # compare_methods only reads the summary stats, so let it skip the chart
+    # work entirely rather than build payloads it throws away.
+    fan, histogram = [], []
+    if with_charts:
+        fan = _sample_fan_chart(paths, initial_value=initial_value)
+        hist_counts, hist_edges = np.histogram(final_values, bins=40)
+        histogram = [
+            {"value": round(float((hist_edges[i] + hist_edges[i+1]) / 2), 0),
+             "count": int(hist_counts[i])}
+            for i in range(len(hist_counts))
+        ]
 
     return {
         "method":          method,
@@ -261,8 +319,10 @@ def compare_methods(
     results = {}
     first_error = None
     for method in ["normal", "t", "bootstrap"]:
+        # with_charts=False: only the summary stats below are read, so there is
+        # no reason to build fan-chart bands and histograms three times over.
         r = simulate(holdings, initial_value, horizon_days, n_simulations,
-                     method=method, seed=42)
+                     method=method, seed=42, with_charts=False)
         if "error" in r:
             first_error = first_error or r["error"]
             continue
