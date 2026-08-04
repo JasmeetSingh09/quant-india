@@ -41,7 +41,11 @@ for _ in range(80):
     views = {t: (float(rng.uniform(-0.05,0.05)), float(rng.uniform(0.5,0.95))) for t in tickers}
     r = PO.black_litterman_optimize(tickers, views)
     if "error" in r: check(False,"bl_errored", r.get("error")); continue
-    w = r.get("optimal_weights",{})
+    # black_litterman_optimize returns its weights as bl_weights (alongside
+    # equilibrium_weights, so the shift is visible). Reading optimal_weights
+    # gave {} and summed to 0 — the assertion was failing on a key the
+    # function has never returned, not on a bad weight vector.
+    w = r.get("bl_weights",{})
     check(abs(sum(w.values())-1.0)<1e-2,"bl_not_simplex",f"sum={sum(w.values())}")
     check(all(math.isfinite(v) for v in w.values()),"bl_nonfinite",str(w))
 

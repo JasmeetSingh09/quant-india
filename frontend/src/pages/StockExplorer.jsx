@@ -100,6 +100,22 @@ function CompanyBrief({ text }) {
   )
 }
 
+/**
+ * Chart ranges. Intervals are chosen to respect Yahoo's limits — 1m only goes
+ * back ~7 days and 5m/15m ~60 days, so the longer ranges step down to hourly,
+ * daily and weekly bars rather than silently returning an empty frame.
+ */
+const CHART_RANGES = [
+  { key: '1D', label: '1D', interval: '5m',  period: '1d'  },
+  { key: '5D', label: '5D', interval: '15m', period: '5d'  },
+  { key: '1M', label: '1M', interval: '1h',  period: '1mo' },
+  { key: '3M', label: '3M', interval: '1d',  period: '3mo' },
+  { key: '6M', label: '6M', interval: '1d',  period: '6mo' },
+  { key: '1Y', label: '1Y', interval: '1d',  period: '1y'  },
+  { key: '2Y', label: '2Y', interval: '1wk', period: '2y'  },
+  { key: '5Y', label: '5Y', interval: '1wk', period: '5y'  },
+]
+
 function SentimentBar({ label, pct: value, color }) {
   return (
     <div>
@@ -452,11 +468,16 @@ function StockDetail({ ticker, onBack }) {
   const { data: alpha,   isLoading: alphaLoading }   = useQuery({ queryKey: ['alpha',   ticker], queryFn: () => getAlphaScore(ticker), enabled: !!ticker, staleTime: 120000 })
   const { data: sent,    isLoading: sentLoading }    = useQuery({ queryKey: ['sent',    ticker], queryFn: () => getSentiment(ticker),  enabled: !!ticker, staleTime: 120000 })
   const { data: newsD,   isLoading: newsLoading }    = useQuery({ queryKey: ['news',    ticker], queryFn: () => getStockNews(ticker),  enabled: !!ticker, staleTime: 60000 })
+  const [range, setRange] = useState('1D')
+  const { interval, period } = CHART_RANGES.find(r => r.key === range) || CHART_RANGES[0]
   const { data: intraday } = useQuery({
-    queryKey: ['intraday', ticker],
-    queryFn: () => getIntraday(ticker, '5m', '1d'),
+    queryKey: ['intraday', ticker, range],
+    queryFn: () => getIntraday(ticker, interval, period),
     enabled: !!ticker,
-    refetchInterval: q => (q.state.data ? (price?.feed_active ? 30000 : false) : false),
+    // Only the intraday ranges move during the session; polling a 1-year daily
+    // chart every 30s just burns Yahoo quota for a bar that changes once a day.
+    refetchInterval: q =>
+      (q.state.data && price?.feed_active && ['1D', '5D'].includes(range)) ? 30000 : false,
   })
   const { data: vol } = useQuery({
     queryKey: ['vol', ticker],
@@ -585,14 +606,31 @@ function StockDetail({ ticker, onBack }) {
             </div>
           </div>
 
-          {/* Intraday chart */}
+          {/* Price chart — intraday through multi-year */}
           {intraday?.candles?.length > 0 && (
             <div className="card">
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
+                  {CHART_RANGES.map(r => (
+                    <button
+                      key={r.key}
+                      onClick={() => setRange(r.key)}
+                      className={`shrink-0 px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                        range === r.key
+                          ? 'bg-green-600 text-white'
+                          : 'bg-gray-800 hover:bg-gray-700 text-gray-300'
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="flex items-center justify-between mb-2">
                 <h2 className="font-semibold text-sm">
                   Price Chart{' '}
                   <span className="text-xs text-gray-500 font-normal">
-                    ({intraday.resolution}{price?.market_open ? ' · updates every 30s' : ''})
+                    ({intraday.resolution}{price?.market_open && ['1D','5D'].includes(range) ? ' · updates every 30s' : ''})
                   </span>
                 </h2>
                 {price?.market_open ? (
