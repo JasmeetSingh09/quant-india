@@ -15,6 +15,7 @@ no edge — and reporting that honestly is the entire point. A real track record
 warts and all, is far more credible than a cherry-picked screenshot.
 """
 
+import time
 import sqlite3
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -81,6 +82,54 @@ def snapshot(universe: list = None) -> dict:
     return {"snapshot_date": today, "logged": logged, "universe_size": len(universe)}
 
 
+_CLOSE_CACHE: dict = {}          # ticker -> (timestamp, Series of closes)
+_CLOSE_TTL = 30 * 60             # 30 min; these are daily bars
+
+
+def _closes_for(tickers: list) -> dict:
+    """
+    Daily close series for many tickers using ONE batched yfinance request.
+
+    Falls back to a single-ticker fetch only for names the batch didn't return,
+    so one bad symbol can't cost a round-trip for every other ticker.
+    """
+    now = time.time()
+    out, missing = {}, []
+    for t in tickers:
+        hit = _CLOSE_CACHE.get(t)
+        if hit and now - hit[0] < _CLOSE_TTL:
+            out[t] = hit[1]
+        else:
+            missing.append(t)
+
+    if missing:
+        try:
+            raw = yf.download(missing, period="1y", auto_adjust=True,
+                              progress=False, group_by="column", threads=True)
+            closes = raw["Close"] if "Close" in raw else raw
+            if isinstance(closes, pd.Series):          # single ticker comes back flat
+                closes = closes.to_frame(missing[0])
+            for t in missing:
+                if t in closes.columns:
+                    s = closes[t].dropna()
+                    if len(s):
+                        out[t] = s
+                        _CLOSE_CACHE[t] = (now, s)
+        except Exception:
+            pass
+
+    for t in missing:                                  # anything the batch skipped
+        if t not in out:
+            try:
+                s = yf.Ticker(t).history(period="1y", auto_adjust=True)["Close"].dropna()
+                if len(s):
+                    out[t] = s
+                    _CLOSE_CACHE[t] = (now, s)
+            except Exception:
+                pass
+    return out
+
+
 def evaluate(min_days: int = 7) -> dict:
     """
     Grade every logged pick that is at least `min_days` old: fetch the current
@@ -98,11 +147,9 @@ def evaluate(min_days: int = 7) -> dict:
 
     cutoff = datetime.now() - timedelta(days=min_days)
     # benchmark prices (cache once)
-    try:
-        nifty = yf.download(BENCHMARK, period="6mo", auto_adjust=True,
-                            progress=False)["Close"].squeeze().dropna()
-    except Exception:
-        nifty = None
+    # Same series for every horizon, so cache it rather than refetching on each
+    # 3d/7d/14d/21d switch.
+    nifty = _closes_for([BENCHMARK]).get(BENCHMARK)
 
     # Measure each pick over a FIXED min_days window, not from its log date to
     # today. Previously every row was priced at today's close, so a pick logged
@@ -110,18 +157,15 @@ def evaluate(min_days: int = 7) -> dict:
     # the 3d/7d/14d buttons changed only which picks were included, never the
     # holding period being measured, so all three returned near-identical
     # numbers. A horizon comparison is only meaningful if the horizon is real.
-    hist_cache: dict = {}
+    # One batched download for every ticker in the record, cached across
+    # requests. Fetching per-ticker meant 13 sequential Yahoo round-trips per
+    # call (5.7s locally, worse on a throttled cloud IP) and the 3d/7d/14d/21d
+    # buttons each paid it again for identical price data.
+    hist_cache = _closes_for(sorted({r[0] for r in rows}))
 
     def _price_after(tk, d_start, n_days):
         """Close n_days after d_start, or None if that date has not arrived."""
         s = hist_cache.get(tk)
-        if s is None:
-            try:
-                s = yf.download(tk, period="1y", auto_adjust=True,
-                                progress=False)["Close"].squeeze().dropna()
-            except Exception:
-                s = pd.Series(dtype=float)
-            hist_cache[tk] = s
         if s is None or not len(s):
             return None
         target = d_start + timedelta(days=n_days)
