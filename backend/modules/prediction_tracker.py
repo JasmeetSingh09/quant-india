@@ -19,6 +19,7 @@ import sqlite3
 from pathlib import Path
 from datetime import datetime, timedelta
 import numpy as np
+import pandas as pd
 import yfinance as yf
 
 _DB_PATH = Path(os.environ.get("QUANT_DATA_DIR", str(Path(__file__).parent.parent))) / "quant_platform.db"
@@ -103,29 +104,56 @@ def evaluate(min_days: int = 7) -> dict:
     except Exception:
         nifty = None
 
+    # Measure each pick over a FIXED min_days window, not from its log date to
+    # today. Previously every row was priced at today's close, so a pick logged
+    # 11 days ago reported an 11-day return whichever horizon was selected —
+    # the 3d/7d/14d buttons changed only which picks were included, never the
+    # holding period being measured, so all three returned near-identical
+    # numbers. A horizon comparison is only meaningful if the horizon is real.
+    hist_cache: dict = {}
+
+    def _price_after(tk, d_start, n_days):
+        """Close n_days after d_start, or None if that date has not arrived."""
+        s = hist_cache.get(tk)
+        if s is None:
+            try:
+                s = yf.download(tk, period="1y", auto_adjust=True,
+                                progress=False)["Close"].squeeze().dropna()
+            except Exception:
+                s = pd.Series(dtype=float)
+            hist_cache[tk] = s
+        if s is None or not len(s):
+            return None
+        target = d_start + timedelta(days=n_days)
+        if target > datetime.now():
+            return None                      # not matured at this horizon yet
+        after = s[s.index >= target]
+        if not len(after):
+            return None                      # target lands beyond available data
+        return float(after.iloc[0])
+
     matured, records = [], []
     for ticker, sdate, alpha, signal, p0 in rows:
         d0 = datetime.strptime(sdate, "%Y-%m-%d")
         if d0 > cutoff or not p0:
             continue
-        try:
-            p1 = float(yf.Ticker(ticker).fast_info.last_price)
-        except Exception:
-            continue
+        p1 = _price_after(ticker, d0, min_days)
         if not p1 or p1 != p1:
             continue
         fwd = (p1 / p0 - 1) * 100
-        # benchmark return over the same window
+        # benchmark measured over the SAME fixed window
         bench = None
         if nifty is not None and len(nifty):
             past = nifty[nifty.index <= (d0 + timedelta(days=2))]
-            if len(past):
-                bench = (float(nifty.iloc[-1]) / float(past.iloc[-1]) - 1) * 100
+            fut  = nifty[nifty.index >= (d0 + timedelta(days=min_days))]
+            if len(past) and len(fut):
+                bench = (float(fut.iloc[0]) / float(past.iloc[-1]) - 1) * 100
         rec = {"ticker": ticker, "date": sdate, "alpha_score": alpha, "signal": signal,
                "forward_return_pct": round(fwd, 2),
                "benchmark_return_pct": round(bench, 2) if bench is not None else None,
                "excess_pct": round(fwd - bench, 2) if bench is not None else None,
-               "days_held": (datetime.now() - d0).days}
+               # the horizon actually measured, not "days since logged"
+               "days_held": min_days}
         records.append(rec)
         matured.append((alpha, fwd, bench, signal))
 

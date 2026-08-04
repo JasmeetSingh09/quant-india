@@ -142,12 +142,12 @@ function TrackRecord() {
   })
   const sc = data?.scorecard
   const rawPreds = data?.predictions || []
-  // The model re-logs a snapshot daily, so each stock appears once per snapshot date.
-  // Collapse to ONE row per stock — keep the longest-held snapshot (most complete
-  // evaluation) — so the table reads as "one line per pick" instead of repeating.
+  // The model re-logs a snapshot daily, so each stock appears once per snapshot
+  // date. Every row is now measured over the SAME fixed horizon, so "longest
+  // held" no longer distinguishes them — keep the most recent snapshot instead.
   const preds = Object.values(rawPreds.reduce((acc, r) => {
     const cur = acc[r.ticker]
-    if (!cur || (r.days_held ?? 0) > (cur.days_held ?? 0)) acc[r.ticker] = r
+    if (!cur || (r.date ?? '') > (cur.date ?? '')) acc[r.ticker] = r
     return acc
   }, {}))
   const pct = v => v == null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(2)}%`
@@ -160,8 +160,10 @@ function TrackRecord() {
           <History size={18} className="text-blue-400" /> Track Record — did past picks actually work?
         </h2>
         <div className="flex items-center gap-1 text-xs">
-          <span className="text-gray-500 mr-1">Held for ≥</span>
-          {[3, 7, 14].map(d => (
+          {/* Exact horizon now, not a minimum: each pick is priced N days after
+              it was logged, so the three buttons really are three horizons. */}
+          <span className="text-gray-500 mr-1">Horizon</span>
+          {[3, 7, 14, 21].map(d => (
             <button key={d} onClick={() => setDays(d)}
               className={`px-2 py-1 rounded ${days === d ? 'bg-blue-600 text-white' : 'bg-gray-800 hover:bg-gray-700 text-gray-300'}`}>
               {d}d
@@ -189,19 +191,19 @@ function TrackRecord() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             <div className="card-sm">
               <p className="stat-label">BUY-signal avg return</p>
-              <p className={`stat-value text-lg ${col(sc.buy_avg_return_pct)}`}>{pct(sc.buy_avg_return_pct)}</p>
+              <p className={`stat-value ${col(sc.buy_avg_return_pct)}`}>{pct(sc.buy_avg_return_pct)}</p>
             </div>
             <div className="card-sm">
               <p className="stat-label">SELL-signal avg return</p>
-              <p className={`stat-value text-lg ${col(sc.sell_avg_return_pct)}`}>{pct(sc.sell_avg_return_pct)}</p>
+              <p className={`stat-value ${col(sc.sell_avg_return_pct)}`}>{pct(sc.sell_avg_return_pct)}</p>
             </div>
             <div className="card-sm">
               <p className="stat-label">BUY − SELL spread<span className="text-gray-600"> (edge)</span></p>
-              <p className={`stat-value text-lg ${col(sc.buy_minus_sell_pct)}`}>{pct(sc.buy_minus_sell_pct)}</p>
+              <p className={`stat-value ${col(sc.buy_minus_sell_pct)}`}>{pct(sc.buy_minus_sell_pct)}</p>
             </div>
             <div className="card-sm">
               <p className="stat-label">Avg excess vs Nifty</p>
-              <p className={`stat-value text-lg ${col(sc.avg_excess_vs_nifty_pct)}`}>{pct(sc.avg_excess_vs_nifty_pct)}</p>
+              <p className={`stat-value ${col(sc.avg_excess_vs_nifty_pct)}`}>{pct(sc.avg_excess_vs_nifty_pct)}</p>
             </div>
           </div>
 
@@ -454,9 +456,18 @@ export default function Dashboard() {
                 <p className={`font-semibold text-sm ${
                   label==='Bull'?'text-green-400':label==='Bear'?'text-red-400':'text-yellow-400'
                 }`}>{label}</p>
-                <p className="text-xs text-gray-500 mt-1">{stats.pct_of_time}% of time</p>
-                <p className={`text-sm font-mono mt-1 ${stats.annualised_ret>=0?'text-green-400':'text-red-400'}`}>
-                  {stats.annualised_ret>0?'+':''}{stats.annualised_ret}% CAGR
+                <p className="text-xs text-gray-500 mt-1">{stats.pct_of_time}% of time · {stats.n_days}d</p>
+                {/* Lead with the daily figure. Annualising a 34-day regime is an
+                    extrapolation, not a CAGR the market ever delivered, so it is
+                    shown as a conditional and clearly de-emphasised. */}
+                <p className={`text-sm font-mono mt-1 ${stats.avg_daily_ret>=0?'text-green-400':'text-red-400'}`}>
+                  {stats.avg_daily_ret>0?'+':''}{stats.avg_daily_ret}%<span className="text-gray-500">/day</span>
+                </p>
+                <p className="text-[11px] text-gray-500 mt-0.5 font-mono">
+                  vol {stats.avg_daily_vol}%/day
+                </p>
+                <p className="text-[11px] text-gray-600 mt-1 leading-snug">
+                  if sustained 1y: {stats.annualised_ret>0?'+':''}{Math.round(stats.annualised_ret)}%
                 </p>
               </div>
             ))}

@@ -304,13 +304,32 @@ def detect_regime(
         if mask.sum() > 0:
             label = label_map[k]
             rets  = X[mask, 0]
+            mu = float(rets.mean())
+            # Volatility is the standard deviation of returns in the regime.
+            # X[:, 1] is abs(return) — a fine HMM observation feature, but it is
+            # mean absolute deviation, not sigma. Reporting it as "vol" also made
+            # vol identical to |mean| whenever a regime's days shared a sign
+            # (bear vol 1.356 next to bear return -1.356 was that artefact).
+            sigma = float(rets.std(ddof=1)) if mask.sum() > 1 else 0.0
+
+            # Returns compound, they do not add: mean x 252 turned a -1.356%
+            # daily bear mean into "-341% CAGR", which is not a possible loss.
+            # Compounding bounds it at -100% by construction.
+            ann_ret = ((1.0 + mu) ** 252 - 1.0) * 100
+
             regime_stats[label] = {
                 "n_days":          int(mask.sum()),
                 "pct_of_time":     round(mask.sum() / len(states) * 100, 1),
-                "avg_daily_ret":   round(float(rets.mean()) * 100, 3),
-                "avg_daily_vol":   round(float(X[mask, 1].mean()) * 100, 3),
-                "annualised_ret":  round(float(rets.mean()) * 252 * 100, 2),
-                "annualised_vol":  round(float(X[mask, 1].mean()) * np.sqrt(252) * 100, 2),
+                "avg_daily_ret":   round(mu * 100, 3),
+                "avg_daily_vol":   round(sigma * 100, 3),
+                "annualised_ret":  round(ann_ret, 2),
+                "annualised_vol":  round(sigma * np.sqrt(252) * 100, 2),
+                # Regimes are short-lived, so a 1-year extrapolation of a 34-day
+                # state is illustrative rather than a forecast. Say so.
+                "annualisation_note": (
+                    f"compounded from {int(mask.sum())} days in this regime — "
+                    "illustrative, not a forecast"
+                ),
             }
 
     # Transition matrix with labels

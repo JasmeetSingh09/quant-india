@@ -65,6 +65,41 @@ function SearchBar({ onSelect, placeholder }) {
 }
 
 // ─── SentimentBar ─────────────────────────────────────────────────────────────
+/**
+ * CompanyBrief — lead with the first two sentences of Yahoo's business summary,
+ * with the rest one click away.
+ *
+ * The backend used to hard-truncate this to 300 characters, which cut Reliance
+ * mid-word. We now receive the full ~1,800 chars, but a wall of text above the
+ * price is worse than useless — so summarise by sentence boundary (never
+ * mid-word) and keep the full text available rather than discarding it.
+ */
+function CompanyBrief({ text }) {
+  const [open, setOpen] = useState(false)
+  const clean = (text || '').trim()
+  // First two sentences, respecting abbreviations like "Ltd." poorly is fine
+  // here — worst case the brief is a little longer than two sentences.
+  const m = clean.match(/^(.*?[.!?])\s+(.*?[.!?])(\s|$)/)
+  const brief = m ? `${m[1]} ${m[2]}` : clean.slice(0, 240)
+  const truncated = brief.length < clean.length
+
+  return (
+    <div className="mt-3 max-w-3xl">
+      <p className="text-sm text-gray-400 leading-relaxed">
+        {open || !truncated ? clean : brief}
+      </p>
+      {truncated && (
+        <button
+          onClick={() => setOpen(o => !o)}
+          className="mt-1 text-xs text-green-400 hover:text-green-300 transition-colors"
+        >
+          {open ? 'Show less' : 'Read full profile'}
+        </button>
+      )}
+    </div>
+  )
+}
+
 function SentimentBar({ label, pct: value, color }) {
   return (
     <div>
@@ -472,37 +507,33 @@ function StockDetail({ ticker, onBack }) {
                   <span className="text-xs text-gray-500">{m.industry}</span>
                 )}
               </div>
-              {m.description && (
-                <p className="text-sm text-gray-400 leading-relaxed mt-3 max-w-3xl">
-                  {m.description}
-                </p>
-              )}
+              {m.description && <CompanyBrief text={m.description} />}
             </div>
             <div className="shrink-0 grid grid-cols-1 sm:grid-cols-2 gap-3 text-right">
               {m.market_cap_fmt && (
                 <div>
-                  <p className="text-[11px] text-gray-500">Market Cap</p>
-                  <p className="text-sm font-semibold font-mono">{m.market_cap_fmt}</p>
+                  <p className="text-xs text-gray-500">Market Cap</p>
+                  <p className="text-base sm:text-lg font-semibold font-mono">{m.market_cap_fmt}</p>
                 </div>
               )}
               {m.beta != null && (
                 <div>
-                  <p className="text-[11px] text-gray-500">Beta</p>
-                  <p className="text-sm font-semibold font-mono">{num(m.beta, 2)}</p>
+                  <p className="text-xs text-gray-500">Beta</p>
+                  <p className="text-base sm:text-lg font-semibold font-mono">{num(m.beta, 2)}</p>
                 </div>
               )}
               {m.employees && (
                 <div>
-                  <p className="text-[11px] text-gray-500">Employees</p>
-                  <p className="text-sm font-semibold font-mono">{m.employees?.toLocaleString('en-IN')}</p>
+                  <p className="text-xs text-gray-500">Employees</p>
+                  <p className="text-base sm:text-lg font-semibold font-mono">{m.employees?.toLocaleString('en-IN')}</p>
                 </div>
               )}
               {m.dividend_yield && (
                 <div>
-                  <p className="text-[11px] text-gray-500">Div Yield</p>
+                  <p className="text-xs text-gray-500">Div Yield</p>
                   {/* dividend_yield is already a PERCENT from the backend — do NOT
                       use pct(), which multiplies by 100 (that showed 0.32% as 33%). */}
-                  <p className="text-sm font-semibold font-mono text-green-400">{Number(m.dividend_yield).toFixed(2)}%</p>
+                  <p className="text-base sm:text-lg font-semibold font-mono text-green-400">{Number(m.dividend_yield).toFixed(2)}%</p>
                 </div>
               )}
             </div>
