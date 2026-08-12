@@ -23,16 +23,60 @@ except Exception:  # pragma: no cover
     jwt = None
 
 
-def _decode_payload(token: str) -> dict | None:
-    if not (_JWT_SECRET and jwt and token):
+_SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+_JWKS_CACHE: dict = {"at": 0.0, "client": None}
+_JWKS_TTL = 60 * 60
+
+
+def _jwks_client():
+    """
+    PyJWKClient for the project's public keys, so ES256/RS256 tokens verify.
+
+    Supabase migrated projects from a shared HS256 secret to asymmetric JWT
+    Signing Keys. A project mid-migration can issue either, so we support both
+    rather than assuming — verifying only HS256 would reject every new token and
+    silently drop those users back into the shared "public" bucket.
+    """
+    if not (jwt and _SUPABASE_URL):
         return None
+    now = time.time()
+    if _JWKS_CACHE["client"] and now - _JWKS_CACHE["at"] < _JWKS_TTL:
+        return _JWKS_CACHE["client"]
     try:
-        return jwt.decode(
-            token, _JWT_SECRET, algorithms=["HS256"],
-            audience="authenticated", options={"verify_aud": False},
-        )
+        from jwt import PyJWKClient
+        c = PyJWKClient(f"{_SUPABASE_URL}/auth/v1/.well-known/jwks.json",
+                        cache_keys=True, lifespan=_JWKS_TTL)
+        _JWKS_CACHE.update(at=now, client=c)
+        return c
     except Exception:
         return None
+
+
+def _decode_payload(token: str) -> dict | None:
+    """Verify against the legacy HS256 secret first, then the project's JWKS."""
+    if not (jwt and token):
+        return None
+
+    if _JWT_SECRET:
+        try:
+            return jwt.decode(
+                token, _JWT_SECRET, algorithms=["HS256"],
+                audience="authenticated", options={"verify_aud": False},
+            )
+        except Exception:
+            pass      # may simply be an asymmetric token — try JWKS below
+
+    client = _jwks_client()
+    if client:
+        try:
+            key = client.get_signing_key_from_jwt(token).key
+            return jwt.decode(
+                token, key, algorithms=["ES256", "RS256"],
+                audience="authenticated", options={"verify_aud": False},
+            )
+        except Exception:
+            return None
+    return None
 
 
 def _unverified_sub(token: str) -> str | None:
@@ -58,13 +102,29 @@ def _unverified_sub(token: str) -> str | None:
         return None
 
 
+def _verification_configured() -> bool:
+    return bool(jwt and (_JWT_SECRET or _SUPABASE_URL))
+
+
 def _decode(token: str) -> str | None:
     payload = _decode_payload(token)
     if payload:
         return payload.get("sub")
-    if not _JWT_SECRET:
-        return _unverified_sub(token)
-    return None      # secret IS set and the token failed verification — reject
+
+    sub = _unverified_sub(token)
+    if not sub:
+        return None
+
+    if not _verification_configured():
+        # Nothing is configured — documented stopgap, separate on the raw sub.
+        return sub
+
+    # Verification IS configured but this token failed it. Returning "public"
+    # here would drop every such user back into one shared bucket — the exact
+    # privacy bug we are fixing. Namespacing keeps them separated AND means a
+    # forged token can never address a verified user's rows, since no verified
+    # id ever carries this prefix.
+    return f"unverified:{sub}"
 
 
 def _bearer(authorization: str | None) -> str | None:
@@ -109,9 +169,16 @@ def auth_status() -> dict:
     if not jwt:
         return {"verified": False,
                 "detail": "PyJWT not installed — users cannot be told apart"}
-    if not _JWT_SECRET:
+    if not (_JWT_SECRET or _SUPABASE_URL):
         return {"verified": False,
-                "detail": "SUPABASE_JWT_SECRET not set — users are separated by "
-                          "unverified token claims, which is a stopgap, not a "
-                          "security boundary. Set it in the Render dashboard."}
-    return {"verified": True, "detail": "Supabase JWTs verified (HS256)"}
+                "detail": "Neither SUPABASE_JWT_SECRET nor SUPABASE_URL is set — "
+                          "users are separated by unverified token claims, which "
+                          "is a stopgap, not a security boundary."}
+    modes = []
+    if _JWT_SECRET:
+        modes.append("HS256 (legacy secret)")
+    if _SUPABASE_URL:
+        modes.append("ES256/RS256 (JWKS)" if _jwks_client() else "JWKS unreachable")
+    return {"verified": True, "modes": modes,
+            "detail": "Tokens failing verification are namespaced 'unverified:' "
+                      "and can never address a verified user's data."}
