@@ -42,6 +42,13 @@ CYCLE_HOURS    = 24       # start a fresh pass once results are this old
 # live app that shares this connection.
 MAX_WORKERS    = 6
 
+# Bump when the alpha model changes in a way that invalidates stored scores.
+# Rows carrying an older version are treated as NOT done and get re-scored, so a
+# model fix reaches already-scanned stocks instead of waiting for tomorrow's
+# cycle. IDEA.NS sat at +55.95 STRONG BUY for hours after the distress fix
+# landed purely because its row already existed for the current cycle.
+MODEL_VERSION  = "distress-v2"
+
 _LOCK    = threading.Lock()
 _THREAD  = None
 _STOP    = threading.Event()
@@ -103,6 +110,17 @@ def _init_db():
                          "ADD COLUMN IF NOT EXISTS last_complete_cycle TEXT")
         else:
             conn.execute("ALTER TABLE alpha_scan_state ADD COLUMN last_complete_cycle TEXT")
+    except Exception:
+        pass
+    finally:
+        conn.close()
+
+    conn = get_conn()
+    try:
+        if IS_POSTGRES:
+            conn.execute("ALTER TABLE alpha_scan2 ADD COLUMN IF NOT EXISTS model_version TEXT")
+        else:
+            conn.execute("ALTER TABLE alpha_scan2 ADD COLUMN model_version TEXT")
         conn.commit()
     except Exception:
         pass          # already present
@@ -173,26 +191,27 @@ def _save_result(ticker: str, cycle: str, r: dict):
         (f.get("quality")   or {}).get("score"),
         (f.get("value")     or {}).get("score"),
         (f.get("sentiment") or {}).get("score"),
-        r.get("error"), cycle, now,
+        r.get("error"), cycle, now, MODEL_VERSION,
     )
     conn = get_conn()
     if IS_POSTGRES:
         conn.execute(
             "INSERT INTO alpha_scan2 (ticker, alpha_score, signal, confidence, market_cap,"
-            " momentum, quality, value, sentiment, error, cycle, scanned_at)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
+            " momentum, quality, value, sentiment, error, cycle, scanned_at, model_version)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
             " ON CONFLICT (ticker, cycle) DO UPDATE SET"
             " alpha_score=EXCLUDED.alpha_score, signal=EXCLUDED.signal,"
             " confidence=EXCLUDED.confidence, market_cap=EXCLUDED.market_cap,"
             " momentum=EXCLUDED.momentum, quality=EXCLUDED.quality,"
             " value=EXCLUDED.value, sentiment=EXCLUDED.sentiment,"
-            " error=EXCLUDED.error, cycle=EXCLUDED.cycle, scanned_at=EXCLUDED.scanned_at",
+            " error=EXCLUDED.error, cycle=EXCLUDED.cycle, scanned_at=EXCLUDED.scanned_at,"
+            " model_version=EXCLUDED.model_version",
             vals)
     else:
         conn.execute(
             "INSERT OR REPLACE INTO alpha_scan2 (ticker, alpha_score, signal, confidence,"
-            " market_cap, momentum, quality, value, sentiment, error, cycle, scanned_at)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", vals)
+            " market_cap, momentum, quality, value, sentiment, error, cycle, scanned_at, model_version)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", vals)
     conn.commit()
     conn.close()
 
@@ -200,7 +219,8 @@ def _save_result(ticker: str, cycle: str, r: dict):
 def _already_done(cycle: str) -> set:
     """Tickers finished in THIS cycle — the basis for resuming after a restart."""
     conn = get_conn()
-    rows = conn.execute("SELECT ticker FROM alpha_scan2 WHERE cycle = ?", (cycle,)).fetchall()
+    rows = conn.execute("SELECT ticker FROM alpha_scan2 WHERE cycle = ? "
+                        "AND model_version = ?", (cycle, MODEL_VERSION)).fetchall()
     conn.close()
     return {r[0] for r in rows}
 
