@@ -208,6 +208,14 @@ def _compute_sentiment_factor(ticker: str, days_back: int = 14) -> dict:
         # Confidence = total weight normalised by max possible weight
         confidence   = min(1.0, sum(weights) / (days_back * 0.5))
 
+        # Confidence was reported but never applied, so a single stale headline
+        # could hand the composite a full-strength opinion: IPCALAB.NS scored
+        # sentiment +0.4174 at confidence 0.0, worth +10.4 alpha points from
+        # evidence the model itself rated worthless. Shrink the score toward
+        # neutral in proportion to the evidence behind it — the other factors
+        # already return 0.0 when they have nothing.
+        weighted_avg = weighted_avg * confidence
+
         return {
             "score":      round(float(weighted_avg), 4),
             "confidence": round(float(confidence), 4),
@@ -344,32 +352,62 @@ def _compute_quality_factor(ticker: str) -> dict:
         f_result = piotroski_score(ticker)
         f_norm   = f_result.get("f_score", 4) / 9
 
-        # ROE Z-score using NSE historical parameters
-        roe      = info.get("returnOnEquity", 0) or 0
-        roe_mean = 0.12    # median NSE ROE
-        roe_std  = 0.08
-        roe_z    = (roe - roe_mean) / roe_std
+        # Yahoo omits returnOnEquity for ~82% of NSE names and freeCashflow for
+        # ~92% (measured over a 40-stock sample). The old code read them with
+        # `or 0`, so ABSENT became "earns 0% on equity" — a -1.5 sigma penalty
+        # against the NSE median. That scored data coverage, not quality: names
+        # Yahoo happens to cover (TCS: +0.73) beat names it doesn't (NTPC, SAIL,
+        # SUNPHARMA) by ~0.8 of score for no company-related reason.
+        # Fall back to the statement-derived values, and where a component is
+        # genuinely unavailable, DROP it and lower confidence rather than
+        # scoring it as zero.
+        roe    = info.get("returnOnEquity")
+        fcf    = info.get("freeCashflow")
+        mktcap = info.get("marketCap") or None
+        if roe is None or fcf is None:
+            try:
+                from data_fetcher import _derived_fundamentals
+                der = _derived_fundamentals(ticker, info)
+                if roe is None:
+                    roe = der.get("roe")
+                if fcf is None:
+                    fcf = der.get("free_cashflow")
+            except Exception:
+                pass
 
-        # FCF yield Z-score
-        fcf      = info.get("freeCashflow", 0) or 0
-        mktcap   = info.get("marketCap", 1) or 1
-        fcf_yield = fcf / mktcap
-        fcf_mean  = 0.035
-        fcf_std   = 0.04
-        fcf_z     = (fcf_yield - fcf_mean) / fcf_std
+        roe_mean, roe_std   = 0.12, 0.08     # median NSE ROE
+        fcf_mean, fcf_std   = 0.035, 0.04    # median NSE FCF yield
 
-        # Composite (before tanh normalisation)
-        raw = 0.4 * f_norm + 0.4 * (roe_z / 3) + 0.2 * (fcf_z / 3)
+        # Weight only the components we actually have, then renormalise.
+        parts, wsum = [], 0.0
+        if f_result.get("f_score") is not None:
+            parts.append((0.4, f_norm)); wsum += 0.4
+        if roe is not None:
+            parts.append((0.4, ((roe - roe_mean) / roe_std) / 3)); wsum += 0.4
+        fcf_yield = (fcf / mktcap) if (fcf is not None and mktcap) else None
+        if fcf_yield is not None:
+            parts.append((0.2, ((fcf_yield - fcf_mean) / fcf_std) / 3)); wsum += 0.2
+
+        if not parts:
+            return {"score": 0.0, "confidence": 0.0,
+                    "reason": "no quality inputs available"}
+
+        raw = sum(w * v for w, v in parts) / wsum
 
         # Tanh maps any real number smoothly to (-1, +1)
         score = float(np.tanh(raw))
 
         return {
             "score":       round(score, 4),
-            "confidence":  0.85,
+            # Scale the old 0.85 ceiling by how much of the composite we had.
+            "confidence":  round(0.85 * wsum, 3),
+            "inputs_used": [n for n, ok in
+                            (("piotroski", f_result.get("f_score") is not None),
+                             ("roe", roe is not None),
+                             ("fcf_yield", fcf_yield is not None)) if ok],
             "piotroski":   f_result.get("f_score"),
-            "roe":         round(roe * 100, 2),
-            "fcf_yield":   round(fcf_yield * 100, 2),
+            "roe":         round(roe * 100, 2) if roe is not None else None,
+            "fcf_yield":   round(fcf_yield * 100, 2) if fcf_yield is not None else None,
             "interpretation": (
                 "High quality business"       if score > 0.4 else
                 "Above-average quality"       if score > 0.1 else
@@ -483,6 +521,14 @@ def compute_alpha_score(
     """
     w = weights or FACTOR_WEIGHTS
 
+    # One stock must produce one score. Un-normalised tickers reached the news
+    # query and the peer lookup verbatim, so "TCS.NS", "tcs.ns" and "  TCS.NS  "
+    # returned -13.97 (NEUTRAL), -15.14 (SELL) and -16.17 (SELL) — the same
+    # company on both sides of a decision boundary.
+    ticker = (ticker or "").strip().upper()
+    if not ticker:
+        return {"error": "Ticker is required"}
+
     sentiment_f = _compute_sentiment_factor(ticker)
     momentum_f  = _compute_momentum_factor(ticker, peers)
     quality_f   = _compute_quality_factor(ticker)
@@ -494,6 +540,22 @@ def compute_alpha_score(
         "quality":   quality_f,
         "value":     value_f,
     }
+
+    # Refuse to score a symbol nothing resolves for. Previously every factor
+    # degraded to neutral individually but the composite still emitted a
+    # confident-looking verdict: ZZZQQQ123.NS scored -5.27 NEUTRAL, and the
+    # string "'; DROP TABLE x;--" scored -9.88 with sentiment confidence 1.00.
+    # A typo must read as an error, not as analysis.
+    # Gate on evidence the symbol RESOLVES, not on factor confidence: the
+    # Piotroski helper returns a score even for a company that does not exist,
+    # which kept quality's confidence above zero and let fakes through.
+    # marketCap was present for 40/40 real NSE names in the audit and is absent
+    # for every fabricated one.
+    has_price = momentum_f.get("confidence", 0) > 0
+    has_fund  = bool((_ticker_info(ticker) or {}).get("marketCap"))
+    if not has_price and not has_fund:
+        return {"error": f"No market data found for '{ticker}'. Check the symbol "
+                         f"(NSE tickers end in .NS, e.g. RELIANCE.NS)."}
 
     # Weighted composite (each factor in [-1, +1])
     raw_score = (
@@ -727,7 +789,8 @@ _PICKS_TTL = 6 * 3600
 _PICKS_WARMING = False  # guards against launching two concurrent scans
 # Bump whenever the scoring MODEL changes so old persisted picks are discarded
 # instead of served stale. ("mom-abs" = absolute 12-1 momentum rewrite.)
-_PICKS_VERSION = "mom-abs-v3-u30"   # bumped: 30-stock universe invalidates old picks
+_PICKS_VERSION = "qual-derived-v4"  # bumped: quality no longer scores missing
+                                    # ROE/FCF as zero, so every cached rank is stale
 
 
 # --- persistence: the scan is slow (FinBERT + throttled Yahoo) and the in-memory
