@@ -278,10 +278,21 @@ def top_by_tier(n: int = 10, min_confidence: float = 0.3) -> dict:
     ).fetchall()
     conn.close()
 
+    # Contributions are returned in POINTS (weight x factor score x 100), not as
+    # raw factor scores, so the tier cards can reuse the existing pick-card UI
+    # unchanged — it already renders contributions on that scale.
+    from alpha_model import FACTOR_WEIGHTS as W
+
+    def _pts(name, v):
+        return round(W.get(name, 0) * (v or 0) * 100, 2)
+
     recs = [{
         "ticker": r[0], "alpha_score": r[1], "signal": r[2], "confidence": r[3],
         "market_cap": r[4],
-        "contributions": {"momentum": r[5], "quality": r[6], "value": r[7], "sentiment": r[8]},
+        "contributions": {"momentum": _pts("momentum", r[5]),
+                          "quality":  _pts("quality",  r[6]),
+                          "value":    _pts("value",    r[7]),
+                          "sentiment": _pts("sentiment", r[8])},
         "scanned_at": r[9],
     } for r in rows if (r[3] or 0) >= min_confidence]
 
@@ -294,16 +305,23 @@ def top_by_tier(n: int = 10, min_confidence: float = 0.3) -> dict:
     for r in recs:
         r.setdefault("cap_tier", "unknown")
 
-    def top(tier):
-        pool = [r for r in recs if r.get("cap_tier") == tier]
-        return sorted(pool, key=lambda r: -(r["alpha_score"] or 0))[:n]
+    def tier_block(tier):
+        """Best and worst n within a tier — ranked inside the tier, so a small
+        cap is never judged against a large cap's score."""
+        pool = sorted([r for r in recs if r.get("cap_tier") == tier],
+                      key=lambda r: -(r["alpha_score"] or 0))
+        buys   = pool[:n]
+        avoids = list(reversed(pool[-n:])) if len(pool) > n else pool[len(buys):]
+        # With a small pool the two lists could otherwise overlap.
+        picked = {r["ticker"] for r in buys}
+        avoids = [r for r in avoids if r["ticker"] not in picked]
+        return {"buys": buys, "avoids": avoids, "scored": len(pool)}
 
     st = get_state()
     return {
-        "large_cap": top("large"),
-        "mid_cap":   top("mid"),
-        "small_cap": top("small"),
-        "avoid":     sorted(recs, key=lambda r: (r["alpha_score"] or 0))[:n],
+        "large_cap": tier_block("large"),
+        "mid_cap":   tier_block("mid"),
+        "small_cap": tier_block("small"),
         "universe_scored": len(recs),
         "scan": {"status": st.get("status"), "cycle": st.get("cycle"),
                  "done": st.get("done"), "total": st.get("total"),

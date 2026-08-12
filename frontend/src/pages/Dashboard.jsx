@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getMCX, getRegime, getMarketNews, getPrice, getTopPicks, getPredictionTrack } from '../api'
+import { getMCX, getRegime, getMarketNews, getPrice, getPredictionTrack } from '../api'
 import Spinner from '../components/Spinner'
 import RegimeBadge from '../components/RegimeBadge'
 import Explainer from '../components/Explainer'
@@ -267,15 +267,6 @@ export default function Dashboard() {
   const { data: mcx,    isLoading: mcxLoading,    isError: mcxError    } = useQuery({ queryKey: ['mcx'],     queryFn: getMCX,        refetchInterval: 120000 })
   const { data: regime, isLoading: regimeLoading, isError: regimeError } = useQuery({ queryKey: ['regime'],  queryFn: getRegime,     staleTime: 300000 })
   const { data: news,   isLoading: newsLoading,   isError: newsError   } = useQuery({ queryKey: ['mktNews'], queryFn: getMarketNews, staleTime: 60000 })
-  const { data: picks,    isLoading: picksLoading,
-          isError: picksError, refetch: refetchPicks } = useQuery({ queryKey: ['topPicks'], queryFn: getTopPicks,   staleTime: 25 * 60 * 1000, retry: 1,
-            refetchInterval: q => {
-              const d = q.state.data
-              if (!d) return false
-              if (d.warming) return 15000              // first-ever scan: no picks yet
-              if (d.refreshing) return 30000           // rescan in flight: current picks shown, poll for the new ones
-              return (d.scanned < d.universe_size) ? 20000 : false
-            } })
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
@@ -338,106 +329,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Top Picks */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="font-semibold flex items-center gap-2">
-              <Sparkles size={17} className="text-green-400" /> Top Picks
-            </h2>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Stocks ranked by our 4-factor alpha model — an idea screen, not a guarantee.
-            </p>
-          </div>
-          {picks && (
-            <div className="flex items-center gap-3">
-              {picks.refreshing && (
-                <span
-                  className="flex items-center gap-1.5 text-xs text-blue-400"
-                  title="A fresh scan is running in the background. These picks are still valid — the new ones will appear here automatically."
-                >
-                  <RefreshCw size={11} className="animate-spin" />
-                  Updating in background
-                </span>
-              )}
-              <p className="text-xs text-gray-600">
-                {picks.scanned}/{picks.universe_size} scanned · {picks.as_of}
-              </p>
-              <button
-                onClick={() => refetchPicks()}
-                className="p-1.5 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors"
-                title="Refresh picks"
-              >
-                <RefreshCw size={13} />
-              </button>
-            </div>
-          )}
-        </div>
-
-        {picksLoading && (
-          <div className="flex flex-col items-center py-8 gap-2">
-            <Spinner size="sm" />
-            <p className="text-xs text-gray-500">Scanning the universe… (first load ~30–60s)</p>
-          </div>
-        )}
-
-        {picksError && (
-          <div className="flex items-center justify-between px-4 py-3 rounded-lg bg-red-950/40 border border-red-900/50">
-            <p className="text-sm text-red-400">Could not load picks — data source may be busy.</p>
-            <button onClick={() => refetchPicks()} className="text-xs text-red-400 hover:text-red-300 underline">Retry</button>
-          </div>
-        )}
-
-        {picks?.warming && (
-          <div className="flex flex-col items-center py-8 gap-2">
-            <Spinner size="sm" />
-            <p className="text-xs text-gray-500">Ranking the universe — the first scan takes a minute. Updating automatically…</p>
-          </div>
-        )}
-
-        {picks && !picks.warming && (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {/* Buys */}
-              <div>
-                <h3 className="text-xs font-semibold text-green-400 uppercase tracking-wider flex items-center gap-1.5 mb-3">
-                  <TrendingUp size={13} /> Looks strong ({picks.buys?.length || 0})
-                </h3>
-                {picks.buys?.length ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {picks.buys.map(r => <PickCard key={r.ticker} r={r} buy />)}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-500">Nothing scoring positive right now.</p>
-                )}
-              </div>
-              {/* Avoids */}
-              <div>
-                <h3 className="text-xs font-semibold text-red-400 uppercase tracking-wider flex items-center gap-1.5 mb-3">
-                  <TrendingDown size={13} /> Looks weak ({picks.avoids?.length || 0})
-                </h3>
-                {picks.avoids?.length ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {picks.avoids.map(r => <PickCard key={r.ticker} r={r} buy={false} />)}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-500">Nothing scoring negative right now.</p>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <Explainer>
-                <p><b>What this is:</b> we score {picks.universe_size} large liquid stocks on four factors —
-                  <i> momentum</i>, <i>quality</i>, <i>value</i>, and <i>sentiment</i>. Bars show how each
-                  factor pushed the score up (green) or down (red).</p>
-                <p className="text-yellow-300/90"><b>Honest caveat:</b> {picks.disclaimer} This is a screen,
-                  do your own homework, and never invest money you can't afford to lose.</p>
-              </Explainer>
-            </div>
-          </>
-        )}
-      </div>
 
       {/* Honest track record of past picks */}
       {/* Top picks per cap tier, from the full 2,401-stock universe scan */}
