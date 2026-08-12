@@ -53,9 +53,15 @@ _STOP    = threading.Event()
 
 def _init_db():
     conn = get_conn()
+    # Keyed on (ticker, cycle), not ticker alone. With ticker as the sole key a
+    # new pass overwrote the previous one row by row, so the dashboard showed a
+    # half-old/half-new mixture while scanning, and signal history could never
+    # hold more than one reading per stock. Keeping cycles side by side lets the
+    # display stay pinned to the last COMPLETE pass while the next one fills in
+    # behind it, and lets history actually accumulate day over day.
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS alpha_scan (
-            ticker      TEXT PRIMARY KEY,
+        CREATE TABLE IF NOT EXISTS alpha_scan2 (
+            ticker      TEXT NOT NULL,
             alpha_score REAL,
             signal      TEXT,
             confidence  REAL,
@@ -65,8 +71,9 @@ def _init_db():
             value       REAL,
             sentiment   REAL,
             error       TEXT,
-            cycle       TEXT,
-            scanned_at  TEXT
+            cycle       TEXT NOT NULL,
+            scanned_at  TEXT,
+            PRIMARY KEY (ticker, cycle)
         )
     """)
     conn.execute("""
@@ -77,11 +84,30 @@ def _init_db():
             finished_at TEXT,
             done        INTEGER DEFAULT 0,
             total       INTEGER DEFAULT 0,
-            status      TEXT
+            status      TEXT,
+            last_complete_cycle TEXT
         )
     """)
     conn.commit()
     conn.close()
+
+    # last_complete_cycle was added after the table shipped, and CREATE TABLE
+    # IF NOT EXISTS will not add a column to an existing table. Run the ALTER on
+    # its OWN connection: on Postgres a failing statement poisons every
+    # subsequent one in the same transaction, which is exactly what 500'd the
+    # watchlist and simulator endpoints after the Supabase switch.
+    conn = get_conn()
+    try:
+        if IS_POSTGRES:
+            conn.execute("ALTER TABLE alpha_scan_state "
+                         "ADD COLUMN IF NOT EXISTS last_complete_cycle TEXT")
+        else:
+            conn.execute("ALTER TABLE alpha_scan_state ADD COLUMN last_complete_cycle TEXT")
+        conn.commit()
+    except Exception:
+        pass          # already present
+    finally:
+        conn.close()
 
 
 # ---------------------------------------------------------------------------
@@ -97,17 +123,18 @@ def get_state() -> dict:
     _init_db()
     conn = get_conn()
     row = conn.execute(
-        "SELECT cycle, started_at, finished_at, done, total, status "
+        "SELECT cycle, started_at, finished_at, done, total, status, last_complete_cycle "
         "FROM alpha_scan_state WHERE id = 1"
     ).fetchone()
-    scanned = conn.execute("SELECT COUNT(*) FROM alpha_scan WHERE alpha_score IS NOT NULL").fetchone()[0]
+    scanned = conn.execute("SELECT COUNT(*) FROM alpha_scan2 WHERE alpha_score IS NOT NULL").fetchone()[0]
     conn.close()
     if not row:
         return {"status": "never_run", "done": 0, "total": 0, "scored_total": scanned}
-    cycle, started, finished, done, total, status = row
+    cycle, started, finished, done, total, status, last_complete = row
     return {
         "status": status, "cycle": cycle, "started_at": started,
         "finished_at": finished, "done": done, "total": total,
+        "last_complete_cycle": last_complete,
         "scored_total": scanned,
         "pct": round(done / total * 100, 1) if total else 0.0,
         "running": _THREAD is not None and _THREAD.is_alive(),
@@ -118,17 +145,17 @@ def _set_state(**kw):
     conn = get_conn()
     row = conn.execute("SELECT id FROM alpha_scan_state WHERE id = 1").fetchone()
     if not row:
-        conn.execute(
-            "INSERT INTO alpha_scan_state (id, cycle, started_at, finished_at, done, total, status) "
-            "VALUES (1,?,?,?,?,?,?)",
-            (kw.get("cycle"), kw.get("started_at"), kw.get("finished_at"),
-             kw.get("done", 0), kw.get("total", 0), kw.get("status", "idle")))
-    else:
-        sets, vals = [], []
-        for k, v in kw.items():
-            sets.append(f"{k} = ?"); vals.append(v)
-        if sets:
-            conn.execute(f"UPDATE alpha_scan_state SET {', '.join(sets)} WHERE id = 1", vals)
+        # Seed a bare row, then fall through to the UPDATE below. The INSERT
+        # used to spell out its columns, so any key it did not name was
+        # silently dropped — last_complete_cycle vanished on first write, and
+        # the display then served a half-finished scan.
+        conn.execute("INSERT INTO alpha_scan_state (id, status) VALUES (1, ?)",
+                     (kw.get("status", "idle"),))
+    sets, vals = [], []
+    for k, v in kw.items():
+        sets.append(f"{k} = ?"); vals.append(v)
+    if sets:
+        conn.execute(f"UPDATE alpha_scan_state SET {', '.join(sets)} WHERE id = 1", vals)
     conn.commit()
     conn.close()
 
@@ -151,10 +178,10 @@ def _save_result(ticker: str, cycle: str, r: dict):
     conn = get_conn()
     if IS_POSTGRES:
         conn.execute(
-            "INSERT INTO alpha_scan (ticker, alpha_score, signal, confidence, market_cap,"
+            "INSERT INTO alpha_scan2 (ticker, alpha_score, signal, confidence, market_cap,"
             " momentum, quality, value, sentiment, error, cycle, scanned_at)"
             " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
-            " ON CONFLICT (ticker) DO UPDATE SET"
+            " ON CONFLICT (ticker, cycle) DO UPDATE SET"
             " alpha_score=EXCLUDED.alpha_score, signal=EXCLUDED.signal,"
             " confidence=EXCLUDED.confidence, market_cap=EXCLUDED.market_cap,"
             " momentum=EXCLUDED.momentum, quality=EXCLUDED.quality,"
@@ -163,7 +190,7 @@ def _save_result(ticker: str, cycle: str, r: dict):
             vals)
     else:
         conn.execute(
-            "INSERT OR REPLACE INTO alpha_scan (ticker, alpha_score, signal, confidence,"
+            "INSERT OR REPLACE INTO alpha_scan2 (ticker, alpha_score, signal, confidence,"
             " market_cap, momentum, quality, value, sentiment, error, cycle, scanned_at)"
             " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", vals)
     conn.commit()
@@ -173,7 +200,7 @@ def _save_result(ticker: str, cycle: str, r: dict):
 def _already_done(cycle: str) -> set:
     """Tickers finished in THIS cycle — the basis for resuming after a restart."""
     conn = get_conn()
-    rows = conn.execute("SELECT ticker FROM alpha_scan WHERE cycle = ?", (cycle,)).fetchall()
+    rows = conn.execute("SELECT ticker FROM alpha_scan2 WHERE cycle = ?", (cycle,)).fetchall()
     conn.close()
     return {r[0] for r in rows}
 
@@ -272,7 +299,10 @@ def _scan_loop():
     if _STOP.is_set():
         _set_state(done=counter["n"], status="stopped")
         return
-    _set_state(done=counter["n"], finished_at=datetime.now().isoformat(), status="complete")
+    # Publishing happens HERE and only here: the display swaps to this pass
+    # atomically once it is finished, never partway through.
+    _set_state(done=counter["n"], finished_at=datetime.now().isoformat(),
+               status="complete", last_complete_cycle=cycle)
 
 
 def start_scan(force: bool = False) -> dict:
@@ -323,11 +353,19 @@ def top_by_tier(n: int = 10, min_confidence: float = 0.3) -> dict:
     market moves.
     """
     _init_db()
+    st = get_state()
+    # Serve the last COMPLETE pass. While the next one runs its rows accumulate
+    # under a different cycle and stay invisible, so the dashboard never shows a
+    # half-updated mixture — it keeps yesterday's answer until today's is whole.
+    # On the very first run there is no complete pass yet, so fall back to
+    # whatever the in-progress cycle has rather than showing an empty app.
+    serve_cycle = st.get("last_complete_cycle") or st.get("cycle")
     conn = get_conn()
     rows = conn.execute(
         "SELECT ticker, alpha_score, signal, confidence, market_cap, "
         "       momentum, quality, value, sentiment, scanned_at "
-        "FROM alpha_scan WHERE alpha_score IS NOT NULL AND error IS NULL"
+        "FROM alpha_scan2 WHERE alpha_score IS NOT NULL AND error IS NULL "
+        "  AND cycle = ?", (serve_cycle,)
     ).fetchall()
     conn.close()
 
@@ -367,8 +405,8 @@ def top_by_tier(n: int = 10, min_confidence: float = 0.3) -> dict:
         avoids = [r for r in avoids if r["ticker"] not in picked]
         return {"buys": buys, "avoids": avoids, "scored": len(pool)}
 
-    st = get_state()
     return {
+        "serving_cycle": serve_cycle,
         "large_cap": tier_block("large"),
         "mid_cap":   tier_block("mid"),
         "small_cap": tier_block("small"),
@@ -385,7 +423,7 @@ def get_signal_history(ticker: str, limit: int = 30) -> list:
     ticker = (ticker or "").strip().upper()
     conn = get_conn()
     rows = conn.execute(
-        "SELECT scanned_at, alpha_score, signal, confidence FROM alpha_scan "
+        "SELECT scanned_at, alpha_score, signal, confidence FROM alpha_scan2 "
         "WHERE ticker = ? ORDER BY scanned_at DESC", (ticker,)
     ).fetchall()
     conn.close()
