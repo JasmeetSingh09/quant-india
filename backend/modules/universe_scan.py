@@ -31,9 +31,16 @@ from db import get_conn, IS_POSTGRES
 # Deliberately gentle: this is a background crawl competing with live traffic
 # for the same throttled connection. Raising these speeds the scan up and
 # makes the app slower.
-PAUSE_BETWEEN  = 1.2      # seconds between stocks
-PAUSE_ON_ERROR = 4.0      # back off harder after a failure (usually throttling)
+PAUSE_BETWEEN  = 0.4      # seconds a worker waits after finishing a stock
+PAUSE_ON_ERROR = 3.0      # back off harder after a failure (usually throttling)
 CYCLE_HOURS    = 24       # start a fresh pass once results are this old
+
+# Each stock is ~200s of WAITING on throttled Yahoo round-trips, not computing,
+# so the scan is I/O-bound and parallelises well. Serially it managed 18
+# stocks/hour — 5.5 days for the universe. Kept modest: more workers means
+# heavier throttling, and the point is to finish in a day without degrading the
+# live app that shares this connection.
+MAX_WORKERS    = 6
 
 _LOCK    = threading.Lock()
 _THREAD  = None
@@ -190,7 +197,26 @@ def _universe() -> list:
         if not t.endswith(".NS"):
             t += ".NS"
         out.append(t)
-    return sorted(set(out))
+    out = sorted(set(out))
+
+    # Order matters while the scan is incomplete. Alphabetical meant every
+    # partial result was an A — the large and mid tiers showed nothing but
+    # ADANI* and A-names for hours, which reads as a broken product rather than
+    # a running scan. So: the known liquid names first (they populate the large
+    # and mid tiers immediately), then everything else in a deterministic
+    # shuffle so partial coverage is spread across the whole alphabet instead of
+    # clustered at the front.
+    try:
+        from data_fetcher import NSE_SECTORS
+        priority = [t for v in NSE_SECTORS.values() for t in v]
+    except Exception:
+        priority = []
+    pri_set = set(priority)
+    head = [t for t in priority if t in set(out)]
+    tail = [t for t in out if t not in pri_set]
+    import random as _r
+    _r.Random(20260813).shuffle(tail)     # fixed seed: same order across restarts
+    return head + tail
 
 
 def _scan_loop():
@@ -204,10 +230,16 @@ def _scan_loop():
     _set_state(cycle=cycle, started_at=datetime.now().isoformat(), finished_at=None,
                done=len(done), total=len(universe), status="running")
 
-    n = len(done)
-    for ticker in todo:
+    from concurrent.futures import ThreadPoolExecutor
+
+    counter = {"n": len(done)}
+    clock   = threading.Lock()
+
+    def _one(ticker):
+        """Score and persist a single stock. Never raises — a bad ticker must
+        not take down the pool, and its error is stored so the cycle does not
+        retry it forever."""
         if _STOP.is_set():
-            _set_state(status="stopped")
             return
         try:
             r = compute_alpha_score(ticker)
@@ -224,11 +256,23 @@ def _scan_loop():
             except Exception:
                 pass
             time.sleep(PAUSE_ON_ERROR)
-        n += 1
-        if n % 10 == 0:
-            _set_state(done=n)
+        # Progress is still written per stock, so a restart resumes accurately
+        # regardless of which workers were mid-flight.
+        with clock:
+            counter["n"] += 1
+            if counter["n"] % 10 == 0:
+                try:
+                    _set_state(done=counter["n"])
+                except Exception:
+                    pass
 
-    _set_state(done=n, finished_at=datetime.now().isoformat(), status="complete")
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS, thread_name_prefix="scan") as pool:
+        list(pool.map(_one, todo))
+
+    if _STOP.is_set():
+        _set_state(done=counter["n"], status="stopped")
+        return
+    _set_state(done=counter["n"], finished_at=datetime.now().isoformat(), status="complete")
 
 
 def start_scan(force: bool = False) -> dict:
