@@ -4,6 +4,7 @@ import { getMCX, getRegime, getMarketNews, getPrice, getTopPicks, getPredictionT
 import Spinner from '../components/Spinner'
 import RegimeBadge from '../components/RegimeBadge'
 import Explainer from '../components/Explainer'
+import CapTierPicks from '../components/CapTierPicks'
 import { TrendingUp, TrendingDown, Sparkles, ArrowUpRight, ArrowDownRight, RefreshCw, History } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 
@@ -439,6 +440,9 @@ export default function Dashboard() {
       </div>
 
       {/* Honest track record of past picks */}
+      {/* Top picks per cap tier, from the full 2,401-stock universe scan */}
+      <CapTierPicks n={10} />
+
       <TrackRecord />
 
       {/* Regime detail */}

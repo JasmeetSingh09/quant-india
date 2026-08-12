@@ -69,6 +69,12 @@ export const getChallenges  = () => api.get('/simulator/challenges')
 export const getAlphaScore  = ticker => api.get(`/alpha/score?ticker=${ticker}`)
 export const scanAlpha      = body => api.post('/alpha/scan', body)
 export const getTopPicks    = () => api.get('/alpha/top-picks', { timeout: 150000 })
+// Full-universe scan (all 2,401 NSE names), split by SEBI cap tier
+export const getUniverseTop  = (n = 10) => api.get(`/alpha/universe/top?n=${n}`)
+export const getScanStatus   = () => api.get('/alpha/universe/status')
+// This stock's own signal over time — today, yesterday, 5 days ago
+export const getSignalHistory = (ticker, limit = 30) =>
+  api.get(`/alpha/signal-history?ticker=${encodeURIComponent(ticker)}&limit=${limit}`)
 export const getRegimeAlpha = ticker => api.get(`/alpha/regime-adjusted?ticker=${ticker}`)
 export const explainAlpha   = ticker => api.get(`/alpha/explain?ticker=${ticker}`)
 export const getPredictionTrack = (minDays = 7) => api.get(`/predictions/track?min_days=${minDays}`)

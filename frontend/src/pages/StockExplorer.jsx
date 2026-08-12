@@ -8,6 +8,7 @@ import {
 } from '../api'
 import Spinner from '../components/Spinner'
 import AlphaMeter from '../components/AlphaMeter'
+import SignalHistory from '../components/SignalHistory'
 import StatCard from '../components/StatCard'
 import { Search, TrendingUp, TrendingDown, ArrowLeft, ExternalLink, Filter, LayoutList, LayoutGrid } from 'lucide-react'
 import { InfoTip } from '../components/Term'
@@ -762,11 +763,15 @@ function StockDetail({ ticker, onBack }) {
               )}
             </div>
 
-            {/* Column 2 — Alpha score */}
+            {/* Column 2 — Alpha score, then this stock's own signal over time */}
             <div className="space-y-3">
               <h2 className="font-semibold text-sm text-gray-400 uppercase tracking-wider">
                 Alpha Score<InfoTip k="alpha_score" />
               </h2>
+              {/* Renders nothing until the universe scan has recorded this
+                  ticker, so a stock the scan has not reached yet simply shows
+                  no history rather than an empty placeholder. */}
+              <SignalHistory ticker={ticker} />
               {alphaLoading ? <Spinner size="sm" /> : alpha && (
                 <div className="card">
                   <AlphaMeter score={alpha.alpha_score} />
