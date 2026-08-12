@@ -49,12 +49,16 @@ export const removeFromWatchlist = ticker => api.delete(`/watchlist/remove?ticke
 
 // Simulator - realtime
 export const startSimulation   = body => api.post('/simulator/realtime/start', body)
-export const getSimulationPnl  = name => api.get(`/simulator/realtime/${name}`)
+// Simulation names are user-typed and go in the URL PATH, so they must be
+// encoded. A name like "Example " (trailing space) or one containing a slash
+// or '#' silently reached the backend altered, so delete/history/add/remove
+// all looked up a name that did not exist and appeared to do nothing.
+export const getSimulationPnl  = name => api.get(`/simulator/realtime/${encodeURIComponent(name)}`)
 export const getSimulations    = () => api.get('/simulator/realtime')
-export const deleteSimulation  = name => api.delete(`/simulator/realtime/${name}`)
-export const getSimHistory     = name => api.get(`/simulator/realtime/${name}/history`)
-export const addSimPosition    = (name, ticker, amount) => api.post(`/simulator/realtime/${name}/add`, { ticker, amount })
-export const removeSimPosition = (name, ticker) => api.post(`/simulator/realtime/${name}/remove`, { ticker })
+export const deleteSimulation  = name => api.delete(`/simulator/realtime/${encodeURIComponent(name)}`)
+export const getSimHistory     = name => api.get(`/simulator/realtime/${encodeURIComponent(name)}/history`)
+export const addSimPosition    = (name, ticker, amount) => api.post(`/simulator/realtime/${encodeURIComponent(name)}/add`, { ticker, amount })
+export const removeSimPosition = (name, ticker) => api.post(`/simulator/realtime/${encodeURIComponent(name)}/remove`, { ticker })
 
 // Simulator - historic
 export const runBacktest    = body => api.post('/simulator/historic', body)

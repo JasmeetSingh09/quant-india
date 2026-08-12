@@ -266,6 +266,18 @@ def start_simulation(
     """
     _init_db()
 
+    # The name becomes a URL path segment on every later call (pnl, history,
+    # add, remove, delete), so normalise it at the source. A trailing space —
+    # "Example " was live in production — made every one of those lookups miss,
+    # so the simulation could be created but never deleted.
+    name = (name or "").strip()
+    if not name:
+        return {"error": "Simulation name is required"}
+    if "/" in name or "\\" in name:
+        return {"error": "Simulation name cannot contain slashes"}
+    if len(name) > 60:
+        return {"error": "Simulation name must be 60 characters or fewer"}
+
     total_alloc = sum(holdings.values())
     if abs(total_alloc - 100) > 0.01:
         return {"error": f"Allocations must sum to 100%, got {total_alloc:.1f}%"}
@@ -648,8 +660,16 @@ def delete_simulation(name: str, user_id: str = "public") -> dict:
     count = conn.execute("SELECT COUNT(*) FROM simulations WHERE name = ? AND user_id = ?",
                          (name, user_id)).fetchone()[0]
     if not count:
-        conn.close()
-        return {"error": f"Simulation '{name}' not found"}
+        # Rows created before names were trimmed can carry stray whitespace
+        # (e.g. "Example "), which no exact match will ever hit. Fall back to a
+        # trimmed comparison so those remain deletable.
+        row = conn.execute(
+            "SELECT name FROM simulations WHERE TRIM(name) = TRIM(?) AND user_id = ?",
+            (name, user_id)).fetchone()
+        if not row:
+            conn.close()
+            return {"error": f"Simulation '{name}' not found"}
+        name = row[0]
     conn.execute("DELETE FROM sim_positions WHERE sim_name = ? AND user_id = ?", (name, user_id))
     conn.execute("DELETE FROM sim_snapshots WHERE sim_name = ? AND user_id = ?", (name, user_id))
     conn.execute("DELETE FROM simulations WHERE name = ? AND user_id = ?", (name, user_id))
