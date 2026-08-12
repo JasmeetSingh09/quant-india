@@ -1011,6 +1011,29 @@ def alpha_scan(req: ScanRequest):
     return {"rankings": scan_alpha(req.tickers, weights=req.weights)}
 
 
+class BuildPortfolioRequest(BaseModel):
+    amount: float = 100000
+    horizon_months: int = 12
+    max_loss_pct: float = 20.0
+    n_stocks: int = 5
+    risk: str = "balanced"
+
+
+@app.post("/portfolio/build")
+def portfolio_build(req: BuildPortfolioRequest):
+    """
+    Turn five beginner answers into a concrete portfolio, and say plainly
+    whether its downside fits the loss limit they stated.
+    """
+    from portfolio_builder import build_portfolio
+    result = build_portfolio(
+        amount=req.amount, horizon_months=req.horizon_months,
+        max_loss_pct=req.max_loss_pct, n_stocks=req.n_stocks, risk=req.risk)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
 @app.get("/alpha/universe/top")
 def alpha_universe_top(n: int = Query(10, ge=1, le=50)):
     """
