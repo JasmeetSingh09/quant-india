@@ -10,9 +10,8 @@ import Calculators from './pages/Calculators'
 import Simulator from './pages/Simulator'
 import MyStocks from './pages/MyStocks'
 import PortfolioLab from './pages/PortfolioLab'
-import QuantResearch from './pages/QuantResearch'
 import Markets from './pages/Markets'
-import OptionsLab from './pages/OptionsLab'
+import Advanced from './pages/Advanced'
 import Login from './pages/Login'
 import Landing from './pages/Landing'
 import { useAuth } from './AuthContext'
@@ -100,10 +99,14 @@ export default function App() {
           <Route path="/my-stocks"   element={<MyStocks />} />
           <Route path="/simulator"   element={<Simulator />} />
           <Route path="/lab"         element={<PortfolioLab />} />
-          <Route path="/research"    element={<QuantResearch />} />
+          <Route path="/advanced"    element={<Advanced />} />
           <Route path="/markets"     element={<Markets />} />
-          <Route path="/options"     element={<OptionsLab />} />
           <Route path="/calculators" element={<Calculators />} />
+
+          {/* Options Lab and Research now live inside the Advanced Centre.
+              Keep the old paths working — they are bookmarked and linked. */}
+          <Route path="/options"     element={<Navigate to="/advanced" replace />} />
+          <Route path="/research"    element={<Navigate to="/advanced" replace />} />
 
           {/* Once signed in, /login and the landing page no longer exist in this
               route table. Without these the browser sits on /login after a
@@ -117,9 +120,9 @@ export default function App() {
           <Route path="/watchlist"   element={<Navigate to="/my-stocks" replace />} />
           <Route path="/optimizer"   element={<Navigate to="/lab" replace />} />
           <Route path="/montecarlo"  element={<Navigate to="/lab" replace />} />
-          <Route path="/risk"        element={<Navigate to="/lab" replace />} />
-          <Route path="/factors"     element={<Navigate to="/research" replace />} />
-          <Route path="/pairs"       element={<Navigate to="/research" replace />} />
+          <Route path="/risk"        element={<Navigate to="/advanced" replace />} />
+          <Route path="/factors"     element={<Navigate to="/advanced" replace />} />
+          <Route path="/pairs"       element={<Navigate to="/advanced" replace />} />
           <Route path="/commodities" element={<Navigate to="/markets" replace />} />
           <Route path="/news"        element={<Navigate to="/markets" replace />} />
           <Route path="*"            element={<NotFound />} />

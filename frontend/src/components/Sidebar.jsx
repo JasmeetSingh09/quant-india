@@ -14,11 +14,14 @@ const links = [
   { to: '/my-stocks',   icon: Briefcase,       label: 'My Stocks'  },
   { to: '/simulator',   icon: PlayCircle,      label: 'Simulator'  },
   { to: '/lab',         icon: TrendingUp,      label: 'Port. Lab'  }, // intentional abbrev — full label overflows w-56
-  { to: '/options',     icon: Sigma,           label: 'Options Lab'},
-  { to: '/research',    icon: FlaskConical,    label: 'Research'   },
   { to: '/markets',     icon: BarChart3,       label: 'Markets'    },
   { to: '/calculators', icon: Calculator,      label: 'Calculators'},
 ]
+
+// Kept visually separate from the main flow. Options Lab and Research used to
+// sit in the list above, which put seven-factor regressions and Black-Scholes
+// at the same level as "My Stocks" for a first-time user.
+const advancedLink = { to: '/advanced', icon: FlaskConical, label: 'Advanced' }
 
 /**
  * Sidebar — one nav, two behaviours.
@@ -137,13 +140,21 @@ export default function Sidebar({ isMobile, open, collapsed, onClose, onToggleCo
 
         {/* Nav */}
         <nav className={`flex-1 py-4 space-y-0.5 overflow-y-auto overflow-x-hidden ${railed ? 'px-2' : 'px-3'}`}>
-          {links.map(({ to, icon: Icon, label }) => (
+          {[...links, null, advancedLink].map(item => item === null ? (
+            <div key="sep" className="pt-3 mt-3 border-t border-gray-800/80">
+              {showLabels && (
+                <p className="px-3 pb-1 text-[10px] uppercase tracking-wider text-gray-600">
+                  Advanced
+                </p>
+              )}
+            </div>
+          ) : (
             <NavLink
-              key={to}
-              to={to}
-              end={to === '/'}
+              key={item.to}
+              to={item.to}
+              end={item.to === '/'}
               onClick={isMobile ? onClose : undefined}
-              title={railed ? label : undefined}
+              title={railed ? item.label : undefined}
               className={({ isActive }) =>
                 `group relative flex items-center rounded-lg text-sm font-medium transition-all
                  ${railed ? 'justify-center px-0 py-3' : 'gap-3 px-3 py-2.5'}
@@ -156,8 +167,8 @@ export default function Sidebar({ isMobile, open, collapsed, onClose, onToggleCo
               {({ isActive }) => (
                 <>
                   <span className={`absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-green-400 transition-all ${isActive ? 'opacity-100' : 'opacity-0'}`} />
-                  <Icon size={16} className={`shrink-0 ${isActive ? 'text-green-400' : 'text-gray-500 group-hover:text-gray-300'}`} />
-                  {showLabels && <span className="truncate">{label}</span>}
+                  <item.icon size={16} className={`shrink-0 ${isActive ? 'text-green-400' : 'text-gray-500 group-hover:text-gray-300'}`} />
+                  {showLabels && <span className="truncate">{item.label}</span>}
                 </>
               )}
             </NavLink>

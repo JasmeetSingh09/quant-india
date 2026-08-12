@@ -1,0 +1,31 @@
+import TabShell from '../components/TabShell'
+import OptionsLab from './OptionsLab'
+import RiskLab from './RiskLab'
+import Factors from './Factors'
+import PairsTrading from './PairsTrading'
+import Seasonality from './Seasonality'
+import Research from './Research'
+import Backtest from './Backtest'
+
+/**
+ * Advanced Centre — the quantitative tools, gathered in one place.
+ *
+ * These are kept OFF the beginner path deliberately. A new investor's job is
+ * pick stocks -> build a portfolio -> simulate it -> change the weights, and
+ * every extra nav item competes with that. Nothing here is removed or watered
+ * down; it is one click away for anyone who wants it, and out of the way for
+ * everyone who doesn't.
+ */
+const TABS = [
+  { label: 'Risk',        Component: RiskLab },
+  { label: 'Factors',     Component: Factors },
+  { label: 'Signals',     Component: Research },
+  { label: 'Backtest',    Component: Backtest },
+  { label: 'Pairs',       Component: PairsTrading },
+  { label: 'Seasonality', Component: Seasonality },
+  { label: 'Options',     Component: OptionsLab },
+]
+
+export default function Advanced() {
+  return <TabShell tabs={TABS} persistKey="adv.active" />
+}
