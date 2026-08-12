@@ -105,6 +105,13 @@ export default function App() {
           <Route path="/options"     element={<OptionsLab />} />
           <Route path="/calculators" element={<Calculators />} />
 
+          {/* Once signed in, /login and the landing page no longer exist in this
+              route table. Without these the browser sits on /login after a
+              successful sign-in, falls through to "*", and flashes the 404 page
+              before anything navigates away. Send them to the dashboard. */}
+          <Route path="/login"       element={<Navigate to="/" replace />} />
+          <Route path="/signup"      element={<Navigate to="/" replace />} />
+
           {/* Redirects for old routes */}
           <Route path="/portfolio"   element={<Navigate to="/my-stocks" replace />} />
           <Route path="/watchlist"   element={<Navigate to="/my-stocks" replace />} />
