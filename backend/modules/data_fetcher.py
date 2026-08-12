@@ -803,14 +803,26 @@ def format_large_number(num: float) -> str:
     """
     if num is None:
         return "N/A"
-    if num >= 1e12:
-        return f"₹{num/1e12:.2f}L Cr"
-    elif num >= 1e7:
-        return f"₹{num/1e7:.2f} Cr"
-    elif num >= 1e5:
-        return f"₹{num/1e5:.2f} Lakh"
+    try:
+        num = float(num)
+    except (TypeError, ValueError):
+        return "N/A"
+
+    # Scale on the MAGNITUDE and re-apply the sign. Every branch below used to
+    # test `num >= ...`, so a negative value failed all of them and fell through
+    # to the raw fallback: a free cash flow of -1,745,370,000 rendered as
+    # "₹-1745370000.00" instead of "-₹174.54 Cr". Negative FCF is common and
+    # became visible on every stock once we started deriving it.
+    sign = "-" if num < 0 else ""
+    n = abs(num)
+    if n >= 1e12:
+        return f"{sign}₹{n/1e12:.2f}L Cr"
+    elif n >= 1e7:
+        return f"{sign}₹{n/1e7:.2f} Cr"
+    elif n >= 1e5:
+        return f"{sign}₹{n/1e5:.2f} Lakh"
     else:
-        return f"₹{num:.2f}"
+        return f"{sign}₹{n:,.2f}"
 
 
 if __name__ == "__main__":

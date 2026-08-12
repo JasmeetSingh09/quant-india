@@ -256,9 +256,18 @@ def stop_scan() -> dict:
 # Reads
 # ---------------------------------------------------------------------------
 
-# SEBI convention: rank all listed companies by market cap.
-LARGE_CAP_RANK = 100      # ranks 1-100
-MID_CAP_RANK   = 250      # ranks 101-250; everything after is small cap
+# AMFI/SEBI cap bands expressed in RUPEES rather than as ranks.
+#
+# Ranking was the original approach, but ranks can only be computed against the
+# stocks scanned SO FAR. Mid-scan that meant ranking ~180 alphabetically-early
+# names, which labelled AFIL — a ₹416 Cr company — as "mid cap" because it
+# happened to sit 101st in that partial list. Absolute thresholds are correct
+# from the very first stock scanned and do not lie while the scan is running.
+#
+# Cut-offs track the AMFI bands: large ≈ top 100 (> ₹1,00,000 Cr),
+# mid ≈ ranks 101-250 (₹33,000-1,00,000 Cr), small below that.
+LARGE_CAP_MIN = 1.00e12   # ₹1,00,000 Cr
+MID_CAP_MIN   = 3.30e11   # ₹33,000 Cr
 
 
 def top_by_tier(n: int = 10, min_confidence: float = 0.3) -> dict:
@@ -296,14 +305,11 @@ def top_by_tier(n: int = 10, min_confidence: float = 0.3) -> dict:
         "scanned_at": r[9],
     } for r in rows if (r[3] or 0) >= min_confidence]
 
-    ranked_by_cap = sorted([r for r in recs if r["market_cap"]],
-                           key=lambda r: -r["market_cap"])
-    for i, r in enumerate(ranked_by_cap, 1):
-        r["cap_rank"] = i
-        r["cap_tier"] = ("large" if i <= LARGE_CAP_RANK else
-                         "mid"   if i <= MID_CAP_RANK else "small")
     for r in recs:
-        r.setdefault("cap_tier", "unknown")
+        mc = r.get("market_cap")
+        r["cap_tier"] = ("unknown" if not mc else
+                         "large" if mc >= LARGE_CAP_MIN else
+                         "mid"   if mc >= MID_CAP_MIN else "small")
 
     def tier_block(tier):
         """Best and worst n within a tier — ranked inside the tier, so a small
