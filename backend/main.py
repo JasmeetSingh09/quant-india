@@ -133,10 +133,17 @@ def _start_picks_scheduler():
 @app.on_event("startup")
 async def startup():
     """On startup: load full NSE+BSE universe and start news refresh scheduler."""
-    from auth import auth_status
-    _a = auth_status()
-    if not _a["verified"]:
-        print(f"[auth] WARNING: {_a['detail']}")
+    # Never let a diagnostic abort startup: a NameError in auth_status once
+    # crash-looped the whole service (Exited with status 3) purely because it
+    # was reporting configuration. Reporting must not be able to take the app
+    # down.
+    try:
+        from auth import auth_status
+        _a = auth_status()
+        if not _a.get("verified"):
+            print(f"[auth] WARNING: {_a.get('detail')}")
+    except Exception as _e:
+        print(f"[auth] WARNING: could not determine auth status: {_e}")
     import asyncio
     # Load stock universe in background so startup is not blocked
     loop = asyncio.get_event_loop()
@@ -1577,14 +1584,18 @@ def research_full_report(ticker: str = Query(..., description="NSE ticker")):
 
 @app.get("/")
 def root():
-    from auth import auth_status
+    try:
+        from auth import auth_status
+        _auth = auth_status()
+    except Exception as e:
+        _auth = {"verified": False, "detail": f"auth status unavailable: {e}"}
     return {
         "service": "Indian Stock Investor Intelligence Platform",
         "status":  "running",
         "docs":    "/docs",
         # Surfaced so a deploy missing SUPABASE_JWT_SECRET is visible rather
         # than silently falling back to weaker per-user separation.
-        "auth":    auth_status(),
+        "auth":    _auth,
     }
 
 

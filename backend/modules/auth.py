@@ -12,6 +12,7 @@ If it is not set, auth is effectively disabled and everyone is "public" (safe de
 """
 
 import os
+import time
 from fastapi import Header
 
 _JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "").strip()
