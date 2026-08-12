@@ -394,6 +394,38 @@ def _compute_quality_factor(ticker: str) -> dict:
 
         raw = sum(w * v for w, v in parts) / wsum
 
+        # Negative shareholder equity means liabilities exceed assets — the
+        # company is technically insolvent, which is a quality red flag no
+        # Piotroski score or cash-flow yield should be allowed to outweigh.
+        # IDEA.NS (bookValue -3.30) was scoring +0.39 "above-average quality"
+        # on those two inputs alone while having no equity left.
+        # Distress is a QUALITY question, not a valuation one. Each flag is a
+        # general rule, never a hard-coded verdict on a named company: a
+        # turnaround can legitimately show strong momentum alongside poor
+        # quality, and the model's job is to price that tension rather than
+        # refuse to look at the stock.
+        book_value = info.get("bookValue")
+        shares     = info.get("sharesOutstanding")
+        equity     = (book_value * shares) if (book_value and shares) else None
+        debt       = info.get("totalDebt")
+        ocf        = info.get("operatingCashflow")
+        net_income = info.get("netIncomeToCommon")
+
+        flags, penalty = [], 0.0
+        if book_value is not None and book_value < 0:
+            flags.append("negative shareholders' equity"); penalty += 0.5
+        if equity and equity > 0 and debt and (debt / equity) > 2.0:
+            flags.append(f"debt/equity {debt/equity:.1f}x"); penalty += 0.25
+        if net_income is not None and net_income < 0:
+            flags.append("loss-making"); penalty += 0.25
+        if ocf is not None and ocf < 0:
+            flags.append("negative operating cash flow"); penalty += 0.25
+
+        if flags:
+            # Cap the composite at neutral before subtracting, so strong
+            # sub-scores cannot offset insolvency into positive territory.
+            raw = min(raw, 0.0) - penalty
+
         # Tanh maps any real number smoothly to (-1, +1)
         score = float(np.tanh(raw))
 
@@ -405,12 +437,14 @@ def _compute_quality_factor(ticker: str) -> dict:
                             (("piotroski", f_result.get("f_score") is not None),
                              ("roe", roe is not None),
                              ("fcf_yield", fcf_yield is not None)) if ok],
+            "distress_flags": flags,
             "piotroski":   f_result.get("f_score"),
             "roe":         round(roe * 100, 2) if roe is not None else None,
             "fcf_yield":   round(fcf_yield * 100, 2) if fcf_yield is not None else None,
             "interpretation": (
                 "High quality business"       if score > 0.4 else
                 "Above-average quality"       if score > 0.1 else
+                ("Financially distressed — " + ", ".join(flags)) if flags else
                 "Low quality / weak business" if score < -0.4 else
                 "Below-average quality"       if score < -0.1 else
                 "Average quality"
@@ -448,7 +482,27 @@ def _compute_value_factor(ticker: str, peers: list = None) -> dict:
         pe_self  = info.get("trailingPE")
         pb_self  = info.get("priceToBook")
 
+        # A NEGATIVE multiple is distress, not a discount. Vodafone Idea
+        # (IDEA.NS) carries bookValue -3.30 and priceToBook -4.09 — liabilities
+        # exceed assets — and the z-score read that as "significantly
+        # undervalued", scoring +0.90 and helping push the stock to STRONG BUY.
+        # A company with no equity left is the definition of a value trap, so
+        # drop the offending multiple rather than treat it as cheap.
+        distressed = []
+        if pe_self is not None and pe_self <= 0:
+            distressed.append("negative earnings")
+            pe_self = None
+        if pb_self is not None and pb_self <= 0:
+            distressed.append("negative book value")
+            pb_self = None
+
         if not pe_self and not pb_self:
+            # Nothing usable left. If that is BECAUSE the multiples were
+            # negative, say so and score it as a warning, not as neutral.
+            if distressed:
+                return {"score": -0.5, "confidence": 0.6,
+                        "reason": f"unusable valuation: {', '.join(distressed)}",
+                        "interpretation": "Distressed — " + " and ".join(distressed)}
             return {"score": 0.0, "confidence": 0.0, "reason": "no valuation data"}
 
         peer_pes = []

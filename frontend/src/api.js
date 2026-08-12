@@ -70,6 +70,8 @@ export const getAlphaScore  = ticker => api.get(`/alpha/score?ticker=${ticker}`)
 export const scanAlpha      = body => api.post('/alpha/scan', body)
 export const getTopPicks    = () => api.get('/alpha/top-picks', { timeout: 150000 })
 // Full-universe scan (all 2,401 NSE names), split by SEBI cap tier
+// Guided flow: five answers -> a portfolio plus a downside verdict
+export const buildPortfolio = body => api.post('/portfolio/build', body, { timeout: 120000 })
 export const getUniverseTop  = (n = 10) => api.get(`/alpha/universe/top?n=${n}`)
 export const getScanStatus   = () => api.get('/alpha/universe/status')
 // This stock's own signal over time — today, yesterday, 5 days ago

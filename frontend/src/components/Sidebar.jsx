@@ -3,13 +3,14 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Search, PlayCircle,
   TrendingUp, BarChart3, FlaskConical,
-  Briefcase, Calculator, Zap, LogOut, Sigma,
+  Briefcase, Calculator, Zap, LogOut, Sigma, Wand2,
   PanelLeftClose, PanelLeftOpen, X
 } from 'lucide-react'
 import { useAuth } from '../AuthContext'
 
 const links = [
   { to: '/',            icon: LayoutDashboard, label: 'Dashboard'  },
+  { to: '/build',       icon: Wand2,           label: 'Build'      },
   { to: '/stock',       icon: Search,          label: 'Stocks'     },
   { to: '/my-stocks',   icon: Briefcase,       label: 'My Stocks'  },
   { to: '/simulator',   icon: PlayCircle,      label: 'Simulator'  },
