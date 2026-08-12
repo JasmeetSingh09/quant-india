@@ -170,10 +170,19 @@ def auth_status() -> dict:
         return {"verified": False,
                 "detail": "PyJWT not installed — users cannot be told apart"}
     if not (_JWT_SECRET or _SUPABASE_URL):
+        # Names only, never values — enough to catch a typo'd or unsaved key
+        # without ever exposing the secret itself.
+        seen = sorted(k for k in os.environ if "SUPA" in k.upper())
         return {"verified": False,
                 "detail": "Neither SUPABASE_JWT_SECRET nor SUPABASE_URL is set — "
                           "users are separated by unverified token claims, which "
-                          "is a stopgap, not a security boundary."}
+                          "is a stopgap, not a security boundary.",
+                "supabase_env_keys_present": seen,
+                "hint": ("No SUPABASE* variable reached the process. Check the key "
+                         "spelling in Render and that the change was saved and "
+                         "redeployed.") if not seen else
+                        f"Found {seen} — check spelling against SUPABASE_JWT_SECRET "
+                        "and SUPABASE_URL."}
     modes = []
     if _JWT_SECRET:
         modes.append("HS256 (legacy secret)")
