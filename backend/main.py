@@ -144,6 +144,16 @@ async def startup():
             print(f"[auth] WARNING: {_a.get('detail')}")
     except Exception as _e:
         print(f"[auth] WARNING: could not determine auth status: {_e}")
+
+    # Resume/begin the full-universe alpha scan in the background. It writes
+    # progress after every stock, so a redeploy mid-scan continues rather than
+    # restarting — which matters because this service restarts often and a full
+    # pass takes hours. Wrapped: a scan problem must never block startup.
+    try:
+        from universe_scan import start_scan
+        print(f"[scan] {start_scan().get('status')}")
+    except Exception as _e:
+        print(f"[scan] WARNING: could not start universe scan: {_e}")
     import asyncio
     # Load stock universe in background so startup is not blocked
     loop = asyncio.get_event_loop()
@@ -999,6 +1009,40 @@ def alpha_scan(req: ScanRequest):
     Body: {"tickers": ["TCS.NS", "INFY.NS", "WIPRO.NS", "HCLTECH.NS"]}
     """
     return {"rankings": scan_alpha(req.tickers, weights=req.weights)}
+
+
+@app.get("/alpha/universe/top")
+def alpha_universe_top(n: int = Query(10, ge=1, le=50)):
+    """
+    Top `n` names per cap tier from the full-universe scan.
+
+    Always serves the last completed results. A scan in progress is invisible
+    here by design — users should never see a "scanning" state.
+    """
+    from universe_scan import top_by_tier
+    return top_by_tier(n=n)
+
+
+@app.get("/alpha/universe/status")
+def alpha_universe_status():
+    """Progress of the background universe scan (for you, not the UI)."""
+    from universe_scan import get_state
+    return get_state()
+
+
+@app.post("/alpha/universe/scan")
+def alpha_universe_scan(force: bool = Query(False)):
+    """Start the background scan. No-op if one is already running."""
+    from universe_scan import start_scan
+    return start_scan(force=force)
+
+
+@app.get("/alpha/signal-history")
+def alpha_signal_history(ticker: str = Query(...), limit: int = Query(30, ge=1, le=200)):
+    """This stock's stored signal over time — today, yesterday, 5 days ago."""
+    from universe_scan import get_signal_history
+    return {"ticker": ticker.strip().upper(),
+            "history": get_signal_history(ticker, limit=limit)}
 
 
 @app.get("/alpha/top-picks")
