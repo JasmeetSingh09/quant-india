@@ -237,9 +237,29 @@ def simulate(
     if abs(total - 100) > 0.01:
         return {"error": f"Allocations must sum to 100%, got {total:.1f}%"}
 
-    hist = _portfolio_daily_returns(holdings)
+    # Fetch at least as much history as we intend to project, and never less
+    # than three years. Previously this always pulled a fixed ~1.4 years of
+    # trading data regardless of horizon, so a 3.5-year run extrapolated 2.5x
+    # beyond its own sample: a window that happened to contain a 26%/yr bull
+    # run produced a +124% median and a 0.48% chance of loss over 3.5 years,
+    # which is not a believable outcome for three Indian equities.
+    lookback = max(1095, int(horizon_days / 252 * 365 * 2))
+    hist = _portfolio_daily_returns(holdings, lookback_days=lookback)
     if len(hist) < 30:
         return {"error": "Insufficient historical data to fit the simulation."}
+
+    # Even with a longer window the sample can still be shorter than the
+    # horizon. Say so rather than presenting an extrapolation as a forecast.
+    history_years = len(hist) / 252
+    horizon_years = horizon_days / 252
+    extrapolation_warning = None
+    if history_years < horizon_years:
+        extrapolation_warning = (
+            f"Only {history_years:.1f} years of history available for a "
+            f"{horizon_years:.1f}-year projection. Outcomes beyond the sample "
+            f"length assume this period's average return continues, which is a "
+            f"strong assumption — treat the range as illustrative."
+        )
 
     mu    = float(hist.mean())
     sigma = float(hist.std())
@@ -318,6 +338,8 @@ def simulate(
         "method_label":    method_label,
         "n_simulations":   n_simulations,
         "holdings":        holdings,
+        "history_years":   round(history_years, 2),
+        "extrapolation_warning": extrapolation_warning,
         "fitted_params":   {"daily_mean_pct": round(mu*100, 4),
                             "daily_vol_pct":  round(sigma*100, 4)},
         **summary,
