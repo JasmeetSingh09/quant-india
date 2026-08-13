@@ -429,10 +429,14 @@ def get_current_price(ticker: str) -> dict:
     if hit and (now - hit[0]) < ttl:
         return {**hit[1], "cached": True}
 
-    stock = yf.Ticker(ticker)
-    info = stock.fast_info
-
     try:
+        # Constructing the ticker and reading fast_info can themselves fail when
+        # the upstream is down or throttling. They used to sit OUTSIDE this try,
+        # so that failure escaped uncaught and 500'd the endpoint instead of
+        # falling through to the stale-price path below.
+        stock = yf.Ticker(ticker)
+        info = stock.fast_info
+
         current_price = info.last_price
         previous_close = info.previous_close
         change = current_price - previous_close
@@ -450,11 +454,31 @@ def get_current_price(ticker: str) -> dict:
             "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
         _LIVE_CACHE[ticker] = (now, result)   # cache only successful fetches
+        # Persist it too. The in-memory fallback below is lost on restart, which
+        # is precisely when it is needed — this host restarts on every deploy.
+        try:
+            from data_health import remember_price
+            remember_price(ticker, result.get("price"))
+        except Exception:
+            pass
         return result
     except Exception as e:
         # serve a stale cached value if we have one, rather than an error
         if hit:
             return {**hit[1], "cached": True, "stale": True}
+        # Nothing in memory — fall back to the last good price on disk. A user
+        # seeing "Rs 1,290, as of 14h ago" can still reason; a blank or a silent
+        # zero is how a data outage turns into a wrong number.
+        try:
+            from data_health import last_known_price
+            lk = last_known_price(ticker)
+            if lk:
+                return {"ticker": ticker, "price": lk["price"], "change": None,
+                        "change_pct": None, "stale": True,
+                        "as_of": lk["seen_at"], "age_hours": lk["age_hours"],
+                        "note": lk["note"], "market_open": is_market_open()}
+        except Exception:
+            pass
         return {"ticker": ticker, "error": str(e)}
 
 

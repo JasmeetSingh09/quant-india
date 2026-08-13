@@ -20,7 +20,7 @@ measurement instead of a shrug.
 
 from datetime import datetime, timedelta
 
-from db import get_conn
+from db import get_conn, IS_POSTGRES
 
 PROBE_TICKERS = ["RELIANCE.NS", "TCS.NS", "HDFCBANK.NS"]
 
@@ -135,3 +135,63 @@ def history(days: int = 14) -> dict:
         "degraded_pct": round(len(bad) / len(probes) * 100, 1) if probes else 0.0,
         "recent": probes[:20],
     }
+
+
+# ---------------------------------------------------------------------------
+# Last-known-good price cache
+# ---------------------------------------------------------------------------
+#
+# A true second provider is the real fix, and it is not done: stooq serves a bot
+# challenge rather than CSV for NSE symbols, and the NSE endpoint blocks cloud
+# IPs. Wiring in a source that returns JavaScript and calling it redundancy
+# would be worse than nothing.
+#
+# What IS achievable is surviving an outage rather than pretending one cannot
+# happen. Every successful price is persisted; when the upstream fails, the app
+# serves the last known good value clearly marked stale, with its age. A user
+# seeing "Rs 1,290 (as of yesterday 15:30)" can still reason. A blank, or worse
+# a silent zero, is how a data outage becomes a wrong number.
+
+
+def remember_price(ticker: str, price: float) -> None:
+    """Persist a good price. Never raises — caching must not break fetching."""
+    try:
+        if not price or price != price:
+            return
+        _init_db()
+        conn = get_conn()
+        conn.execute("""CREATE TABLE IF NOT EXISTS last_known_price (
+            ticker TEXT PRIMARY KEY, price REAL NOT NULL, seen_at TEXT NOT NULL)""")
+        conn.execute(
+            "INSERT INTO last_known_price (ticker, price, seen_at) VALUES (?,?,?) "
+            + ("ON CONFLICT (ticker) DO UPDATE SET price=EXCLUDED.price, "
+               "seen_at=EXCLUDED.seen_at" if IS_POSTGRES else ""),
+            (ticker, float(price), datetime.now().isoformat())
+        ) if IS_POSTGRES else conn.execute(
+            "INSERT OR REPLACE INTO last_known_price (ticker, price, seen_at) "
+            "VALUES (?,?,?)", (ticker, float(price), datetime.now().isoformat()))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+def last_known_price(ticker: str, max_age_hours: int = 96) -> dict | None:
+    """The most recent good price, with its age, or None if too old to be useful."""
+    try:
+        conn = get_conn()
+        row = conn.execute(
+            "SELECT price, seen_at FROM last_known_price WHERE ticker = ?",
+            (ticker,)).fetchone()
+        conn.close()
+        if not row:
+            return None
+        age_h = (datetime.now() - datetime.fromisoformat(row[1])).total_seconds() / 3600
+        if age_h > max_age_hours:
+            return None
+        return {"price": row[0], "seen_at": row[1], "age_hours": round(age_h, 1),
+                "stale": True,
+                "note": f"Live price unavailable — showing the last good value "
+                        f"from {round(age_h, 1)}h ago."}
+    except Exception:
+        return None
