@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { advisePortfolio, portfolioScenarios, portfolioWhatIf } from '../api'
+import { advisePortfolio, portfolioScenarios, portfolioWhatIf, trackEvent } from '../api'
 import Spinner from './Spinner'
 import { Lightbulb, AlertTriangle, Info, Check, Plus, X } from 'lucide-react'
 
@@ -63,7 +63,8 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
   const n = Object.keys(holdings || {}).length
   if (n < 2) return null
 
-  const run = () => { advice.mutate(body); scen.mutate(body) }
+  const run = () => { trackEvent('advice_requested', { n_stocks: n })
+                      advice.mutate(body); scen.mutate(body) }
   const busy = advice.isPending || scen.isPending
 
   return (
@@ -179,8 +180,9 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
             </p>
 
             <button
-              onClick={() => whatIf.mutate({ holdings, initial_value: initialValue,
-                                             horizon_months: hz, new_holdings: rows })}
+              onClick={() => { trackEvent('scenario_tested', { source: 'per_stock' })
+                               whatIf.mutate({ holdings, initial_value: initialValue,
+                                              horizon_months: hz, new_holdings: rows }) }}
               disabled={whatIf.isPending || Object.keys(rows).length < 2}
               className="btn-ghost text-xs mt-2">
               {whatIf.isPending ? 'Testing…' : 'Test my edits'}
@@ -193,8 +195,9 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
           </div>
 
           <button
-            onClick={() => whatIf.mutate({ holdings, initial_value: initialValue,
-                                           horizon_months: hz, max_weight_pct: cap })}
+            onClick={() => { trackEvent('scenario_tested', { source: 'cap' })
+                             whatIf.mutate({ holdings, initial_value: initialValue,
+                                            horizon_months: hz, max_weight_pct: cap }) }}
             disabled={whatIf.isPending}
             className="btn-ghost text-xs mt-3">
             {whatIf.isPending ? 'Testing…' : 'Test this change'}
@@ -225,7 +228,8 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
                 </div>
               </div>
               {whatIf.data.changed ? (
-                <button onClick={() => { onApply?.(whatIf.data.weights); setApplied('your change') }}
+                <button onClick={() => { trackEvent('allocation_changed', { source: 'custom' })
+                                         onApply?.(whatIf.data.weights); setApplied('your change') }}
                         className="btn-ghost text-xs">
                   {applied === 'your change' ? 'Applied' : 'Apply these weights'}
                 </button>
@@ -281,7 +285,8 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
                     </td>
                     <td className="text-right">
                       <button
-                        onClick={() => { onApply?.(s.weights); setApplied(s.name) }}
+                        onClick={() => { trackEvent('allocation_changed', { source: 'scenario' })
+                                         onApply?.(s.weights); setApplied(s.name) }}
                         className="btn-ghost text-xs whitespace-nowrap"
                       >
                         {applied === s.name ? 'Applied' : 'Apply'}

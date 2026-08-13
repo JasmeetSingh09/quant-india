@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { startSimulation, getSimulationPnl, getSimulations, deleteSimulation, runBacktest, getSimHistory, addSimPosition, removeSimPosition } from '../api'
 import Spinner from '../components/Spinner'
 import PortfolioCoach from '../components/PortfolioCoach'
+import { trackEvent } from '../api'
 import StarterHelp from '../components/StarterHelp'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend, BarChart, Bar, Cell, ReferenceLine } from 'recharts'
 import { InfoTip } from '../components/Term'
@@ -237,7 +238,8 @@ export default function Simulator() {
               <StarterHelp amount={rtCapital} onFill={setRtHoldings} />
             </div>
             <button
-              onClick={() => startMut.mutate({ name: simName, holdings: rtHoldings, initial_value: rtCapital })}
+              onClick={() => { trackEvent('simulation_started', { n_stocks: Object.keys(rtHoldings).length })
+                               startMut.mutate({ name: simName, holdings: rtHoldings, initial_value: rtCapital }) }}
               disabled={startMut.isPending || !simName || Object.keys(rtHoldings).length === 0}
               className="btn-primary w-full">
               {startMut.isPending ? 'Starting...' : 'Start Simulation'}

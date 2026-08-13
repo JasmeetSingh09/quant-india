@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { buildPortfolio } from '../api'
+import { buildPortfolio, trackEvent } from '../api'
 import { Wand2, ChevronDown, ChevronRight, Check } from 'lucide-react'
 
 const RISKS = [
@@ -34,6 +34,7 @@ export default function StarterHelp({ amount = 100000, onFill }) {
     }),
     onSuccess: d => {
       onFill?.(Object.fromEntries(d.holdings.map(h => [h.ticker, h.weight_pct])))
+      trackEvent('portfolio_built', { n_stocks: d.holdings.length, risk })
       setDone(d.holdings.length)
       setOpen(false)
     },

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import usePersistentState from '../usePersistentState'
 import { useMutation } from '@tanstack/react-query'
-import { runMonteCarlo, compareMonteCarlo } from '../api'
+import { runMonteCarlo, compareMonteCarlo, trackEvent } from '../api'
 import Spinner from '../components/Spinner'
 import PortfolioCoach from '../components/PortfolioCoach'
 import {
@@ -112,7 +112,8 @@ export default function MonteCarlo() {
               <option value="normal">Normal distribution</option>
             </select>
           </div>
-          <button className="btn-primary w-full" onClick={() => sim.mutate(body())} disabled={sim.isPending || !allocOk}>
+          <button className="btn-primary w-full" onClick={() => { trackEvent('montecarlo_run', { n_stocks: Object.keys(holdings).length })
+                           sim.mutate(body()) }} disabled={sim.isPending || !allocOk}>
             {sim.isPending ? 'Simulating 10,000 paths…' : 'Run Simulation'}
           </button>
           <button className="btn-ghost w-full" onClick={() => cmp.mutate(body())} disabled={cmp.isPending || !allocOk}>

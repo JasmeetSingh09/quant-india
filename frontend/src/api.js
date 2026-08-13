@@ -84,6 +84,12 @@ export const scanAlpha      = body => api.post('/alpha/scan', body)
 export const getTopPicks    = () => api.get('/alpha/top-picks', { timeout: 150000 })
 // Full-universe scan (all 2,401 NSE names), split by SEBI cap tier
 // Guided flow: five answers -> a portfolio plus a downside verdict
+// Fire-and-forget product analytics. Never awaited and never surfaced: a
+// failed metric must not interrupt, slow, or error the action being measured.
+export const trackEvent = (event, props = {}) => {
+  try { api.post('/events/track', { event, props }).catch(() => {}) } catch { /* ignore */ }
+}
+
 export const advisePortfolio   = body => api.post('/portfolio/advise', body, { timeout: 120000 })
 export const portfolioWhatIf = body => api.post('/portfolio/what-if', body, { timeout: 120000 })
 export const portfolioScenarios = body => api.post('/portfolio/scenarios', body, { timeout: 180000 })
