@@ -1083,6 +1083,25 @@ def simulator_seed_demos(days_back: int = Query(30, ge=1, le=365),
     return seed_demos(days_back=days_back, replace=replace)
 
 
+class TrackEventRequest(BaseModel):
+    event: str
+    props: Optional[dict] = None
+
+
+@app.post("/events/track")
+def events_track(req: TrackEventRequest, user_id: str = Depends(current_user_id)):
+    """Record one product event. Fire-and-forget: never fails the caller."""
+    from analytics import track
+    return track(req.event, user_id=user_id, **(req.props or {}))
+
+
+@app.get("/events/funnel")
+def events_funnel(days: int = Query(42, ge=1, le=365)):
+    """Pilot scorecard, including % who changed an allocation after simulating."""
+    from analytics import funnel
+    return funnel(days=days)
+
+
 @app.get("/simulator/leaderboard")
 def simulator_leaderboard(n: int = Query(5, ge=1, le=20)):
     """
