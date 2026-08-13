@@ -1102,6 +1102,20 @@ def events_funnel(days: int = Query(42, ge=1, le=365)):
     return funnel(days=days)
 
 
+@app.post("/predictions/seal")
+def predictions_seal():
+    """Seal any unsealed days into the tamper-evident chain. Idempotent."""
+    from integrity import seal
+    return seal()
+
+
+@app.get("/predictions/integrity")
+def predictions_integrity():
+    """Recompute the chain and report whether the track record has been edited."""
+    from integrity import verify
+    return verify()
+
+
 @app.get("/simulator/leaderboard")
 def simulator_leaderboard(n: int = Query(5, ge=1, le=20)):
     """
