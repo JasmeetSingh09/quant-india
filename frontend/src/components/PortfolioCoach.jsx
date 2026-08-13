@@ -71,7 +71,7 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="font-semibold flex items-center gap-2">
           <Lightbulb size={18} className="text-yellow-400" />
-          What to fix
+          What to fix — and why
         </h2>
         <button onClick={run} disabled={busy} className="btn-ghost text-xs">
           {busy ? 'Analysing…' : advice.data ? 'Re-analyse' : 'Analyse my portfolio'}
@@ -81,7 +81,8 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
       {!advice.data && !busy && (
         <p className="text-sm text-gray-500">
           Checks your holdings against the alpha model, measures where the risk
-          actually sits, and simulates the downside — then suggests specific changes.
+          actually sits, and simulates the downside. Every finding comes with the
+          principle behind it, so you can spot the same problem yourself next time.
         </p>
       )}
 
@@ -103,6 +104,14 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-200">{s.title}</p>
                     <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{s.detail}</p>
+                    {/* The principle behind the finding. Fixing this portfolio is
+                        worth less than recognising the same mistake unaided next
+                        time, so the lesson sits alongside every warning. */}
+                    {s.lesson && (
+                      <p className="text-[11px] text-gray-500 mt-2 pl-2 border-l-2 border-gray-700 leading-relaxed">
+                        {s.lesson}
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}

@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { startSimulation, getSimulationPnl, getSimulations, deleteSimulation, runBacktest, getSimHistory, addSimPosition, removeSimPosition } from '../api'
 import Spinner from '../components/Spinner'
 import PortfolioCoach from '../components/PortfolioCoach'
-import PortfolioBuilder from '../components/PortfolioBuilder'
+import StarterHelp from '../components/StarterHelp'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend, BarChart, Bar, Cell, ReferenceLine } from 'recharts'
 import { InfoTip } from '../components/Term'
 import { Plus, Trash2, RefreshCw, TrendingUp, TrendingDown } from 'lucide-react'
@@ -118,7 +118,13 @@ function PnlRow({ pos, onRemove, onTopUp, busy }) {
 }
 
 export default function Simulator() {
-  const [tab, setTab] = usePersistentState('sim.tab', 'realtime')
+  const [storedTab, setTab] = usePersistentState('sim.tab', 'realtime')
+  // A tab that no longer exists must not blank the page. The Build tab was
+  // removed after shipping, so anyone who had it selected carries 'build' in
+  // localStorage — without this guard the whole simulator rendered empty for
+  // them, since no branch matched.
+  const TABS = ['realtime', 'historic']
+  const tab = TABS.includes(storedTab) ? storedTab : 'realtime'
   const qc = useQueryClient()
 
   // Realtime state — persisted so switching modules never loses your setup
@@ -197,28 +203,14 @@ export default function Simulator() {
       <div className="flex items-center gap-4">
         <h1 className="text-2xl font-bold">Simulator</h1>
         <div className="flex bg-gray-800 rounded-lg p-1">
-          {['build','realtime','historic'].map(t => (
+          {TABS.map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-1.5 rounded text-sm font-medium transition-colors capitalize ${
                 tab===t ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-gray-200'
-              }`}>{t === 'build' ? '✨ Build for me' : t === 'realtime' ? '⚡ Real-time' : '📈 Historic'}</button>
+              }`}>{t === 'realtime' ? '⚡ Real-time' : '📈 Historic'}</button>
           ))}
         </div>
       </div>
-
-      {/* The guided flow lives here rather than on its own page: the simulator
-          is the hero, and a separate Build entry split the same journey across
-          two nav items. */}
-      {tab === 'build' && (
-        <div className="space-y-2">
-          <p className="text-sm text-gray-400 max-w-3xl">
-            Answer five questions and we'll build you a starting point — then show you
-            honestly how much you could lose, and what to change. Paper-trade it from
-            the bottom of the results.
-          </p>
-          <PortfolioBuilder embedded />
-        </div>
-      )}
 
       {tab === 'realtime' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -236,6 +228,13 @@ export default function Simulator() {
             <div>
               <label className="label">Holdings</label>
               <HoldingsInput holdings={rtHoldings} setHoldings={setRtHoldings} />
+            </div>
+
+            {/* Fills the form above — it does not build or start anything. The
+                user still edits the weights and presses Start themselves,
+                because choosing the weights is the part that teaches. */}
+            <div>
+              <StarterHelp amount={rtCapital} onFill={setRtHoldings} />
             </div>
             <button
               onClick={() => startMut.mutate({ name: simName, holdings: rtHoldings, initial_value: rtCapital })}

@@ -18,9 +18,47 @@ from datetime import datetime
 SEV = {"high": 3, "medium": 2, "low": 1}
 
 
+# The transferable principle behind each finding. The advisor's job is not
+# only to fix THIS portfolio — a user who understands why concentration hurts
+# can spot it in the next one without being told. Findings are specific to the
+# holdings; lessons are general and identical every time, which is what makes
+# them learnable.
+LESSONS = {
+    "weak_alpha": (
+        "Why it matters: every rupee has an opportunity cost. Money sitting in a "
+        "name the model rates poorly is money not working in one it rates well. "
+        "The size of a position should reflect how much conviction you have."),
+    "underweight_strong": (
+        "Why it matters: conviction and position size should agree. A tiny "
+        "position in your best idea barely moves your result even when you are "
+        "right — being correct only pays if you owned enough of it."),
+    "concentration": (
+        "Why it matters: with one stock above 40%, your outcome IS that "
+        "company's outcome. Everything you know about it can be true and one "
+        "surprise — a bad quarter, a regulator, a fire — still decides your "
+        "year. Diversification is the only free lunch in investing."),
+    "too_few": (
+        "Why it matters: risk falls fast as you add holdings, then flattens. "
+        "Going from 3 stocks to 8 removes most single-company risk; going from "
+        "20 to 40 removes very little and makes the portfolio harder to follow."),
+    "risk_concentration": (
+        "Why it matters: money and risk are different things. A volatile stock "
+        "at 10% can drive more of your ups and downs than a stable one at 30%. "
+        "Professionals size positions by RISK contributed, not rupees spent."),
+    "correlated": (
+        "Why it matters: diversification comes from holdings that move "
+        "differently, not from counting names. Two banks are one bet on banking. "
+        "Real spread means different sectors, sizes and business drivers."),
+    "downside_breach": (
+        "Why it matters: the loss you can live with should drive the portfolio, "
+        "not the other way round. Deciding this BEFORE you invest is what stops "
+        "you selling at the bottom — the single most expensive mistake there is."),
+}
+
+
 def _tip(severity, kind, title, detail, tickers=None):
     return {"severity": severity, "kind": kind, "title": title,
-            "detail": detail, "tickers": tickers or []}
+            "detail": detail, "lesson": LESSONS.get(kind), "tickers": tickers or []}
 
 
 def _alpha_for(tickers):
@@ -154,6 +192,8 @@ def advise(holdings: dict, initial_value: float = 100000,
         "holdings_analysed": len(tickers),
         "headline": (tips[0]["title"] if tips else
                      "No obvious problems found — the model has no specific fix to suggest."),
+        "teaches": "Each finding comes with the principle behind it, so the same "
+                   "mistake is recognisable next time without being told.",
         "basis": "Alpha scores from the latest universe scan, risk decomposition and "
                  "correlation from 400 days of returns, downside from 4,000 simulations.",
         "disclaimer": "Model output, not financial advice.",
