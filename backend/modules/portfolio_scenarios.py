@@ -166,7 +166,8 @@ def scenarios(holdings: dict, initial_value: float = 100000,
 
 
 def what_if(holdings: dict, initial_value: float = 100000,
-            horizon_months: int = 12, max_weight_pct: float = None) -> dict:
+            horizon_months: int = 12, max_weight_pct: float = None,
+            new_holdings: dict = None) -> dict:
     """
     Measure a user's OWN tweak rather than a preset one.
 
@@ -192,6 +193,34 @@ def what_if(holdings: dict, initial_value: float = 100000,
     base = _measure(base_w, initial_value, horizon_days)
     if not base:
         return {"error": "Could not simulate this portfolio."}
+
+    # An explicit new_holdings wins: the user has edited weights directly, or
+    # added/removed stocks, and that is a more specific instruction than a cap.
+    if new_holdings:
+        edited = {t: float(v) for t, v in new_holdings.items() if float(v or 0) > 0}
+        if len(edited) < 2:
+            return {"error": "Keep at least 2 stocks."}
+        bad = [t for t in edited if not (t.endswith(".NS") or t.endswith(".BO"))]
+        if bad:
+            return {"error": f"Unsupported ticker(s): {', '.join(bad[:3])}. Use NSE symbols ending .NS"}
+        new_w = _norm(edited)
+        after = _measure(new_w, initial_value, horizon_days)
+        if not after:
+            return {"error": "Could not simulate the edited portfolio. Check the tickers."}
+        added   = [t for t in new_w if t not in base_w]
+        removed = [t for t in base_w if t not in new_w]
+        applied = []
+        if added:   applied.append("added " + ", ".join(t.replace(".NS","") for t in added))
+        if removed: applied.append("removed " + ", ".join(t.replace(".NS","") for t in removed))
+        if not applied: applied.append("reweighted")
+        return {
+            "base": base, "after": after,
+            "weights": {k: round(v, 2) for k, v in new_w.items()},
+            "changed": True, "applied": applied, "horizon_months": horizon_months,
+            "delta_return_pct":   round(after["return_pct"] - base["return_pct"], 2),
+            "delta_downside_pct": round(after["downside_pct"] - base["downside_pct"], 2),
+            "disclaimer": "Simulated from past returns. Not a prediction.",
+        }
 
     new_w, applied = dict(base_w), []
     if max_weight_pct:

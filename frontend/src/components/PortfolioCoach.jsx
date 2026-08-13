@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { advisePortfolio, portfolioScenarios, portfolioWhatIf } from '../api'
 import Spinner from './Spinner'
-import { Lightbulb, AlertTriangle, Info, Check } from 'lucide-react'
+import { Lightbulb, AlertTriangle, Info, Check, Plus, X } from 'lucide-react'
 
 const sevStyle = s =>
   s === 'high'   ? 'border-red-800/60 bg-red-950/30' :
@@ -38,6 +38,22 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
   const [cap, setCap] = useState(Math.max(minCap, 30))
   const [hz, setHz]   = useState(horizonMonths)
   const whatIf = useMutation({ mutationFn: portfolioWhatIf })
+  // Per-stock editing: change any weight, drop a name, add a new one. Seeded
+  // from the current portfolio the first time the panel is opened.
+  const [edit, setEdit] = useState(null)
+  const [newTicker, setNewTicker] = useState('')
+  const rows = edit ?? holdings
+  const editTotal = Object.values(rows).reduce((a, b) => a + (Number(b) || 0), 0)
+  const setW = (t, v) => setEdit({ ...rows, [t]: v })
+  const dropT = t => { const n = { ...rows }; delete n[t]; setEdit(n) }
+  const addT = () => {
+    let t = newTicker.trim().toUpperCase()
+    if (!t) return
+    if (!t.endsWith('.NS') && !t.endsWith('.BO')) t += '.NS'
+    if (rows[t]) return
+    setEdit({ ...rows, [t]: 10 })
+    setNewTicker('')
+  }
   const body = { holdings, initial_value: initialValue,
                  horizon_months: horizonMonths, max_loss_pct: maxLossPct }
 
@@ -118,6 +134,53 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
                 {hz} months{hz >= 12 && ` (${(hz / 12).toFixed(1)} years)`}
               </p>
             </div>
+          </div>
+
+          {/* Per-stock control: exact weights, remove, add */}
+          <div className="mt-4 pt-3 border-t border-gray-800/70">
+            <p className="label mb-2">Or set each stock yourself</p>
+            <div className="space-y-1.5">
+              {Object.entries(rows).map(([t, v]) => (
+                <div key={t} className="flex items-center gap-2">
+                  <span className="font-mono text-xs w-24 truncate">{t.replace('.NS', '')}</span>
+                  <input type="range" min="0" max="100" step="1" className="flex-1"
+                         value={Number(v) || 0} onChange={e => setW(t, Number(e.target.value))} />
+                  <input type="number" min="0" max="100" step="1"
+                         className="input w-16 text-right py-1 text-xs"
+                         value={Number(v) || 0} onChange={e => setW(t, Number(e.target.value))} />
+                  <span className="text-xs text-gray-500">%</span>
+                  <button onClick={() => dropT(t)} title="Remove"
+                          className="text-gray-600 hover:text-red-400 shrink-0"><X size={13} /></button>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 mt-2">
+              <input className="input flex-1 py-1 text-xs" placeholder="Add a stock — e.g. ITC"
+                     value={newTicker} onChange={e => setNewTicker(e.target.value)}
+                     onKeyDown={e => e.key === 'Enter' && addT()} />
+              <button onClick={addT} className="btn-ghost text-xs flex items-center gap-1">
+                <Plus size={12} /> Add
+              </button>
+            </div>
+
+            <p className={`text-[11px] mt-2 ${Math.abs(editTotal - 100) < 0.5 ? 'text-gray-600' : 'text-yellow-400'}`}>
+              Total {editTotal.toFixed(1)}%
+              {Math.abs(editTotal - 100) >= 0.5 && ' — will be scaled to 100% when tested'}
+            </p>
+
+            <button
+              onClick={() => whatIf.mutate({ holdings, initial_value: initialValue,
+                                             horizon_months: hz, new_holdings: rows })}
+              disabled={whatIf.isPending || Object.keys(rows).length < 2}
+              className="btn-ghost text-xs mt-2">
+              {whatIf.isPending ? 'Testing…' : 'Test my edits'}
+            </button>
+            {edit && (
+              <button onClick={() => setEdit(null)} className="btn-ghost text-xs mt-2 ml-2">
+                Reset
+              </button>
+            )}
           </div>
 
           <button

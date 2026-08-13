@@ -1041,6 +1041,7 @@ class WhatIfRequest(BaseModel):
     initial_value: float = 100000
     horizon_months: int = 12
     max_weight_pct: Optional[float] = None
+    new_holdings: Optional[dict] = None
 
 
 @app.post("/portfolio/what-if")
@@ -1049,7 +1050,8 @@ def portfolio_what_if(req: WhatIfRequest):
     from portfolio_scenarios import what_if
     result = what_if(req.holdings, initial_value=req.initial_value,
                      horizon_months=req.horizon_months,
-                     max_weight_pct=req.max_weight_pct)
+                     max_weight_pct=req.max_weight_pct,
+                     new_holdings=req.new_holdings)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
