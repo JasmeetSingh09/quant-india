@@ -447,5 +447,37 @@ def get_signal_history(ticker: str, limit: int = 30) -> list:
         "WHERE ticker = ? ORDER BY scanned_at DESC", (ticker,)
     ).fetchall()
     conn.close()
-    return [{"date": r[0], "alpha_score": r[1], "signal": r[2], "confidence": r[3]}
-            for r in rows[:limit]]
+    out = [{"date": r[0], "alpha_score": r[1], "signal": r[2], "confidence": r[3]}
+           for r in rows[:limit]]
+    if not out:
+        return out
+
+    # Attach the closing price on each reading's date, so a past call can be
+    # read against what the stock actually did: "BUY at 2,188 five days ago,
+    # 2,364 now". Fetched from history rather than stored at scan time, which
+    # means it also fills in for readings taken before this existed.
+    try:
+        import yfinance as yf
+        from datetime import timedelta
+        dates = sorted({d["date"][:10] for d in out})
+        start = (datetime.fromisoformat(dates[0]) - timedelta(days=7)).strftime("%Y-%m-%d")
+        end   = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+        px = yf.download(ticker, start=start, end=end, progress=False,
+                         auto_adjust=True)["Close"].squeeze().dropna()
+        if len(px):
+            closes = {str(i.date()): float(v) for i, v in px.items()}
+            days   = sorted(closes)
+            for row in out:
+                d = row["date"][:10]
+                # Markets close on weekends and holidays: fall back to the most
+                # recent trading day at or before the reading.
+                prior = [x for x in days if x <= d]
+                row["close"] = round(closes[prior[-1]], 2) if prior else None
+            latest = round(float(px.iloc[-1]), 2)
+            for row in out:
+                if row.get("close"):
+                    row["price_now"] = latest
+                    row["since_pct"] = round((latest / row["close"] - 1) * 100, 2)
+    except Exception:
+        pass          # price history is a nice-to-have; never fail the history
+    return out

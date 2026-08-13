@@ -58,13 +58,14 @@ export default function SignalHistory({ ticker }) {
       </div>
 
       <div className="table-wrap">
-        <table className="w-full min-w-[22rem] text-sm">
+        <table className="w-full min-w-[28rem] text-sm">
           <thead>
             <tr className="text-gray-500 text-xs border-b border-gray-800">
               <th className="text-left py-1.5 font-medium">When</th>
               <th className="text-left font-medium">Signal</th>
               <th className="text-right font-medium">Alpha</th>
-              <th className="text-right font-medium">Confidence</th>
+              <th className="text-right font-medium">Close</th>
+              <th className="text-right font-medium">Since</th>
             </tr>
           </thead>
           <tbody>
@@ -79,8 +80,16 @@ export default function SignalHistory({ ticker }) {
                 <td className={`text-right font-mono ${r.alpha_score >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                   {r.alpha_score > 0 ? '+' : ''}{r.alpha_score}
                 </td>
-                <td className="text-right font-mono text-gray-500">
-                  {Math.round((r.confidence || 0) * 100)}%
+                {/* What the stock actually closed at that day, and what it has
+                    done since — so a past call can be judged, not just read. */}
+                <td className="text-right font-mono text-gray-300">
+                  {r.close != null ? `₹${r.close.toLocaleString('en-IN')}` : '—'}
+                </td>
+                <td className={`text-right font-mono ${
+                  r.since_pct == null ? 'text-gray-600'
+                  : r.since_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {r.since_pct == null ? '—'
+                    : `${r.since_pct > 0 ? '+' : ''}${r.since_pct.toFixed(1)}%`}
                 </td>
               </tr>
             ))}
@@ -89,8 +98,9 @@ export default function SignalHistory({ ticker }) {
       </div>
 
       <p className="text-[11px] text-gray-600 mt-3">
-        Recorded once per daily universe scan. History starts from the first
-        scan — earlier dates were never measured, so they are not shown.
+        Recorded once per daily universe scan. “Close” is what the stock ended at
+        that day; “Since” is how it has moved from that close to now — so you can
+        judge each past call, not just read it. History starts from the first scan.
       </p>
     </div>
   )
