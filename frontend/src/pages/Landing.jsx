@@ -42,16 +42,17 @@ export default function Landing() {
       {/* Hero */}
       <section className="max-w-3xl mx-auto text-center px-6 pt-16 pb-12">
         <p className="text-xs font-semibold tracking-widest text-green-400 uppercase mb-4">
-          Learn investing by doing it
+          Quantitative portfolio research for the NSE
         </p>
         <h1 className="text-4xl sm:text-5xl font-bold text-white leading-tight">
-          Build a portfolio. See what could go wrong. Learn why.
+          The maths quant desks use, on all 2,400 NSE stocks
         </h1>
         <p className="mt-5 text-lg text-gray-400">
-          Quant India is a free learning tool for Indian investors. Build an NSE
-          portfolio, simulate thousands of possible futures, find out how much you
-          could actually lose, and paper-trade it with no real money at risk —
-          using the same maths real quant desks use, explained in plain English.
+          A four-factor alpha model scoring the entire NSE daily. Nine portfolio
+          optimisers — Markowitz, Black-Litterman, HRP, Min-CVaR. Monte Carlo,
+          GARCH volatility, Fama-French factors and a three-state regime model.
+          Build a portfolio with them, see exactly what could go wrong, and
+          paper-trade it before risking a rupee.
         </p>
         <div className="mt-8 flex items-center justify-center gap-3">
           <button onClick={goSignIn} className="btn-primary">Get started — it's free</button>
@@ -59,6 +60,25 @@ export default function Landing() {
         </div>
         <p className="mt-4 text-xs text-gray-600">Signals &amp; research only — not financial advice.</p>
       </section>
+
+      {/* Hard numbers. Each one is verifiable in the app or the repo — this is
+          the technical credibility the honest positioning has to sit on. */}
+      <section className="max-w-6xl mx-auto px-6 pt-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            ['2,401', 'NSE stocks scored daily'],
+            ['9', 'portfolio optimisers'],
+            ['168,389', 'test assertions passing'],
+            ['4', 'factors per alpha score'],
+          ].map(([n, l]) => (
+            <div key={l} className="card-sm text-center">
+              <p className="text-2xl font-bold font-mono text-green-400">{n}</p>
+              <p className="text-[11px] text-gray-500 mt-1">{l}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
 
       {/* Features */}
       <section id="features" className="max-w-6xl mx-auto px-6 py-12">
@@ -80,6 +100,32 @@ export default function Landing() {
           ))}
         </div>
       </section>
+
+      {/* Under the hood */}
+      <section className="max-w-6xl mx-auto px-6 py-12">
+        <div className="text-center mb-8">
+          <h2 className="text-2xl sm:text-3xl font-bold text-white">Under the hood</h2>
+          <p className="text-gray-400 mt-2">
+            Textbook methods, implemented and tested — not a black box.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            ['Alpha model', 'Momentum (12-1, volatility-adjusted), quality (Piotroski F-score, ROE, FCF yield), value (P/E and P/B z-scores vs peers) and FinBERT news sentiment — combined into one score with every contribution shown.'],
+            ['Portfolio optimisation', 'Markowitz mean-variance with Ledoit-Wolf shrinkage, Black-Litterman with He-Litterman equilibrium, Hierarchical Risk Parity, Equal Risk Contribution, Maximum Diversification and Min-CVaR via linear programming.'],
+            ['Risk & simulation', 'Monte Carlo by normal, Student-t, i.i.d. and block bootstrap. VaR and CVaR, GARCH(1,1) volatility forecasting, risk decomposition by contribution, and Kelly-based position sizing.'],
+            ['Factor research', 'Fama-French three-factor regressions with t-stats, cointegration testing for pairs, seasonality studies and a three-state Gaussian HMM for market regime.'],
+            ['Options', 'Black-Scholes-Merton pricing with the full Greeks and risk-neutral probabilities — verified against the textbook case at 10.4506 versus 10.45.'],
+            ['Honesty by construction', 'Momentum backtested point-in-time: a 23%/yr edge collapsed to 11.7% (t 3.78 to 1.50) once survivorship was removed. We publish the corrected number, and the live scorecard, including where it shows no edge.'],
+          ].map(([title, desc]) => (
+            <div key={title} className="card space-y-2">
+              <h3 className="font-semibold text-white text-sm">{title}</h3>
+              <p className="text-xs text-gray-400 leading-relaxed">{desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
 
       {/* Closing CTA */}
       <section className="max-w-3xl mx-auto text-center px-6 py-16">
