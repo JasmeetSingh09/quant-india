@@ -81,7 +81,11 @@ def _init_db_locked():
             initial_value   REAL NOT NULL,
             started_at      TEXT NOT NULL,
             last_checked    TEXT,
-            status          TEXT DEFAULT 'active'
+            status          TEXT DEFAULT 'active',
+            -- Demo portfolios are REAL simulations tracked against live prices;
+            -- the flag exists only so the leaderboard can label them honestly
+            -- rather than passing them off as another anonymous user's result.
+            is_demo         INTEGER DEFAULT 0
         )
     """)
     conn.execute("""
@@ -153,6 +157,18 @@ def _init_db_locked():
     conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_pf_user_name ON portfolios(user_id, name)")
     conn.commit()
     conn.close()
+
+    conn = get_conn()
+    try:
+        if _db.IS_POSTGRES:
+            conn.execute("ALTER TABLE simulations ADD COLUMN IF NOT EXISTS is_demo INTEGER DEFAULT 0")
+        else:
+            conn.execute("ALTER TABLE simulations ADD COLUMN is_demo INTEGER DEFAULT 0")
+        conn.commit()
+    except Exception:
+        pass          # already present
+    finally:
+        conn.close()
 
 
 def _rebuild_if_global_unique(conn, table: str, columns_ddl: str, columns_csv: str):
@@ -250,6 +266,7 @@ def start_simulation(
     holdings: dict,
     initial_value: float = 100_000,
     user_id: str = "public",
+    is_demo: bool = False,
 ) -> dict:
     """
     Start a real-time paper trading simulation.
@@ -327,9 +344,9 @@ def start_simulation(
     conn = get_conn()
     try:
         conn.execute(
-            "INSERT INTO simulations (user_id, name, initial_value, started_at, last_checked, status) "
-            "VALUES (?, ?, ?, ?, ?, 'active')",
-            (user_id, name, initial_value, now, now)
+            "INSERT INTO simulations (user_id, name, initial_value, started_at, last_checked, status, is_demo) "
+            "VALUES (?, ?, ?, ?, ?, 'active', ?)",
+            (user_id, name, initial_value, now, now, 1 if is_demo else 0)
         )
         for p in positions:
             conn.execute("""

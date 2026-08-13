@@ -1052,6 +1052,13 @@ def portfolio_scenarios_ep(req: AdviseRequest):
     return result
 
 
+@app.post("/simulator/seed-demos")
+def simulator_seed_demos():
+    """Create the example portfolios shown on the leaderboard. Idempotent."""
+    from leaderboard import seed_demos
+    return seed_demos()
+
+
 @app.get("/simulator/leaderboard")
 def simulator_leaderboard(n: int = Query(5, ge=1, le=20)):
     """

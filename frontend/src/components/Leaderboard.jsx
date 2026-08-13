@@ -42,7 +42,15 @@ export default function Leaderboard({ n = 5 }) {
             <div className="flex items-center gap-3 min-w-0">
               <span className={`font-mono text-sm w-6 shrink-0 ${medal(r.rank)}`}>#{r.rank}</span>
               <div className="min-w-0">
-                <p className="text-sm text-gray-200 truncate">{r.label}</p>
+                <p className="text-sm text-gray-200 truncate flex items-center gap-1.5">
+                  {r.label}
+                  {r.is_demo && (
+                    <span className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded
+                                     bg-gray-800 text-gray-400 border border-gray-700 shrink-0">
+                      example
+                    </span>
+                  )}
+                </p>
                 <p className="text-[11px] text-gray-600">
                   {r.n_positions} stocks · {r.days_running} days
                 </p>

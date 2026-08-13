@@ -35,13 +35,14 @@ def top_simulations(n: int = 5) -> dict:
 
     conn = get_conn()
     rows = conn.execute(
-        "SELECT user_id, name, initial_value, started_at FROM simulations "
-        "WHERE status = 'active'"
+        "SELECT user_id, name, initial_value, started_at, COALESCE(is_demo, 0) "
+        "FROM simulations WHERE status = 'active'"
     ).fetchall()
     conn.close()
 
     results = []
-    for user_id, name, initial, started in rows:
+    demo_seen = 0
+    for user_id, name, initial, started, is_demo in rows:
         try:
             days = (datetime.now() - datetime.fromisoformat(started)).days
         except Exception:
@@ -60,8 +61,17 @@ def top_simulations(n: int = 5) -> dict:
         ret = p.get("total_pnl_pct")
         if ret is None:
             continue
+        if is_demo:
+            demo_seen += 1
+            # Named, not pseudonymised. A demo shown as "Investor #247" would be
+            # indistinguishable from a real user's result — fabricated social
+            # proof, and the opposite of what this platform claims to be.
+            label = f"Example portfolio {demo_seen}"
+        else:
+            label = _label(user_id, name)
         results.append({
-            "label": _label(user_id, name),
+            "label": label,
+            "is_demo": bool(is_demo),
             "return_pct": round(float(ret), 2),
             "days_running": days,
             "n_positions": len(positions),
@@ -79,3 +89,33 @@ def top_simulations(n: int = 5) -> dict:
         "privacy": "Names, holdings and identities are never published.",
         "as_of": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
+
+
+# Diversified, defensible example portfolios. These are REAL simulations tracked
+# against live NSE prices — nothing is fabricated. They exist so the leaderboard
+# and demos are not empty before the pilot, and they are labelled as examples so
+# no one mistakes them for another user's result.
+DEMO_PORTFOLIOS = [
+    ("Large-cap core",   {"HDFCBANK.NS": 25, "TCS.NS": 20, "RELIANCE.NS": 20,
+                          "ICICIBANK.NS": 20, "ITC.NS": 15}),
+    ("Spread across sectors", {"SBIN.NS": 18, "SUNPHARMA.NS": 18, "LT.NS": 18,
+                               "MARUTI.NS": 16, "NTPC.NS": 15, "TITAN.NS": 15}),
+    ("Equal weight eight",    {"INFY.NS": 12.5, "AXISBANK.NS": 12.5, "TATASTEEL.NS": 12.5,
+                               "HINDUNILVR.NS": 12.5, "BHARTIARTL.NS": 12.5,
+                               "ASIANPAINT.NS": 12.5, "COALINDIA.NS": 12.5, "WIPRO.NS": 12.5}),
+]
+
+
+def seed_demos(initial_value: float = 100000) -> dict:
+    """Create the example portfolios if they do not already exist. Idempotent."""
+    from simulator import start_simulation, list_simulations
+    existing = {s.get("name") for s in (list_simulations(user_id="demo") or [])}
+    created, skipped = [], []
+    for name, holdings in DEMO_PORTFOLIOS:
+        if name in existing:
+            skipped.append(name); continue
+        r = start_simulation(name, holdings, initial_value=initial_value,
+                             user_id="demo", is_demo=True)
+        (created if "error" not in r else skipped).append(name)
+    return {"created": created, "skipped": skipped,
+            "note": "Real simulations tracked against live prices, labelled as examples."}
