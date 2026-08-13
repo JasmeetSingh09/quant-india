@@ -5,6 +5,7 @@ import Spinner from '../components/Spinner'
 import RegimeBadge from '../components/RegimeBadge'
 import Explainer from '../components/Explainer'
 import CapTierPicks from '../components/CapTierPicks'
+import Leaderboard from '../components/Leaderboard'
 import { TrendingUp, TrendingDown, Sparkles, ArrowUpRight, ArrowDownRight, RefreshCw, History } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 
@@ -331,6 +332,10 @@ export default function Dashboard() {
 
 
       {/* Honest track record of past picks */}
+      {/* Renders nothing until a simulation qualifies, so an empty pilot
+          shows no hollow scaffolding. */}
+      <Leaderboard n={5} />
+
       {/* Top picks per cap tier, from the full 2,401-stock universe scan */}
       <CapTierPicks n={10} />
 
