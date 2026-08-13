@@ -120,7 +120,7 @@ else:
 # ========================= RATE LIMIT =================================
 section("rate limit")
 import rate_limit
-from rate_limit import check, bucket_for, LIMITS
+from rate_limit import check, bucket_for, LIMITS, IP_CEILING
 
 rate_limit._hits.clear()
 
@@ -158,6 +158,51 @@ try:
     ok(True, "no client info handled")
 except Exception:
     ok(False, "no client info handled")
+
+# The classroom case: many anonymous people behind one address must not share
+# a single budget, because that is what a demo actually looks like.
+class ClientReq(FakeReq):
+    def __init__(self, path, ip="203.0.113.9", cid=None, auth=None, ua="Mozilla/5.0"):
+        super().__init__(path, ip, auth)
+        self.headers = dict(self.headers)
+        self.headers["user-agent"] = ua
+        if cid:
+            self.headers["x-client-id"] = cid
+
+
+rate_limit._hits.clear()
+blocked = sum(1 for p in range(30) for _ in range(10)
+              if check(ClientReq("/stock/X", cid=f"device-{p:08d}")) is not None)
+ok(blocked == 0, f"30 anonymous people on one IP are not throttled (got {blocked} blocks)")
+
+# One runaway tab is still caught.
+rate_limit._hits.clear()
+n = sum(1 for _ in range(400) if check(ClientReq("/stock/X", cid="device-00000001")) is None)
+ok(n == LIMITS["light"][0], "single client still capped at its own limit")
+
+# Rotating the self-asserted id must not buy an unlimited budget.
+rate_limit._hits.clear()
+n = sum(1 for i in range(2000) if check(ClientReq("/stock/X", cid=f"device-{i:08d}")) is None)
+ok(n == IP_CEILING["light"][0], "rotating client ids stopped by the network ceiling")
+
+# A signed-in user is accountable individually and must survive a busy network.
+ok(check(ClientReq("/stock/X", auth="Bearer " + "q" * 60)) is None,
+   "signed-in user not blocked by a saturated network")
+
+# ...but still has their own budget.
+rate_limit._hits.clear()
+n = sum(1 for _ in range(400) if check(ClientReq("/stock/X", auth="Bearer " + "q" * 60)) is None)
+ok(n == LIMITS["light"][0], "signed-in user still has a personal limit")
+
+# A short or malformed client id must fall back rather than be trusted.
+rate_limit._hits.clear()
+for bad_cid in ("", "ab", "x" * 200, "has space", "semi;colon"):
+    r = check(ClientReq("/stock/X", cid=bad_cid))
+    ok(r is None or "retry_after" in r, f"malformed client id {bad_cid[:12]!r} handled")
+
+# An old cached bundle sends no client id at all and must still work.
+rate_limit._hits.clear()
+ok(check(ClientReq("/stock/X")) is None, "missing client id still served")
 
 # A blocked response must say when to retry.
 rate_limit._hits.clear()

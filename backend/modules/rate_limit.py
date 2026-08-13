@@ -19,11 +19,28 @@ runs on two instances is a shared store, not a bigger dictionary.
 import time
 from collections import defaultdict, deque
 
-# (requests, seconds). Expensive work gets a tight budget; reads get room.
+# (requests, seconds) per CALLER. Expensive work gets a tight budget; reads get
+# room, because a single dashboard load fires several of them.
 LIMITS = {
     "heavy":  (5,   300),    # scans, backtests, full simulations
     "medium": (30,  60),     # optimisation, monte carlo, advice
-    "light":  (120, 60),     # prices, lookups, page data
+    "light":  (180, 60),     # prices, lookups, page data
+}
+
+# A second, per-NETWORK ceiling.
+#
+# Without it the per-caller limit is trivially defeated: an anonymous caller is
+# identified partly by a header it sends itself, so rotating that header would
+# buy an unlimited budget. With it, one machine cannot flood regardless.
+#
+# The numbers are set for the case that actually happens — a classroom or office
+# where thirty people share one address. Thirty people browsing hard is a few
+# hundred light requests a minute; a runaway script is thousands. The ceiling
+# sits between those, so real users never meet it.
+IP_CEILING = {
+    "heavy":  (40,   300),
+    "medium": (200,  60),
+    "light":  (1200, 60),
 }
 
 # Longest prefix wins, so /portfolio/advise can be "medium" while /portfolio is
@@ -47,19 +64,44 @@ def bucket_for(path: str) -> str:
     return "light"
 
 
+def _ip(request) -> str:
+    fwd = request.headers.get("x-forwarded-for") or ""
+    if fwd:
+        return fwd.split(",")[0].strip()
+    return request.client.host if getattr(request, "client", None) else "unknown"
+
+
 def client_key(request) -> str:
     """
-    Identify the caller. A signed-in user is limited as themselves so that a
-    shared office or college IP does not punish everyone behind it; anonymous
-    callers fall back to IP.
+    Identify the caller as narrowly as is honest.
+
+    A signed-in user is limited as themselves. Anonymous callers used to fall
+    back to bare IP, which meant thirty people on one school network shared a
+    single budget and the last few to open the app got a 429 — the exact
+    situation a demo creates.
+
+    So anonymous callers are separated by a client id the browser generates and
+    keeps, falling back to IP plus a user-agent fingerprint when there is none
+    (an older cached bundle, or a direct API call). Neither is trustworthy on its
+    own, which is why the per-network ceiling above exists: this key decides how
+    finely honest users are separated, not how much total damage one machine can
+    do.
     """
     auth = request.headers.get("authorization") or ""
     if auth.startswith("Bearer ") and len(auth) > 40:
         return "u:" + auth[-24:]
-    fwd = request.headers.get("x-forwarded-for") or ""
-    ip = fwd.split(",")[0].strip() if fwd else (
-        request.client.host if request.client else "unknown")
-    return "ip:" + ip
+
+    cid = (request.headers.get("x-client-id") or "").strip()
+    if 8 <= len(cid) <= 64 and all(c.isalnum() or c in "-_" for c in cid):
+        return "c:" + cid
+
+    ua = request.headers.get("user-agent") or ""
+    return "ip:" + _ip(request) + ":" + str(abs(hash(ua)) % 100000)
+
+
+def network_key(request) -> str:
+    """The address itself, for the ceiling. Not spoofable by a header we trust."""
+    return "net:" + _ip(request)
 
 
 def check(request) -> dict | None:
@@ -75,25 +117,48 @@ def check(request) -> dict | None:
         return None
 
     bucket = bucket_for(path)
-    limit, window = LIMITS[bucket]
-    key = f"{client_key(request)}|{bucket}"
     now = time.time()
 
-    q = _hits[key]
-    while q and now - q[0] > window:
-        q.popleft()
+    # Both budgets must allow the request: the caller's own, and the network's.
+    # Checked before either is charged, so a request rejected by one does not
+    # consume the other.
+    key = client_key(request)
+    gates = [(f"{key}|{bucket}", *LIMITS[bucket], "caller")]
 
-    if len(q) >= limit:
-        retry = int(window - (now - q[0])) + 1
-        return {"bucket": bucket, "limit": limit, "window": window,
-                "retry_after": retry,
-                "detail": (f"Too many requests. This endpoint allows {limit} every "
-                           f"{window // 60 or 1} minute(s) — it does real computation, "
-                           f"and the cap keeps the app responsive for everyone. "
-                           f"Try again in {retry}s.")}
+    # The network ceiling exists because an anonymous caller's identity is a
+    # header it sends itself, so rotating it would otherwise buy an unlimited
+    # budget. A signed-in user is not self-asserted — the token is verified —
+    # so they are accountable individually and keep their own budget regardless
+    # of how busy the network around them is. Blocking a pilot user because
+    # thirty strangers share their school's address is the exact failure this
+    # ceiling was added to prevent, not an acceptable side effect of it.
+    if not key.startswith("u:"):
+        gates.append((f"{network_key(request)}|{bucket}", *IP_CEILING[bucket], "network"))
 
-    q.append(now)
-    if len(_hits) > 10_000:                 # bound memory on a long uptime
+    for key, limit, window, scope in gates:
+        q = _hits[key]
+        while q and now - q[0] > window:
+            q.popleft()
+        if len(q) >= limit:
+            retry = int(window - (now - q[0])) + 1
+            mins = window // 60 or 1
+            return {"bucket": bucket, "limit": limit, "window": window,
+                    "scope": scope, "retry_after": retry,
+                    "detail": (
+                        f"Too many requests. This endpoint allows {limit} every "
+                        f"{mins} minute(s) — it does real computation, and the cap "
+                        f"keeps the app responsive for everyone. Try again in "
+                        f"{retry}s."
+                        if scope == "caller" else
+                        f"This network has made {limit} requests in {mins} minute(s), "
+                        f"which is above what a group of people browsing normally "
+                        f"produces. Signing in raises your own limit. Try again in "
+                        f"{retry}s.")}
+
+    for key, _, _, _ in gates:
+        _hits[key].append(now)
+
+    if len(_hits) > 20_000:                 # bound memory on a long uptime
         for k in [k for k, v in _hits.items() if not v or now - v[-1] > 3600]:
             _hits.pop(k, None)
     return None

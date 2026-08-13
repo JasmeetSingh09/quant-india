@@ -11,10 +11,33 @@ const api = axios.create({
 // Attach the Supabase JWT so the backend can scope data (watchlist, portfolio,
 // simulations, alerts) to the signed-in user. Anonymous users send no token and
 // fall back to the shared 'public' account on the backend.
+// A stable per-browser id, used only so the rate limiter can tell two anonymous
+// visitors apart. Without it everyone on one school or office network shares a
+// single budget and the last few people to open the app get a 429 — which is
+// precisely what a classroom demo produces. It is random, carries nothing about
+// the person, and is never used to identify anyone: the server treats it as a
+// hint for fairness, with a per-network ceiling behind it that no header can lift.
+const CLIENT_ID_KEY = 'app.clientId'
+function clientId() {
+  try {
+    let id = localStorage.getItem(CLIENT_ID_KEY)
+    if (!id) {
+      id = (crypto.randomUUID?.() ||
+            Math.random().toString(36).slice(2) + Date.now().toString(36))
+      localStorage.setItem(CLIENT_ID_KEY, id)
+    }
+    return id
+  } catch {
+    return null      // private mode with storage disabled — fall back to IP
+  }
+}
+
 api.interceptors.request.use(async config => {
   const { data } = await supabase.auth.getSession()
   const token = data.session?.access_token
   if (token) config.headers.Authorization = `Bearer ${token}`
+  const cid = clientId()
+  if (cid) config.headers['X-Client-Id'] = cid
   return config
 })
 
