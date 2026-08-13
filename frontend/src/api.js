@@ -20,7 +20,20 @@ api.interceptors.request.use(async config => {
 
 api.interceptors.response.use(
   r => r.data,
-  e => Promise.reject(e?.response?.data?.detail || e.message || 'API error')
+  e => {
+    // FastAPI returns `detail` as a STRING for HTTPException but as a LIST of
+    // error objects for 422 validation failures. Passing that list straight
+    // through meant the UI rendered "[object Object]" instead of a message.
+    const d = e?.response?.data?.detail
+    if (typeof d === 'string') return Promise.reject(d)
+    if (Array.isArray(d)) {
+      return Promise.reject(
+        d.map(x => x?.msg ? `${(x.loc || []).slice(-1)[0] ?? ''}: ${x.msg}` : JSON.stringify(x))
+         .join('; ') || 'Invalid request')
+    }
+    if (d) return Promise.reject(typeof d === 'object' ? JSON.stringify(d) : String(d))
+    return Promise.reject(e?.message || 'API error')
+  }
 )
 
 // Stock
@@ -71,6 +84,9 @@ export const scanAlpha      = body => api.post('/alpha/scan', body)
 export const getTopPicks    = () => api.get('/alpha/top-picks', { timeout: 150000 })
 // Full-universe scan (all 2,401 NSE names), split by SEBI cap tier
 // Guided flow: five answers -> a portfolio plus a downside verdict
+export const advisePortfolio   = body => api.post('/portfolio/advise', body, { timeout: 120000 })
+export const portfolioScenarios = body => api.post('/portfolio/scenarios', body, { timeout: 180000 })
+export const getLeaderboard     = (n=5) => api.get(`/simulator/leaderboard?n=${n}`)
 export const buildPortfolio = body => api.post('/portfolio/build', body, { timeout: 120000 })
 export const getUniverseTop  = (n = 10) => api.get(`/alpha/universe/top?n=${n}`)
 export const getScanStatus   = () => api.get('/alpha/universe/status')

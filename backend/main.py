@@ -25,6 +25,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from typing import Optional
 from pydantic import BaseModel
 
 load_dotenv(Path(__file__).parent / ".env")
@@ -1015,7 +1016,10 @@ class AdviseRequest(BaseModel):
     holdings: dict
     initial_value: float = 100000
     horizon_months: int = 12
-    max_loss_pct: float = None
+    # Optional[...] is required: `float = None` declares a float that merely
+    # defaults to None, so sending an explicit null 422s instead of meaning
+    # "no loss limit set".
+    max_loss_pct: Optional[float] = None
 
 
 @app.post("/portfolio/advise")

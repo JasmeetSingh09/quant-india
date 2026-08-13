@@ -3,6 +3,7 @@ import usePersistentState from '../usePersistentState'
 import { useMutation } from '@tanstack/react-query'
 import { runMVO, runBL, getFrontier, autoOptimize, runHRP, runRiskParity, runMaxDiversification, runMinCVaR, runRegimeAdaptive } from '../api'
 import Spinner from '../components/Spinner'
+import PortfolioCoach from '../components/PortfolioCoach'
 import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceDot, LineChart, Line } from 'recharts'
 import { Plus, Trash2 } from 'lucide-react'
 import { InfoTip } from '../components/Term'
@@ -483,6 +484,15 @@ export default function Optimizer() {
           )}
         </div>
       </div>
+
+      {/* The Optimizer holds a TICKER LIST, not weights, so an applied scenario
+          changes which stocks are in play and the optimiser re-derives the
+          weights itself. Equal weights are assumed for the analysis since the
+          user has not chosen sizing on this page. */}
+      <PortfolioCoach
+        holdings={Object.fromEntries(tickers.map(t => [t, 100 / (tickers.length || 1)]))}
+        onApply={w => setTickers(Object.keys(w))}
+      />
     </div>
   )
 }

@@ -3,6 +3,7 @@ import usePersistentState from '../usePersistentState'
 import { useMutation } from '@tanstack/react-query'
 import { runMonteCarlo, compareMonteCarlo } from '../api'
 import Spinner from '../components/Spinner'
+import PortfolioCoach from '../components/PortfolioCoach'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, Legend
@@ -248,6 +249,15 @@ export default function MonteCarlo() {
           )}
         </div>
       </div>
+
+      {/* Suggestions + tweakable what-ifs. Holdings here ARE weights, so an
+          applied scenario maps directly onto this page's state. */}
+      <PortfolioCoach
+        holdings={holdings}
+        initialValue={capital}
+        horizonMonths={Math.round(years * 12)}
+        onApply={w => setHoldings(w)}
+      />
     </div>
   )
 }
