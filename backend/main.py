@@ -1116,6 +1116,53 @@ def predictions_integrity():
     return verify()
 
 
+class ShareRequest(BaseModel):
+    sim_name: str
+
+
+@app.post("/share/create")
+def share_create(req: ShareRequest, user_id: str = Depends(current_user_id)):
+    """Publish one simulation as a public read-only link. Opt-in, revocable."""
+    from share import create_share
+    r = create_share(req.sim_name, user_id=user_id)
+    if "error" in r:
+        raise HTTPException(status_code=404, detail=r["error"])
+    return r
+
+
+@app.post("/share/revoke")
+def share_revoke(req: ShareRequest, user_id: str = Depends(current_user_id)):
+    from share import revoke_share
+    return revoke_share(req.sim_name, user_id=user_id)
+
+
+@app.get("/share/{token}")
+def share_read(token: str):
+    """Public — the token is the credential. Exposes holdings, weights and
+    returns; never the owner, their email or any rupee amount."""
+    from share import get_shared
+    r = get_shared(token)
+    if "error" in r:
+        raise HTTPException(status_code=404, detail=r["error"])
+    return r
+
+
+@app.post("/digest/preview")
+def digest_preview(user_id: str = Depends(current_user_id)):
+    """Build this user's weekly digest WITHOUT sending it."""
+    from weekly_digest import build_digest
+    return build_digest(user_id)
+
+
+@app.post("/digest/send")
+def digest_send(user_id: str = Depends(current_user_id),
+                email: str = Depends(current_user_email)):
+    """Send this user's weekly digest to their own address. Skips when there is
+    nothing worth saying — a weekly 'no change' trains people to ignore us."""
+    from weekly_digest import send_digest
+    return send_digest(user_id, to_email=email)
+
+
 @app.get("/simulator/leaderboard")
 def simulator_leaderboard(n: int = Query(5, ge=1, le=20)):
     """
