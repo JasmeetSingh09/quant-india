@@ -113,3 +113,101 @@ def send_digest(user_id: str = "public", to_email: str = None) -> dict:
     r = send_email(d["subject"], d["html"], to_email=to_email)
     return {"sent": bool(r and not r.get("error")), "n_portfolios": d["n_portfolios"],
             "result": r}
+
+
+# ---------------------------------------------------------------------------
+# Scheduling
+# ---------------------------------------------------------------------------
+
+_scheduler = None
+
+
+def send_all_digests() -> dict:
+    """
+    One weekly pass over everyone with a simulation worth reporting on.
+
+    Sends to each user's OWN address, taken from the accounts that have
+    simulations — never a blast to one list. A user with nothing to report is
+    skipped rather than mailed, which is the whole point: an email that says
+    "no change" teaches people to ignore the sender.
+    """
+    from db import get_conn
+    try:
+        conn = get_conn()
+        rows = conn.execute(
+            "SELECT DISTINCT user_id FROM simulations WHERE status = 'active' "
+            "AND COALESCE(is_demo, 0) = 0").fetchall()
+        conn.close()
+    except Exception as e:
+        return {"error": str(e)[:120]}
+
+    sent, skipped, no_address = [], [], []
+    for (uid,) in rows:
+        try:
+            d = build_digest(uid)
+            if "skip" in d:
+                skipped.append(uid[:8]); continue
+
+            # HARD STOP. We do not store per-user email addresses — the address
+            # only exists inside a request's JWT. Calling send_email without an
+            # explicit recipient falls back to GMAIL_RECEIVER, which would post
+            # every user's holdings to a single inbox. That is a privacy breach,
+            # not a delivery bug, so the batch refuses rather than guessing.
+            addr = _address_for(uid)
+            if not addr:
+                no_address.append(uid[:8]); continue
+
+            from alerts import send_email
+            r = send_email(d["subject"], d["html"], to_email=addr)
+            if r and not r.get("error"):
+                sent.append(uid[:8])
+            else:
+                no_address.append(uid[:8])
+        except Exception:
+            no_address.append(uid[:8])
+
+    return {
+        "sent": len(sent), "skipped_nothing_to_say": len(skipped),
+        "skipped_no_address": len(no_address),
+        "blocker": ("Digests can only go to users whose address we hold. Emails "
+                    "live in the Supabase JWT, not in our database, so the batch "
+                    "cannot address them. Store an opt-in address per user, or "
+                    "drive digests from Supabase, before relying on this."
+                    if no_address else None),
+        "ran_at": datetime.now().isoformat(),
+    }
+
+
+def _address_for(user_id: str):
+    """
+    The user's own email, or None. Deliberately returns None today: we do not
+    persist addresses anywhere, and a wrong recipient here means one person
+    receiving another person's portfolio.
+    """
+    try:
+        conn_ok = False
+        from db import get_conn
+        conn = get_conn(); conn_ok = True
+        row = conn.execute(
+            "SELECT email FROM user_emails WHERE user_id = ?", (user_id,)).fetchone()
+        conn.close()
+        return row[0] if row and row[0] else None
+    except Exception:
+        # No user_emails table yet — correct answer is "we don't know".
+        return None
+
+
+def start_digest_scheduler(day_of_week: str = "sun", hour: int = 18):
+    """Weekly, Sunday evening — before the week starts, not during it."""
+    global _scheduler
+    if _scheduler is not None:
+        return {"status": "already_running"}
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        _scheduler = BackgroundScheduler(daemon=True)
+        _scheduler.add_job(send_all_digests, "cron", day_of_week=day_of_week,
+                           hour=hour, id="weekly_digest")
+        _scheduler.start()
+        return {"status": "started", "when": f"{day_of_week} {hour:02d}:00"}
+    except Exception as e:
+        return {"status": "failed", "error": str(e)[:120]}

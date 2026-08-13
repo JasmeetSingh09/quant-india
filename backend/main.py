@@ -151,6 +151,12 @@ async def startup():
     # restarting — which matters because this service restarts often and a full
     # pass takes hours. Wrapped: a scan problem must never block startup.
     try:
+        from weekly_digest import start_digest_scheduler
+        print(f"[digest] {start_digest_scheduler()}")
+    except Exception as _e:
+        print(f"[digest] WARNING: scheduler not started: {_e}")
+
+    try:
         from data_health import probe
         _h = probe()
         if not _h["healthy"]:
@@ -1167,6 +1173,13 @@ def share_read(token: str):
     if "error" in r:
         raise HTTPException(status_code=404, detail=r["error"])
     return r
+
+
+@app.post("/digest/run-now")
+def digest_run_now():
+    """Run the weekly pass immediately — for testing the schedule, not a blast."""
+    from weekly_digest import send_all_digests
+    return send_all_digests()
 
 
 @app.post("/digest/preview")
