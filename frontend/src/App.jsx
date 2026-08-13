@@ -14,6 +14,7 @@ import Markets from './pages/Markets'
 import Advanced from './pages/Advanced'
 import Login from './pages/Login'
 import Landing from './pages/Landing'
+import SharedPortfolio from './pages/SharedPortfolio'
 import { useAuth } from './AuthContext'
 
 function NotFound() {
@@ -54,6 +55,10 @@ export default function App() {
     return (
       <Routes>
         <Route path="/login" element={<Login />} />
+        {/* A shared link must open for someone with no account — demanding a
+            login before showing anything defeats the entire point. The token
+            is the credential, so there is nothing to sign in to. */}
+        <Route path="/s/:token" element={<SharedPortfolio />} />
         <Route path="*"      element={<Landing />} />
       </Routes>
     )
@@ -106,6 +111,7 @@ export default function App() {
           {/* Options Lab and Research now live inside the Advanced Centre.
               Keep the old paths working — they are bookmarked and linked. */}
           {/* Build is now a tab inside the Simulator, which is the hero flow */}
+          <Route path="/s/:token"    element={<SharedPortfolio />} />
           <Route path="/build"       element={<Navigate to="/simulator" replace />} />
           <Route path="/options"     element={<Navigate to="/advanced" replace />} />
           <Route path="/research"    element={<Navigate to="/advanced" replace />} />

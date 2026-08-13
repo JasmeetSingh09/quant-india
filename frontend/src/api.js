@@ -86,6 +86,10 @@ export const getTopPicks    = () => api.get('/alpha/top-picks', { timeout: 15000
 // Guided flow: five answers -> a portfolio plus a downside verdict
 // Fire-and-forget product analytics. Never awaited and never surfaced: a
 // failed metric must not interrupt, slow, or error the action being measured.
+export const createShare = sim_name => api.post('/share/create', { sim_name })
+export const revokeShare = sim_name => api.post('/share/revoke', { sim_name })
+export const getShared   = token => api.get(`/share/${encodeURIComponent(token)}`)
+
 export const trackEvent = (event, props = {}) => {
   try { api.post('/events/track', { event, props }).catch(() => {}) } catch { /* ignore */ }
 }

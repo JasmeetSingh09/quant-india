@@ -4,11 +4,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { startSimulation, getSimulationPnl, getSimulations, deleteSimulation, runBacktest, getSimHistory, addSimPosition, removeSimPosition } from '../api'
 import Spinner from '../components/Spinner'
 import PortfolioCoach from '../components/PortfolioCoach'
-import { trackEvent } from '../api'
+import { trackEvent, createShare } from '../api'
 import StarterHelp from '../components/StarterHelp'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend, BarChart, Bar, Cell, ReferenceLine } from 'recharts'
 import { InfoTip } from '../components/Term'
-import { Plus, Trash2, RefreshCw, TrendingUp, TrendingDown } from 'lucide-react'
+import { Plus, Trash2, RefreshCw, TrendingUp, TrendingDown, Share2, Check } from 'lucide-react'
 
 // Commodities you can add to a simulation (friendly name → yfinance futures ticker)
 const COMMODITY_PICKS = [
@@ -171,6 +171,19 @@ export default function Simulator() {
     onSuccess: (d) => { qc.invalidateQueries(['simList']); setActiveSimName(d.name) },
   })
 
+  // Sharing is opt-in per simulation: the link only exists once the owner asks
+  // for it, and the copied URL is the public page, not an API path.
+  const [sharedLink, setSharedLink] = useState(null)
+  const shareMut = useMutation({
+    mutationFn: createShare,
+    onSuccess: d => {
+      const url = `${window.location.origin}/s/${d.token}`
+      setSharedLink(url)
+      try { navigator.clipboard?.writeText(url) } catch { /* clipboard may be blocked */ }
+      trackEvent('portfolio_shared')
+    },
+  })
+
   const deleteMut = useMutation({
     mutationFn: deleteSimulation,
     onSuccess: (_, deletedName) => { qc.invalidateQueries(['simList']); if (activeSimName === deletedName) setActiveSimName('') },
@@ -256,12 +269,31 @@ export default function Simulator() {
                 onClick={() => setActiveSimName(s.name)}>
                 <div className="flex justify-between">
                   <span className="font-mono font-semibold text-green-400">{s.name}</span>
+                  <div className="flex items-center gap-2 shrink-0">
+                  <button onClick={e => { e.stopPropagation(); shareMut.mutate(s.name) }}
+                    title="Get a public link to this portfolio"
+                    className="text-gray-600 hover:text-green-400"><Share2 size={13}/></button>
                   <button onClick={e => { e.stopPropagation(); deleteMut.mutate(s.name) }}
                     className="text-gray-600 hover:text-red-400"><Trash2 size={13}/></button>
+                  </div>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">₹{s.initial_value?.toLocaleString('en-IN')} · Started {s.started_at?.slice(0,10)}</p>
               </div>
             ))}
+
+            {sharedLink && (
+              <div className="card-sm border-green-800/50 bg-green-950/20">
+                <p className="text-xs text-green-400 flex items-center gap-1.5">
+                  <Check size={13}/> Public link copied
+                </p>
+                <p className="text-[11px] text-gray-400 font-mono break-all mt-1">{sharedLink}</p>
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Anyone with this link sees the holdings and returns — never your
+                  name, email or amounts.
+                </p>
+              </div>
+            )}
+            {shareMut.isError && <p className="banner-error text-xs">{String(shareMut.error)}</p>}
 
             {/* P&L display */}
             {activeSimName && (
