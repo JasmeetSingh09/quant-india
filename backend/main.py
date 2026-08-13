@@ -151,6 +151,14 @@ async def startup():
     # restarting — which matters because this service restarts often and a full
     # pass takes hours. Wrapped: a scan problem must never block startup.
     try:
+        from data_health import probe
+        _h = probe()
+        if not _h["healthy"]:
+            print(f"[data] WARNING: upstream degraded — {_h['notes']}")
+    except Exception as _e:
+        print(f"[data] WARNING: health probe failed: {_e}")
+
+    try:
         from universe_scan import start_scan
         print(f"[scan] {start_scan().get('status')}")
     except Exception as _e:
@@ -1114,6 +1122,20 @@ def predictions_integrity():
     """Recompute the chain and report whether the track record has been edited."""
     from integrity import verify
     return verify()
+
+
+@app.get("/health/data")
+def health_data():
+    """Is the upstream data source actually working right now?"""
+    from data_health import probe
+    return probe()
+
+
+@app.get("/health/data/history")
+def health_data_history(days: int = Query(14, ge=1, le=90)):
+    """Recent probes, so degradation reads as a trend not a bad moment."""
+    from data_health import history
+    return history(days=days)
 
 
 class ShareRequest(BaseModel):
