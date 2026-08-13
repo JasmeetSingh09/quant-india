@@ -62,7 +62,13 @@ def _portfolio_daily_returns(holdings: dict, lookback_days: int = 504) -> pd.Ser
     each one (a 4-stock compare = 12 serial Yahoo round-trips). On a throttled
     cloud IP that download, not the simulation maths, was the entire wait.
     """
-    key = (tuple(sorted(holdings)), lookback_days)
+    # The key must include the WEIGHTS, not just the tickers. Keying on tickers
+    # alone meant every re-weighting of the same names reused the first
+    # portfolio's return series, so 55/30/15 and equal-weight simulated
+    # identically — which silently made every what-if scenario report a zero
+    # delta. Weights are rounded so trivial float noise still hits the cache.
+    key = (tuple(sorted((t, round(float(w), 4)) for t, w in holdings.items())),
+           lookback_days)
     now = time.time()
     with _HIST_LOCK:
         hit = _HIST_CACHE.get(key)

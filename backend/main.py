@@ -1032,6 +1032,22 @@ def portfolio_advise(req: AdviseRequest):
     return result
 
 
+@app.post("/portfolio/scenarios")
+def portfolio_scenarios_ep(req: AdviseRequest):
+    """
+    Concrete "what if" options with the exact weights to apply, so the user can
+    tweak and re-run the optimiser or simulator on the changed portfolio.
+    Reports the change in BOTH return and downside — most improvements are
+    trades, and showing only the upside would misrepresent them.
+    """
+    from portfolio_scenarios import scenarios
+    result = scenarios(req.holdings, initial_value=req.initial_value,
+                       horizon_months=req.horizon_months)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
 @app.get("/simulator/leaderboard")
 def simulator_leaderboard(n: int = Query(5, ge=1, le=20)):
     """
