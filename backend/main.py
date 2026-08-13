@@ -126,6 +126,10 @@ def _start_picks_scheduler():
         from apscheduler.schedulers.background import BackgroundScheduler
         sched = BackgroundScheduler(daemon=True)
         sched.add_job(warm_top_picks, "interval", hours=6, id="warm_top_picks")
+        # NSE publishes bhavcopy after the close; a daily pull keeps the
+        # independent fallback fresh without anyone remembering to.
+        from bhavcopy import fetch_day
+        sched.add_job(fetch_day, "cron", hour=20, id="bhavcopy_daily")
         sched.start()
     except Exception:
         pass
@@ -1128,6 +1132,19 @@ def predictions_integrity():
     """Recompute the chain and report whether the track record has been edited."""
     from integrity import verify
     return verify()
+
+
+@app.post("/bhavcopy/fetch")
+def bhavcopy_fetch(days: int = Query(1, ge=1, le=30)):
+    """Pull NSE's own end-of-day file(s) — the independent second source."""
+    from bhavcopy import fetch_day, backfill
+    return fetch_day() if days == 1 else backfill(days)
+
+
+@app.get("/bhavcopy/coverage")
+def bhavcopy_coverage():
+    from bhavcopy import coverage
+    return coverage()
 
 
 @app.get("/health/data")

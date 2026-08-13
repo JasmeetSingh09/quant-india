@@ -469,6 +469,21 @@ def get_current_price(ticker: str) -> dict:
         # Nothing in memory — fall back to the last good price on disk. A user
         # seeing "Rs 1,290, as of 14h ago" can still reason; a blank or a silent
         # zero is how a data outage turns into a wrong number.
+        # Prefer the EXCHANGE's own close over a stale copy of Yahoo. Bhavcopy
+        # is published by NSE, so when Yahoo is down this is genuinely a second
+        # source rather than a cached first one.
+        try:
+            from bhavcopy import close_from_bhavcopy
+            bc = close_from_bhavcopy(ticker)
+            if bc:
+                return {"ticker": ticker, "price": bc["price"], "change": None,
+                        "change_pct": None, "stale": True, "as_of": bc["as_of"],
+                        "source": bc["source"],
+                        "note": f"Live feed unavailable — official NSE close from "
+                                f"{bc['as_of']}.",
+                        "market_open": is_market_open()}
+        except Exception:
+            pass
         try:
             from data_health import last_known_price
             lk = last_known_price(ticker)
