@@ -3,6 +3,7 @@ import usePersistentState from '../usePersistentState'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { startSimulation, getSimulationPnl, getSimulations, deleteSimulation, runBacktest, getSimHistory, addSimPosition, removeSimPosition } from '../api'
 import Spinner from '../components/Spinner'
+import PortfolioCoach from '../components/PortfolioCoach'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend, BarChart, Bar, Cell, ReferenceLine } from 'recharts'
 import { InfoTip } from '../components/Term'
 import { Plus, Trash2, RefreshCw, TrendingUp, TrendingDown } from 'lucide-react'
@@ -504,6 +505,18 @@ export default function Simulator() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Coach the ACTIVE simulation. Weights come from the live position
+          values, so suggestions reflect what the portfolio has drifted to
+          rather than what it was bought at. */}
+      {pnlData?.positions?.length >= 2 && (
+        <PortfolioCoach
+          holdings={Object.fromEntries(
+            pnlData.positions.map(p => [p.ticker, p.allocation_pct ?? p.current_value]))}
+          initialValue={pnlData.initial_value || 100000}
+          horizonMonths={12}
+        />
       )}
     </div>
   )

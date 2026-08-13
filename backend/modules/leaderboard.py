@@ -106,16 +106,28 @@ DEMO_PORTFOLIOS = [
 ]
 
 
-def seed_demos(initial_value: float = 100000) -> dict:
-    """Create the example portfolios if they do not already exist. Idempotent."""
-    from simulator import start_simulation, list_simulations
+def seed_demos(initial_value: float = 100000, days_back: int = 30,
+               replace: bool = False) -> dict:
+    """
+    Create the example portfolios, entered `days_back` ago.
+
+    Dating the entry in the past means each example has REAL performance
+    immediately — the return is genuine NSE price history over that window, not
+    a number invented to fill the board. A demo started today would sit at 0%
+    and tell a visitor nothing.
+    """
+    from datetime import timedelta
+    from simulator import start_simulation, list_simulations, delete_simulation
+    entry = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
     existing = {s.get("name") for s in (list_simulations(user_id="demo") or [])}
     created, skipped = [], []
     for name, holdings in DEMO_PORTFOLIOS:
         if name in existing:
-            skipped.append(name); continue
+            if not replace:
+                skipped.append(name); continue
+            delete_simulation(name, user_id="demo")
         r = start_simulation(name, holdings, initial_value=initial_value,
-                             user_id="demo", is_demo=True)
+                             user_id="demo", is_demo=True, entry_date=entry)
         (created if "error" not in r else skipped).append(name)
-    return {"created": created, "skipped": skipped,
-            "note": "Real simulations tracked against live prices, labelled as examples."}
+    return {"created": created, "skipped": skipped, "entry_date": entry,
+            "note": f"Entered {days_back} days ago at real closing prices; returns are actual NSE history."}

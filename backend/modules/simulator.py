@@ -261,12 +261,34 @@ def _download_prices(tickers: list, start: str, end: str) -> pd.DataFrame:
 # ── MODE 1: REAL-TIME SIMULATION ──────────────────────────────────────────
 # ---------------------------------------------------------------------------
 
+def _price_on(ticker: str, date_str: str):
+    """Closing price on (or the first trading day after) `date_str`.
+
+    Used to start a simulation in the past so it has REAL performance from day
+    one — the return is genuine NSE price history, not an invented number.
+    Returns None if no bar exists, and the caller drops that holding rather than
+    substituting a live price, which would silently misstate the entry.
+    """
+    try:
+        d = datetime.fromisoformat(date_str)
+        end = (d + timedelta(days=12)).strftime("%Y-%m-%d")
+        df = yf.download(ticker, start=d.strftime("%Y-%m-%d"), end=end,
+                         progress=False, auto_adjust=True)
+        if df is None or df.empty:
+            return None
+        s_ = df["Close"].squeeze().dropna()
+        return round(float(s_.iloc[0]), 2) if len(s_) else None
+    except Exception:
+        return None
+
+
 def start_simulation(
     name: str,
     holdings: dict,
     initial_value: float = 100_000,
     user_id: str = "public",
     is_demo: bool = False,
+    entry_date: str = None,
 ) -> dict:
     """
     Start a real-time paper trading simulation.
@@ -312,6 +334,7 @@ def start_simulation(
             return {"error": f"Unsupported ticker '{t}' (use .NS stocks or commodity futures like GC=F)"}
 
     now = datetime.now().isoformat()
+    started = entry_date if entry_date else now
     positions = []
     failed    = []
 
@@ -321,7 +344,9 @@ def start_simulation(
     # is roughly one fetch, not the sum.
     import concurrent.futures as _cf
     def _resolve(t):
-        return t, _live_price(t), _company_name(t)
+        # A dated start prices the entry from history; otherwise today's live price.
+        px = _price_on(t, entry_date) if entry_date else _live_price(t)
+        return t, px, _company_name(t)
     resolved = {}
     with _cf.ThreadPoolExecutor(max_workers=min(8, len(holdings) * 2 or 1)) as _ex:
         for t, p, nm in _ex.map(_resolve, list(holdings.keys())):
@@ -354,7 +379,7 @@ def start_simulation(
         conn.execute(
             "INSERT INTO simulations (user_id, name, initial_value, started_at, last_checked, status, is_demo) "
             "VALUES (?, ?, ?, ?, ?, 'active', ?)",
-            (user_id, name, initial_value, now, now, 1 if is_demo else 0)
+            (user_id, name, initial_value, started, now, 1 if is_demo else 0)
         )
         for p in positions:
             conn.execute("""

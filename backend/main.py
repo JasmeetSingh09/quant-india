@@ -1053,10 +1053,13 @@ def portfolio_scenarios_ep(req: AdviseRequest):
 
 
 @app.post("/simulator/seed-demos")
-def simulator_seed_demos():
-    """Create the example portfolios shown on the leaderboard. Idempotent."""
+def simulator_seed_demos(days_back: int = Query(30, ge=1, le=365),
+                         replace: bool = Query(False)):
+    """Create the example portfolios shown on the leaderboard. Idempotent
+    unless `replace` is set. Entries are priced from real history `days_back`
+    ago so each example has genuine performance immediately."""
     from leaderboard import seed_demos
-    return seed_demos()
+    return seed_demos(days_back=days_back, replace=replace)
 
 
 @app.get("/simulator/leaderboard")
