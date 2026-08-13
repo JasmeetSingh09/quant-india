@@ -57,6 +57,11 @@ function WeightBar({ ticker, weight, sub, explain }) {
 export default function Optimizer() {
   const [tab, setTab]       = usePersistentState('opt.tab', 'mvo')
   const [tickers, setTickers] = usePersistentState('opt.tickers', DEFAULT_TICKERS)
+  // Amount and horizon are only used by the coach below — the optimisers
+  // themselves solve for weights, not rupees — but the downside it reports
+  // is meaningless without both.
+  const [amount, setAmount]   = usePersistentState('opt.amount', 100000)
+  const [months, setMonths]   = usePersistentState('opt.months', 12)
   const [target, setTarget]   = usePersistentState('opt.target', 'max_sharpe')
   const [maxWeight, setMaxWeight] = usePersistentState('opt.maxWeight', 35)   // cap per stock (%) to force diversification
   // Risk-free rate feeds EVERY Sharpe figure — it's a real assumption, so it's
@@ -489,8 +494,35 @@ export default function Optimizer() {
           changes which stocks are in play and the optimiser re-derives the
           weights itself. Equal weights are assumed for the analysis since the
           user has not chosen sizing on this page. */}
+      <div className="card">
+        <h2 className="font-semibold mb-1">Your plan</h2>
+        <p className="text-xs text-gray-500 mb-4">
+          Used to work out what these stocks could do for you, and what the bad case looks like.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div>
+            <label className="label">How much are you investing?</label>
+            <input type="number" min="1000" step="1000" className="input"
+                   value={amount} onChange={e => setAmount(Number(e.target.value))} />
+            <p className="text-[11px] text-gray-600 mt-1">
+              ₹{Math.round(amount).toLocaleString('en-IN')}
+            </p>
+          </div>
+          <div>
+            <label className="label">For how long?</label>
+            <input type="range" min="3" max="60" step="3" className="w-full"
+                   value={months} onChange={e => setMonths(Number(e.target.value))} />
+            <p className="text-[11px] text-gray-600 mt-1">
+              {months} months{months >= 12 && ` (${(months / 12).toFixed(1)} years)`}
+            </p>
+          </div>
+        </div>
+      </div>
+
       <PortfolioCoach
         holdings={Object.fromEntries(tickers.map(t => [t, 100 / (tickers.length || 1)]))}
+        initialValue={amount}
+        horizonMonths={months}
         onApply={w => setTickers(Object.keys(w))}
       />
     </div>
