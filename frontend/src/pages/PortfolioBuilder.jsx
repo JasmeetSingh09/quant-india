@@ -43,7 +43,7 @@ export default function PortfolioBuilder() {
     <div className="p-4 sm:p-6 space-y-6 max-w-5xl">
       <PageHeader
         title="Build me a portfolio"
-        subtitle="Answer five questions. We'll pick the stocks, size each position, and tell you honestly whether the downside fits what you said you could take."
+        subtitle="Answer five questions and we'll build you a starting point — then show you honestly how much you could lose, and what to change. A way to learn portfolio construction, not a promise of returns."
       />
 
       <div className="card space-y-5">

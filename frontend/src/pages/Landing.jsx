@@ -32,15 +32,16 @@ export default function Landing() {
       {/* Hero */}
       <section className="max-w-3xl mx-auto text-center px-6 pt-16 pb-12">
         <p className="text-xs font-semibold tracking-widest text-green-400 uppercase mb-4">
-          Quant tools for Indian markets
+          Learn investing by doing it
         </p>
         <h1 className="text-4xl sm:text-5xl font-bold text-white leading-tight">
-          Institutional-grade stock intelligence for the NSE
+          Build a portfolio. See what could go wrong. Learn why.
         </h1>
         <p className="mt-5 text-lg text-gray-400">
-          Quant India brings the toolkit real quant desks use — a factor alpha model,
-          FinBERT news sentiment, portfolio optimisation, Monte Carlo simulation and
-          risk analytics — to Indian retail investors, explained in plain English.
+          Quant India is a free learning tool for Indian investors. Build an NSE
+          portfolio, simulate thousands of possible futures, find out how much you
+          could actually lose, and paper-trade it with no real money at risk —
+          using the same maths real quant desks use, explained in plain English.
         </p>
         <div className="mt-8 flex items-center justify-center gap-3">
           <button onClick={goSignIn} className="btn-primary">Get started — it's free</button>
