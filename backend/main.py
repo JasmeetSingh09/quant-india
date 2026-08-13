@@ -1038,20 +1038,49 @@ class AdviseRequest(BaseModel):
     # defaults to None, so sending an explicit null 422s instead of meaning
     # "no loss limit set".
     max_loss_pct: Optional[float] = None
+    # When the caller knows how the portfolio is actually doing, the coach can
+    # compare it to the index. Optional because not every caller has a live
+    # return to hand — and a missing return means the comparison is skipped
+    # rather than computed against zero.
+    current_return_pct: Optional[float] = None
 
 
 @app.post("/portfolio/advise")
-def portfolio_advise(req: AdviseRequest):
+def portfolio_advise(req: AdviseRequest, user_id: str = Depends(current_user_id)):
     """
     What to fix in a portfolio, grounded in the alpha model, measured risk and
     simulated downside. Every suggestion cites the number that triggered it.
     """
     from portfolio_advisor import advise
     result = advise(req.holdings, initial_value=req.initial_value,
-                    horizon_months=req.horizon_months, max_loss_pct=req.max_loss_pct)
+                    horizon_months=req.horizon_months, max_loss_pct=req.max_loss_pct,
+                    current_return_pct=req.current_return_pct, user_id=user_id)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
+
+
+@app.get("/benchmark")
+def benchmark_return(days: int = 365):
+    """Nifty 50 over a window — the free alternative every portfolio competes with."""
+    from benchmark import index_return
+    r = index_return(days)
+    if r is None:
+        raise HTTPException(status_code=503, detail="Index data unavailable right now.")
+    return r
+
+
+@app.get("/advice/effectiveness")
+def advice_effectiveness():
+    """
+    Whether the coach's own advice has been shown to help yet.
+
+    Public and deliberately unflattering: it reports "not enough data" until
+    there genuinely is enough, rather than quoting a number built on a handful
+    of rows.
+    """
+    from advice_log import effectiveness
+    return effectiveness()
 
 
 class WhatIfRequest(BaseModel):

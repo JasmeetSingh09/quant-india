@@ -564,6 +564,7 @@ export default function Simulator() {
             pnlData.positions.map(p => [p.ticker, p.allocation_pct ?? p.current_value]))}
           initialValue={pnlData.initial_value || 100000}
           horizonMonths={12}
+          currentReturnPct={pnlData.total_pnl_pct}
         />
       )}
     </div>

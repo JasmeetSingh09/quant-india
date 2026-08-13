@@ -27,9 +27,14 @@ const pctStr = v => v == null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(1)}%`
  * case. Surfacing only the return would push beginners toward whichever option
  * is most concentrated, which is the opposite of what this tool is for.
  */
+// currentReturnPct is how the portfolio is ACTUALLY doing, when the caller
+// knows. Passing it turns on the index comparison. The optimizer and Monte
+// Carlo deal in hypothetical portfolios that have not returned anything yet,
+// so they correctly leave it out rather than comparing a simulation to a real
+// index and calling the difference performance.
 export default function PortfolioCoach({ holdings, initialValue = 100000,
                                          horizonMonths = 12, maxLossPct = null,
-                                         onApply }) {
+                                         currentReturnPct = null, onApply }) {
   const [applied, setApplied] = useState(null)
   // User-driven tweak, distinct from the preset scenarios: they answer "what
   // could I change?", this answers "what if I change it like THIS?".
@@ -55,7 +60,8 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
     setNewTicker('')
   }
   const body = { holdings, initial_value: initialValue,
-                 horizon_months: horizonMonths, max_loss_pct: maxLossPct }
+                 horizon_months: horizonMonths, max_loss_pct: maxLossPct,
+                 current_return_pct: currentReturnPct }
 
   const advice = useMutation({ mutationFn: advisePortfolio })
   const scen   = useMutation({ mutationFn: portfolioScenarios })
@@ -93,6 +99,60 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
 
       {advice.data && (
         <>
+          {/* The comparison most apps leave out. Shown before the findings
+              because "you are behind the index" reframes everything below it,
+              and shown in red when it is bad rather than quietly in grey. */}
+          {advice.data.benchmark?.verdict && (
+            <div className={`p-3 rounded-lg border text-sm ${
+              advice.data.benchmark.verdict === 'behind'
+                ? 'border-red-800 bg-red-950/30'
+                : advice.data.benchmark.verdict === 'ahead'
+                ? 'border-green-800 bg-green-950/30'
+                : 'border-gray-700 bg-gray-900/40'}`}>
+              <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                <span className="font-medium text-gray-200">
+                  You {advice.data.benchmark.portfolio_return_pct >= 0 ? '+' : ''}
+                  {advice.data.benchmark.portfolio_return_pct}%
+                  <span className="text-gray-500 mx-2">vs</span>
+                  {advice.data.benchmark.benchmark} {advice.data.benchmark.benchmark_return_pct >= 0 ? '+' : ''}
+                  {advice.data.benchmark.benchmark_return_pct}%
+                </span>
+                <span className={`font-mono text-xs ${
+                  advice.data.benchmark.difference_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {advice.data.benchmark.difference_pct >= 0 ? '+' : ''}
+                  {advice.data.benchmark.difference_pct} pts
+                </span>
+              </div>
+              <p className="text-xs text-gray-400 mt-1 leading-relaxed">
+                {advice.data.benchmark.plain}
+              </p>
+            </div>
+          )}
+
+          {/* Where the money actually sits by sector. Counting holdings hides
+              five banks; this makes it impossible to miss. */}
+          {advice.data.sector_exposure && Object.keys(advice.data.sector_exposure).length > 1 && (
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-1.5">Sector exposure</p>
+              <div className="flex h-2 rounded-full overflow-hidden bg-gray-800">
+                {Object.entries(advice.data.sector_exposure).map(([sec, pct], i) => (
+                  <div key={sec} title={`${sec} ${pct}%`} style={{ width: `${pct}%` }}
+                       className={['bg-green-500','bg-blue-500','bg-amber-500','bg-purple-500',
+                                   'bg-pink-500','bg-cyan-500'][i % 6]} />
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5">
+                {Object.entries(advice.data.sector_exposure).slice(0, 6).map(([sec, pct], i) => (
+                  <span key={sec} className="text-[11px] text-gray-400 flex items-center gap-1">
+                    <span className={`w-2 h-2 rounded-sm ${['bg-green-500','bg-blue-500','bg-amber-500',
+                      'bg-purple-500','bg-pink-500','bg-cyan-500'][i % 6]}`} />
+                    {sec.replace(/_/g, ' & ')} {pct}%
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {advice.data.suggestions.length === 0 ? (
             <p className="text-sm text-green-400 flex items-center gap-2">
               <Check size={15} /> {advice.data.headline}
@@ -105,6 +165,15 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-200">{s.title}</p>
                     <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{s.detail}</p>
+                    {/* The size of the prize. A warning without a number is a
+                        lecture; this turns it into a decision the user can weigh. */}
+                    {s.payoff && (
+                      <p className="text-xs mt-2 font-mono text-green-400">
+                        cap {s.payoff.cap_pct}% → worst case {s.payoff.downside_before}%
+                        {' '}to {s.payoff.downside_after}%
+                        <span className="text-green-300"> ({s.payoff.improvement_pts} pts better)</span>
+                      </p>
+                    )}
                     {/* The principle behind the finding. Fixing this portfolio is
                         worth less than recognising the same mistake unaided next
                         time, so the lesson sits alongside every warning. */}
