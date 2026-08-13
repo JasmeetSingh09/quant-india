@@ -6,6 +6,7 @@ import RegimeBadge from '../components/RegimeBadge'
 import Explainer from '../components/Explainer'
 import CapTierPicks from '../components/CapTierPicks'
 import Leaderboard from '../components/Leaderboard'
+import EmailOptIn from '../components/EmailOptIn'
 import { TrendingUp, TrendingDown, Sparkles, ArrowUpRight, ArrowDownRight, RefreshCw, History } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 
@@ -294,6 +295,9 @@ export default function Dashboard() {
           {NIFTY_STOCKS.map(t => <PriceTag key={t} ticker={t} />)}
         </div>
       </div>
+
+      {/* Asked once, then never again — see the component. */}
+      <EmailOptIn />
 
       {/* Outcomes first: what the app is FOR — best portfolios, the
           picks, and whether past picks actually worked. News and

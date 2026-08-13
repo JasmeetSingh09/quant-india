@@ -1175,6 +1175,32 @@ def share_read(token: str):
     return r
 
 
+@app.get("/me/email-pref")
+def me_email_pref(user_id: str = Depends(current_user_id)):
+    """Has this user opted in to the weekly summary?"""
+    from user_prefs import get_pref
+    return get_pref(user_id)
+
+
+@app.post("/me/email-pref")
+def me_email_opt_in(user_id: str = Depends(current_user_id),
+                    email: str = Depends(current_user_email)):
+    """Opt in. The address is taken from the verified token, never from the
+    request body, so nobody can subscribe somebody else."""
+    from user_prefs import opt_in
+    r = opt_in(user_id, email)
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+
+@app.delete("/me/email-pref")
+def me_email_opt_out(user_id: str = Depends(current_user_id)):
+    """Opt out — deletes the address rather than flagging it."""
+    from user_prefs import opt_out
+    return opt_out(user_id)
+
+
 @app.post("/digest/run-now")
 def digest_run_now():
     """Run the weekly pass immediately — for testing the schedule, not a blast."""

@@ -180,20 +180,14 @@ def send_all_digests() -> dict:
 
 def _address_for(user_id: str):
     """
-    The user's own email, or None. Deliberately returns None today: we do not
-    persist addresses anywhere, and a wrong recipient here means one person
-    receiving another person's portfolio.
+    The address this user explicitly opted in with, or None. Only opted-in rows
+    exist at all, so "no row" and "did not consent" are the same answer — which
+    is why the batch can treat None as a hard stop rather than a lookup miss.
     """
     try:
-        conn_ok = False
-        from db import get_conn
-        conn = get_conn(); conn_ok = True
-        row = conn.execute(
-            "SELECT email FROM user_emails WHERE user_id = ?", (user_id,)).fetchone()
-        conn.close()
-        return row[0] if row and row[0] else None
+        from user_prefs import address_for
+        return address_for(user_id)
     except Exception:
-        # No user_emails table yet — correct answer is "we don't know".
         return None
 
 
