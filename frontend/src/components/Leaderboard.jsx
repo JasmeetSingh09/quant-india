@@ -1,7 +1,8 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { getLeaderboard } from '../api'
-import { Trophy } from 'lucide-react'
+import { Trophy, ChevronDown, ChevronRight } from 'lucide-react'
 
 const medal = r => r === 1 ? 'text-yellow-400' : r === 2 ? 'text-gray-300' : r === 3 ? 'text-amber-600' : 'text-gray-600'
 
@@ -15,6 +16,7 @@ const medal = r => r === 1 ? 'text-yellow-400' : r === 2 ? 'text-gray-300' : r =
  * name would identify someone immediately.
  */
 export default function Leaderboard({ n = 5 }) {
+  const [open, setOpen] = useState(null)
   const { data, isLoading } = useQuery({
     queryKey: ['leaderboard', n],
     queryFn: () => getLeaderboard(n),
@@ -38,7 +40,10 @@ export default function Leaderboard({ n = 5 }) {
 
       <div className="space-y-1">
         {rows.map(r => (
-          <div key={r.label} className="flex items-center justify-between py-2 border-b border-gray-900 last:border-0">
+          <div key={r.label} className="border-b border-gray-900 last:border-0">
+          <div
+            onClick={() => r.holdings && setOpen(open === r.label ? null : r.label)}
+            className={`flex items-center justify-between py-2 ${r.holdings ? 'cursor-pointer hover:bg-gray-800/40 -mx-2 px-2 rounded' : ''}`}>
             <div className="flex items-center gap-3 min-w-0">
               <span className={`font-mono text-sm w-6 shrink-0 ${medal(r.rank)}`}>#{r.rank}</span>
               <div className="min-w-0">
@@ -56,9 +61,32 @@ export default function Leaderboard({ n = 5 }) {
                 </p>
               </div>
             </div>
-            <span className={`font-mono text-sm shrink-0 ${r.return_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-              {r.return_pct > 0 ? '+' : ''}{r.return_pct.toFixed(1)}%
-            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className={`font-mono text-sm ${r.return_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {r.return_pct > 0 ? '+' : ''}{r.return_pct.toFixed(1)}%
+              </span>
+              {r.holdings && (open === r.label
+                ? <ChevronDown size={14} className="text-gray-500" />
+                : <ChevronRight size={14} className="text-gray-600" />)}
+            </div>
+          </div>
+
+          {/* Holdings appear for examples only — a real user's mix is never shown */}
+          {r.holdings && open === r.label && (
+            <div className="pb-2 pl-9 space-y-1">
+              {r.holdings.map(h => (
+                <div key={h.ticker} className="flex items-center justify-between text-xs">
+                  <span className="font-mono text-gray-300">{h.name}</span>
+                  <div className="flex items-center gap-3 font-mono">
+                    <span className="text-gray-500 w-12 text-right">{h.weight_pct}%</span>
+                    <span className={`w-16 text-right ${h.return_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {h.return_pct > 0 ? '+' : ''}{h.return_pct.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           </div>
         ))}
       </div>

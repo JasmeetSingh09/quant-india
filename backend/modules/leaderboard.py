@@ -69,9 +69,24 @@ def top_simulations(n: int = 5) -> dict:
             label = f"Example portfolio {demo_seen}"
         else:
             label = _label(user_id, name)
+        # Holdings are published for EXAMPLES ONLY. They are ours to show and
+        # seeing the actual mix is most of the educational value. A real user's
+        # holdings stay private: with a pilot of a dozen classmates a holdings
+        # list identifies the person, and nobody consented to that.
+        holdings = None
+        if is_demo:
+            holdings = sorted(
+                [{"ticker": x.get("ticker"),
+                  "name": (x.get("ticker") or "").replace(".NS", ""),
+                  "weight_pct": round(float(x.get("allocation_pct") or 0), 1),
+                  "return_pct": round(float(x.get("pnl_pct") or 0), 2)}
+                 for x in positions],
+                key=lambda h: -h["weight_pct"])
+
         results.append({
             "label": label,
             "is_demo": bool(is_demo),
+            "holdings": holdings,
             "return_pct": round(float(ret), 2),
             "days_running": days,
             "n_positions": len(positions),
@@ -86,7 +101,7 @@ def top_simulations(n: int = 5) -> dict:
         "total_qualifying": len(results),
         "rules": (f"Active paper portfolios with at least {MIN_POSITIONS} stocks, "
                   f"running {MIN_DAYS}+ days. Ranked by percentage return."),
-        "privacy": "Names, holdings and identities are never published.",
+        "privacy": "Real users stay anonymous and their holdings are never published. Only the example portfolios show what they hold.",
         "as_of": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
 
