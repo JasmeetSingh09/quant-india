@@ -1011,6 +1011,27 @@ def alpha_scan(req: ScanRequest):
     return {"rankings": scan_alpha(req.tickers, weights=req.weights)}
 
 
+class AdviseRequest(BaseModel):
+    holdings: dict
+    initial_value: float = 100000
+    horizon_months: int = 12
+    max_loss_pct: float = None
+
+
+@app.post("/portfolio/advise")
+def portfolio_advise(req: AdviseRequest):
+    """
+    What to fix in a portfolio, grounded in the alpha model, measured risk and
+    simulated downside. Every suggestion cites the number that triggered it.
+    """
+    from portfolio_advisor import advise
+    result = advise(req.holdings, initial_value=req.initial_value,
+                    horizon_months=req.horizon_months, max_loss_pct=req.max_loss_pct)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
 @app.get("/simulator/leaderboard")
 def simulator_leaderboard(n: int = Query(5, ge=1, le=20)):
     """
