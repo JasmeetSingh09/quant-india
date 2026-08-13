@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { buildPortfolio } from '../api'
+import { buildPortfolio, startSimulation } from '../api'
 import PageHeader from '../components/PageHeader'
 import Spinner from '../components/Spinner'
-import { Wand2, ShieldCheck, AlertTriangle } from 'lucide-react'
+import { Wand2, ShieldCheck, AlertTriangle, PlayCircle } from 'lucide-react'
 
 const RISKS = [
   { key: 'conservative', label: 'Careful',  note: 'Large companies only' },
@@ -24,6 +24,20 @@ export default function PortfolioBuilder() {
 
   const mut = useMutation({ mutationFn: buildPortfolio })
   const r = mut.data
+
+  // Paper-trade the built portfolio. This closes the loop the whole flow exists
+  // for: build -> simulate -> change -> simulate again. The simulator takes
+  // {ticker: allocation_pct}, which is exactly what the builder returns once
+  // the holdings list is folded into a map.
+  const [simName, setSimName] = useState('')
+  const sim = useMutation({
+    mutationFn: () => startSimulation({
+      name: (simName || `My portfolio ${new Date().toLocaleDateString('en-IN')}`).trim(),
+      holdings: Object.fromEntries(r.holdings.map(h => [h.ticker, h.weight_pct])),
+      initial_value: r.inputs.amount,
+    }),
+    onSuccess: () => navigate('/simulator'),
+  })
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-5xl">
@@ -168,6 +182,31 @@ export default function PortfolioBuilder() {
               </div>
             </div>
           )}
+
+          {/* Paper-trade it — the next step, not an afterthought */}
+          <div className="card space-y-3">
+            <div>
+              <h2 className="font-semibold">Try it with fake money</h2>
+              <p className="text-xs text-gray-500 mt-1">
+                Track this portfolio against real prices without risking anything.
+                Come back in a week and see what actually happened.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                className="input sm:flex-1"
+                placeholder="Name it — e.g. My first portfolio"
+                value={simName}
+                onChange={e => setSimName(e.target.value)}
+              />
+              <button onClick={() => sim.mutate()} disabled={sim.isPending}
+                      className="btn-primary flex items-center justify-center gap-2 shrink-0">
+                <PlayCircle size={15} />
+                {sim.isPending ? 'Starting…' : 'Paper-trade this'}
+              </button>
+            </div>
+            {sim.isError && <p className="banner-error">{String(sim.error)}</p>}
+          </div>
 
           <p className="text-[11px] text-gray-600">{r.disclaimer}</p>
         </>
