@@ -520,6 +520,7 @@ export default function Optimizer() {
       </div>
 
       <PortfolioCoach
+          focus="design"
         holdings={Object.fromEntries(tickers.map(t => [t, 100 / (tickers.length || 1)]))}
         initialValue={amount}
         horizonMonths={months}

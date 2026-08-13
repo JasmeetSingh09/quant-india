@@ -64,6 +64,30 @@ LESSONS = {
         "in one click. Beating it is the only reason to pick individual stocks. "
         "If you cannot, buying the index is the rational choice — and finding "
         "that out early is worth far more than a flattering number."),
+    "illiquid": (
+        "Why it matters: a price you cannot trade at is not a price. Thinly "
+        "traded stocks are easy to buy and hard to sell — the spread widens "
+        "exactly when you want out, because everyone else wants out too. "
+        "Liquidity is invisible until the day it is the only thing that matters."),
+    "tax_boundary": (
+        "Why it matters: in India a gain held under a year is taxed at 20% and "
+        "one held over a year at 12.5%. The same profit is worth more for having "
+        "waited, and frequent trading costs tax as well as brokerage — usually "
+        "the larger of the two."),
+}
+
+
+# Each module asks a different question, so it gets a different subset. The
+# optimizer designs a portfolio that has not returned anything yet, so telling
+# it that it "trails the index" would be comparing a simulation to reality and
+# calling the difference performance. Monte Carlo is about the shape of the
+# downside, not about which stock the model dislikes.
+FOCUS = {
+    "live":   None,      # a real portfolio with real money and real time: everything
+    "design": {"weak_alpha", "underweight_strong", "concentration", "too_few",
+               "sector_concentration", "risk_concentration", "correlated", "illiquid"},
+    "risk":   {"concentration", "too_few", "sector_concentration",
+               "risk_concentration", "correlated", "downside_breach"},
 }
 
 
@@ -154,13 +178,19 @@ def _alpha_for(tickers):
 def advise(holdings: dict, initial_value: float = 100000,
            horizon_months: int = 12, max_loss_pct: float = None,
            current_return_pct: float = None, user_id: str = None,
-           portfolio_id: str = None) -> dict:
+           portfolio_id: str = None, focus: str = "live",
+           days_held: int = None) -> dict:
     """
     holdings: {ticker: weight_pct} summing to ~100.
     current_return_pct: the portfolio's actual return so far, when the caller
         knows it — enables the index comparison, which is skipped without it.
+    focus: which module is asking — "live" (real portfolio), "design" (building
+        one), or "risk" (studying the downside). Controls which findings apply.
     Returns suggestions ordered by severity, each citing its own evidence.
     """
+    allowed = FOCUS.get(focus, None)
+    def wanted(kind):
+        return allowed is None or kind in allowed
     if not holdings:
         return {"error": "No holdings to analyse."}
     tickers = list(holdings)
@@ -173,7 +203,7 @@ def advise(holdings: dict, initial_value: float = 100000,
     # ---- 1. the model's own opinion of what you hold ---------------------
     weak = [(t, a["alpha_score"], a["signal"]) for t, a in alpha.items()
             if a.get("alpha_score") is not None and a["alpha_score"] < -15]
-    for t, sc, sig in sorted(weak, key=lambda x: x[1])[:3]:
+    for t, sc, sig in (sorted(weak, key=lambda x: x[1])[:3] if wanted("weak_alpha") else []):
         tips.append(_tip("high", "weak_alpha",
             f"{t.replace('.NS','')} scores {sc:+.0f} ({sig})",
             f"It is {w.get(t,0):.0f}% of your money while the model rates it a {sig}. "
@@ -181,7 +211,7 @@ def advise(holdings: dict, initial_value: float = 100000,
 
     strong_missing = [t for t, a in alpha.items()
                       if (a.get("alpha_score") or 0) > 40 and w.get(t, 0) < 10]
-    for t in strong_missing[:2]:
+    for t in (strong_missing[:2] if wanted("underweight_strong") else []):
         a = alpha[t]
         tips.append(_tip("low", "underweight_strong",
             f"{t.replace('.NS','')} scores {a['alpha_score']:+.0f} but is only {w[t]:.0f}%",
@@ -305,22 +335,62 @@ def advise(holdings: dict, initial_value: float = 100000,
                     f"points of downside removed without predicting anything.")
             break     # one simulation is enough; they share the same fix
 
+    # ---- 6b. can you actually trade what you hold? -----------------------
+    if wanted("illiquid"):
+        try:
+            from liquidity import assess, label
+            bad = []
+            for t in tickers:
+                a = assess(t)
+                if a.get("tier") in ("thin", "illiquid"):
+                    bad.append((t, a))
+            if bad:
+                worst = min(bad, key=lambda x: x[1].get("daily_value") or 0)
+                pct = sum(w.get(t, 0) for t, _ in bad)
+                tips.append(_tip("high" if pct > 20 else "medium", "illiquid",
+                    f"{len(bad)} holding(s) barely trade — {pct:.0f}% of your money",
+                    f"{worst[0].replace('.NS','')} turns over "
+                    f"{label(worst[1].get('daily_value'))}. At that size an order "
+                    f"moves the price against you, and selling in a hurry is worse "
+                    f"than buying. A score on a stock you cannot exit is not an "
+                    f"opportunity.",
+                    [t for t, _ in bad]))
+        except Exception:
+            pass
+
+    # ---- 6c. the tax boundary, when there is a real gain and a real clock --
+    tax_view = None
+    if wanted("tax_boundary") and current_return_pct is not None and days_held:
+        try:
+            from tax import after_tax
+            tax_view = after_tax(initial_value,
+                                 initial_value * (1 + current_return_pct / 100.0),
+                                 days_held=days_held)
+            if tax_view.get("boundary_note") and (tax_view.get("long_term_in_days") or 999) <= 90:
+                tips.append(_tip("low", "tax_boundary",
+                    f"{tax_view['long_term_in_days']} days from long-term treatment",
+                    tax_view["boundary_note"]))
+        except Exception:
+            tax_view = None
+
     # ---- 7. the comparison nobody volunteers ------------------------------
     bench = None
-    try:
-        from benchmark import compare, index_return
-        bench = index_return(max(30, horizon_months * 30))
-        if bench and current_return_pct is not None:
-            c = compare(current_return_pct, max(30, horizon_months * 30))
-            if c:
-                bench = c
-                if c["verdict"] == "behind":
-                    tips.append(_tip("high", "behind_index",
-                        f"You are {abs(c['difference_pct']):.1f} points behind "
-                        f"{c['benchmark']}",
-                        c["plain"]))
-    except Exception:
-        bench = None
+    if wanted("behind_index"):
+        try:
+            from benchmark import compare, index_return
+            window = max(30, horizon_months * 30)
+            bench = index_return(window)
+            if bench and current_return_pct is not None:
+                c = compare(current_return_pct, window)
+                if c:
+                    bench = c
+                    if c["verdict"] == "behind":
+                        tips.append(_tip("high", "behind_index",
+                            f"You are {abs(c['difference_pct']):.1f} points behind "
+                            f"{c['benchmark']}",
+                            c["plain"]))
+        except Exception:
+            bench = None
 
     tips.sort(key=lambda t: -SEV.get(t["severity"], 0))
 
@@ -337,6 +407,8 @@ def advise(holdings: dict, initial_value: float = 100000,
         "n_suggestions": len(tips),
         "downside_pct": downside,
         "benchmark": bench,
+        "focus": focus,
+        "tax": tax_view,
         "sector_exposure": {k: round(v, 1) for k, v in
                             sorted(sectors.items(), key=lambda kv: -kv[1])} if sectors else {},
         "holdings_analysed": len(tickers),

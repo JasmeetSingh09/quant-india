@@ -14,6 +14,37 @@ const sevIcon = s =>
   s === 'medium' ? <Info size={14} className="text-yellow-400 shrink-0 mt-0.5" />
                  : <Info size={14} className="text-gray-500 shrink-0 mt-0.5" />
 
+// Each module asks a different question, so the coach answers a different one.
+// The Optimizer is designing a portfolio that has not returned anything yet;
+// telling it that it "trails the index" would compare a simulation to reality
+// and call the difference performance. Monte Carlo is about the shape of the
+// downside, not about which stock the model dislikes. Only a live portfolio has
+// a real return, a real holding period and therefore a real tax position.
+const MODES = {
+  live: {
+    heading: 'How you are really doing',
+    intro: 'Compares your portfolio to the index, checks what you hold against ' +
+           'the model, and shows what the gain is worth after tax. Every finding ' +
+           'comes with the principle behind it.',
+    showEditor: true, showScenarios: true, showTax: true,
+  },
+  design: {
+    heading: 'Is this portfolio well built?',
+    intro: 'Checks the structure of the portfolio you are designing — ' +
+           'concentration, sector overlap, correlation and whether you could ' +
+           'actually trade what is in it. No performance claims: this portfolio ' +
+           'has not run yet.',
+    showEditor: true, showScenarios: true, showTax: false,
+  },
+  risk: {
+    heading: 'How bad can it get?',
+    intro: 'Focuses on the downside: where risk is concentrated, which holdings ' +
+           'move together, and how much the worst case improves if you change ' +
+           'the shape of the portfolio.',
+    showEditor: true, showScenarios: true, showTax: false,
+  },
+}
+
 const pctStr = v => v == null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(1)}%`
 
 /**
@@ -34,7 +65,8 @@ const pctStr = v => v == null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(1)}%`
 // index and calling the difference performance.
 export default function PortfolioCoach({ holdings, initialValue = 100000,
                                          horizonMonths = 12, maxLossPct = null,
-                                         currentReturnPct = null, onApply }) {
+                                         currentReturnPct = null, daysHeld = null,
+                                         focus = 'live', onApply }) {
   const [applied, setApplied] = useState(null)
   // User-driven tweak, distinct from the preset scenarios: they answer "what
   // could I change?", this answers "what if I change it like THIS?".
@@ -61,8 +93,10 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
   }
   const body = { holdings, initial_value: initialValue,
                  horizon_months: horizonMonths, max_loss_pct: maxLossPct,
-                 current_return_pct: currentReturnPct }
+                 current_return_pct: currentReturnPct,
+                 focus, days_held: daysHeld }
 
+  const mode = MODES[focus] || MODES.live
   const advice = useMutation({ mutationFn: advisePortfolio })
   const scen   = useMutation({ mutationFn: portfolioScenarios })
 
@@ -78,7 +112,7 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="font-semibold flex items-center gap-2">
           <Lightbulb size={18} className="text-yellow-400" />
-          What to fix — and why
+          {mode.heading}
         </h2>
         <button onClick={run} disabled={busy} className="btn-ghost text-xs">
           {busy ? 'Analysing…' : advice.data ? 'Re-analyse' : 'Analyse my portfolio'}
@@ -87,9 +121,7 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
 
       {!advice.data && !busy && (
         <p className="text-sm text-gray-500">
-          Checks your holdings against the alpha model, measures where the risk
-          actually sits, and simulates the downside. Every finding comes with the
-          principle behind it, so you can spot the same problem yourself next time.
+          {mode.intro}
         </p>
       )}
 
@@ -126,6 +158,32 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
               <p className="text-xs text-gray-400 mt-1 leading-relaxed">
                 {advice.data.benchmark.plain}
               </p>
+            </div>
+          )}
+
+          {/* What the gain is actually worth. Only a live portfolio has a real
+              holding period, so this never appears on a designed one. */}
+          {mode.showTax && advice.data.tax && !advice.data.tax.error && (
+            <div className="p-3 rounded-lg border border-gray-700 bg-gray-900/40">
+              <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                <span className="text-sm font-medium text-gray-200">
+                  After tax: {advice.data.tax.net_return_pct >= 0 ? '+' : ''}
+                  {advice.data.tax.net_return_pct}%
+                  <span className="text-gray-500 text-xs ml-2">
+                    (gross {advice.data.tax.gross_return_pct >= 0 ? '+' : ''}
+                    {advice.data.tax.gross_return_pct}%)
+                  </span>
+                </span>
+                <span className="text-[11px] text-gray-500 uppercase tracking-wide">
+                  {advice.data.tax.kind} · {advice.data.tax.rate_pct}%
+                </span>
+              </div>
+              {advice.data.tax.boundary_note && (
+                <p className="text-xs text-amber-300/90 mt-1.5 leading-relaxed">
+                  {advice.data.tax.boundary_note}
+                </p>
+              )}
+              <p className="text-[10px] text-gray-600 mt-1.5">{advice.data.tax.disclaimer}</p>
             </div>
           )}
 

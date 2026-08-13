@@ -132,14 +132,61 @@ def fetch_day(day: datetime = None) -> dict:
     return {"day": iso, "stored": len(rows), "source": "NSE bhavcopy"}
 
 
-def backfill(days: int = 10) -> dict:
-    """Pull the last N calendar days. Missing days are skipped, not retried."""
+def backfill(days: int = 10, workers: int = 4) -> dict:
+    """
+    Pull the last N calendar days. Missing days are skipped, not retried.
+
+    Downloads run in parallel because thirty sequential fetches take longer than
+    any sensible request timeout — that is what made the first 7-day attempt die
+    at 280 seconds. Concurrency is deliberately modest: NSE is a public archive
+    being used politely, and hammering it to save a minute would be a good way
+    to lose the source entirely.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    targets = [datetime.now() - timedelta(days=i) for i in range(1, days + 1)]
     out = []
-    for i in range(1, days + 1):
-        out.append(fetch_day(datetime.now() - timedelta(days=i)))
+    with ThreadPoolExecutor(max_workers=max(1, min(workers, 6))) as ex:
+        for r in ex.map(fetch_day, targets):
+            out.append(r)
     return {"days_attempted": days,
             "days_stored": len([o for o in out if o.get("stored")]),
             "rows": sum(o.get("stored", 0) for o in out)}
+
+
+_BACKFILL_STATE = {"running": False, "started": None, "result": None}
+
+
+def backfill_async(days: int = 30) -> dict:
+    """
+    Kick off a backfill in the background and return immediately.
+
+    A 30-day pull outlives any HTTP request, so the request starts the work and
+    /bhavcopy/coverage reports progress — the same pattern the universe scan
+    uses. Guards against a second run stacking on top of a first.
+    """
+    import threading
+    if _BACKFILL_STATE["running"]:
+        return {"started": False, "note": "A backfill is already running.",
+                "since": _BACKFILL_STATE["started"]}
+
+    def _run():
+        _BACKFILL_STATE.update(running=True, started=datetime.now().isoformat(),
+                               result=None)
+        try:
+            _BACKFILL_STATE["result"] = backfill(days)
+        except Exception as e:
+            _BACKFILL_STATE["result"] = {"error": f"{type(e).__name__}: {e}"}
+        finally:
+            _BACKFILL_STATE["running"] = False
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"started": True, "days": days,
+            "note": "Running in the background. Poll /bhavcopy/coverage for progress."}
+
+
+def backfill_status() -> dict:
+    return dict(_BACKFILL_STATE)
 
 
 def close_from_bhavcopy(ticker: str, max_age_days: int = 7):

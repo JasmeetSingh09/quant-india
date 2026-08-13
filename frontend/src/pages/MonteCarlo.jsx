@@ -254,6 +254,7 @@ export default function MonteCarlo() {
       {/* Suggestions + tweakable what-ifs. Holdings here ARE weights, so an
           applied scenario maps directly onto this page's state. */}
       <PortfolioCoach
+          focus="risk"
         holdings={holdings}
         initialValue={capital}
         horizonMonths={Math.round(years * 12)}

@@ -565,6 +565,8 @@ export default function Simulator() {
           initialValue={pnlData.initial_value || 100000}
           horizonMonths={12}
           currentReturnPct={pnlData.total_pnl_pct}
+          daysHeld={pnlData.days_running}
+          focus="live"
         />
       )}
     </div>

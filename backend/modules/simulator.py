@@ -406,6 +406,14 @@ def start_simulation(
     }
 
 
+def _days_since(iso) -> int | None:
+    """Whole days since an ISO timestamp, or None if it cannot be parsed."""
+    try:
+        from datetime import datetime as _dt
+        return max(0, (_dt.now() - _dt.fromisoformat(str(iso)[:19])).days)
+    except Exception:
+        return None
+
 def get_simulation_pnl(name: str, user_id: str = "public") -> dict:
     """
     Fetch live prices for all positions in a simulation and compute P&L.
@@ -503,6 +511,10 @@ def get_simulation_pnl(name: str, user_id: str = "public") -> dict:
         "simulation":      name,
         "started_at":      started_at,
         "checked_at":      now,
+        # How long the money has actually been at work. The coach needs it to
+        # tell short-term from long-term capital gains, which is a 7.5-point
+        # difference in the tax rate rather than a detail.
+        "days_running":    _days_since(started_at),
         "initial_value":   initial_value,
         "current_value":   round(total_current, 2),
         "total_pnl_inr":   round(total_pnl_inr, 2),

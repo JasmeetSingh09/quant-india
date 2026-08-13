@@ -1066,6 +1066,10 @@ class AdviseRequest(BaseModel):
     # return to hand — and a missing return means the comparison is skipped
     # rather than computed against zero.
     current_return_pct: Optional[float] = None
+    # Which module is asking. Each one gets the findings that apply to it: an
+    # optimizer designing a portfolio has no realised return to benchmark or tax.
+    focus: str = "live"
+    days_held: Optional[int] = None
 
 
 @app.post("/portfolio/advise")
@@ -1077,7 +1081,8 @@ def portfolio_advise(req: AdviseRequest, user_id: str = Depends(current_user_id)
     from portfolio_advisor import advise
     result = advise(req.holdings, initial_value=req.initial_value,
                     horizon_months=req.horizon_months, max_loss_pct=req.max_loss_pct,
-                    current_return_pct=req.current_return_pct, user_id=user_id)
+                    current_return_pct=req.current_return_pct, user_id=user_id,
+                    focus=req.focus, days_held=req.days_held)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -1231,10 +1236,22 @@ def bhavcopy_fetch(days: int = Query(1, ge=1, le=30)):
     return fetch_day() if days == 1 else backfill(days)
 
 
+@app.post("/bhavcopy/backfill")
+def bhavcopy_backfill(days: int = Query(30, ge=1, le=60)):
+    """
+    Build real history in the background. Thirty days of files outlives any HTTP
+    request, so this starts the work and returns; progress shows in /coverage.
+    """
+    from bhavcopy import backfill_async
+    return backfill_async(days)
+
+
 @app.get("/bhavcopy/coverage")
 def bhavcopy_coverage():
-    from bhavcopy import coverage
-    return coverage()
+    from bhavcopy import coverage, backfill_status
+    c = coverage()
+    c["backfill"] = backfill_status()
+    return c
 
 
 @app.get("/health/data")
