@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { buildPortfolio, startSimulation } from '../api'
-import PageHeader from '../components/PageHeader'
-import Spinner from '../components/Spinner'
+import PageHeader from './PageHeader'
+import Spinner from './Spinner'
 import { Wand2, ShieldCheck, AlertTriangle, PlayCircle } from 'lucide-react'
 
 const RISKS = [
@@ -14,6 +14,15 @@ const RISKS = [
 
 const rupee = v => v == null ? '—' : `₹${Math.round(v).toLocaleString('en-IN')}`
 
+/**
+ * PortfolioBuilder — the guided five-question flow.
+ *
+ * Lives in components/, not pages/: it is no longer routable on its own. The
+ * simulator is the hero, and a separate Build destination split one journey
+ * (decide what to hold, then watch it) across two nav items. It renders as the
+ * first tab inside the Simulator; `embedded` drops the page padding and header
+ * that a standalone route would need.
+ */
 export default function PortfolioBuilder({ embedded = false }) {
   const navigate = useNavigate()
   const [form, setForm] = useState({
