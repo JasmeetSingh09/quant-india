@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { advisePortfolio, portfolioScenarios } from '../api'
+import { advisePortfolio, portfolioScenarios, portfolioWhatIf } from '../api'
 import Spinner from './Spinner'
 import { Lightbulb, AlertTriangle, Info, Check } from 'lucide-react'
 
@@ -31,6 +31,13 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
                                          horizonMonths = 12, maxLossPct = null,
                                          onApply }) {
   const [applied, setApplied] = useState(null)
+  // User-driven tweak, distinct from the preset scenarios: they answer "what
+  // could I change?", this answers "what if I change it like THIS?".
+  const nHold = Object.keys(holdings || {}).length
+  const minCap = Math.ceil(100 / Math.max(nHold, 1))
+  const [cap, setCap] = useState(Math.max(minCap, 30))
+  const [hz, setHz]   = useState(horizonMonths)
+  const whatIf = useMutation({ mutationFn: portfolioWhatIf })
   const body = { holdings, initial_value: initialValue,
                  horizon_months: horizonMonths, max_loss_pct: maxLossPct }
 
@@ -87,6 +94,77 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
           )}
           <p className="text-[11px] text-gray-600">{advice.data.basis}</p>
         </>
+      )}
+
+      {/* Your own tweak */}
+      {advice.data && (
+        <div className="pt-2 border-t border-gray-800">
+          <h3 className="section-title mb-2">Or change it yourself</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="label">Cut concentration — max per stock</label>
+              <input type="range" min={minCap} max="100" step="5" className="w-full"
+                     value={cap} onChange={e => setCap(Number(e.target.value))} />
+              <p className="text-[11px] text-gray-600 mt-1">
+                No holding above {cap}%
+                {cap <= minCap && ` (lowest possible with ${nHold} stocks)`}
+              </p>
+            </div>
+            <div>
+              <label className="label">Hold for longer</label>
+              <input type="range" min="3" max="60" step="3" className="w-full"
+                     value={hz} onChange={e => setHz(Number(e.target.value))} />
+              <p className="text-[11px] text-gray-600 mt-1">
+                {hz} months{hz >= 12 && ` (${(hz / 12).toFixed(1)} years)`}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => whatIf.mutate({ holdings, initial_value: initialValue,
+                                           horizon_months: hz, max_weight_pct: cap })}
+            disabled={whatIf.isPending}
+            className="btn-ghost text-xs mt-3">
+            {whatIf.isPending ? 'Testing…' : 'Test this change'}
+          </button>
+
+          {whatIf.isError && <p className="banner-error mt-3">{String(whatIf.error)}</p>}
+
+          {whatIf.data && (
+            <div className="mt-3 p-3 rounded-lg border border-gray-700 bg-gray-900/40 space-y-2">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-[11px] text-gray-500">Typical outcome</p>
+                  <p className="font-mono">
+                    {pctStr(whatIf.data.base.return_pct)} → {pctStr(whatIf.data.after.return_pct)}
+                    <span className={`ml-2 text-xs ${whatIf.data.delta_return_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {pctStr(whatIf.data.delta_return_pct)}
+                    </span>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-gray-500">Worst 5%</p>
+                  <p className="font-mono">
+                    {pctStr(whatIf.data.base.downside_pct)} → {pctStr(whatIf.data.after.downside_pct)}
+                    <span className={`ml-2 text-xs ${whatIf.data.delta_downside_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {pctStr(whatIf.data.delta_downside_pct)}
+                    </span>
+                  </p>
+                </div>
+              </div>
+              {whatIf.data.changed ? (
+                <button onClick={() => { onApply?.(whatIf.data.weights); setApplied('your change') }}
+                        className="btn-ghost text-xs">
+                  {applied === 'your change' ? 'Applied' : 'Apply these weights'}
+                </button>
+              ) : (
+                <p className="text-[11px] text-gray-500">
+                  This cap changes nothing — no holding is above {cap}% already.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {scen.data?.scenarios?.length > 0 && (

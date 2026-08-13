@@ -85,6 +85,7 @@ export const getTopPicks    = () => api.get('/alpha/top-picks', { timeout: 15000
 // Full-universe scan (all 2,401 NSE names), split by SEBI cap tier
 // Guided flow: five answers -> a portfolio plus a downside verdict
 export const advisePortfolio   = body => api.post('/portfolio/advise', body, { timeout: 120000 })
+export const portfolioWhatIf = body => api.post('/portfolio/what-if', body, { timeout: 120000 })
 export const portfolioScenarios = body => api.post('/portfolio/scenarios', body, { timeout: 180000 })
 export const getLeaderboard     = (n=5) => api.get(`/simulator/leaderboard?n=${n}`)
 export const buildPortfolio = body => api.post('/portfolio/build', body, { timeout: 120000 })

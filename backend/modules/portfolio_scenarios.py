@@ -163,3 +163,71 @@ def scenarios(holdings: dict, initial_value: float = 100000,
         "disclaimer": "Simulated from past returns. Not a prediction, not financial advice.",
         "as_of": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
+
+
+def what_if(holdings: dict, initial_value: float = 100000,
+            horizon_months: int = 12, max_weight_pct: float = None) -> dict:
+    """
+    Measure a user's OWN tweak rather than a preset one.
+
+    Presets answer "what could I change?"; this answers "what if I change it
+    like THIS?" — cap any holding at max_weight_pct, and/or run a different
+    horizon. Both the original and the tweaked portfolio are simulated over the
+    SAME horizon so the comparison is like for like; changing only the horizon
+    still moves both numbers, which is the honest way to show that a longer
+    holding period changes the range of outcomes rather than the portfolio.
+    """
+    if not holdings or len(holdings) < 2:
+        return {"error": "Need at least 2 holdings."}
+    try:
+        horizon_months = int(horizon_months)
+        initial_value = float(initial_value)
+    except (TypeError, ValueError):
+        return {"error": "Horizon and amount must be numbers."}
+    if not 1 <= horizon_months <= 120:
+        return {"error": "Horizon must be between 1 and 120 months."}
+
+    base_w = _norm(holdings)
+    horizon_days = max(21, horizon_months * 21)
+    base = _measure(base_w, initial_value, horizon_days)
+    if not base:
+        return {"error": "Could not simulate this portfolio."}
+
+    new_w, applied = dict(base_w), []
+    if max_weight_pct:
+        cap = float(max_weight_pct)
+        if cap < 100.0 / len(base_w):
+            return {"error": f"With {len(base_w)} stocks the cap must be at least "
+                             f"{100.0/len(base_w):.0f}%."}
+        # Redistribute whatever exceeds the cap across the holdings still under
+        # it, repeating until nothing breaches — capping once can push another
+        # holding over the line.
+        for _ in range(20):
+            over = {k: v for k, v in new_w.items() if v > cap + 1e-9}
+            if not over:
+                break
+            excess = sum(v - cap for v in over.values())
+            for k in over:
+                new_w[k] = cap
+            room = [k for k, v in new_w.items() if v < cap - 1e-9]
+            if not room:
+                break
+            for k in room:
+                new_w[k] += excess / len(room)
+        applied.append(f"no holding above {cap:.0f}%")
+
+    new_w = _norm(new_w)
+    changed = any(abs(new_w[k] - base_w[k]) > 0.01 for k in base_w)
+    after = _measure(new_w, initial_value, horizon_days) if changed else base
+
+    return {
+        "base": base,
+        "after": after,
+        "weights": {k: round(v, 2) for k, v in new_w.items()},
+        "changed": changed,
+        "applied": applied,
+        "horizon_months": horizon_months,
+        "delta_return_pct":   round(after["return_pct"] - base["return_pct"], 2),
+        "delta_downside_pct": round(after["downside_pct"] - base["downside_pct"], 2),
+        "disclaimer": "Simulated from past returns. Not a prediction.",
+    }

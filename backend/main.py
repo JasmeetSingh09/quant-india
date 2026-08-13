@@ -1036,6 +1036,25 @@ def portfolio_advise(req: AdviseRequest):
     return result
 
 
+class WhatIfRequest(BaseModel):
+    holdings: dict
+    initial_value: float = 100000
+    horizon_months: int = 12
+    max_weight_pct: Optional[float] = None
+
+
+@app.post("/portfolio/what-if")
+def portfolio_what_if(req: WhatIfRequest):
+    """Measure the user's OWN tweak — cap concentration, change horizon."""
+    from portfolio_scenarios import what_if
+    result = what_if(req.holdings, initial_value=req.initial_value,
+                     horizon_months=req.horizon_months,
+                     max_weight_pct=req.max_weight_pct)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
 @app.post("/portfolio/scenarios")
 def portfolio_scenarios_ep(req: AdviseRequest):
     """
