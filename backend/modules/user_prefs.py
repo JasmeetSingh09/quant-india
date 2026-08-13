@@ -39,8 +39,10 @@ def opt_in(user_id: str, email: str) -> dict:
         return {"error": "Sign in first."}
     if not email or "@" not in email:
         # We only ever store what the token gave us; a missing address means the
-        # token had none, not that the user should type one.
-        return {"error": "No verified email on this account."}
+        # token had none, not that the user should type one. Say what to do
+        # about it — an error that only states a fact leaves the user stuck.
+        return {"error": "We could not read a verified email for your account. "
+                         "Sign out, sign back in, and try again."}
 
     _init_db()
     now = datetime.now().isoformat()

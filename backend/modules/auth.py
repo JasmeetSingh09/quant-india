@@ -151,14 +151,71 @@ def current_user_email(authorization: str | None = Header(default=None)) -> str 
     if anonymous. Used to route alert emails to the logged-in user."""
     token = _bearer(authorization)
     payload = _decode_payload(token)
-    if payload:
-        return payload.get("email")
-    if not _JWT_SECRET and jwt and token:
+    if payload is None and not _JWT_SECRET and jwt and token:
         try:
-            return jwt.decode(token, options={"verify_signature": False}).get("email")
+            payload = jwt.decode(token, options={"verify_signature": False})
         except Exception:
-            return None
+            payload = None
+    if not payload:
+        return None
+
+    email = _email_from_claims(payload)
+    if email:
+        return email
+
+    # The token verified but carried no address. Supabase does not always put
+    # `email` in the JWT — it depends on the signing key and how the account was
+    # created — so ask the auth server, using the caller's own token as the
+    # credential. No service key, and a user can only ever fetch themselves.
+    return _email_from_supabase(token)
+
+
+def _email_from_claims(payload: dict) -> str | None:
+    """Where Supabase actually puts the address, in the order it tends to."""
+    for value in (payload.get("email"),
+                  (payload.get("user_metadata") or {}).get("email"),
+                  (payload.get("app_metadata") or {}).get("email"),
+                  payload.get("preferred_username")):
+        if isinstance(value, str) and "@" in value:
+            return value.strip()
     return None
+
+
+_EMAIL_CACHE: dict[str, tuple[float, str | None]] = {}
+
+
+def _email_from_supabase(token: str) -> str | None:
+    """
+    GET /auth/v1/user with the caller's token. Cached for a few minutes because
+    this sits on a request dependency and must not add a network hop per call.
+    """
+    if not (_SUPABASE_URL and token):
+        return None
+    key = token[-32:]
+    hit = _EMAIL_CACHE.get(key)
+    now = time.time()
+    if hit and now - hit[0] < 600:
+        return hit[1]
+
+    email = None
+    try:
+        import requests
+        headers = {"Authorization": f"Bearer {token}"}
+        anon = os.getenv("SUPABASE_ANON_KEY", "").strip()
+        # Supabase's gateway wants an apikey; the user's own JWT is accepted as
+        # one when no anon key is configured.
+        headers["apikey"] = anon or token
+        r = requests.get(f"{_SUPABASE_URL}/auth/v1/user", headers=headers, timeout=6)
+        if r.status_code == 200:
+            body = r.json()
+            email = _email_from_claims(body if isinstance(body, dict) else {})
+    except Exception:
+        email = None
+
+    if len(_EMAIL_CACHE) > 500:
+        _EMAIL_CACHE.clear()
+    _EMAIL_CACHE[key] = (now, email)
+    return email
 
 
 def auth_enabled() -> bool:
