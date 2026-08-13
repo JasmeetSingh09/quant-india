@@ -12,7 +12,6 @@ import MyStocks from './pages/MyStocks'
 import PortfolioLab from './pages/PortfolioLab'
 import Markets from './pages/Markets'
 import Advanced from './pages/Advanced'
-import PortfolioBuilder from './pages/PortfolioBuilder'
 import Login from './pages/Login'
 import Landing from './pages/Landing'
 import { useAuth } from './AuthContext'
@@ -100,13 +99,14 @@ export default function App() {
           <Route path="/my-stocks"   element={<MyStocks />} />
           <Route path="/simulator"   element={<Simulator />} />
           <Route path="/lab"         element={<PortfolioLab />} />
-          <Route path="/build"       element={<PortfolioBuilder />} />
           <Route path="/advanced"    element={<Advanced />} />
           <Route path="/markets"     element={<Markets />} />
           <Route path="/calculators" element={<Calculators />} />
 
           {/* Options Lab and Research now live inside the Advanced Centre.
               Keep the old paths working — they are bookmarked and linked. */}
+          {/* Build is now a tab inside the Simulator, which is the hero flow */}
+          <Route path="/build"       element={<Navigate to="/simulator" replace />} />
           <Route path="/options"     element={<Navigate to="/advanced" replace />} />
           <Route path="/research"    element={<Navigate to="/advanced" replace />} />
 

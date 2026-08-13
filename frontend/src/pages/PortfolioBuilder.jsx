@@ -14,7 +14,7 @@ const RISKS = [
 
 const rupee = v => v == null ? '—' : `₹${Math.round(v).toLocaleString('en-IN')}`
 
-export default function PortfolioBuilder() {
+export default function PortfolioBuilder({ embedded = false }) {
   const navigate = useNavigate()
   const [form, setForm] = useState({
     amount: 100000, horizon_months: 12, max_loss_pct: 20,
@@ -40,11 +40,11 @@ export default function PortfolioBuilder() {
   })
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-5xl">
-      <PageHeader
+    <div className={embedded ? "space-y-6 max-w-5xl" : "p-4 sm:p-6 space-y-6 max-w-5xl"}>
+      {!embedded && <PageHeader
         title="Build me a portfolio"
         subtitle="Answer five questions and we'll build you a starting point — then show you honestly how much you could lose, and what to change. A way to learn portfolio construction, not a promise of returns."
-      />
+      />}
 
       <div className="card space-y-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">

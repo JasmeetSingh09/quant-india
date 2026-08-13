@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { startSimulation, getSimulationPnl, getSimulations, deleteSimulation, runBacktest, getSimHistory, addSimPosition, removeSimPosition } from '../api'
 import Spinner from '../components/Spinner'
 import PortfolioCoach from '../components/PortfolioCoach'
+import PortfolioBuilder from './PortfolioBuilder'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend, BarChart, Bar, Cell, ReferenceLine } from 'recharts'
 import { InfoTip } from '../components/Term'
 import { Plus, Trash2, RefreshCw, TrendingUp, TrendingDown } from 'lucide-react'
@@ -196,14 +197,28 @@ export default function Simulator() {
       <div className="flex items-center gap-4">
         <h1 className="text-2xl font-bold">Simulator</h1>
         <div className="flex bg-gray-800 rounded-lg p-1">
-          {['realtime','historic'].map(t => (
+          {['build','realtime','historic'].map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-1.5 rounded text-sm font-medium transition-colors capitalize ${
                 tab===t ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-gray-200'
-              }`}>{t === 'realtime' ? '⚡ Real-time' : '📈 Historic'}</button>
+              }`}>{t === 'build' ? '✨ Build for me' : t === 'realtime' ? '⚡ Real-time' : '📈 Historic'}</button>
           ))}
         </div>
       </div>
+
+      {/* The guided flow lives here rather than on its own page: the simulator
+          is the hero, and a separate Build entry split the same journey across
+          two nav items. */}
+      {tab === 'build' && (
+        <div className="space-y-2">
+          <p className="text-sm text-gray-400 max-w-3xl">
+            Answer five questions and we'll build you a starting point — then show you
+            honestly how much you could lose, and what to change. Paper-trade it from
+            the bottom of the results.
+          </p>
+          <PortfolioBuilder embedded />
+        </div>
+      )}
 
       {tab === 'realtime' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
