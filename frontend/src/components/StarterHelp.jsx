@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { buildPortfolio } from '../api'
-import { Wand2, ChevronDown, ChevronRight } from 'lucide-react'
+import { Wand2, ChevronDown, ChevronRight, Check } from 'lucide-react'
 
 const RISKS = [
   { key: 'conservative', label: 'Careful' },
@@ -26,6 +26,7 @@ export default function StarterHelp({ amount = 100000, onFill }) {
   const [open, setOpen] = useState(false)
   const [risk, setRisk] = useState('balanced')
   const [n, setN] = useState(5)
+  const [done, setDone] = useState(0)
 
   const mut = useMutation({
     mutationFn: () => buildPortfolio({
@@ -33,6 +34,7 @@ export default function StarterHelp({ amount = 100000, onFill }) {
     }),
     onSuccess: d => {
       onFill?.(Object.fromEntries(d.holdings.map(h => [h.ticker, h.weight_pct])))
+      setDone(d.holdings.length)
       setOpen(false)
     },
   })
@@ -44,8 +46,11 @@ export default function StarterHelp({ amount = 100000, onFill }) {
         className="w-full flex items-center justify-between px-3 py-2 text-left"
       >
         <span className="flex items-center gap-2 text-xs text-gray-400">
-          <Wand2 size={13} className="text-green-400" />
-          Not sure where to start? Get some suggestions
+          {done ? <Check size={13} className="text-green-400" />
+                : <Wand2 size={13} className="text-green-400" />}
+          {done
+            ? `Filled ${done} stocks above — edit any weight, then press Start`
+            : 'Not sure where to start? Get some suggestions'}
         </span>
         {open ? <ChevronDown size={14} className="text-gray-500" />
               : <ChevronRight size={14} className="text-gray-600" />}
@@ -81,9 +86,19 @@ export default function StarterHelp({ amount = 100000, onFill }) {
             </div>
             <button onClick={() => mut.mutate()} disabled={mut.isPending}
                     className="btn-ghost text-xs">
-              {mut.isPending ? 'Finding…' : 'Fill the form'}
+              {mut.isPending ? 'Finding stocks…' : 'Fill the form'}
             </button>
           </div>
+
+          {/* This call scores candidates and runs a simulation on a throttled
+              host — it can take up to a minute. Without saying so the button
+              just sits there and reads as broken. */}
+          {mut.isPending && (
+            <p className="text-[11px] text-gray-500 flex items-center gap-2">
+              <span className="w-3 h-3 border-2 border-gray-600 border-t-green-400 rounded-full animate-spin" />
+              Scoring stocks and simulating the result — this can take up to a minute.
+            </p>
+          )}
 
           {mut.isError && <p className="banner-error text-xs">{String(mut.error)}</p>}
         </div>
