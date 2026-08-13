@@ -1011,6 +1011,18 @@ def alpha_scan(req: ScanRequest):
     return {"rankings": scan_alpha(req.tickers, weights=req.weights)}
 
 
+@app.get("/simulator/leaderboard")
+def simulator_leaderboard(n: int = Query(5, ge=1, le=20)):
+    """
+    Top paper portfolios by return, anonymised.
+
+    Deliberately returns no names, no holdings and no identities — with a pilot
+    of a few classmates, either would identify the person immediately.
+    """
+    from leaderboard import top_simulations
+    return top_simulations(n=n)
+
+
 class BuildPortfolioRequest(BaseModel):
     amount: float = 100000
     horizon_months: int = 12
