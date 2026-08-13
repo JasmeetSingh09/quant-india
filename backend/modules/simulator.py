@@ -295,9 +295,17 @@ def start_simulation(
     if len(name) > 60:
         return {"error": "Simulation name must be 60 characters or fewer"}
 
+    # Rounded per-stock weights rarely sum to exactly 100: 40 + 29.1 + 22.2 +
+    # 6.69 + 2 = 99.99, whose difference from 100 evaluates to
+    # 0.010000000000005 in floating point and tripped a 0.01 tolerance. The
+    # message then printed 99.99 as "100.0", so it read as "must sum to 100%,
+    # got 100.0%". Allow a sane rounding tolerance, report the real number to
+    # 2dp, and renormalise so downstream maths still uses exact weights.
     total_alloc = sum(holdings.values())
-    if abs(total_alloc - 100) > 0.01:
-        return {"error": f"Allocations must sum to 100%, got {total_alloc:.1f}%"}
+    if abs(total_alloc - 100) > 0.5:
+        return {"error": f"Allocations must sum to 100%, got {total_alloc:.2f}%"}
+    if total_alloc > 0 and abs(total_alloc - 100) > 1e-9:
+        holdings = {t: v * 100.0 / total_alloc for t, v in holdings.items()}
     for t in holdings:
         # Accept NSE/BSE stocks (.NS/.BO), commodity futures (=F), and indices (^)
         if not (t.endswith(".NS") or t.endswith(".BO") or "=F" in t or t.startswith("^")):
