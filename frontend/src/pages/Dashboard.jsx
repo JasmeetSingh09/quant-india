@@ -295,6 +295,21 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Outcomes first: what the app is FOR — best portfolios, the
+          picks, and whether past picks actually worked. News and
+          commodity prices are context, so they sit below. */}
+      {/* Honest track record of past picks */}
+      {/* Renders nothing until a simulation qualifies, so an empty pilot
+          shows no hollow scaffolding. */}
+      <Leaderboard n={5} />
+
+      {/* Top picks per cap tier, from the full 2,401-stock universe scan */}
+      <CapTierPicks n={10} />
+
+      <TrackRecord />
+
+
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* MCX Commodities */}
         <div className="card col-span-1">
@@ -329,17 +344,6 @@ export default function Dashboard() {
           )}
         </div>
       </div>
-
-
-      {/* Honest track record of past picks */}
-      {/* Renders nothing until a simulation qualifies, so an empty pilot
-          shows no hollow scaffolding. */}
-      <Leaderboard n={5} />
-
-      {/* Top picks per cap tier, from the full 2,401-stock universe scan */}
-      <CapTierPicks n={10} />
-
-      <TrackRecord />
 
       {/* Regime detail */}
       {regimeError && (
