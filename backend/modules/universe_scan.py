@@ -47,7 +47,7 @@ MAX_WORKERS    = 6
 # model fix reaches already-scanned stocks instead of waiting for tomorrow's
 # cycle. IDEA.NS sat at +55.95 STRONG BUY for hours after the distress fix
 # landed purely because its row already existed for the current cycle.
-MODEL_VERSION  = "distress-v2"
+MODEL_VERSION  = "distress-v3-coverage"
 
 _LOCK    = threading.Lock()
 _THREAD  = None
