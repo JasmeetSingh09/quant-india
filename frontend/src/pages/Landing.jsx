@@ -1,15 +1,25 @@
 import { useNavigate } from 'react-router-dom'
 import {
-  Zap, TrendingUp, Brain, BarChart3, Shuffle, ShieldCheck, Newspaper, LineChart,
+  Zap, Wand2, Shuffle, Lightbulb, SlidersHorizontal, PlayCircle, History, LineChart,
 } from 'lucide-react'
 
+// Written as steps a user takes, not tools we own. The old list named the
+// machinery ("4-Factor Alpha Model", "FinBERT Sentiment"), which sold a
+// stock-picking edge the track record does not support. Same technology
+// underneath — described by what it lets someone learn.
 const FEATURES = [
-  { icon: TrendingUp, title: '4-Factor Alpha Model', desc: 'Momentum, quality, value and news sentiment combined into one transparent score — with a breakdown of what drives every call.' },
-  { icon: Brain,      title: 'FinBERT Sentiment',    desc: 'A finance-tuned language model reads Indian market news and scores it, so sentiment is measured, not guessed.' },
-  { icon: BarChart3,  title: 'Portfolio Optimiser',  desc: 'Markowitz, Black-Litterman and Hierarchical Risk Parity — build portfolios the way quant desks actually do.' },
-  { icon: Shuffle,    title: 'Monte Carlo',          desc: '10,000 simulated futures from real NSE history: see the odds of loss, doubling, and worst-case drawdowns.' },
-  { icon: ShieldCheck,title: 'Risk Analytics',       desc: 'Kelly sizing, volatility targeting and deflated Sharpe — position sizing that protects you from ruin.' },
-  { icon: Newspaper,  title: 'Macro & Market News',  desc: 'Live NSE, macro and commodities news with sector-impact tagging, right next to your holdings.' },
+  { icon: Wand2, title: '1. Build a portfolio in five answers',
+    desc: 'Tell us how much, for how long, and the worst loss you could live with. You get real NSE stocks with sensible position sizes — a starting point to learn from, not a tip sheet.' },
+  { icon: Shuffle, title: '2. See what could actually happen',
+    desc: 'Thousands of simulated futures from years of real NSE history. Typical outcome, best case, and the one that matters: how bad the worst 5% looks.' },
+  { icon: Lightbulb, title: '3. Find out what is wrong with it',
+    desc: 'Every warning cites the number behind it — "this stock is 55% of your money", "these two move together 0.85, so they are one bet, not two".' },
+  { icon: SlidersHorizontal, title: '4. Change it and watch the effect',
+    desc: 'Cut concentration, add or drop a stock, hold for longer. Each change shows what it does to BOTH your expected return and your worst case — because most improvements are trades, not free wins.' },
+  { icon: PlayCircle, title: '5. Paper-trade it, risk-free',
+    desc: 'Track your portfolio against real prices with no real money. Come back in a week and find out what actually happened.' },
+  { icon: History, title: 'And we show our own scorecard',
+    desc: "Our model's past calls are published with their real returns — including the periods where it showed no edge at all. Nobody else does this, and it is the reason you can trust the other numbers." },
 ]
 
 export default function Landing() {
@@ -52,6 +62,12 @@ export default function Landing() {
 
       {/* Features */}
       <section id="features" className="max-w-6xl mx-auto px-6 py-12">
+        <div className="text-center mb-8">
+          <h2 className="text-2xl sm:text-3xl font-bold text-white">How it works</h2>
+          <p className="text-gray-400 mt-2">
+            Five steps, about ten minutes, no money at risk.
+          </p>
+        </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map(({ icon: Icon, title, desc }) => (
             <div key={title} className="card space-y-3">
