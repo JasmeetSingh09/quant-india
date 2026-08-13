@@ -114,6 +114,29 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def _rate_limit(request, call_next):
+    """
+    Keep one caller from exhausting the instance for everyone else.
+
+    Deliberately fails OPEN: if the limiter itself errors, the request is served.
+    A bug in the throttle must never become an outage — that would be a worse
+    version of the problem it exists to prevent.
+    """
+    try:
+        from rate_limit import check
+        hit = check(request)
+        if hit:
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=429,
+                content={"detail": hit["detail"]},
+                headers={"Retry-After": str(hit["retry_after"])})
+    except Exception:
+        pass
+    return await call_next(request)
+
+
 def _start_picks_scheduler():
     """Refresh the Top Picks cache every 6h, matching its TTL.
 
@@ -1068,6 +1091,44 @@ def benchmark_return(days: int = 365):
     if r is None:
         raise HTTPException(status_code=503, detail="Index data unavailable right now.")
     return r
+
+
+class TaxRequest(BaseModel):
+    positions: list = []
+    invested: Optional[float] = None
+    current_value: Optional[float] = None
+    days_held: Optional[int] = None
+
+
+@app.post("/tax/after-tax")
+def tax_after_tax(req: TaxRequest):
+    """
+    What the gain is worth after Indian capital gains tax.
+
+    Short-term 20%, long-term 12.5% above the Rs 1.25 lakh exemption. Indicative
+    only — it does not model loss set-off, surcharge, cess or anyone's other
+    income, and says so in the response rather than in fine print.
+    """
+    from tax import portfolio_after_tax, after_tax
+    if req.positions:
+        r = portfolio_after_tax(req.positions)
+    elif req.invested is not None and req.current_value is not None:
+        r = after_tax(req.invested, req.current_value, days_held=req.days_held)
+    else:
+        raise HTTPException(status_code=400,
+                            detail="Send either `positions` or invested + current_value.")
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+
+@app.get("/liquidity/{ticker}")
+def liquidity_check(ticker: str):
+    """Whether a signal on this stock is something you could actually act on."""
+    from liquidity import assess, label
+    a = assess(ticker)
+    a["daily_value_label"] = label(a.get("daily_value"))
+    return a
 
 
 @app.get("/advice/effectiveness")

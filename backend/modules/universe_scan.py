@@ -423,6 +423,16 @@ def top_by_tier(n: int = 10, min_confidence: float = 0.3) -> dict:
         # With a small pool the two lists could otherwise overlap.
         picked = {r["ticker"] for r in buys}
         avoids = [r for r in avoids if r["ticker"] not in picked]
+        # A score means nothing on a stock that trades Rs 241 a day. Annotated
+        # rather than filtered out: silently dropping a name leaves the user
+        # wondering where it went, whereas showing it marked "barely trades"
+        # teaches them why it was never an opportunity.
+        try:
+            from liquidity import annotate
+            annotate(buys)
+            annotate(avoids)
+        except Exception:
+            pass
         return {"buys": buys, "avoids": avoids, "scored": len(pool)}
 
     return {
