@@ -101,11 +101,42 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
   const scen   = useMutation({ mutationFn: portfolioScenarios })
 
   const n = Object.keys(holdings || {}).length
-  if (n < 2) return null
 
+  // A single holding used to hide the coach entirely, which meant the one
+  // person who most needs to hear "this is one company's outcome, not a
+  // portfolio" was the only person never told. There is nothing to correlate
+  // or optimise with one stock, so the panel says the one true thing instead of
+  // running numbers that would all be about that stock.
+  if (n === 1) {
+    const only = Object.keys(holdings)[0].replace('.NS', '')
+    return (
+      <div className="card space-y-2">
+        <h2 className="font-semibold flex items-center gap-2">
+          <Lightbulb size={18} className="text-yellow-400" />
+          One holding is not a portfolio
+        </h2>
+        <p className="text-sm text-gray-300">
+          Everything that happens here is {only}'s result. You can be completely
+          right about the company and still lose the year to one bad quarter, one
+          regulator, or one fire.
+        </p>
+        <p className="text-xs text-gray-500 leading-relaxed">
+          Add a second holding from a different sector and the coach can start
+          measuring something — how the two move together, where the risk actually
+          sits, and how much the worst case improves. Most of the benefit of
+          diversifying arrives by 8&ndash;12 names, and almost all of it is gone by 3.
+        </p>
+      </div>
+    )
+  }
+  if (n < 1) return null
+
+  // Only the advice runs on click. Scenarios cost ~45s of simulation against
+  // ~7s for the findings, and firing both meant the panel sat spinning long
+  // after the answers had arrived. They now load when someone asks for them.
   const run = () => { trackEvent('advice_requested', { n_stocks: n })
-                      advice.mutate(body); scen.mutate(body) }
-  const busy = advice.isPending || scen.isPending
+                      advice.mutate(body) }
+  const busy = advice.isPending
 
   return (
     <div className="card space-y-4">
@@ -198,6 +229,19 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
                        className={['bg-green-500','bg-blue-500','bg-amber-500','bg-purple-500',
                                    'bg-pink-500','bg-cyan-500'][i % 6]} />
                 ))}
+                {/* Not every listed company maps to a known sector. Naming the
+                    remainder is better than leaving a gap that reads as a bug —
+                    and better than scaling it away, which would quietly overstate
+                    how much of the portfolio we actually classified. */}
+                {(() => {
+                  const known = Object.values(advice.data.sector_exposure)
+                                      .reduce((a, b) => a + b, 0)
+                  const rest = Math.max(0, 100 - known)
+                  return rest > 0.5
+                    ? <div title={`Unclassified ${rest.toFixed(0)}%`}
+                           style={{ width: `${rest}%` }} className="bg-gray-600" />
+                    : null
+                })()}
               </div>
               <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5">
                 {Object.entries(advice.data.sector_exposure).slice(0, 6).map(([sec, pct], i) => (
@@ -369,6 +413,26 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
           )}
         </div>
       )}
+
+      {/* Loaded on request rather than with the findings. Comparing several
+          whole portfolios means simulating each one, which takes far longer than
+          the advice itself — and most people read the findings first anyway. */}
+      {advice.data && !scen.data && (
+        <div className="pt-2 border-t border-gray-800 flex items-center gap-3 flex-wrap">
+          <button onClick={() => { trackEvent('scenarios_requested', { n_stocks: n })
+                                   scen.mutate(body) }}
+                  disabled={scen.isPending} className="btn-ghost text-xs">
+            {scen.isPending ? 'Simulating…' : 'Compare ways to change it'}
+          </button>
+          <span className="text-[11px] text-gray-500">
+            {scen.isPending
+              ? 'Simulating each version of the portfolio — around a minute.'
+              : 'Runs a full simulation of several alternatives. Takes about a minute.'}
+          </span>
+        </div>
+      )}
+
+      {scen.isError && <p className="banner-error text-xs">{String(scen.error)}</p>}
 
       {scen.data?.scenarios?.length > 0 && (
         <div className="pt-2 border-t border-gray-800">
