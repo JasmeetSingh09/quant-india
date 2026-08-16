@@ -48,6 +48,11 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 # ---------------------------------------------------------------------------
 
 _HIST_CACHE: dict = {}          # (tickers, lookback) -> (timestamp, Series)
+# Raw per-ticker closes, shared by every portfolio that mentions the ticker.
+# Six hours because these are daily bars: within a trading day the only thing
+# that changes is the last point, and a scenario comparison does not turn on it.
+_PRICE_CACHE: dict = {}         # (ticker, start, end) -> (timestamp, Series)
+_PRICE_TTL = 6 * 3600
 _HIST_TTL = 30 * 60             # 30 min — intraday drift is irrelevant to a 1y sim
 _HIST_LOCK = threading.Lock()
 
@@ -79,11 +84,34 @@ def _portfolio_daily_returns(holdings: dict, lookback_days: int = 504) -> pd.Ser
     start = (datetime.now() - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
 
     def _one(t):
+        # Cached per TICKER, not per portfolio.
+        #
+        # _HIST_CACHE above keys on weights, because what it stores is the
+        # weighted portfolio return series. That is right for repeat runs of the
+        # same portfolio and useless for scenarios, which differ from each other
+        # only by weight: every one missed that cache and re-downloaded every
+        # holding. Seven scenarios over five names meant thirty-five Yahoo calls
+        # from an IP that is already throttled, which is where the minute went.
+        #
+        # A ticker's price history does not depend on how much of it you own, so
+        # caching it here makes every scenario after the first cost arithmetic
+        # instead of network.
+        ck = (t, start, end)
+        with _HIST_LOCK:
+            hit = _PRICE_CACHE.get(ck)
+        if hit and time.time() - hit[0] < _PRICE_TTL:
+            return t, hit[1]
         try:
             df = yf.download(t, start=start, end=end, progress=False, auto_adjust=True)
-            return t, (df["Close"].squeeze() if not df.empty else None)
+            s = df["Close"].squeeze() if not df.empty else None
         except Exception:
-            return t, None
+            s = None
+        if s is not None:
+            with _HIST_LOCK:
+                if len(_PRICE_CACHE) > 1200:
+                    _PRICE_CACHE.clear()
+                _PRICE_CACHE[ck] = (time.time(), s)
+        return t, s
 
     prices = {}
     with ThreadPoolExecutor(max_workers=min(8, max(1, len(holdings)))) as pool:
