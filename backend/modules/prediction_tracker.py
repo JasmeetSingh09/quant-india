@@ -330,17 +330,25 @@ def _independence(records, horizon_days):
         eff += max(1, int(span / max(1, horizon_days)) + 1) if len(ds) > 1 else 1
     eff = min(eff, len(records))
 
+    all_dates = sorted(r["date"] for r in records)
     return {
         "observations": len(records),
         "distinct_stocks": len(by_t),
         "horizon_days": horizon_days,
+        "period": f"{all_dates[0]} to {all_dates[-1]}",
         "effective_independent_estimate": eff,
         "overlapping": len(records) > eff,
-        "note": (f"{len(records)} observations across {len(by_t)} stocks. Because "
-                 f"picks are logged daily and each is measured over {horizon_days} "
-                 f"days, consecutive observations of the same stock overlap and are "
-                 f"not separate trades. Roughly {eff} independent windows — treat "
-                 f"that, not the raw count, as the sample size."),
+        # Phrased as an approximation on purpose. `eff` is an estimate of
+        # effective independence under a crude assumption, not a count of unique
+        # trades, and stating it as though it were the true sample size would
+        # replace one overstatement with another.
+        "note": (f"{len(records)} observed prediction windows across {len(by_t)} "
+                 f"stocks ({all_dates[0]} to {all_dates[-1]}). Because picks are "
+                 f"logged daily and each is measured over {horizon_days} days, "
+                 f"consecutive observations of the same stock overlap heavily — "
+                 f"they correspond to roughly {eff} independent windows under this "
+                 f"approximation. Read the evidence as closer to {eff} than to "
+                 f"{len(records)}."),
     }
 
 

@@ -271,6 +271,77 @@ ok("behind_index" not in kinds_r and "weak_alpha" not in kinds_r, "risk mode sta
 print(f"  risk mode findings:   {sorted(kinds_r) or 'none'}")
 
 
+# ================= TRACK-RECORD METRIC SEMANTICS =======================
+# Permanent regression tests for the scorecard. These encode decisions rather
+# than just exercising code: a future change that flips how a SELL is scored, or
+# quietly starts counting a flat stock as a successful BUY, should fail here.
+section("track record semantics")
+from prediction_tracker import _side_stats, _independence
+
+def rows(*vals):
+    return [{"forward_return_pct": v, "excess_pct": None} for v in vals]
+
+# BUY: right when the stock rises.
+b = _side_stats(rows(5, -3, 2), wants_down=False)
+ok(b["hit_rate_pct"] == 66.7, "BUY hit = share that rose")
+ok(b["hit_means"] == "rose", "BUY hit labelled 'rose'")
+
+# SELL: right when the stock FALLS. A rising SELL is a miss however good the
+# average looks — the bug this whole section exists to prevent.
+s_ = _side_stats(rows(-5, 3, -2), wants_down=True)
+ok(s_["hit_rate_pct"] == 66.7, "SELL hit = share that fell")
+ok(s_["hit_means"] == "fell", "SELL hit labelled 'fell'")
+ok(_side_stats(rows(1, 2, 3), wants_down=True)["hit_rate_pct"] == 0.0,
+   "all-rising SELLs score 0% despite a positive average")
+
+# Zero return: a flat stock did not do what either signal asked, so it counts
+# as a miss on BOTH sides. Documented here because "unchanged" is genuinely
+# ambiguous and silence would let it drift.
+ok(_side_stats(rows(0, 0), wants_down=False)["hit_rate_pct"] == 0.0,
+   "flat counts as a BUY miss")
+ok(_side_stats(rows(0, 0), wants_down=True)["hit_rate_pct"] == 0.0,
+   "flat counts as a SELL miss")
+
+# Degenerate inputs.
+ok(_side_stats([], wants_down=False) is None, "no rows -> None")
+one = _side_stats(rows(4.2), wants_down=False)
+ok(one["signals"] == 1 and one["median_return_pct"] == 4.2, "single observation")
+ok(one["best_pct"] == one["worst_pct"] == 4.2, "single obs best == worst")
+
+# Median must expose an average carried by outliers.
+out = _side_stats(rows(0, 0, 0, 0, 50), wants_down=False)
+ok(out["median_return_pct"] == 0.0 and out["avg_return_pct"] == 10.0,
+   "median exposes an outlier-driven average")
+ok(out["hit_rate_pct"] == 20.0, "hit rate agrees with the median, not the mean")
+
+# Missing benchmark must not fabricate an excess figure.
+ok(_side_stats(rows(1, 2), wants_down=False)["avg_excess_vs_nifty_pct"] is None,
+   "no benchmark -> excess is None, never 0")
+mixed = [{"forward_return_pct": 1, "excess_pct": 2.0},
+         {"forward_return_pct": 2, "excess_pct": None}]
+ok(_side_stats(mixed, wants_down=False)["avg_excess_vs_nifty_pct"] == 2.0,
+   "excess averages only rows that have one")
+
+# Extreme values stay arithmetic.
+ext = _side_stats(rows(-99.9, 1000.0), wants_down=False)
+ok(ext["worst_pct"] == -99.9 and ext["best_pct"] == 1000.0, "extremes preserved")
+
+# Overlap: daily observations of one stock are not independent trades.
+daily = [{"ticker": "A.NS", "date": f"2026-07-{d:02d}"} for d in range(1, 29)]
+ind = _independence(daily, 21)
+ok(ind["effective_independent_estimate"] < ind["observations"],
+   "overlapping observations reduce the effective count")
+ok(ind["overlapping"] is True, "overlap flagged")
+ok("approximation" in ind["note"], "note states it is an approximation")
+ok(ind["period"].startswith("2026-07-01"), "evaluation period reported")
+
+# Non-overlapping observations must NOT be discounted.
+sparse = [{"ticker": f"T{i}.NS", "date": "2026-07-01"} for i in range(10)]
+ok(_independence(sparse, 21)["effective_independent_estimate"] == 10,
+   "ten different stocks on one day are ten independent windows")
+ok(_independence([], 21) is None, "empty records -> None")
+
+
 # ============================ REPORT ==================================
 print("\n" + "=" * 60)
 print(f"TOTAL CHECKS: {checks}")

@@ -137,7 +137,11 @@ function NewsCard({ article }) {
 
 function TrackRecord() {
   const navigate = useNavigate()
-  const [days, setDays] = useState(3)   // shortest window so the record shows as soon as picks mature
+  // Defaults to 21 because that is the horizon every signal card advertises.
+  // It defaulted to 3, so a card badged "21d" sat directly above a record
+  // measuring a completely different question — the shortest window flatters
+  // the sample count, which is exactly the wrong thing to optimise for here.
+  const [days, setDays] = useState(21)
   const { data, isLoading } = useQuery({
     queryKey: ['predTrack', days],
     queryFn: () => getPredictionTrack(days),
@@ -260,6 +264,17 @@ function TrackRecord() {
                                              : 'border-yellow-800 bg-yellow-900/15 text-yellow-200'}`}>
             <b>Verdict:</b> {sc.verdict}
             <span className="block text-xs text-gray-400 mt-1">
+              {days !== 21 && (
+                <span className="block text-amber-300/80 mb-1">
+                  Showing a {days}-day horizon. Signals are issued on a 21-day view,
+                  so this measures a different question than the cards above.
+                </span>
+              )}
+              {sc.independence?.period && (
+                <span className="block text-gray-500 mb-1">
+                  {sc.independence.period} · {sc.independence.distinct_stocks} stocks · {days}-day horizon
+                </span>
+              )}
               {sc.matured_predictions} signal observations
               {sc.independence?.effective_independent_estimate
                 ? ` (~${sc.independence.effective_independent_estimate} independent)` : ''}
