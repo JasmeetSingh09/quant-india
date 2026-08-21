@@ -10,6 +10,7 @@ import EmailOptIn from '../components/EmailOptIn'
 import { ChevronDown, TrendingUp, TrendingDown, Sparkles, ArrowUpRight, ArrowDownRight, RefreshCw, History } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import usePersistentState from '../usePersistentState'
+import ErrorBoundary from '../components/ErrorBoundary'
 
 const NIFTY_STOCKS = ['RELIANCE.NS','TCS.NS','HDFCBANK.NS','INFY.NS','ICICIBANK.NS']
 
@@ -502,17 +503,17 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <Leaderboard n={5} />
+      <ErrorBoundary name="section"><Leaderboard n={5} /></ErrorBoundary>
 
       {/* 1. What is the market doing? */}
       <RegimeBanner regime={regime} loading={regimeLoading} />
 
       {/* 2. What should I look at? */}
-      <CapTierPicks n={10} />
+      <ErrorBoundary name="section"><CapTierPicks n={10} /></ErrorBoundary>
 
       {/* 3. Does the model actually work? Directly under the picks on purpose:
           a signal and its measured track record belong on the same screen. */}
-      <TrackRecord />
+      <ErrorBoundary name="section"><TrackRecord /></ErrorBoundary>
 
       {/* Asked once, then never again — see the component. */}
       <EmailOptIn />

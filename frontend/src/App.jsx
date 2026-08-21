@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Menu, Zap } from 'lucide-react'
 import Sidebar from './components/Sidebar'
+import ErrorBoundary from './components/ErrorBoundary'
 import useMediaQuery from './hooks/useMediaQuery'
 import usePersistentState from './usePersistentState'
 import Dashboard from './pages/Dashboard'
@@ -53,6 +54,7 @@ export default function App() {
   // route). The actual app tools stay gated — you must sign in to reach them.
   if (!user) {
     return (
+      <ErrorBoundary name="page">
       <Routes>
         <Route path="/login" element={<Login />} />
         {/* A shared link must open for someone with no account — demanding a
@@ -61,6 +63,7 @@ export default function App() {
         <Route path="/s/:token" element={<SharedPortfolio />} />
         <Route path="*"      element={<Landing />} />
       </Routes>
+      </ErrorBoundary>
     )
   }
 
@@ -96,6 +99,9 @@ export default function App() {
         )}
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden">
+        {/* Keyed on the path so navigating away from a broken page clears the
+            error — otherwise one failure would follow the user everywhere. */}
+        <ErrorBoundary name="page" key={location.pathname}>
         <Routes>
           <Route path="/"            element={<Dashboard />} />
           <Route path="/stock"       element={<StockExplorer />} />
@@ -135,6 +141,7 @@ export default function App() {
           <Route path="/news"        element={<Navigate to="/markets" replace />} />
           <Route path="*"            element={<NotFound />} />
         </Routes>
+        </ErrorBoundary>
         </main>
       </div>
     </div>
