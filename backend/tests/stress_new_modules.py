@@ -651,6 +651,41 @@ ok(_even_fix.get("changed") is False or "steps" in _even_fix,
    "an already-balanced portfolio proposes nothing or explains why")
 
 
+# Six-factor model: weights, separation of concerns, and honest explanation.
+from alpha_v2 import WEIGHTS_V2, explain as _v2explain, FACTOR_PLAIN
+
+ok(abs(sum(WEIGHTS_V2.values()) - 1.0) < 1e-9, "V2 weights sum to 1.0")
+ok(len(WEIGHTS_V2) == 6, "V2 has exactly six factors")
+ok("liquidity" not in WEIGHTS_V2,
+   "liquidity is NOT a factor — it is an execution constraint, not attractiveness")
+ok(len(set(WEIGHTS_V2.values())) > 1, "weights are not all equal")
+ok(WEIGHTS_V2["momentum"] == max(WEIGHTS_V2.values()),
+   "momentum carries the largest weight, matching its evidence base")
+ok(all(k in FACTOR_PLAIN for k in WEIGHTS_V2), "every factor has a plain-language label")
+
+# The sentence must name the WORST factor, not the mildest negative.
+_fake = {"ticker": "X.NS",
+         "contributions": {"momentum": -13.1, "quality": 14.6, "growth": 3.9,
+                           "value": -8.4, "sentiment": -0.9, "low_risk": -4.0},
+         "weights_used": WEIGHTS_V2}
+_e = _v2explain(_fake)
+ok(_e["biggest_concern"] == FACTOR_PLAIN["momentum"][0],
+   "biggest concern is the most negative factor")
+ok(FACTOR_PLAIN["momentum"][0] in _e["sentence"],
+   "and the sentence names that same factor, not the mildest one")
+ok(_e["n_positive"] == 2 and _e["n_total"] == 6, "factor agreement counted correctly")
+
+# Cheap-but-weak must be taught, not just scored.
+_cheap = {"ticker": "Y.NS",
+          "contributions": {"value": 12.0, "quality": -8.0, "growth": -5.0},
+          "weights_used": WEIGHTS_V2}
+ok("Cheap does not mean good" in (_v2explain(_cheap).get("lesson") or ""),
+   "a cheap stock with weak fundamentals is explained, not just scored")
+
+ok(_v2explain({}) == {}, "no input -> no explanation invented")
+ok(_v2explain({"error": "x"}) == {}, "an errored score explains nothing")
+
+
 # ============================ REPORT ==================================
 print("\n" + "=" * 60)
 print(f"TOTAL CHECKS: {checks}")

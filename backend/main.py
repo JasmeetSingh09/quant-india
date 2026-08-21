@@ -1265,6 +1265,47 @@ def portfolio_suggest_fix(req: FixRequest):
     return r
 
 
+@app.get("/alpha/v2")
+def alpha_v2_score(ticker: str = Query(..., description="NSE ticker e.g. TCS.NS")):
+    """
+    Six-factor score, its plain-language explanation, and the four-factor score
+    beside it.
+
+    Both models run so the track record can eventually say which is better.
+    Neither has been shown to work yet, and shipping the bigger one on the
+    grounds that it sounds more advanced would be the opposite of that.
+    """
+    from alpha_v2 import compute_v2, explain, WEIGHTS_V2, WEIGHT_NOTES
+    r = compute_v2(ticker.strip().upper())
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    r["explanation"] = explain(r)
+    r["weight_reasons"] = WEIGHT_NOTES
+    return r
+
+
+@app.get("/alpha/compare")
+def alpha_compare(ticker: str = Query(...)):
+    """Four-factor against six-factor, side by side, for one stock."""
+    from alpha_v2 import compute_v2
+    from alpha_model import compute_alpha_score, MODEL_VERSION
+    v1 = compute_alpha_score(ticker.strip().upper())
+    if "error" in v1:
+        raise HTTPException(status_code=400, detail=v1["error"])
+    v2 = compute_v2(ticker.strip().upper(), v1_result=v1)
+    return {
+        "ticker": ticker.strip().upper(),
+        "v1": {"model_version": MODEL_VERSION, "alpha_score": v1.get("alpha_score"),
+               "signal": v1.get("signal"), "factors": list(v1.get("weights_used") or {})},
+        "v2": {"model_version": v2.get("model_version"), "alpha_score": v2.get("alpha_score"),
+               "signal": v2.get("signal"), "factors": list(v2.get("weights_used") or {})},
+        "disagreement": v2.get("disagreement"),
+        "note": ("Neither model has demonstrated predictive skill on the current "
+                 "sample. This comparison exists so the track record can settle "
+                 "it, not to imply the six-factor model is better."),
+    }
+
+
 @app.get("/methodology")
 def methodology_all():
     """
