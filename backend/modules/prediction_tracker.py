@@ -246,10 +246,11 @@ def evaluate(min_days: int = 7) -> dict:
         "buy_minus_sell_pct":  round(float(np.mean(buys) - np.mean(sells)), 2) if buys and sells else None,
         "alpha_vs_return_correlation": round(corr, 3) if corr is not None else None,
         "avg_excess_vs_nifty_pct": round(float(np.mean(excess)), 2) if excess else None,
-        "verdict": _verdict(buys, sells, corr, excess),
     }
     scorecard["by_signal"] = _by_signal(records)
     scorecard["independence"] = _independence(records, min_days)
+    scorecard["verdict"] = _verdict(buys, sells, corr, excess,
+                                    scorecard["by_signal"], scorecard["independence"])
     return {"scorecard": scorecard, "predictions": sorted(records, key=lambda r: r["date"])}
 
 
@@ -352,14 +353,63 @@ def _independence(records, horizon_days):
     }
 
 
-def _verdict(buys, sells, corr, excess):
-    if buys and sells and np.mean(buys) > np.mean(sells) and (corr or 0) > 0.1:
-        return ("Signal shows some edge so far: BUYs outperformed SELLs and higher "
-                "alpha correlated with higher return. Keep collecting data — small "
-                "samples are noisy.")
-    return ("No reliable edge yet: the signal is not clearly separating winners from "
-            "losers (consistent with returns being hard to predict). This is the "
-            "honest, expected result on a small/short sample.")
+# Below this many effective independent windows, no hit rate means anything.
+# A 55% rate on 20 windows is 11 correct calls — entirely ordinary luck. Naming
+# the threshold rather than hiding it is the point: the verdict should say WHY it
+# cannot conclude, not just that it cannot.
+MIN_EFFECTIVE_N = 30
+
+
+def _verdict(buys, sells, corr, excess, by_signal=None, independence=None):
+    """
+    Say what the evidence actually supports, and why.
+
+    The old verdict keyed off the BUY-minus-SELL spread and the alpha/return
+    correlation. Both can look encouraging on a handful of overlapping windows,
+    and neither answers the question a reader is asking: is there enough here to
+    conclude anything at all? So the sample comes first, then direction.
+
+    "Not enough independent evidence" and "enough evidence, no edge found" are
+    completely different findings and were previously reported with the same
+    sentence.
+    """
+    bs = by_signal or {}
+    b, s_ = bs.get("buy") or {}, bs.get("sell") or {}
+    eff = (independence or {}).get("effective_independent_estimate")
+    obs = (independence or {}).get("observations")
+
+    # 1. Is there enough independent evidence to say anything?
+    if eff is not None and eff < MIN_EFFECTIVE_N:
+        return (f"Not enough independent evidence yet. The {obs} observations here "
+                f"overlap heavily — they correspond to roughly {eff} independent "
+                f"windows, and below about {MIN_EFFECTIVE_N} a hit rate near 50% is "
+                f"indistinguishable from chance. This is a statement about the "
+                f"sample, not about the model: it has not been tested enough to "
+                f"pass or fail yet.")
+
+    b_hit, s_hit = b.get("hit_rate_pct"), s_.get("hit_rate_pct")
+    parts = []
+    if b_hit is not None:
+        parts.append(f"BUY {b_hit:.0f}% on {b.get('signals')} signals")
+    if s_hit is not None:
+        parts.append(f"SELL {s_hit:.0f}% on {s_.get('signals')} signals")
+    detail = "; ".join(parts) or "no matured signals"
+
+    # 2. There is enough evidence. Does it show direction?
+    edges = [h for h in (b_hit, s_hit) if h is not None]
+    if edges and all(45 <= h <= 55 for h in edges):
+        return (f"Enough evidence, and no edge found. {detail}. Hit rates sit around "
+                f"a coin flip, which is the ordinary result for short-horizon "
+                f"prediction and the one most models quietly avoid reporting.")
+
+    if edges and all(h > 55 for h in edges) and (corr or 0) > 0.1:
+        return (f"Some edge so far. {detail}, and higher alpha scores went with "
+                f"higher returns. Treat it as provisional: {eff} independent windows "
+                f"is a start, not a result.")
+
+    return (f"Mixed. {detail}. One side looks better than chance and the other does "
+            f"not, which on a sample this size is more likely to be noise than a "
+            f"real asymmetry between BUY and SELL.")
 
 
 def start_prediction_scheduler():

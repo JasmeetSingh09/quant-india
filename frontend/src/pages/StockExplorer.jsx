@@ -9,6 +9,7 @@ import {
 import Spinner from '../components/Spinner'
 import AlphaMeter from '../components/AlphaMeter'
 import SignalHistory from '../components/SignalHistory'
+import WhySignal from '../components/WhySignal'
 import StatCard from '../components/StatCard'
 import { Search, TrendingUp, TrendingDown, ArrowLeft, ExternalLink, Filter, LayoutList, LayoutGrid } from 'lucide-react'
 import { InfoTip } from '../components/Term'
@@ -772,6 +773,12 @@ function StockDetail({ ticker, onBack }) {
                   ticker, so a stock the scan has not reached yet simply shows
                   no history rather than an empty placeholder. */}
               <SignalHistory ticker={ticker} />
+              {/* Everything behind the badge, on one screen: the score and what
+                  it is not, data coverage, the driving factor, this stock's own
+                  recent signals, and how signals of this kind have actually
+                  performed — including when that record is too thin to mean
+                  anything. */}
+              <WhySignal ticker={ticker} />
               {alphaLoading ? <Spinner size="sm" /> : alpha && (
                 <div className="card">
                   <AlphaMeter score={alpha.alpha_score} />
