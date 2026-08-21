@@ -342,6 +342,39 @@ ok(_independence(sparse, 21)["effective_independent_estimate"] == 10,
 ok(_independence([], 21) is None, "empty records -> None")
 
 
+# The verdict must distinguish "untested" from "tested and failed", and must
+# not launder a thin side's uncertainty by averaging it with a well-sampled one.
+from prediction_tracker import _verdict, MIN_EFFECTIVE_N
+
+def sides(bh, bn, sh, sn):
+    return {"buy": {"hit_rate_pct": bh, "signals": bn},
+            "sell": {"hit_rate_pct": sh, "signals": sn}}
+
+thin_sample = _verdict([1], [1], 0.05, [0], sides(50, 40, 54, 30),
+                       {"effective_independent_estimate": 5, "observations": 240})
+ok("not enough independent evidence" in thin_sample.lower(),
+   "tiny effective sample -> reports the sample, not a failure")
+
+# The production case that caught the first version: 109 BUYs, 24 SELLs.
+mixed_n = _verdict([1], [1], 0.05, [0], sides(50.5, 109, 54.2, 24),
+                   {"effective_independent_estimate": 30, "observations": 240})
+ok("inconclusive" in mixed_n.lower(), "a thin side makes the verdict inconclusive")
+ok("SELL (24)" in mixed_n, "names which side is undersampled")
+ok("no edge found" not in mixed_n,
+   "never claims 'no edge' about a side with too few signals")
+
+both_ok = _verdict([1], [1], 0.05, [0], sides(50, 400, 49, 300),
+                   {"effective_independent_estimate": 120, "observations": 660})
+ok("no edge found" in both_ok, "well-sampled coin flip is reported as no edge")
+
+edge = _verdict([1], [1], 0.3, [0], sides(62, 400, 58, 300),
+                {"effective_independent_estimate": 120, "observations": 660})
+ok("some edge" in edge.lower(), "a real edge is reported as provisional")
+ok("provisional" in edge.lower(), "edge claim stays hedged")
+
+ok(MIN_EFFECTIVE_N >= 30, "independence threshold is not set trivially low")
+
+
 # ============================ REPORT ==================================
 print("\n" + "=" * 60)
 print(f"TOTAL CHECKS: {checks}")

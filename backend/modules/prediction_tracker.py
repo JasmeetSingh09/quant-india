@@ -388,14 +388,29 @@ def _verdict(buys, sells, corr, excess, by_signal=None, independence=None):
                 f"pass or fail yet.")
 
     b_hit, s_hit = b.get("hit_rate_pct"), s_.get("hit_rate_pct")
+    b_n, s_n = b.get("signals") or 0, s_.get("signals") or 0
     parts = []
     if b_hit is not None:
-        parts.append(f"BUY {b_hit:.0f}% on {b.get('signals')} signals")
+        parts.append(f"BUY {b_hit:.0f}% on {b_n} signals")
     if s_hit is not None:
-        parts.append(f"SELL {s_hit:.0f}% on {s_.get('signals')} signals")
+        parts.append(f"SELL {s_hit:.0f}% on {s_n} signals")
     detail = "; ".join(parts) or "no matured signals"
 
-    # 2. There is enough evidence. Does it show direction?
+    # 2. Enough evidence OVERALL is not enough evidence about each side.
+    #
+    # Production caught this: with 109 BUYs and 24 SELLs the first version
+    # announced "enough evidence, no edge found" — a conclusion it had no
+    # standing to draw about SELL. A side with a handful of signals supports no
+    # verdict at all, in either direction, and lumping it in with a
+    # better-sampled side launders its uncertainty.
+    thin = [f"{name} ({n})" for name, n in (("BUY", b_n), ("SELL", s_n))
+            if 0 < n < MIN_EFFECTIVE_N]
+    if thin:
+        return (f"Partly inconclusive. {detail}. {' and '.join(thin)} has too few "
+                f"signals to support any verdict — below about {MIN_EFFECTIVE_N} a "
+                f"hit rate is dominated by chance, so that side is neither working "
+                f"nor failing yet, just untested.")
+
     edges = [h for h in (b_hit, s_hit) if h is not None]
     if edges and all(45 <= h <= 55 for h in edges):
         return (f"Enough evidence, and no edge found. {detail}. Hit rates sit around "
