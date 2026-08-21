@@ -686,6 +686,52 @@ ok(_v2explain({}) == {}, "no input -> no explanation invented")
 ok(_v2explain({"error": "x"}) == {}, "an errored score explains nothing")
 
 
+# Portfolio fit, walk-forward, regime tilts, anomaly detection.
+from portfolio_fit import fit as _fit
+from regime_weights import proposed_weights as _rw, TILTS as _TILTS
+from anomaly import detect as _anom
+
+_it = {"INFY.NS": 30, "TCS.NS": 30, "WIPRO.NS": 20, "HCLTECH.NS": 20}
+_same = _fit("TECHM.NS", _it, add_pct=15)
+_diff = _fit("SUNPHARMA.NS", _it, add_pct=15)
+if "error" not in _same and "error" not in _diff:
+    ok(_same["fit_score"] < _diff["fit_score"],
+       "a fifth IT stock fits an IT portfolio worse than a pharma stock does")
+    ok(_same["components"]["sector"]["score"] == 0.0,
+       "adding to a 100% sector scores zero on sector fit")
+ok("error" in _fit("X.NS", {}), "no holdings -> nothing to fit against")
+ok(_fit("INFY.NS", _it).get("held") is True, "a stock already held is reported as held")
+
+# Regime tilts must ship inactive until evidence supports them.
+_p = _rw("Bear")
+ok(_p["active"] is False, "regime tilting is NOT applied by default")
+ok(abs(sum(_p["proposed_weights"].values()) - 1.0) < 1e-6, "tilted weights renormalise to 1")
+ok(_p["proposed_weights"]["low_risk"] > _p["current_weights"]["low_risk"],
+   "a bear regime tilts toward low-risk")
+ok(_p["proposed_weights"]["momentum"] < _p["current_weights"]["momentum"],
+   "and away from momentum")
+ok(set(_TILTS) == {"Bull", "Sideways", "Bear"}, "three regimes, matching the HMM")
+ok(all(abs(v - 1.0) < 1e-9 for v in _TILTS["Sideways"].values()),
+   "sideways applies no tilt at all")
+
+# Anomaly output must never look like a recommendation.
+_a = _anom("RELIANCE.NS")
+ok("this_is_not_a_signal" in _a, "anomaly output states it is not a signal")
+ok(not any(k in str(_a).upper() for k in ("STRONG BUY", "STRONG SELL")),
+   "anomaly output contains no buy/sell language")
+ok(_anom("")["checked"] is False, "an empty ticker is not silently checked")
+
+
+# Events: context without a score.
+from events import detect as _events
+_e = _events("")
+ok(_e["checked"] is False, "an empty ticker is not silently checked")
+_e2 = _events("RELIANCE.NS")
+ok("this_is_not_a_signal" in _e2, "events state they are not a recommendation")
+ok("score" not in {k.lower() for k in _e2 if k != "sentiment"},
+   "events produce no score of their own — the sentiment factor already has that job")
+
+
 # ============================ REPORT ==================================
 print("\n" + "=" * 60)
 print(f"TOTAL CHECKS: {checks}")

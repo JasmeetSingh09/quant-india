@@ -123,6 +123,11 @@ export const trackEvent = (event, props = {}) => {
 
 export const suggestFix        = body => api.post('/portfolio/suggest-fix', body, { timeout: 180000 })
 export const getAlphaV2        = ticker => api.get(`/alpha/v2?ticker=${encodeURIComponent(ticker)}`, { timeout: 120000 })
+export const getAnomaly        = t => api.get(`/anomaly/${encodeURIComponent(t)}`)
+export const getEvents         = t => api.get(`/events/${encodeURIComponent(t)}`)
+export const getPortfolioFit   = body => api.post('/portfolio/fit', body, { timeout: 120000 })
+export const getWalkForward    = () => api.get('/validation/walk-forward', { timeout: 240000 })
+export const getRegimeWeights  = () => api.get('/regime/weights')
 export const getMethodology    = tool => api.get(`/methodology/${tool}`)
 export const getBenchmark      = (days = 365) => api.get('/benchmark', { params: { days } })
 export const advisePortfolio   = body => api.post('/portfolio/advise', body, { timeout: 120000 })

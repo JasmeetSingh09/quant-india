@@ -1306,6 +1306,64 @@ def alpha_compare(ticker: str = Query(...)):
     }
 
 
+class FitRequest(BaseModel):
+    ticker: str
+    holdings: dict
+    add_pct: float = 10.0
+
+
+@app.post("/portfolio/fit")
+def portfolio_fit_check(req: FitRequest):
+    """
+    Does this stock belong in THIS portfolio — separate from whether it is a
+    good stock. Attractiveness is a prediction; fit is arithmetic.
+    """
+    from portfolio_fit import fit
+    r = fit(req.ticker, req.holdings, add_pct=req.add_pct)
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+
+@app.get("/validation/walk-forward")
+def validation_walk_forward(horizon_days: int = Query(21, ge=5, le=90),
+                            top_n: int = Query(5, ge=2, le=15)):
+    """
+    Out-of-sample momentum test on non-overlapping windows.
+
+    Momentum only, and the response explains why: it is the one factor
+    computable from prices alone, so a past ranking can be rebuilt exactly as it
+    looked then. Testing the others would require ranking the past with today's
+    fundamentals.
+    """
+    from walk_forward import run
+    r = run(horizon_days=horizon_days, top_n=top_n)
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+
+@app.get("/regime/weights")
+def regime_weight_proposal(regime: str = Query(None)):
+    """What the factor weights would become under regime tilting. A proposal."""
+    from regime_weights import proposed_weights
+    return proposed_weights(regime)
+
+
+@app.get("/anomaly/{ticker}")
+def anomaly_check(ticker: str):
+    """Unusual behaviour for this stock against its own history. Not a signal."""
+    from anomaly import detect
+    return detect(ticker)
+
+
+@app.get("/events/{ticker}")
+def events_check(ticker: str):
+    """Recent news and any imminent results. Context, not a score."""
+    from events import detect
+    return detect(ticker)
+
+
 @app.get("/methodology")
 def methodology_all():
     """

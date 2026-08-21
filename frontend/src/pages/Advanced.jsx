@@ -6,6 +6,7 @@ import PairsTrading from './PairsTrading'
 import Seasonality from './Seasonality'
 import Research from './Research'
 import Backtest from './Backtest'
+import WalkForward from '../components/WalkForward'
 
 /**
  * Advanced Centre — the quantitative tools, gathered in one place.
@@ -17,6 +18,10 @@ import Backtest from './Backtest'
  * everyone who doesn't.
  */
 const TABS = [
+  // Validation first on purpose. Whether the model works is a more important
+  // question than anything else these tools can compute, and burying it at the
+  // end would say the opposite.
+  { label: 'Validation',  Component: WalkForward },
   { label: 'Risk',        Component: RiskLab },
   { label: 'Factors',     Component: Factors },
   { label: 'Signals',     Component: Research },
