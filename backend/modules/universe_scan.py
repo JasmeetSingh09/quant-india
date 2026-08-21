@@ -178,7 +178,11 @@ def get_state() -> dict:
         "failed": err_n,
         "progress_note": (f"{done} of {total} attempted; {ok_n} scored, {err_n} failed."
                           if total else f"{done} attempted; {ok_n} scored, {err_n} failed."),
-        "pct": round(done / total * 100, 1) if total else 0.0,
+        # The universe grows between a scan starting and finishing — bhavcopy
+        # adds symbols nightly — so `done` can exceed the `total` captured at
+        # the start, and the bar reads over 100%. Clamped for display; the raw
+        # counts above are left untouched because they are the honest record.
+        "pct": round(min(done / total * 100, 100.0), 1) if total else 0.0,
         "running": _THREAD is not None and _THREAD.is_alive(),
     }
 
