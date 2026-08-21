@@ -229,13 +229,45 @@ def _already_done(cycle: str) -> set:
 # Worker
 # ---------------------------------------------------------------------------
 
+def _bhavcopy_symbols() -> list:
+    """
+    Every symbol the exchange itself published, from our own database.
+
+    The scan was covering ~130 stocks out of 2,400. The cause was the universe
+    source: it fetches the listing over the network, and when that fetch degrades
+    it silently falls back to a short built-in list. The scan then completed
+    honestly against a universe that was almost empty — status "complete", 130
+    stocks, and nobody the wiser.
+
+    Bhavcopy already holds 2,700+ NSE symbols locally, straight from the
+    exchange's own daily file. It needs no network, cannot be throttled, and is
+    authoritative about what is actually listed. So it is now the primary source
+    and the network listing is the fallback, which is the correct way round.
+    """
+    try:
+        from db import get_conn
+        conn = get_conn()
+        rows = conn.execute(
+            "SELECT DISTINCT symbol FROM bhavcopy_eod "
+            "WHERE day >= (SELECT MAX(day) FROM bhavcopy_eod)").fetchall()
+        conn.close()
+        return [r[0] for r in rows if r and r[0]]
+    except Exception:
+        return []
+
+
 def _universe() -> list:
     from stock_universe import get_all_symbols, ensure_universe_loaded
-    try:
-        ensure_universe_loaded()
-    except Exception:
-        pass
-    syms = get_all_symbols("NSE") or []
+
+    syms = _bhavcopy_symbols()
+    if len(syms) >= 500:
+        pass                       # the exchange's own list; nothing to add
+    else:
+        try:
+            ensure_universe_loaded()
+        except Exception:
+            pass
+        syms = list(syms) + list(get_all_symbols("NSE") or [])
     out = []
     for s in syms:
         t = (s if isinstance(s, str) else (s.get("symbol") or "")).strip().upper()
@@ -509,3 +541,31 @@ def get_signal_history(ticker: str, limit: int = 30) -> list:
     except Exception:
         pass          # price history is a nice-to-have; never fail the history
     return out
+
+
+def stored_scores_for_today() -> dict:
+    """
+    {ticker: {alpha_score, signal, confidence}} from the newest complete cycle.
+
+    Lets the prediction tracker log the whole universe without re-running the
+    model on 2,400 stocks — the scan already did that work today, and re-doing
+    it would make full coverage impossible rather than merely slow.
+    """
+    _init_db()
+    conn = get_conn()
+    try:
+        row = conn.execute(
+            "SELECT last_complete_cycle, cycle FROM alpha_scan_state WHERE id = 1"
+        ).fetchone()
+        cycle = (row[0] or row[1]) if row else None
+        if not cycle:
+            return {}
+        rows = conn.execute(
+            "SELECT ticker, alpha_score, signal, confidence FROM alpha_scan2 "
+            "WHERE cycle = ? AND alpha_score IS NOT NULL", (cycle,)).fetchall()
+    except Exception:
+        return {}
+    finally:
+        conn.close()
+    return {r[0]: {"alpha_score": r[1], "signal": r[2], "confidence": r[3]}
+            for r in rows}

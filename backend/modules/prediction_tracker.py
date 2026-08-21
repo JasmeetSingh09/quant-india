@@ -56,16 +56,47 @@ def snapshot(universe: list = None) -> dict:
     """
     init_table()
     from alpha_model import compute_alpha_score, TOP_PICKS_UNIVERSE
-    universe = universe or TOP_PICKS_UNIVERSE
     today = datetime.now().strftime("%Y-%m-%d")
+
+    # Default to everything the universe scan has already scored, not a curated
+    # list of thirty. The track record measured 30 stocks while the model rated
+    # 2,400 — so the evidence covered barely one percent of what the app shows,
+    # and the thin sample the verdict keeps complaining about was largely
+    # self-inflicted.
+    #
+    # Re-scoring is not needed: the scan stored a score for every stock today.
+    # Reading those rows makes this a database pass instead of thousands of
+    # model runs, which is the only way covering the full universe is feasible.
+    scored = {}
+    if universe is None:
+        try:
+            from universe_scan import stored_scores_for_today
+            scored = stored_scores_for_today()
+        except Exception:
+            scored = {}
+    universe = universe or list(scored) or TOP_PICKS_UNIVERSE
+
+    # Prices from the exchange's own file. One query for every symbol, instead
+    # of one throttled Yahoo round-trip per stock — at 2,400 stocks that
+    # difference is the whole feature.
+    bhav = {}
+    try:
+        from bhavcopy import closes_for_latest_day
+        bhav = closes_for_latest_day()
+    except Exception:
+        bhav = {}
 
     logged = 0
     c = _conn()
     for t in universe:
         try:
-            r = compute_alpha_score(t)
-            price = r.get("factors", {})  # price fetched separately below
-            px = yf.Ticker(t).fast_info.last_price
+            stored = scored.get(t)
+            r = stored if stored else compute_alpha_score(t)
+            if not r or r.get("alpha_score") is None:
+                continue
+            px = bhav.get(t)
+            if px is None:
+                px = yf.Ticker(t).fast_info.last_price
             if px is None or not (px == px):
                 continue
             c.execute(
@@ -101,6 +132,25 @@ def _closes_for(tickers: list) -> dict:
             out[t] = hit[1]
         else:
             missing.append(t)
+
+    # Serve from the exchange's own stored history first. Once the record covers
+    # the whole universe this is not an optimisation but the only workable path:
+    # grading 2,400 stocks through Yahoo is thousands of throttled round-trips,
+    # while bhavcopy is one query against a table we already keep.
+    if missing:
+        try:
+            from bhavcopy import closes_history
+            hist = closes_history(missing)
+            for t, by_day in hist.items():
+                if len(by_day) < 2:
+                    continue
+                idx = pd.to_datetime(sorted(by_day))
+                ser = pd.Series([by_day[d] for d in sorted(by_day)], index=idx)
+                out[t] = ser
+                _CLOSE_CACHE[t] = (now, ser)
+            missing = [t for t in missing if t not in out]
+        except Exception:
+            pass
 
     if missing:
         try:

@@ -224,3 +224,47 @@ def coverage() -> dict:
     return {"rows": n, "days": d, "symbols": s, "latest_day": last,
             "note": "Official NSE end-of-day. Independent of Yahoo — this is the "
                     "fallback that still answers when Yahoo does not."}
+
+
+def closes_for_latest_day() -> dict:
+    """
+    {symbol: close} for the most recent stored trading day.
+
+    One query for the whole exchange. The prediction snapshot used to fetch a
+    price per ticker from Yahoo, which is fine for thirty stocks and impossible
+    for two thousand four hundred.
+    """
+    try:
+        _init_db()
+        conn = get_conn()
+        rows = conn.execute(
+            "SELECT symbol, close FROM bhavcopy_eod "
+            "WHERE day = (SELECT MAX(day) FROM bhavcopy_eod) AND close IS NOT NULL"
+        ).fetchall()
+        conn.close()
+        return {r[0]: float(r[1]) for r in rows if r and r[1]}
+    except Exception:
+        return {}
+
+
+def closes_history(symbols=None) -> dict:
+    """
+    {symbol: {day: close}} across every stored day — the local substitute for
+    per-ticker price downloads when grading a large record.
+    """
+    try:
+        _init_db()
+        conn = get_conn()
+        rows = conn.execute(
+            "SELECT symbol, day, close FROM bhavcopy_eod WHERE close IS NOT NULL"
+        ).fetchall()
+        conn.close()
+    except Exception:
+        return {}
+    want = set(symbols) if symbols else None
+    out: dict = {}
+    for sym, day, close in rows:
+        if want and sym not in want:
+            continue
+        out.setdefault(sym, {})[day] = float(close)
+    return out
