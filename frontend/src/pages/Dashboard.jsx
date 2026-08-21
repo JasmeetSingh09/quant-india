@@ -159,6 +159,13 @@ function TrackRecord() {
   }, {}))
   const pct = v => v == null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(2)}%`
   const col = v => v == null ? 'text-gray-400' : v >= 0 ? 'text-green-400' : 'text-red-400'
+  // Direction-aware. A negative excess return is BAD for a BUY and GOOD for a
+  // SELL — the stock underperformed the index, which is what the SELL called.
+  // Painting it red either way says "bad" about the model being right, which is
+  // the same mistake as scoring a SELL by whether the stock went up.
+  const colFor = (v, wantsDown) =>
+    v == null ? 'text-gray-400'
+      : (wantsDown ? v <= 0 : v >= 0) ? 'text-green-400' : 'text-red-400'
 
   return (
     <div className="card space-y-4">
@@ -225,7 +232,10 @@ function TrackRecord() {
                   </div>
                   <div className="col-span-2 pt-1 border-t border-gray-800">
                     <p className="text-[11px] text-gray-500">
-                      vs Nifty <span className={col(d.avg_excess_vs_nifty_pct)}>
+                      vs Nifty <span className={colFor(d.avg_excess_vs_nifty_pct, want === 'fell')}
+                        title={want === 'fell'
+                          ? 'For a SELL, underperforming the index is the signal being right.'
+                          : 'For a BUY, beating the index is the signal being right.'}>
                         {pct(d.avg_excess_vs_nifty_pct)}</span>
                       <span className="text-gray-600"> · best {pct(d.best_pct)} · worst {pct(d.worst_pct)}</span>
                     </p>
