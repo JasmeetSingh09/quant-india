@@ -85,9 +85,16 @@ export default function SignalHistory({ ticker }) {
                 <td className="text-right font-mono text-gray-300">
                   {r.close != null ? `₹${r.close.toLocaleString('en-IN')}` : '—'}
                 </td>
+                {/* Direction-aware. A stock falling after a SELL is the model
+                    being RIGHT; colouring it red says the opposite. Same error
+                    as scoring a SELL by whether the stock rose, in the palette. */}
                 <td className={`text-right font-mono ${
                   r.since_pct == null ? 'text-gray-600'
-                  : r.since_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  : ((r.signal || '').includes('SELL') ? r.since_pct <= 0 : r.since_pct >= 0)
+                    ? 'text-green-400' : 'text-red-400'}`}
+                    title={(r.signal || '').includes('SELL')
+                      ? 'For a SELL, a fall is the signal being right.'
+                      : 'For a BUY, a rise is the signal being right.'}>
                   {r.since_pct == null ? '—'
                     : `${r.since_pct > 0 ? '+' : ''}${r.since_pct.toFixed(1)}%`}
                 </td>

@@ -50,18 +50,21 @@ function PickCard({ r, buy, onOpen }) {
           <span className="font-mono font-bold text-sm truncate">{name}</span>
         </div>
         <span title="Alpha score, -100 to +100. Composite of momentum, quality, value and sentiment. Higher means the model prefers it more strongly — it is NOT a predicted return."
-              className={`text-base font-bold font-mono shrink-0 cursor-help ${buy ? 'text-green-400' : 'text-red-400'}`}>
+              className={`text-sm font-medium font-mono shrink-0 cursor-help ${buy ? 'text-green-400/80' : 'text-red-400/80'}`}>
           {score > 0 ? '+' : ''}{score?.toFixed(0)}
         </span>
       </div>
       <div className="flex items-center justify-between text-[11px] mb-2">
+        {/* The decision, not the score, is the thing being communicated. The
+            alpha number was set in bold at a larger size than the signal, so
+            the secondary metric outweighed the call it produced. */}
         <span title={buy
                 ? 'Model expects outperformance over roughly 21 trading days.'
                 : 'Model expects underperformance — read as avoid or reduce. The model does not model short selling.'}
-              className={`badge-${buy ? 'green' : 'red'} cursor-help`}>
+              className={`badge-${buy ? 'green' : 'red'} cursor-help text-xs font-bold tracking-wide`}>
           {r.signal}{!buy && r.signal?.includes('SELL') ? ' · avoid' : ''}
         </span>
-        <span className="text-gray-600 text-[10px]">21d</span>
+        <span className="text-gray-500 text-[10px]">21-day signal</span>
         <span className="text-gray-500" title="How much of the model's input data was available for this stock — not the chance the signal is right.">{Math.round((r.confidence || 0) * 100)}% data</span>
       </div>
       <div className="space-y-1">

@@ -71,7 +71,19 @@ export default function WhySignal({ ticker }) {
         </span>
       </div>
 
+      {/* The decision, stated before the numbers that produced it. */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="text-[10px] uppercase tracking-widest text-gray-500">Current signal</span>
+        <span className={`px-2 py-0.5 rounded text-sm font-bold tracking-wide ${
+          buy ? 'bg-green-900/40 text-green-300 border border-green-800'
+              : 'bg-red-900/40 text-red-300 border border-red-800'}`}>
+          {alpha.signal}{!buy && (alpha.signal || '').includes('SELL') ? ' · avoid' : ''}
+        </span>
+        <span className="text-xs text-gray-500">over {horizon} trading days</span>
+      </div>
+
       {/* What the score is, stated with what it is not. */}
+      <p className="text-[10px] uppercase tracking-widest text-gray-500">Model context</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="card-sm">
           <p className="stat-label">Alpha score</p>
@@ -156,8 +168,15 @@ export default function WhySignal({ ticker }) {
           answer is that we cannot tell yet. */}
       {side && (
         <div>
-          <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-1.5">
-            How {buy ? 'BUY' : 'SELL'} signals have performed
+          <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">
+            Historical track record — {buy ? 'BUY' : 'SELL'} signals
+          </p>
+          {/* Labelled as history, deliberately. A hit rate sitting under a live
+              badge is read as the odds for THIS call unless it is named as the
+              past, which it is not and cannot be. */}
+          <p className="text-[10px] text-gray-600 mb-1.5">
+            How signals like this one have done before. Not the probability that
+            today's call is right.
           </p>
           <div className="table-wrap">
             <table className="w-full text-sm">
@@ -174,6 +193,12 @@ export default function WhySignal({ ticker }) {
                     side.hit_rate_pct >= 55 ? 'text-green-400'
                     : side.hit_rate_pct >= 45 ? 'text-gray-200' : 'text-red-400'}`}>
                     {side.hit_rate_pct}%
+                    {side.significance && (
+                      <span className="block text-[10px] text-gray-500 font-normal">
+                        95% CI {side.significance.ci95_low_pct}–{side.significance.ci95_high_pct}%
+                        {!side.significance.significant_at_5pct && ' · not significant'}
+                      </span>
+                    )}
                   </td>
                 </tr>
                 <tr className="border-b border-gray-800">
@@ -201,6 +226,10 @@ export default function WhySignal({ ticker }) {
         </p>
       )}
 
+      <p className="text-[11px] text-gray-600 leading-relaxed">
+        {alpha.horizon_note ||
+          `This signal applies to the stated ${horizon}-day horizon and is not a long-term investment recommendation.`}
+      </p>
       <p className="text-[11px] text-gray-600 leading-relaxed">
         {alpha.action_note || (buy
           ? 'The model expects outperformance over this horizon.'
