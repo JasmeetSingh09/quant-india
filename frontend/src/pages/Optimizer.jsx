@@ -276,8 +276,8 @@ export default function Optimizer() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {[
-                  ['Expected Return', `${mvoResult.expected_annual_return_pct}%`, null],
-                  ['Expected Bumpiness', `${mvoResult.expected_annual_vol_pct}%`, 'volatility'],
+                  ['Historical avg return', `${mvoResult.expected_annual_return_pct}%`, null],
+                  ['Historical volatility', `${mvoResult.expected_annual_vol_pct}%`, 'volatility'],
                   ['Sharpe Ratio',    mvoResult.expected_sharpe, 'sharpe'],
                   ['Better than equal-split', `${mvoResult.vs_equal_weight?.sharpe_improvement > 0 ? '+' : ''}${mvoResult.vs_equal_weight?.sharpe_improvement}`, 'sharpe'],
                 ].map(([l,v,tip]) => (
@@ -288,7 +288,7 @@ export default function Optimizer() {
                 ))}
               </div>
               <div className="card">
-                <h3 className="font-semibold mb-3">Optimised Weights
+                <h3 className="font-semibold mb-3">Optimised Weights<span className="block text-[11px] font-normal text-green-400/80 mt-0.5">Optimised for: {target === 'max_sharpe' ? 'Maximise Sharpe Ratio' : target === 'min_variance' ? 'Minimise Variance' : target}</span>
                   <span className="block text-[11px] font-normal text-gray-500 mt-0.5">
                     Optimal for this objective under these estimates — not a universally
                     best portfolio. Change the window or the objective and these move.
@@ -303,7 +303,7 @@ export default function Optimizer() {
                   <p><b>The numbers:</b> each % is how much of your money to put in that stock. A higher
                     "Sharpe ratio" means a better return-for-risk trade-off. We compared it to a plain
                     equal split to show the improvement.</p>
-                  <p className="text-yellow-300/90"><b>Important — what "Expected Return" means here:</b> it's
+                  <p className="text-yellow-300/90"><b>Important — what "Historical avg return" means here:</b> it's
                     the stock's <i>past average return</i> over this period, not a forecast. So if a stock
                     recently fell, its "expected return" can be <i>negative</i> — Markowitz naively assumes
                     fallen stocks keep falling. That's the famous weakness of this method. For sensible,
@@ -320,8 +320,8 @@ export default function Optimizer() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {[
-                  ['Expected Return', `${hrpResult.expected_annual_return_pct}%`, null],
-                  ['Expected Bumpiness', `${hrpResult.expected_annual_vol_pct}%`, 'volatility'],
+                  ['Historical avg return', `${hrpResult.expected_annual_return_pct}%`, null],
+                  ['Historical volatility', `${hrpResult.expected_annual_vol_pct}%`, 'volatility'],
                   ['Sharpe Ratio',    hrpResult.expected_sharpe, 'sharpe'],
                 ].map(([l,v,tip]) => (
                   <div key={l} className="card-sm">
@@ -339,7 +339,7 @@ export default function Optimizer() {
                 <div className="mt-3 p-3 bg-gray-800 rounded-lg">
                   <p className="text-xs text-gray-300">{hrpResult.interpretation}</p>
                 </div>
-                <p className="text-xs text-yellow-300/80 mt-2">Note: "Expected Return" is the past average
+                <p className="text-xs text-yellow-300/80 mt-2">Note: "Historical avg return" is the past average
                   over this period (not a forecast) — it can be negative if these stocks recently fell.
                   Use Black-Litterman for market-based expected returns.</p>
               </div>
@@ -350,8 +350,8 @@ export default function Optimizer() {
           {rpResult && !rpResult.error && (
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {[['Expected Return', `${rpResult.expected_annual_return_pct}%`, null],
-                  ['Expected Bumpiness', `${rpResult.expected_annual_vol_pct}%`, 'volatility'],
+                {[['Historical avg return', `${rpResult.expected_annual_return_pct}%`, null],
+                  ['Historical volatility', `${rpResult.expected_annual_vol_pct}%`, 'volatility'],
                   ['Sharpe Ratio', rpResult.expected_sharpe, 'sharpe']].map(([l,v,tip]) => (
                   <div key={l} className="card-sm"><p className="stat-label">{l}{tip && <InfoTip k={tip}/>}</p><p className="stat-value">{v}</p></div>
                 ))}
@@ -366,7 +366,7 @@ export default function Optimizer() {
                 ))}
                 <div className="mt-3 p-3 bg-gray-800 rounded-lg"><p className="text-xs text-gray-300">{rpResult.interpretation}</p></div>
                 <p className="text-xs text-yellow-300/80 mt-2">Note: Risk Parity uses only the
-                  covariance matrix — it never looks at returns. "Expected Return" here is the past
+                  covariance matrix — it never looks at returns. "Historical avg return" here is the past
                   average over this period (not a forecast) and can be negative if these stocks fell;
                   it is a description, not something this algorithm optimised for.</p>
               </div>
@@ -377,8 +377,8 @@ export default function Optimizer() {
           {mdResult && !mdResult.error && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                {[['Expected Return', `${mdResult.expected_annual_return_pct}%`, null],
-                  ['Expected Bumpiness', `${mdResult.expected_annual_vol_pct}%`, 'volatility'],
+                {[['Historical avg return', `${mdResult.expected_annual_return_pct}%`, null],
+                  ['Historical volatility', `${mdResult.expected_annual_vol_pct}%`, 'volatility'],
                   ['Sharpe Ratio', mdResult.expected_sharpe, 'sharpe'],
                   ['Diversification Ratio', mdResult.diversification_ratio, null]].map(([l,v,tip]) => (
                   <div key={l} className="card-sm"><p className="stat-label">{l}{tip && <InfoTip k={tip}/>}</p><p className="stat-value">{v}</p></div>
@@ -389,7 +389,7 @@ export default function Optimizer() {
                 {Object.entries(mdResult.optimal_pct || {}).sort(([,a],[,b])=>b-a).map(([t,w]) => <WeightBar key={t} ticker={t} weight={w} explain={mdResult.explanations?.[t]} />)}
                 <div className="mt-3 p-3 bg-gray-800 rounded-lg"><p className="text-xs text-gray-300">{mdResult.interpretation}</p></div>
                 <p className="text-xs text-yellow-300/80 mt-2">Note: Max Diversification uses only the
-                  covariance matrix — it never looks at returns. "Expected Return" here is the past
+                  covariance matrix — it never looks at returns. "Historical avg return" here is the past
                   average over this period (not a forecast) and can be negative if these stocks fell;
                   it is a description, not something this algorithm optimised for. Use Black-Litterman
                   for market-based expected returns.</p>
@@ -401,7 +401,7 @@ export default function Optimizer() {
           {cvarResult && !cvarResult.error && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                {[['Expected Return', `${cvarResult.expected_annual_return_pct}%`, null],
+                {[['Historical avg return', `${cvarResult.expected_annual_return_pct}%`, null],
                   ['Daily VaR', `${cvarResult.var_daily_pct}%`, 'volatility'],
                   ['Daily CVaR', `${cvarResult.cvar_daily_pct}%`, null],
                   ['Sharpe', cvarResult.expected_sharpe, 'sharpe']].map(([l,v,tip]) => (

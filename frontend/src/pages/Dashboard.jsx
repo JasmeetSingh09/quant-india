@@ -218,11 +218,18 @@ function TrackRecord() {
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
                   <div>
                     <p className="text-[11px] text-gray-500">Hit rate</p>
-                    <p className={`text-lg font-semibold ${
-                      d.hit_rate_pct >= 55 ? 'text-green-400'
-                      : d.hit_rate_pct >= 45 ? 'text-gray-200' : 'text-red-400'}`}>
+                    <p className={`text-base font-medium ${
+                      d.hit_rate_pct >= 55 ? 'text-green-400/90'
+                      : d.hit_rate_pct >= 45 ? 'text-gray-300' : 'text-red-400/90'}`}>
                       {d.hit_rate_pct}%
                     </p>
+                    {/* The uncertainty is set at the same weight as the number,
+                        so "53.8%" cannot be scanned as accuracy on its own. */}
+                    {d.significance && !d.significance.significant_at_5pct && (
+                      <p className="text-[11px] text-amber-300/80 font-medium">
+                        Very uncertain · {d.signals} signals
+                      </p>
+                    )}
                     <p className="text-[10px] text-gray-600">share that {want}</p>
                     {d.significance && (
                       <p className="text-[10px] text-gray-500 mt-0.5"
@@ -280,8 +287,12 @@ function TrackRecord() {
               overlap was doing the work. */}
           {sc.independent_sample?.by_signal && (
             <div className="rounded-lg border border-gray-700 bg-gray-900/40 p-3">
-              <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-2">
-                Non-overlapping windows only · {sc.independent_sample.observations} observations
+              <p className="text-[11px] uppercase tracking-wide text-amber-400/90 mb-1">
+                Preliminary — {sc.independent_sample.observations} independent windows
+              </p>
+              <p className="text-[11px] text-amber-200/70 mb-2 leading-relaxed">
+                Too little independent data to say whether the model has predictive
+                skill. Read the percentages below as noisy, not as accuracy.
               </p>
               <div className="grid grid-cols-2 gap-3">
                 {[['BUY', sc.independent_sample.by_signal.buy, 'rose'],

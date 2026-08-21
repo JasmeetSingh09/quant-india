@@ -16,16 +16,16 @@ import { InfoTip } from '../components/Term'
 import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
-const fmtCap = v => v == null ? '—'
+const fmtCap = v => v == null ? 'Not available'
   : v >= 1e12 ? `₹${(v / 1e12).toFixed(2)}L Cr`
   : v >= 1e7  ? `₹${(v / 1e7).toFixed(1)} Cr`
   : `₹${v.toLocaleString('en-IN')}`
 const num = (v, d = 1) => {
   if (v == null) return '—'
   const n = Number(v)
-  return isNaN(n) ? '—' : n.toFixed(d)
+  return isNaN(n) ? 'Not available' : n.toFixed(d)
 }
-const pct = (v, d = 1) => v == null ? '—' : `${(v * 100).toFixed(d)}%`
+const pct = (v, d = 1) => v == null ? 'Not available' : `${(v * 100).toFixed(d)}%`
 
 // ─── SearchBar ────────────────────────────────────────────────────────────────
 function SearchBar({ onSelect, placeholder }) {
@@ -164,7 +164,7 @@ function BalanceItem({ label, value, highlight }) {
   return (
     <div className="flex flex-col gap-0.5">
       <p className="text-[11px] text-gray-500">{label}</p>
-      <p className={`text-sm font-mono font-semibold ${highlight || 'text-gray-200'}`}>{value ?? '—'}</p>
+      <p className={`text-sm font-mono font-semibold ${highlight || 'text-gray-200'}`}>{value ?? 'Not available'}</p>
     </div>
   )
 }
@@ -208,7 +208,7 @@ function StockBoxCard({ r, onSelect }) {
         </div>
         <div className="text-right shrink-0 ml-2">
           <p className="font-mono font-bold text-sm text-gray-100">
-            {r.price ? `₹${num(r.price, 0)}` : '—'}
+            {r.price ? `₹${num(r.price, 0)}` : 'Not available'}
           </p>
           {r.change_pct != null && (
             <p className={`text-xs font-medium mt-0.5 flex items-center justify-end gap-0.5 ${up ? 'text-green-400' : 'text-red-400'}`}>
@@ -239,19 +239,19 @@ function StockBoxCard({ r, onSelect }) {
         <div className="rounded-lg bg-gray-800/50 px-2 py-1.5">
           <p className="text-[10px] text-gray-500 mb-0.5">ROE %</p>
           <p className={`text-xs font-mono font-semibold ${roePct != null ? (Number(roePct) >= 15 ? 'text-green-400' : 'text-gray-200') : 'text-gray-500'}`}>
-            {roePct != null ? `${roePct}%` : '—'}
+            {roePct != null ? `${roePct}%` : 'Not available'}
           </p>
         </div>
         <div className="rounded-lg bg-gray-800/50 px-2 py-1.5">
           <p className="text-[10px] text-gray-500 mb-0.5">Margin</p>
           <p className="text-xs font-mono font-semibold text-gray-200">
-            {marginPct != null ? `${marginPct}%` : '—'}
+            {marginPct != null ? `${marginPct}%` : 'Not available'}
           </p>
         </div>
         <div className="rounded-lg bg-gray-800/50 px-2 py-1.5">
           <p className="text-[10px] text-gray-500 mb-0.5">Rev Gr</p>
           <p className={`text-xs font-mono font-semibold ${r.revenue_growth != null ? (r.revenue_growth >= 0 ? 'text-green-400' : 'text-red-400') : 'text-gray-500'}`}>
-            {r.revenue_growth != null ? `${(r.revenue_growth * 100).toFixed(1)}%` : '—'}
+            {r.revenue_growth != null ? `${(r.revenue_growth * 100).toFixed(1)}%` : 'Not available'}
           </p>
         </div>
         <div className="rounded-lg bg-gray-800/50 px-2 py-1.5">
@@ -421,7 +421,7 @@ function StocksList({ onSelect }) {
                     <span className="text-gray-500 text-xs block">{r.company_name}</span>
                   </td>
                   <td className="text-gray-400 text-xs">{r.sector?.replace(/_/g, ' ')}</td>
-                  <td className="text-right font-mono">{r.price ? `₹${num(r.price, 0)}` : '—'}</td>
+                  <td className="text-right font-mono">{r.price ? `₹${num(r.price, 0)}` : 'Not available'}</td>
                   <td className="text-right font-mono text-gray-300">{fmtCap(r.market_cap)}</td>
                   <td className="text-right font-mono">{num(r.pe_ratio)}</td>
                   <td className="text-right font-mono text-green-400">{num(r.roe)}</td>

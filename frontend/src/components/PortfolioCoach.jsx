@@ -164,6 +164,49 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
 
       {advice.data && (
         <>
+          {/* One number the reader can act on, with the five that produced it
+              underneath. Labelled by CHARACTER, not quality: a concentrated
+              portfolio is aggressive, not bad, and calling it bad would import
+              a risk preference the app does not know. */}
+          {advice.data.health?.score != null && (
+            <div className={`p-3 rounded-lg border ${
+              advice.data.health.score >= 60 ? 'border-green-800 bg-green-950/25'
+              : advice.data.health.score >= 40 ? 'border-yellow-800 bg-yellow-950/20'
+              : 'border-red-800 bg-red-950/25'}`}>
+              <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                <span className="text-lg font-bold text-gray-100">
+                  {advice.data.health.score}<span className="text-sm text-gray-500 font-normal"> / 100</span>
+                  <span className="ml-2 text-sm font-semibold uppercase tracking-wide text-gray-300">
+                    {advice.data.health.label}
+                  </span>
+                </span>
+                {advice.data.health.biggest_lever && (
+                  <span className="text-[11px] text-gray-400">
+                    Biggest lever: {advice.data.health.biggest_lever.factor.replace(/_/g, ' ')}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-gray-400 mt-1">{advice.data.health.band_note}</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-3 gap-y-1 mt-2">
+                {Object.entries(advice.data.health.components)
+                  .filter(([, c]) => c.score != null)
+                  .map(([k, c]) => (
+                  <div key={k} className="text-[11px]" title={c.note}>
+                    <span className="text-gray-500">{k.replace(/_/g, ' ')}</span>
+                    <span className={`ml-1 font-mono ${
+                      c.score >= 60 ? 'text-green-400'
+                      : c.score >= 40 ? 'text-yellow-400' : 'text-red-400'}`}>
+                      {Math.round(c.score)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-gray-600 mt-2 leading-relaxed">
+                {advice.data.health.means}
+              </p>
+            </div>
+          )}
+
           {/* The comparison most apps leave out. Shown before the findings
               because "you are behind the index" reframes everything below it,
               and shown in red when it is bad rather than quietly in grey. */}

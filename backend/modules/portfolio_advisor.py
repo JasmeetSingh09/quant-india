@@ -402,7 +402,16 @@ def advise(holdings: dict, initial_value: float = 100000,
     except Exception:
         pass
 
+    # A headline the reader can act on, built from findings already measured.
+    try:
+        from portfolio_score import score as _score
+        _hs = _score(w, {"sector_exposure": {k: round(v, 1) for k, v in sectors.items()} if sectors else {},
+                         "downside_pct": downside, "suggestions": tips})
+    except Exception:
+        _hs = None
+
     return {
+        "health": _hs,
         "suggestions": tips,
         "n_suggestions": len(tips),
         "downside_pct": downside,

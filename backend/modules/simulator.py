@@ -710,6 +710,17 @@ def get_simulation_pnl(name: str, user_id: str = "public") -> dict:
         "cash":            round(_cash_bal, 2),
         "total_pnl_inr":   round(total_pnl_inr, 2),
         "total_pnl_pct":   round(total_pnl_pct, 2),
+        # Split so "-Rs 209" is attributable. Without this a user reasonably
+        # concludes their stocks lost money on day one, when the whole figure is
+        # the cost of buying them.
+        "pnl_breakdown": {
+            "market_inr": round(sum(p["pnl_inr"] for p in positions), 2),
+            "costs_inr": round(total_pnl_inr - sum(p["pnl_inr"] for p in positions), 2),
+            "net_inr": round(total_pnl_inr, 2),
+            "note": ("Market is how the holdings moved. Costs are brokerage, STT, "
+                     "stamp duty, GST and estimated impact, plus any rupees that "
+                     "could not buy a whole share."),
+        },
         "overall_status":  "profit" if total_pnl_inr >= 0 else "loss",
         "positions":       positions,
         "best_performer":  positions[0]["ticker"] if positions else None,
