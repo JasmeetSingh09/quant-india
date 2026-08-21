@@ -465,6 +465,9 @@ def start_simulation(
             resolved[t] = (p, nm)
 
     from execution import cost_breakdown, units_for
+    # Kept apart from `failed`: "we could not price this" and "this allocation
+    # cannot buy a share" are different problems with different fixes.
+    too_small = []
     # Costs are genuinely spent; the remainder that could not buy a whole share
     # is still the user's money and becomes the opening cash balance.
     opening_cost = 0.0
@@ -484,7 +487,17 @@ def start_simulation(
         _u = units_for(_spend, price)
         units = _u.get("units", 0) if "error" not in _u else 0
         if units <= 0:
-            failed.append(ticker)
+            # The price fetched fine — this allocation simply cannot buy one
+            # whole share. Reporting it as a price-fetch failure blamed the
+            # user's ticker for something the ticker had nothing to do with,
+            # and told them to check a symbol that was never wrong.
+            _need_pct = price / float(initial_value) * 100 * 1.01
+            too_small.append({
+                "ticker": ticker, "price": round(price, 2),
+                "allocated": round(alloc_value, 2),
+                "min_pct_needed": round(_need_pct, 2),
+                "min_capital_needed": round(price * 100.0 / max(pct, 0.01), 0),
+            })
             continue
         invested_value = units * price
         opening_cost += (_c.get("total_cost", 0.0) if "error" not in _c else 0.0)
@@ -502,10 +515,22 @@ def start_simulation(
             "entry_date":    now,
         })
 
-    if not positions:
-        return {"error": "Could not fetch prices for any ticker. Check symbols."}
     if failed:
         return {"error": f"Could not fetch prices for: {failed}. Check ticker symbols."}
+    if too_small:
+        _t = too_small[0]
+        _name = _t["ticker"].replace(".NS", "")
+        _all = ", ".join(
+            f"{x['ticker'].replace('.NS','')} needs {x['min_pct_needed']:.1f}%"
+            for x in too_small)
+        return {"error": (
+            f"{_name} costs Rs {_t['price']:,.0f} a share, but {_t['allocated']:,.0f} "
+            f"rupees was allocated to it — not enough for one whole share. "
+            f"NSE does not trade fractions. Either raise the weight ({_all}), or "
+            f"increase capital to about Rs {_t['min_capital_needed']:,.0f}."),
+            "too_small": too_small}
+    if not positions:
+        return {"error": "Could not fetch prices for any ticker. Check symbols."}
 
     conn = get_conn()
     try:

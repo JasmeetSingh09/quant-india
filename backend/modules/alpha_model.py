@@ -49,6 +49,10 @@ from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 
+# Bumped whenever a change alters what a score means. Stamped on every
+# result so a stored signal records which model produced it.
+MODEL_VERSION = "alpha-v4-distress-coverage"
+
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 # ---------------------------------------------------------------------------
@@ -730,6 +734,12 @@ def compute_alpha_score(
                       "means the model prefers it more strongly. It is NOT a "
                       "predicted return."),
         },
+        # Version and data timestamp travel WITH the result. Without them a
+        # figure someone screenshotted in August cannot be told apart from one
+        # produced after the model changed in September, and a track record
+        # silently mixes signals from different models.
+        "model_version": MODEL_VERSION,
+        "data_as_of": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "horizon_days": 21,
         "horizon_note": ("This is a short-horizon signal, measured over about 21 "
                          "trading days. It is not a long-term investment view."),

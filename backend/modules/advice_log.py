@@ -31,6 +31,8 @@ def _init_db():
         CREATE TABLE IF NOT EXISTS advice_log (
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
             issued_at     TEXT NOT NULL,
+            model_version TEXT,
+            data_as_of    TEXT,
             portfolio_key TEXT NOT NULL,
             kind          TEXT NOT NULL,
             severity      TEXT,
@@ -56,6 +58,8 @@ if IS_POSTGRES:
                 CREATE TABLE IF NOT EXISTS advice_log (
                     id            SERIAL PRIMARY KEY,
                     issued_at     TEXT NOT NULL,
+                    model_version TEXT,
+                    data_as_of    TEXT,
                     portfolio_key TEXT NOT NULL,
                     kind          TEXT NOT NULL,
                     severity      TEXT,
@@ -87,6 +91,28 @@ def portfolio_key(holdings: dict, user_id: str = None) -> str:
     return hashlib.sha256(payload.encode()).hexdigest()[:24]
 
 
+def _add_audit_columns():
+    """
+    Backfill the audit columns onto an existing log.
+
+    Own connection: a failed ALTER poisons the whole transaction on Postgres.
+    Older rows keep NULL, which is the honest record — they genuinely were not
+    stamped, and inventing a version for them would defeat the purpose.
+    """
+    for col in ("model_version TEXT", "data_as_of TEXT"):
+        conn = get_conn()
+        try:
+            if IS_POSTGRES:
+                conn.execute(f"ALTER TABLE advice_log ADD COLUMN IF NOT EXISTS {col}")
+            else:
+                conn.execute(f"ALTER TABLE advice_log ADD COLUMN {col}")
+            conn.commit()
+        except Exception:
+            pass
+        finally:
+            conn.close()
+
+
 def record(suggestions: list, holdings: dict, downside_pct=None,
            user_id: str = None) -> int:
     """Write one row per suggestion. Never raises — advice must still render if
@@ -95,8 +121,14 @@ def record(suggestions: list, holdings: dict, downside_pct=None,
         return 0
     try:
         _init_db()
+        _add_audit_columns()
         key = portfolio_key(holdings, user_id)
         now = datetime.now().isoformat()
+        try:
+            from alpha_model import MODEL_VERSION as _mv
+        except Exception:
+            _mv = None
+        _asof = datetime.now().strftime("%Y-%m-%d %H:%M")
         conn = get_conn()
         n = 0
         for s in suggestions:
@@ -108,9 +140,10 @@ def record(suggestions: list, holdings: dict, downside_pct=None,
                 conn.execute(
                     "INSERT INTO advice_log (issued_at, portfolio_key, kind, severity, "
                     "trigger_value, downside_pct, n_holdings, followed, outcome_pct, "
-                    "checked_at) VALUES (?,?,?,?,?,?,?,NULL,NULL,NULL)",
+                    "checked_at, model_version, data_as_of) "
+                    "VALUES (?,?,?,?,?,?,?,NULL,NULL,NULL,?,?)",
                     (now, key, s.get("kind", "unknown"), s.get("severity"),
-                     trigger, downside_pct, len(holdings)))
+                     trigger, downside_pct, len(holdings), _mv, _asof))
                 n += 1
             except Exception:
                 continue
@@ -150,6 +183,7 @@ def effectiveness(min_samples: int = 20) -> dict:
     measurable = [k for k in by_kind if (k["times_followed"] or 0) >= min_samples]
     return {
         "total_suggestions": total,
+        "by_model_version": _by_version(),
         "logging_since": since,
         "by_kind": by_kind,
         "verdict": (
@@ -164,3 +198,24 @@ def effectiveness(min_samples: int = 20) -> dict:
             "not help gets removed, the way the debt-to-equity penalty was removed "
             "when testing showed it carried no signal."),
     }
+
+
+def _by_version() -> list:
+    """
+    Suggestions grouped by the model that produced them.
+
+    A track record that mixes models is measuring an average of things that no
+    longer exist. Recording the version is what lets a later claim say WHICH
+    model was tested rather than "the app".
+    """
+    try:
+        _add_audit_columns()
+        conn = get_conn()
+        rows = conn.execute(
+            "SELECT COALESCE(model_version, 'unversioned'), COUNT(*), MIN(issued_at), "
+            "MAX(issued_at) FROM advice_log GROUP BY 1 ORDER BY 2 DESC").fetchall()
+        conn.close()
+        return [{"model_version": r[0], "suggestions": r[1],
+                 "first": r[2], "last": r[3]} for r in rows]
+    except Exception:
+        return []
