@@ -38,7 +38,11 @@ export default class ErrorBoundary extends Component {
     const { error, info } = this.state
     if (!error) return this.props.children
 
-    const label = this.props.name ? `The ${this.props.name} section` : 'This section'
+    // "The page section" read awkwardly because the App-level boundary is named
+    // "page". Panels get "The X panel"; the page-level one says so directly.
+    const label = !this.props.name ? 'This section'
+      : this.props.name === 'page' ? 'This page'
+      : `The ${this.props.name} panel`
 
     return (
       <div className="card border border-red-800/70 bg-red-950/20 space-y-2">
@@ -49,6 +53,11 @@ export default class ErrorBoundary extends Component {
         <p className="text-xs text-gray-400 leading-relaxed">
           Something went wrong rendering this panel. The rest of the page still
           works — nothing you have saved is affected.
+        </p>
+        {/* Shown without needing a click. Someone reporting this should not have
+            to find a toggle before they can tell us anything useful. */}
+        <p className="text-[11px] font-mono text-red-200/80 break-words">
+          {String(error?.message || error)}
         </p>
 
         <div className="flex items-center gap-2 flex-wrap">

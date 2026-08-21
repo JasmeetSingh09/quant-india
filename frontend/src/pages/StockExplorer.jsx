@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
+import ErrorBoundary from '../components/ErrorBoundary'
 import {
   getPrice, getMetrics, getAlphaScore, getSentiment, getStockNews,
   searchStocks, explainAlpha, getIntraday, getVolForecast,
@@ -774,15 +775,18 @@ function StockDetail({ ticker, onBack }) {
               {/* Renders nothing until the universe scan has recorded this
                   ticker, so a stock the scan has not reached yet simply shows
                   no history rather than an empty placeholder. */}
-              <SignalHistory ticker={ticker} />
+              <ErrorBoundary name="signal history"><SignalHistory ticker={ticker} /></ErrorBoundary>
               {/* Everything behind the badge, on one screen: the score and what
                   it is not, data coverage, the driving factor, this stock's own
                   recent signals, and how signals of this kind have actually
                   performed — including when that record is too thin to mean
                   anything. */}
-              <StockContext ticker={ticker} />
-              <SixFactor ticker={ticker} />
-              <WhySignal ticker={ticker} />
+              {/* One boundary per panel, each named. A page-level catch tells you
+                  the page broke; these tell you WHICH panel, which is the
+                  difference between a fix and a search. */}
+              <ErrorBoundary name="what's happening"><StockContext ticker={ticker} /></ErrorBoundary>
+              <ErrorBoundary name="six-factor view"><SixFactor ticker={ticker} /></ErrorBoundary>
+              <ErrorBoundary name="why this signal"><WhySignal ticker={ticker} /></ErrorBoundary>
               {alphaLoading ? <Spinner size="sm" /> : alpha && (
                 <div className="card">
                   <AlphaMeter score={alpha.alpha_score} />
