@@ -74,12 +74,16 @@ record("live simulator adjusts held units for splits",
        f"_split_factor_since exists and INFY since 2000 = "
        f"{_split_factor_since('INFY.NS', '2000-01-01'):.0f}x")
 
-# The two halves treat DIVIDENDS differently, which is a real inconsistency.
+# Both halves must report TOTAL return, or the same portfolio gives two answers.
+from simulator import _dividends_since
+_div = _dividends_since("ITC.NS", "2023-01-01", 100)
+_pnl_src = inspect.getsource(sys.modules["simulator"])
+_credits = "_dividends_since(ticker, entry_date, units)" in _pnl_src
 record("dividend treatment matches across simulators",
-       "GAP",
-       "backtest uses auto_adjust (total return, dividends reinvested); the live "
-       "simulator tracks price only. The same portfolio therefore returns "
-       "different numbers in the two tools. Disclosed in methodology, not aligned.")
+       "CLEAN" if (_credits and _div > 0) else "GAP",
+       f"backtest uses auto_adjust (total return); live simulator credits "
+       f"dividends as cash — ITC pays Rs {_div:,.0f} on 100 units held since "
+       f"2023-01-01. Both now report total return.")
 
 # --------------------------------------------------- 4. return definition
 print("\n4. Return definition")

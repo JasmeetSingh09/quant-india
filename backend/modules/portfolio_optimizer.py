@@ -512,6 +512,12 @@ def mean_variance_optimize(
     # jittered inside their own estimation error to show how much the
     # "optimal" weights actually depend on an input nobody can pin down.
     _mu_shift: list = None,
+    # Cap on total weight in any one sector. Capping each STOCK at 10% still
+    # allows a portfolio that is 90% financials — every position looks
+    # prudent and the portfolio is one bet. This is the constraint that
+    # actually prevents that, and it is separate from max_weight for a
+    # reason: they stop different things.
+    max_sector_pct: float = None,
 ) -> dict:
     """
     Find the portfolio weights that maximise Sharpe ratio (or minimise variance).
@@ -581,6 +587,27 @@ def mean_variance_optimize(
         return val
 
     constraints = [{"type": "eq", "fun": lambda w: np.sum(w) - 1}]
+
+    # One inequality per sector: the weights inside it must not exceed the cap.
+    sector_map = {}
+    if max_sector_pct is not None and 0 < float(max_sector_pct) < 1:
+        try:
+            from portfolio_advisor import _sector_of
+            for idx_t, t in enumerate(valid):
+                sec = _sector_of(t)
+                if sec:
+                    sector_map.setdefault(sec, []).append(idx_t)
+            cap = float(max_sector_pct)
+            for _sec, idxs in sector_map.items():
+                if len(idxs) > 1:
+                    constraints.append({
+                        "type": "ineq",
+                        # SLSQP treats an inequality as satisfied when >= 0.
+                        "fun": (lambda w, _i=tuple(idxs), _c=cap: _c - float(np.sum(w[list(_i)])))
+                    })
+        except Exception:
+            sector_map = {}
+
     bounds      = [(min_weight, max_weight)] * n
     w0          = np.array([1 / n] * n)
 

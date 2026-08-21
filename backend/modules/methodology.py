@@ -30,19 +30,24 @@ TOOLS = {
             "typically delayed, so treat prices as recent rather than real-time."),
         "assumes": [
             "Your order fills instantly at the displayed price, in full.",
-            "No brokerage, STT, stamp duty or slippage is deducted. The historical "
-            "backtest DOES model these; this real-time view does not, so its "
-            "returns are gross and therefore flattering.",
-            "There is no cash account. Adding a position adds fresh capital rather "
-            "than spending a balance, so you cannot run out of money — which is "
-            "convenient and unlike investing.",
-            "Dividends are not paid in. Returns are price returns, not total "
-            "returns.",
+            "Brokerage, STT, stamp duty, exchange and GST are deducted at "
+            "published rates, and price impact is estimated from the stock's own "
+            "daily traded value. Whole shares only — the remainder stays as "
+            "uninvested cash.",
+            "There is still no cash account: adding a position adds fresh capital "
+            "rather than spending a balance, so you cannot run out of money. That "
+            "is convenient and unlike investing, and it is the one piece of "
+            "realism this simulator still lacks.",
+            "Dividends ARE credited as cash since the purchase date, so this "
+            "reports total return and agrees with the historical backtest. They "
+            "are not reinvested, because cash landing in an account is what "
+            "actually happens.",
         ],
         "do_not_conclude": (
-            "That these returns are achievable. A real order pays costs, may not "
-            "fill at the quoted price, and in a thinly traded stock may move the "
-            "price against you. Treat the figure as an upper bound."),
+            "That these returns are achievable exactly. Costs and estimated impact "
+            "are now deducted, but there is no order book here — the fill price is "
+            "modelled, not quoted, and no bid/ask spread is charged. Treat the "
+            "figure as close, not exact."),
     },
 
     "historic_simulator": {
@@ -92,8 +97,16 @@ TOOLS = {
             "are famously sensitive to this input: a difference of a fraction of a "
             "percent in expected return can swing weights dramatically, which is why "
             "shrinkage and weight caps exist.",
-            "No transaction cost or turnover penalty is applied to the suggested "
-            "weights.",
+            "A turnover penalty is available and off by default, so suggested "
+            "weights ignore the cost of trading into them unless you enable it.",
+            "Per-stock and per-sector caps are both available. They stop "
+            "different things: capping each stock at 10% still permits a "
+            "portfolio that is 90% financials.",
+            "Black-Litterman starts from the market's own implied returns and "
+            "shifts them toward your 'views' — a view being a statement that one "
+            "stock will beat another by some amount. The confidence slider "
+            "decides how far the weights move toward that view; at zero "
+            "confidence you get the market portfolio back.",
         ],
         "do_not_conclude": (
             "That this is THE optimal portfolio. It is optimal for one objective "
@@ -117,6 +130,11 @@ TOOLS = {
             "markets change regime; a simulation drawn from a calm period will "
             "understate a turbulent one.",
             "Each path is a draw from the past, not a forecast of the future.",
+            "Correlations between your holdings are whatever they were over the "
+            "lookback, and are held there. This matters most exactly when it is "
+            "least true: correlations converge toward 1 in a crash, so a "
+            "diversified portfolio behaves like a concentrated one on the days "
+            "the simulation is supposed to be warning you about.",
         ],
         "do_not_conclude": (
             "That the 5th percentile is your worst case. It is the worst case IN "

@@ -244,6 +244,58 @@ def _split_factor_since(ticker: str, entry_date) -> float:
     return factor
 
 
+_DIV_CACHE: dict = {}
+_DIV_TTL = 6 * 3600
+
+
+def _dividends_since(ticker: str, entry_date, units: float) -> float:
+    """
+    Cash dividends paid on a holding since it was bought.
+
+    The backtest uses split- and dividend-adjusted prices, so it reports TOTAL
+    return. The live simulator tracked price only, so the same portfolio gave two
+    different answers in two halves of the same product — and the half users
+    spend most time in was the one understating income.
+
+    Paid as cash rather than reinvested: that is what actually lands in a demat
+    account, and silently reinvesting would overstate returns in the other
+    direction.
+
+    Returns 0.0 on any failure. A dividend that cannot be verified must not be
+    credited.
+    """
+    import time
+    if not ticker or not entry_date or not units:
+        return 0.0
+    key = (ticker, str(entry_date)[:10])
+    hit = _DIV_CACHE.get(key)
+    now = time.time()
+    total = None
+    if hit and now - hit[0] < _DIV_TTL:
+        total = hit[1]
+    if total is None:
+        total = 0.0
+        try:
+            import yfinance as yf
+            import pandas as pd
+            div = yf.Ticker(ticker).dividends
+            if div is not None and len(div):
+                d0 = pd.Timestamp(str(entry_date)[:10])
+                idx = div.index
+                try:
+                    if getattr(idx, "tz", None) is not None:
+                        d0 = d0.tz_localize(idx.tz)
+                except Exception:
+                    pass
+                total = float(div[idx > d0].sum())
+        except Exception:
+            total = 0.0
+        if len(_DIV_CACHE) > 2000:
+            _DIV_CACHE.clear()
+        _DIV_CACHE[key] = (now, total)
+    return float(total) * float(units)
+
+
 def _live_price(ticker: str) -> float | None:
     """
     Fetch the latest price for a ticker.
@@ -525,7 +577,11 @@ def get_simulation_pnl(name: str, user_id: str = "public") -> dict:
         # otherwise read as a 50% loss that never happened.
         units = units * _split_factor_since(ticker, entry_date)
         current_value = units * current_price
-        pnl_inr       = current_value - entry_value
+        # Dividends received, as cash. Without this the live simulator reports
+        # price return while the backtest reports total return, so the same
+        # portfolio gives two different answers in one product.
+        dividends_inr = _dividends_since(ticker, entry_date, units)
+        pnl_inr       = (current_value + dividends_inr) - entry_value
         pnl_pct       = (pnl_inr / entry_value) * 100 if entry_value else 0
 
         total_current += current_value
@@ -541,6 +597,7 @@ def get_simulation_pnl(name: str, user_id: str = "public") -> dict:
             "entry_value":   round(entry_value, 2),
             "current_value": round(current_value, 2),
             "pnl_inr":       round(pnl_inr, 2),
+            "dividends_inr": round(dividends_inr, 2),
             "pnl_pct":       round(pnl_pct, 2),
             "status":        "profit" if pnl_inr >= 0 else "loss",
         })
@@ -794,7 +851,7 @@ def remove_position(sim_name: str, ticker: str, user_id: str = "public") -> dict
     # otherwise read as a 50% loss that never happened.
     units = units * _split_factor_since(ticker, entry_date)
     current_value = units * current_price
-    realized_pnl  = current_value - entry_value
+    realized_pnl  = (current_value + _dividends_since(ticker, entry_date, units)) - entry_value
     new_init      = max(sim[0] - entry_value, 0.0)
 
     conn.execute("DELETE FROM sim_positions WHERE sim_name = ? AND ticker = ? AND user_id = ?",

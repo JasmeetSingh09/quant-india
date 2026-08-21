@@ -279,6 +279,8 @@ class MVORequest(BaseModel):
     risk_free_pct: float = 6.5     # RBI repo proxy; users can pick G-Sec/custom
     current_weights: dict = None   # {ticker: weight%} of the portfolio you hold now
     turnover_lambda: float = 0.0   # >0 penalises trading away from current_weights
+    # Capping each STOCK still allows 90% in one sector. This caps the sector.
+    max_sector_pct: float = None
 
 class BLRequest(BaseModel):
     tickers: list
@@ -1552,6 +1554,7 @@ def optimizer_mvo(req: MVORequest):
         target=req.target, min_weight=req.min_weight, max_weight=req.max_weight,
         risk_free_pct=req.risk_free_pct,
         current_weights=req.current_weights, turnover_lambda=req.turnover_lambda,
+                                  max_sector_pct=req.max_sector_pct,
     )
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
