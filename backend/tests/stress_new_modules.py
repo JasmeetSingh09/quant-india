@@ -594,6 +594,31 @@ else:
     ok(True, "cash tests skipped — could not start a simulation offline")
 
 
+# Survivorship: the correction must never claim more depth than it has.
+from survivorship import coverage as _sv_cov, universe_as_of, check_portfolio, measure_bias
+
+_cov = _sv_cov()
+ok("days" in _cov and "usable" in _cov, "coverage reports its own depth")
+ok(_cov["usable"] is (_cov["days"] >= 2), "usable follows from stored days, not optimism")
+
+_early = check_portfolio(["RELIANCE.NS"], "1990-01-01")
+ok(_early["checked"] is False, "a start date before stored history is not silently checked")
+ok("uncorrected" in _early["note"] or "cannot" in _early["note"],
+   "and says the bias remains rather than implying a clean result")
+
+ok(universe_as_of("1990-01-01") == set(), "no universe before coverage begins")
+_u = universe_as_of(_cov.get("latest") or "2026-08-13")
+ok(isinstance(_u, set), "universe_as_of returns a set")
+if _cov.get("usable") or _u:
+    ok(len(_u) > 100, f"a stored day names a full universe ({len(_u)} symbols)")
+
+_b = measure_bias(_cov.get("earliest") or "2026-08-13")
+ok("measured" in _b, "bias measurement always reports whether it ran")
+if _b.get("measured"):
+    ok(_b["delisted_since"] >= 0, "delisted count is never negative")
+    ok(_b["listed_then"] > 0, "a measured day has a non-empty universe")
+
+
 # ============================ REPORT ==================================
 print("\n" + "=" * 60)
 print(f"TOTAL CHECKS: {checks}")

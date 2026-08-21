@@ -1208,6 +1208,25 @@ def sim_buy_from_cash(name: str, req: BuyRequest, user_id: str = Depends(current
     return r
 
 
+@app.get("/survivorship")
+def survivorship_report(as_of: str = Query(None, description="YYYY-MM-DD")):
+    """
+    How many listed companies have since vanished — the size of the bias.
+
+    Built from NSE's own daily files, each of which names exactly who traded
+    that day, including firms that later delisted. Depth is bounded by how much
+    history is stored, and the response says how much that is.
+    """
+    from survivorship import measure_bias, coverage
+    cov = coverage()
+    if not as_of:
+        as_of = cov.get("earliest") or ""
+    if not as_of:
+        return {"measured": False, "coverage": cov,
+                "note": "No point-in-time history stored yet."}
+    return measure_bias(as_of)
+
+
 @app.get("/execution/preview")
 def execution_preview(ticker: str = Query(...), amount: float = Query(..., gt=0)):
     """

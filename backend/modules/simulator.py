@@ -1345,6 +1345,15 @@ def backtest(
 
     cum_port = (1 + port_daily).cumprod() * initial_value
 
+    # Which of these actually existed at the start? A holding that listed later
+    # is quietly started mid-period, which flatters the result and is invisible.
+    survivorship = None
+    try:
+        from survivorship import check_portfolio
+        survivorship = check_portfolio(list(port_weights), start_date)
+    except Exception:
+        survivorship = None
+
     # ── In-sample / Out-of-sample split ──────────────────────────────────
     split_idx    = int(len(port_daily) * out_of_sample_split)
     is_returns   = port_daily.iloc[:split_idx]
@@ -1491,6 +1500,10 @@ def backtest(
         "monthly_returns":   monthly_data,
         "portfolio_chart":   daily_chart,
         "benchmark":         benchmark,
+        # Reported alongside the result, not in a footnote: a backtest whose
+        # holdings did not all exist at the start is measuring something
+        # other than what it claims.
+        "survivorship":      survivorship,
         "significance_test": significance,
         "tickers_used":      port_tickers,
         "missing_tickers":   [t for t in tickers if t not in port_tickers],
