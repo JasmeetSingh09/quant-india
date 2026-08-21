@@ -410,6 +410,32 @@ ok(len(_non_overlapping(daily_one, 21)) <= len(daily_one),
    "independent count never exceeds observations")
 
 
+# Significance: must be able to REFUTE, and must never call a small sample
+# significant just because the percentage looks good.
+from prediction_tracker import _significance
+
+r = _significance(7, 13)
+ok(r["significant_at_5pct"] is False, "54% of 13 is not significant")
+ok(r["ci95_high_pct"] - r["ci95_low_pct"] > 40,
+   "a 13-observation interval is reported as very wide")
+ok("not evidence of skill" in r["plain"], "small sample says so in plain words")
+
+ok(_significance(55, 100)["significant_at_5pct"] is False, "55% of 100 is not significant")
+ok(_significance(600, 1000)["significant_at_5pct"] is True, "60% of 1000 is significant")
+ok(_significance(500, 1000)["significant_at_5pct"] is False, "exactly 50% is never significant")
+
+# Wilson interval must stay inside [0, 100] at the extremes.
+for hits, n in ((0, 5), (5, 5), (0, 2), (2, 2), (1, 3)):
+    x = _significance(hits, n)
+    ok(0 <= x["ci95_low_pct"] <= 100 and 0 <= x["ci95_high_pct"] <= 100,
+       f"interval stays in range for {hits}/{n}")
+    ok(x["ci95_low_pct"] <= x["ci95_high_pct"], f"interval ordered for {hits}/{n}")
+
+ok(_significance(0, 0) is None, "no observations -> no test")
+ok(_significance(1, 1) is None, "a single observation -> no test")
+ok(_significance(None, 10) is None, "missing hit count -> no test")
+
+
 # ============================ REPORT ==================================
 print("\n" + "=" * 60)
 print(f"TOTAL CHECKS: {checks}")

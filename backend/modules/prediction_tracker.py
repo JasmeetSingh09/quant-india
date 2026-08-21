@@ -355,6 +355,60 @@ def evaluate(min_days: int = 7) -> dict:
     return {"scorecard": scorecard, "predictions": sorted(records, key=lambda r: r["date"])}
 
 
+def _significance(hits: int, n: int) -> dict | None:
+    """
+    Is this hit rate distinguishable from a coin flip?
+
+    A hit rate without a test invites the reader to supply their own, and people
+    are famously bad at it: 54% of 13 looks like an edge, and it is seven out of
+    thirteen, which is what a fair coin does constantly.
+
+    Two-sided binomial test against p=0.5, plus a Wilson interval — Wilson
+    because the textbook normal interval misbehaves at small n and near the
+    extremes, which is exactly the regime this record lives in.
+
+    Reported so it can refute rather than support. The expected answer here is
+    "not significant", and that is the useful finding, not a disappointing one.
+    """
+    if not n or n < 2 or hits is None:
+        return None
+    import math
+    try:
+        from scipy import stats
+        p = float(stats.binomtest(hits, n, 0.5).pvalue)
+    except Exception:
+        # Normal approximation with continuity correction — adequate for a
+        # figure we expect to report as "not significant" anyway.
+        z0 = (abs(hits - n / 2) - 0.5) / (math.sqrt(n) / 2)
+        p = max(0.0, min(1.0, math.erfc(max(z0, 0.0) / math.sqrt(2))))
+
+    phat = hits / n
+    z = 1.959963985
+    denom = 1 + z * z / n
+    centre = (phat + z * z / (2 * n)) / denom
+    half = z * math.sqrt(phat * (1 - phat) / n + z * z / (4 * n * n)) / denom
+    lo, hi = max(0.0, centre - half), min(1.0, centre + half)
+
+    sig = p < 0.05
+    return {
+        "hits": hits,
+        "n": n,
+        "p_value": round(p, 4),
+        "significant_at_5pct": sig,
+        "ci95_low_pct": round(lo * 100, 1),
+        "ci95_high_pct": round(hi * 100, 1),
+        "test": "two-sided binomial vs 50%, Wilson 95% interval",
+        "plain": (
+            f"{hits} correct out of {n}. A fair coin produces a result this "
+            f"extreme about {p * 100:.0f}% of the time, so this is not evidence "
+            f"of skill — the true rate could plausibly be anywhere from "
+            f"{lo * 100:.0f}% to {hi * 100:.0f}%."
+            if not sig else
+            f"{hits} of {n} correct (p = {p:.3f}), which is unlikely from chance "
+            f"alone. One test on one sample is still not a validated edge."),
+    }
+
+
 def _side_stats(rows, wants_down):
     """
     Metrics for one side of the signal.
@@ -372,6 +426,7 @@ def _side_stats(rows, wants_down):
     hits = sum(1 for v in r if (v < 0 if wants_down else v > 0))
     return {
         "signals": len(r),
+        "significance": _significance(hits, len(r)),
         "avg_return_pct": round(float(np.mean(r)), 2),
         "median_return_pct": round(float(np.median(r)), 2),
         # "Right" means the direction the signal called, not "went up".

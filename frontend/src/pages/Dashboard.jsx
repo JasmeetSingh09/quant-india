@@ -224,6 +224,18 @@ function TrackRecord() {
                       {d.hit_rate_pct}%
                     </p>
                     <p className="text-[10px] text-gray-600">share that {want}</p>
+                    {d.significance && (
+                      <p className="text-[10px] text-gray-500 mt-0.5"
+                         title={d.significance.plain}>
+                        95% CI {d.significance.ci95_low_pct}–{d.significance.ci95_high_pct}%
+                        {' · '}
+                        <span className={d.significance.significant_at_5pct
+                          ? 'text-green-400' : 'text-gray-500'}>
+                          {d.significance.significant_at_5pct
+                            ? `p=${d.significance.p_value}` : 'not significant'}
+                        </span>
+                      </p>
+                    )}
                   </div>
                   <div>
                     <p className="text-[11px] text-gray-500">Avg return</p>
@@ -463,6 +475,21 @@ export default function Dashboard() {
           Everything else is context and sits below the fold, because a page
           that shows nine things equally urgently shows nothing. */}
 
+      {/* Market context and the user's own portfolios lead, as requested — the
+          two things someone checks first on arriving. The model's own three
+          questions follow directly underneath. */}
+      <div>
+        <div className="flex items-baseline justify-between gap-3 mb-3 flex-wrap">
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Nifty 50 — Top Holdings</h2>
+          <NiftyLevel />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {NIFTY_STOCKS.map(t => <PriceTag key={t} ticker={t} />)}
+        </div>
+      </div>
+
+      <Leaderboard n={5} />
+
       {/* 1. What is the market doing? */}
       <RegimeBanner regime={regime} loading={regimeLoading} />
 
@@ -475,20 +502,6 @@ export default function Dashboard() {
 
       {/* Asked once, then never again — see the component. */}
       <EmailOptIn />
-
-      <Leaderboard n={5} />
-
-      {/* Market context. Below the three questions because it informs a
-          decision rather than driving one. */}
-      <div>
-        <div className="flex items-baseline justify-between gap-3 mb-3 flex-wrap">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Nifty 50 — Top Holdings</h2>
-          <NiftyLevel />
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {NIFTY_STOCKS.map(t => <PriceTag key={t} ticker={t} />)}
-        </div>
-      </div>
 
 
 
