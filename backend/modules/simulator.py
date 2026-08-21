@@ -192,6 +192,58 @@ def _rebuild_if_global_unique(conn, table: str, columns_ddl: str, columns_csv: s
 # Price helpers
 # ---------------------------------------------------------------------------
 
+_SPLIT_CACHE: dict = {}
+_SPLIT_TTL = 6 * 3600
+
+
+def _split_factor_since(ticker: str, entry_date) -> float:
+    """
+    Cumulative share multiplier from splits and bonus issues since entry.
+
+    A position is stored as fixed units bought at an entry price, and valued as
+    units x current price. That holds until the company splits its stock: the
+    price halves in a 1:2 split, the stored units do not, and the simulator
+    reports a 50% loss that never happened. Bonus issues do the same, and in
+    this market they are common enough that this is not an edge case.
+
+    Returns 1.0 on any failure — never a number that would silently rewrite a
+    portfolio on bad data.
+    """
+    import time
+    if not ticker or not entry_date:
+        return 1.0
+    key = (ticker, str(entry_date)[:10])
+    hit = _SPLIT_CACHE.get(key)
+    now = time.time()
+    if hit and now - hit[0] < _SPLIT_TTL:
+        return hit[1]
+
+    factor = 1.0
+    try:
+        import yfinance as yf
+        import pandas as pd
+        splits = yf.Ticker(ticker).splits
+        if splits is not None and len(splits):
+            d0 = pd.Timestamp(str(entry_date)[:10])
+            idx = splits.index
+            try:
+                if getattr(idx, "tz", None) is not None:
+                    d0 = d0.tz_localize(idx.tz)
+            except Exception:
+                pass
+            for r in splits[idx > d0].values:
+                r = float(r)
+                if r > 0:
+                    factor *= r
+    except Exception:
+        factor = 1.0
+
+    if len(_SPLIT_CACHE) > 2000:
+        _SPLIT_CACHE.clear()
+    _SPLIT_CACHE[key] = (now, factor)
+    return factor
+
+
 def _live_price(ticker: str) -> float | None:
     """
     Fetch the latest price for a ticker.
@@ -468,6 +520,10 @@ def get_simulation_pnl(name: str, user_id: str = "public") -> dict:
         if current_price is None:
             current_price = entry_price   # fallback
 
+        # Adjusted for splits and bonuses since entry: a 1:2 split
+        # halves the price while stored units stay put, which would
+        # otherwise read as a 50% loss that never happened.
+        units = units * _split_factor_since(ticker, entry_date)
         current_value = units * current_price
         pnl_inr       = current_value - entry_value
         pnl_pct       = (pnl_inr / entry_value) * 100 if entry_value else 0
@@ -676,14 +732,14 @@ def remove_position(sim_name: str, ticker: str, user_id: str = "public") -> dict
         conn.close()
         return {"error": f"Simulation '{sim_name}' not found"}
     pos = conn.execute(
-        "SELECT units, entry_price, entry_value FROM sim_positions WHERE sim_name = ? AND ticker = ? AND user_id = ?",
+        "SELECT units, entry_price, entry_value, entry_date FROM sim_positions WHERE sim_name = ? AND ticker = ? AND user_id = ?",
         (sim_name, ticker, user_id)
     ).fetchone()
     if not pos:
         conn.close()
         return {"error": f"{ticker} is not in this simulation."}
 
-    units, entry_price, entry_value = pos
+    units, entry_price, entry_value, entry_date = pos
     n_positions = conn.execute(
         "SELECT COUNT(*) FROM sim_positions WHERE sim_name = ? AND user_id = ?", (sim_name, user_id)
     ).fetchone()[0]
@@ -692,6 +748,10 @@ def remove_position(sim_name: str, ticker: str, user_id: str = "public") -> dict
         return {"error": "Can't remove the last holding — delete the whole simulation instead."}
 
     current_price = _live_price(ticker) or entry_price
+    # Adjusted for splits and bonuses since entry: a 1:2 split
+    # halves the price while stored units stay put, which would
+    # otherwise read as a 50% loss that never happened.
+    units = units * _split_factor_since(ticker, entry_date)
     current_value = units * current_price
     realized_pnl  = current_value - entry_value
     new_init      = max(sim[0] - entry_value, 0.0)

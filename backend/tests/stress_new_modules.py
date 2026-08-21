@@ -473,6 +473,19 @@ ok(_simulate_with_drift(_nan, _w, "quarterly", True).notna().all(),
    "a missing return does not poison the series")
 
 
+# Corporate actions: a split must not read as a loss.
+from simulator import _split_factor_since
+
+ok(_split_factor_since("", "2024-01-01") == 1.0, "no ticker -> no adjustment")
+ok(_split_factor_since("TCS.NS", None) == 1.0, "no entry date -> no adjustment")
+ok(_split_factor_since("NOTAREALTICKER9Z.NS", "2020-01-01") == 1.0,
+   "unknown ticker fails safe at 1.0, never rewrites a portfolio")
+_f = _split_factor_since("INFY.NS", "2000-01-01")
+ok(_f >= 1.0, "cumulative split factor is never below 1")
+ok(_split_factor_since("RELIANCE.NS", "2099-01-01") == 1.0,
+   "a future entry date has no splits after it")
+
+
 # ============================ REPORT ==================================
 print("\n" + "=" * 60)
 print(f"TOTAL CHECKS: {checks}")
