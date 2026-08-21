@@ -257,8 +257,10 @@ def compute_v2(ticker: str, v1_result: dict = None) -> dict:
         "evidence_status": "experimental",
         "evidence_note": (
             "This model has NOT been shown to predict returns. Its largest tested "
-            "factor, momentum, produced no edge across 12 walk-forward "
-            "configurations after correcting for multiple testing. Treat every "
+            "factor, momentum, did not demonstrate a statistically significant "
+            "edge across 12 walk-forward configurations after correcting for "
+            "multiple testing. That is a result about this implementation on "
+            "this universe, not a claim that momentum never works. Treat every "
             "score as a research output, not a recommendation."),
         "score_scale": {"range": [-100, 100],
                         "means": "Model preference, not a predicted return."},

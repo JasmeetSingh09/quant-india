@@ -19,7 +19,7 @@ const FEATURES = [
   { icon: PlayCircle, title: '5. Paper-trade it, risk-free',
     desc: 'Track your portfolio against real prices with no real money. Come back in a week and find out what actually happened.' },
   { icon: History, title: 'And we show our own scorecard',
-    desc: "Our model's past calls are published with their real returns — including the periods where it showed no edge at all. Nobody else does this, and it is the reason you can trust the other numbers." },
+    desc: "Our model's past calls are published with their real returns — including the periods where it has not demonstrated an edge. Nobody else does this, and it is the reason you can trust the other numbers." },
 ]
 
 export default function Landing() {

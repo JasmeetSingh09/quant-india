@@ -86,8 +86,9 @@ export default function WhySignal({ ticker }) {
           it reads as a tested recommendation, which this is not. */}
       <p className="text-[11px] text-amber-200/85 border-l-2 border-amber-700/70 pl-2.5 leading-relaxed">
         <b>Experimental.</b> This model has not been shown to predict returns. Its
-        only tested factor produced no edge across 12 walk-forward configurations
-        after correcting for multiple testing.
+        only tested factor has not demonstrated a statistically significant edge
+        across 12 walk-forward configurations after correcting for multiple
+        testing — a result about this implementation, not about the factor.
       </p>
 
       {/* What the score is, stated with what it is not. */}

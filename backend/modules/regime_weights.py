@@ -6,11 +6,12 @@ drawdown, momentum more in a trending market. The implementation here is
 deliberately cautious, because the evidence to set these weights does not exist
 yet on this universe.
 
-What the walk-forward test found: momentum showed NO edge across 42
-non-overlapping 21-day windows — mean spread 0.029%, win rate exactly 50%,
-p = 1.0. If the factor that carries the largest weight cannot be shown to
-separate winners from losers unconditionally, then tilting toward it in a bull
-market is a guess dressed as a rule.
+What the walk-forward test found: momentum did not demonstrate a
+statistically significant edge across 42 non-overlapping 21-day windows —
+mean spread 0.029%, win rate exactly 50%, p = 1.0. That is a statement about
+this implementation on this universe, not about momentum in general. But if a
+factor has not been shown to separate winners from losers here, tilting toward
+it in a bull market is still a guess dressed as a rule.
 
 So this ships as a PROPOSAL rather than a default. It computes what the weights
 would become, shows them beside the fixed ones, and states plainly that the
@@ -101,8 +102,9 @@ def proposed_weights(regime: str = None) -> dict:
         "active": False,
         "why_not_active": (
             "These tilts are conventional priors, not measured on this universe. "
-            "The walk-forward test found momentum showed no edge at all across 42 "
-            "non-overlapping windows — mean spread 0.03%, win rate exactly 50%. "
+            "The walk-forward test found momentum did not demonstrate a "
+            "significant edge across 42 non-overlapping windows — mean spread "
+            "0.03%, win rate exactly 50%. "
             "Tilting toward a factor that has not been shown to work would be a "
             "guess with extra steps, so this is shown and not applied."),
         "what_would_justify_it": (
