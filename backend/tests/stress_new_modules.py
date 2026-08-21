@@ -534,6 +534,22 @@ ok(estimate_slippage_pct("NOTREAL9Z.NS", 1000)["slippage_pct"] > 0,
    "unknown ticker still charges a nominal impact")
 
 
+# Market hours must be evaluated in IST regardless of where the server runs.
+# Render is UTC; using the host clock made "open" span 14:45-21:00 IST.
+from datetime import timezone as _tz, timedelta as _td, datetime as _dt
+from execution import market_status as _ms, IST as _IST
+
+_closed = _dt(2026, 8, 21, 11, 0, tzinfo=_tz.utc).astimezone(_IST)   # 16:30 IST
+ok(_ms(_closed)["open"] is False, "16:30 IST is closed (11:00 UTC would have said open)")
+_open = _dt(2026, 8, 21, 6, 0, tzinfo=_tz.utc).astimezone(_IST)      # 11:30 IST
+ok(_ms(_open)["open"] is True, "11:30 IST is open")
+_sat = _dt(2026, 8, 22, 6, 0, tzinfo=_tz.utc).astimezone(_IST)
+ok(_ms(_sat)["open"] is False, "Saturday is closed whatever the hour")
+_early = _dt(2026, 8, 21, 3, 0, tzinfo=_tz.utc).astimezone(_IST)     # 08:30 IST
+ok(_ms(_early)["open"] is False, "08:30 IST is before the open")
+ok("IST" in _ms()["as_of"], "timestamps are labelled IST")
+
+
 # ============================ REPORT ==================================
 print("\n" + "=" * 60)
 print(f"TOTAL CHECKS: {checks}")

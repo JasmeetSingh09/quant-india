@@ -17,7 +17,18 @@ whether an order moves the price — a lakh in Reliance is nothing and a lakh in
 stock that trades three lakh a day is most of the day's volume.
 """
 
-from datetime import datetime, time as _time
+from datetime import datetime, time as _time, timedelta, timezone
+
+# NSE trades in IST. The server does not: Render runs UTC, so datetime.now()
+# there is five and a half hours behind the exchange. Checking market hours
+# against the host clock meant "open" spanned 14:45-21:00 IST — closed all
+# morning and open all evening, exactly inverted for most of a trading day.
+IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def now_ist() -> datetime:
+    """Current time in IST regardless of where this process runs."""
+    return datetime.now(timezone.utc).astimezone(IST)
 
 # Statutory and broker charges on a delivery buy, as fractions of turnover.
 # These are knowable, not estimated: they are published rates.
@@ -43,7 +54,7 @@ def market_status(now: datetime = None) -> dict:
     the click teaches nothing — but it now says the fill is at the last close
     rather than pretending it was live.
     """
-    now = now or datetime.now()
+    now = now or now_ist()
     is_weekday = now.weekday() < 5
     in_hours = MARKET_OPEN <= now.time() <= MARKET_CLOSE
     open_now = bool(is_weekday and in_hours)
