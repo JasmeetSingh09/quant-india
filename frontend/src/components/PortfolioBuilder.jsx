@@ -5,6 +5,7 @@ import { buildPortfolio, startSimulation } from '../api'
 import PageHeader from './PageHeader'
 import Spinner from './Spinner'
 import { Wand2, ShieldCheck, AlertTriangle, PlayCircle } from 'lucide-react'
+import { horizonLabel } from '../horizonLabel'
 
 const RISKS = [
   { key: 'conservative', label: 'Careful',  note: 'Large companies only' },
@@ -79,8 +80,7 @@ export default function PortfolioBuilder({ embedded = false }) {
                    value={form.horizon_months}
                    onChange={e => set('horizon_months', Number(e.target.value))} />
             <p className="text-[11px] text-gray-600 mt-1">
-              {form.horizon_months} months
-              {form.horizon_months >= 12 && ` (${(form.horizon_months / 12).toFixed(1)} years)`}
+              {horizonLabel(form.horizon_months)}
             </p>
           </div>
 

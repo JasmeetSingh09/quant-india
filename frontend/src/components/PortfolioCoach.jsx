@@ -4,6 +4,7 @@ import { advisePortfolio, portfolioScenarios, portfolioWhatIf, trackEvent } from
 import Spinner from './Spinner'
 import { Lightbulb, AlertTriangle, Info, Check, Plus, X } from 'lucide-react'
 import Methodology from './Methodology'
+import { horizonLabel } from '../horizonLabel'
 
 const sevStyle = s =>
   s === 'high'   ? 'border-red-800/60 bg-red-950/30' :
@@ -313,7 +314,7 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
               <input type="range" min="3" max="60" step="3" className="w-full"
                      value={hz} onChange={e => setHz(Number(e.target.value))} />
               <p className="text-[11px] text-gray-600 mt-1">
-                {hz} months{hz >= 12 && ` (${(hz / 12).toFixed(1)} years)`}
+                {horizonLabel(hz)}
               </p>
             </div>
           </div>

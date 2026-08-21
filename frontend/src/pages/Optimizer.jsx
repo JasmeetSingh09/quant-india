@@ -9,6 +9,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { InfoTip } from '../components/Term'
 import Explainer from '../components/Explainer'
 import Methodology from '../components/Methodology'
+import { horizonLabel } from '../horizonLabel'
 
 const DEFAULT_TICKERS = ['HDFCBANK.NS','TCS.NS','RELIANCE.NS','INFY.NS','HINDUNILVR.NS','SBIN.NS']
 
@@ -519,7 +520,7 @@ export default function Optimizer() {
             <input type="range" min="3" max="60" step="3" className="w-full"
                    value={months} onChange={e => setMonths(Number(e.target.value))} />
             <p className="text-[11px] text-gray-600 mt-1">
-              {months} months{months >= 12 && ` (${(months / 12).toFixed(1)} years)`}
+              {horizonLabel(months)}
             </p>
           </div>
         </div>

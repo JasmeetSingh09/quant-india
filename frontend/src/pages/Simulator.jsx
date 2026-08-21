@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import usePersistentState from '../usePersistentState'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { startSimulation, getSimulationPnl, getSimulations, deleteSimulation, runBacktest, getSimHistory, addSimPosition, removeSimPosition } from '../api'
+import { useQueries, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { getPrice, startSimulation, getSimulationPnl, getSimulations, deleteSimulation, runBacktest, getSimHistory, addSimPosition, removeSimPosition } from '../api'
 import Spinner from '../components/Spinner'
 import PortfolioCoach from '../components/PortfolioCoach'
 import { trackEvent, createShare } from '../api'
@@ -23,10 +23,36 @@ const COMMODITY_PICKS = [
 const COMMODITY_NAME = Object.fromEntries(COMMODITY_PICKS.map(c => [c.ticker, c.name]))
 const labelOf = t => COMMODITY_NAME[t] || t.replace('.NS', '')
 
-function HoldingsInput({ holdings, setHoldings }) {
+function HoldingsInput({ holdings, setHoldings, capital = 100000 }) {
   const [ticker, setTicker] = useState('')
   const [pct, setPct] = useState('')
   const total = Object.values(holdings).reduce((a, b) => a + b, 0)
+
+  // Prices for the chosen tickers, so a weight too small to buy one share can
+  // be caught here rather than on submit. Cached and shared with every other
+  // price lookup, so this adds no fetches of its own.
+  const tickers = Object.keys(holdings)
+  const priceQs = useQueries({
+    queries: tickers.map(t => ({
+      queryKey: ['price', t],
+      queryFn: () => getPrice(t),
+      staleTime: 5 * 60 * 1000,
+      retry: false,
+    })),
+  })
+  const priceMap = Object.fromEntries(
+    tickers.map((t, i) => [t, priceQs[i]?.data?.price ?? priceQs[i]?.data?.current_price])
+  )
+
+  const tooSmall = Object.entries(holdings).map(([t, w]) => {
+    const px = Number(priceMap[t])
+    if (!px || !capital || !w) return null
+    const alloc = Number(capital) * Number(w) / 100
+    if (alloc >= px) return null
+    return { name: t.replace('.NS', ''), price: Math.round(px),
+             pct: Number(w), alloc: Math.round(alloc),
+             needPct: Math.ceil(px / Number(capital) * 10000) / 100 }
+  }).filter(Boolean)
 
   const add = () => {
     if (!ticker || !pct) return
@@ -71,6 +97,31 @@ function HoldingsInput({ holdings, setHoldings }) {
           <p className={`text-xs mt-1 ${Math.abs(total-100)<0.01?'text-green-400':total>100?'text-red-400':'text-yellow-400'}`}>
             Total: {total.toFixed(1)}% {Math.abs(total-100)<0.01 ? '✓' : total>100 ? '(over 100%)' : '(under 100%)'}
           </p>
+        )}
+
+        {/* Caught before Start rather than after. A weight too small to buy one
+            whole share used to fail on submit with a message about the ticker,
+            which sent people to check a symbol that was never wrong. */}
+        {tooSmall.length > 0 && (
+          <div className="mt-2 rounded-lg border border-amber-700/70 bg-amber-900/15 p-2.5">
+            <p className="text-xs text-amber-200 font-medium">
+              {tooSmall.length === 1
+                ? `${tooSmall[0].name} needs a bigger share of the money`
+                : `${tooSmall.length} holdings need a bigger share of the money`}
+            </p>
+            <ul className="mt-1 space-y-0.5">
+              {tooSmall.map(x => (
+                <li key={x.name} className="text-[11px] text-amber-100/80">
+                  {x.name} costs ₹{x.price.toLocaleString('en-IN')} a share, but {x.pct}% of
+                  ₹{Number(capital).toLocaleString('en-IN')} is only ₹{x.alloc.toLocaleString('en-IN')} —
+                  raise it to about <b>{x.needPct}%</b>.
+                </li>
+              ))}
+            </ul>
+            <p className="text-[10px] text-amber-200/60 mt-1">
+              NSE trades whole shares, so an allocation smaller than one share cannot be bought.
+            </p>
+          </div>
         )}
       </div>
     </div>
@@ -242,7 +293,7 @@ export default function Simulator() {
             </div>
             <div>
               <label className="label">Holdings</label>
-              <HoldingsInput holdings={rtHoldings} setHoldings={setRtHoldings} />
+              <HoldingsInput holdings={rtHoldings} setHoldings={setRtHoldings} capital={rtCapital} />
             </div>
 
             {/* Fills the form above — it does not build or start anything. The
@@ -449,7 +500,7 @@ export default function Simulator() {
               </div>
               <div>
                 <label className="label">Holdings</label>
-                <HoldingsInput holdings={htHoldings} setHoldings={setHtHoldings} />
+                <HoldingsInput holdings={htHoldings} setHoldings={setHtHoldings} capital={htCapital} />
               </div>
               <button
                 onClick={() => btMut.mutate({ holdings: htHoldings, start_date: startDate, end_date: endDate, initial_value: htCapital })}
