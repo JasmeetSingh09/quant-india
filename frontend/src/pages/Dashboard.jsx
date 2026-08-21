@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getMCX, getRegime, getMarketNews, getPrice, getPredictionTrack } from '../api'
+import { getMCX, getRegime, getMarketNews, getPrice, getPredictionTrack, getBenchmark } from '../api'
 import Spinner from '../components/Spinner'
 import RegimeBadge from '../components/RegimeBadge'
 import Explainer from '../components/Explainer'
@@ -313,6 +313,74 @@ function TrackRecord() {
   )
 }
 
+/**
+ * RegimeBanner — what the market is doing, readable at a glance.
+ *
+ * The regime was previously a grid of statistics near the bottom of the page,
+ * which buried the one thing a user wants before looking at any signal. The
+ * probability is shown as the model's own words rather than a bare percentage:
+ * a filtered HMM posterior saturates, and printing "100%" reads as "the market
+ * cannot turn", which no model can claim.
+ */
+function RegimeBanner({ regime, loading }) {
+  if (loading || !regime?.current_regime) return null
+  const label = regime.current_regime
+  const tone = label === 'Bull' ? 'green' : label === 'Bear' ? 'red' : 'yellow'
+  const ring = { green: 'border-green-800/60 bg-green-900/15',
+                 red: 'border-red-800/60 bg-red-900/15',
+                 yellow: 'border-yellow-800/60 bg-yellow-900/15' }[tone]
+  const text = { green: 'text-green-400', red: 'text-red-400', yellow: 'text-yellow-400' }[tone]
+  const prob = regime.current_proba_display
+    ?? (regime.current_proba?.[label] != null
+        ? `${(regime.current_proba[label] * 100).toFixed(1)}%` : null)
+
+  return (
+    <div className={`card border ${ring} flex flex-col gap-2`}>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-baseline gap-3">
+          <span className={`text-xl font-bold tracking-tight ${text}`}>{label.toUpperCase()} REGIME</span>
+          {prob && <span className="text-sm text-gray-400 font-mono">{prob} model probability</span>}
+        </div>
+        <span className="text-[11px] text-gray-500 uppercase tracking-wide">
+          3-state Gaussian HMM · Nifty 50
+        </span>
+      </div>
+      {regime.current_proba_note && (
+        <p className="text-xs text-gray-400 leading-relaxed">{regime.current_proba_note}</p>
+      )}
+      <p className="text-[11px] text-gray-600">
+        Describes which regime best explains recent returns. It is not a forecast,
+        and it is not a reason on its own to buy or sell anything.
+      </p>
+    </div>
+  )
+}
+
+/**
+ * NiftyLevel — the benchmark's own state, next to its constituents.
+ *
+ * Showing four individual holdings without the index they belong to leaves the
+ * reader to infer the market's direction from a sample of four.
+ */
+function NiftyLevel() {
+  const { data } = useQuery({
+    queryKey: ['benchmarkToday'],
+    queryFn: () => getBenchmark(5),
+    staleTime: 10 * 60 * 1000,
+    retry: false,
+  })
+  if (!data || data.return_pct == null) return null
+  const up = data.return_pct >= 0
+  return (
+    <span className="text-xs text-gray-400">
+      Nifty 50 (5d){' '}
+      <span className={`font-mono font-semibold ${up ? 'text-green-400' : 'text-red-400'}`}>
+        {up ? '+' : ''}{data.return_pct}%
+      </span>
+    </span>
+  )
+}
+
 export default function Dashboard() {
   const { data: mcx,    isLoading: mcxLoading,    isError: mcxError    } = useQuery({ queryKey: ['mcx'],     queryFn: getMCX,        refetchInterval: 120000 })
   const { data: regime, isLoading: regimeLoading, isError: regimeError } = useQuery({ queryKey: ['regime'],  queryFn: getRegime,     staleTime: 300000 })
@@ -336,29 +404,37 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Nifty 50 stocks */}
-      <div>
-        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Nifty 50 — Top Holdings</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {NIFTY_STOCKS.map(t => <PriceTag key={t} ticker={t} />)}
-        </div>
-      </div>
+      {/* The dashboard answers three questions in order: what is the market
+          doing, what should I look at, and does the model actually work.
+          Everything else is context and sits below the fold, because a page
+          that shows nine things equally urgently shows nothing. */}
+
+      {/* 1. What is the market doing? */}
+      <RegimeBanner regime={regime} loading={regimeLoading} />
+
+      {/* 2. What should I look at? */}
+      <CapTierPicks n={10} />
+
+      {/* 3. Does the model actually work? Directly under the picks on purpose:
+          a signal and its measured track record belong on the same screen. */}
+      <TrackRecord />
 
       {/* Asked once, then never again — see the component. */}
       <EmailOptIn />
 
-      {/* Outcomes first: what the app is FOR — best portfolios, the
-          picks, and whether past picks actually worked. News and
-          commodity prices are context, so they sit below. */}
-      {/* Honest track record of past picks */}
-      {/* Renders nothing until a simulation qualifies, so an empty pilot
-          shows no hollow scaffolding. */}
       <Leaderboard n={5} />
 
-      {/* Top picks per cap tier, from the full 2,401-stock universe scan */}
-      <CapTierPicks n={10} />
-
-      <TrackRecord />
+      {/* Market context. Below the three questions because it informs a
+          decision rather than driving one. */}
+      <div>
+        <div className="flex items-baseline justify-between gap-3 mb-3 flex-wrap">
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Nifty 50 — Top Holdings</h2>
+          <NiftyLevel />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {NIFTY_STOCKS.map(t => <PriceTag key={t} ticker={t} />)}
+        </div>
+      </div>
 
 
 

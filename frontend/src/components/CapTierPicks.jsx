@@ -5,6 +5,13 @@ import { getUniverseTop } from '../api'
 import Spinner from './Spinner'
 import { ArrowUpRight, ArrowDownRight, Sparkles } from 'lucide-react'
 
+// Each factor's contribution is weight x score x 100, and the weights are not
+// equal — so the bars do NOT share one scale. Momentum can reach +/-35 while
+// value tops out at +/-15. Printing a single range would be wrong, and a bar
+// chart whose rows mean different things is worse than no chart, so each row
+// carries its own maximum.
+const FACTOR_MAX = { momentum: 35, sentiment: 25, quality: 25, value: 15 }
+
 const FACTORS = [
   ['momentum',  'Momentum'],
   ['quality',   'Quality'],
@@ -13,7 +20,7 @@ const FACTORS = [
 ]
 
 const TIERS = [
-  { key: 'large_cap', label: 'Large cap', note: 'Top 100 by market cap' },
+  { key: 'large_cap', label: 'Large cap', note: 'Ranks 1–100 by market cap' },
   { key: 'mid_cap',   label: 'Mid cap',   note: 'Ranks 101–250' },
   { key: 'small_cap', label: 'Small cap', note: 'Rank 251+' },
 ]
@@ -42,19 +49,27 @@ function PickCard({ r, buy, onOpen }) {
                : <ArrowDownRight className="text-red-400 shrink-0" size={15} />}
           <span className="font-mono font-bold text-sm truncate">{name}</span>
         </div>
-        <span className={`text-base font-bold font-mono shrink-0 ${buy ? 'text-green-400' : 'text-red-400'}`}>
+        <span title="Alpha score, -100 to +100. Composite of momentum, quality, value and sentiment. Higher means the model prefers it more strongly — it is NOT a predicted return."
+              className={`text-base font-bold font-mono shrink-0 cursor-help ${buy ? 'text-green-400' : 'text-red-400'}`}>
           {score > 0 ? '+' : ''}{score?.toFixed(0)}
         </span>
       </div>
       <div className="flex items-center justify-between text-[11px] mb-2">
-        <span className={`badge-${buy ? 'green' : 'red'}`}>{r.signal}</span>
+        <span title={buy
+                ? 'Model expects outperformance over roughly 21 trading days.'
+                : 'Model expects underperformance — read as avoid or reduce. The model does not model short selling.'}
+              className={`badge-${buy ? 'green' : 'red'} cursor-help`}>
+          {r.signal}{!buy && r.signal?.includes('SELL') ? ' · avoid' : ''}
+        </span>
+        <span className="text-gray-600 text-[10px]">21d</span>
         <span className="text-gray-500" title="How much of the model's input data was available for this stock — not the chance the signal is right.">{Math.round((r.confidence || 0) * 100)}% data</span>
       </div>
       <div className="space-y-1">
         {FACTORS.map(([k, label]) => {
           const v = r.contributions?.[k] ?? 0
           const pos = v >= 0
-          const w = Math.min(Math.abs(v) * 2, 100)
+          const max = FACTOR_MAX[k] || 25
+          const w = Math.min(Math.abs(v) / max * 100, 100)
           return (
             <div key={k} className="flex items-center gap-2 text-[10px]">
               <span className="w-14 text-gray-500 shrink-0">{label}</span>
@@ -69,10 +84,16 @@ function PickCard({ r, buy, onOpen }) {
         })}
       </div>
       {dom && (
-        <p className="mt-1.5 text-[10px] text-gray-600">
+        <p className="mt-1.5 text-[10px] text-gray-600 cursor-help"
+           title={`${dom[0]} contributed ${dom[1] >= 0 ? '+' : ''}${dom[1].toFixed(1)} points — the largest single component of this score. Each factor's bar is scaled to its own maximum, because the weights differ.`}>
           Driven by <span className="text-gray-400">{dom[0]}</span>
+          {' '}<span className="text-gray-500">({dom[1] >= 0 ? '+' : ''}{dom[1].toFixed(0)} pts)</span>
         </p>
       )}
+      {/* The score's range, stated once per card rather than left to inference. */}
+      <p className="text-[9px] text-gray-700 mt-0.5">
+        bars scaled per factor · momentum ±35, quality/sentiment ±25, value ±15
+      </p>
     </button>
   )
 }

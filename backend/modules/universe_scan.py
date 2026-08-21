@@ -360,6 +360,12 @@ def stop_scan() -> dict:
 #
 # Cut-offs track the AMFI bands: large ≈ top 100 (> ₹1,00,000 Cr),
 # mid ≈ ranks 101-250 (₹33,000-1,00,000 Cr), small below that.
+# SEBI's actual definition is positional, not monetary.
+LARGE_CAP_RANK_MAX = 100   # ranks 1-100    -> large cap
+MID_CAP_RANK_MAX   = 250   # ranks 101-250  -> mid cap; 251+ -> small cap
+
+# Kept only so older stored rows and any caller still importing them resolve.
+# Nothing classifies on these any more.
 LARGE_CAP_MIN = 1.00e12   # ₹1,00,000 Cr
 MID_CAP_MIN   = 3.30e11   # ₹33,000 Cr
 
@@ -407,11 +413,23 @@ def top_by_tier(n: int = 10, min_confidence: float = 0.3) -> dict:
         "scanned_at": r[9],
     } for r in rows if (r[3] or 0) >= min_confidence]
 
+    # SEBI defines the tiers by RANK, not by rupee thresholds: the 1st-100th
+    # company by full market cap is large cap, 101st-250th is mid, 251st onward
+    # is small. We were using fixed rupee cut-offs while the interface told users
+    # the opposite — a claim about our own methodology that was simply untrue.
+    #
+    # Rank is also the more durable definition. Fixed thresholds drift with the
+    # market: a rupee band set today silently reclassifies half the exchange
+    # after a big year, whereas "top 100" means the same thing in every market.
+    ranked = sorted([r for r in recs if r.get("market_cap")],
+                    key=lambda r: -(r["market_cap"] or 0))
+    for i, r in enumerate(ranked):
+        r["cap_rank"] = i + 1
+        r["cap_tier"] = ("large" if i < LARGE_CAP_RANK_MAX else
+                         "mid"   if i < MID_CAP_RANK_MAX else "small")
     for r in recs:
-        mc = r.get("market_cap")
-        r["cap_tier"] = ("unknown" if not mc else
-                         "large" if mc >= LARGE_CAP_MIN else
-                         "mid"   if mc >= MID_CAP_MIN else "small")
+        if not r.get("market_cap"):
+            r["cap_tier"], r["cap_rank"] = "unknown", None
 
     def tier_block(tier):
         """Best and worst n within a tier — ranked inside the tier, so a small
