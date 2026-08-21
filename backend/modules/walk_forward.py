@@ -143,13 +143,18 @@ def run(tickers: list = None, start: str = "2022-01-01", horizon_days: int = 21,
         verdict = (f"Momentum separated winners from losers on this universe: the "
                    f"top {top_n} beat the bottom {top_n} by {mean_sp:.2f}% per "
                    f"{horizon_days}-day window across {n} non-overlapping tests "
-                   f"(p = {sig['p_value']:.3f}). One universe and one factor — not "
-                   f"a validated strategy.")
+                   f"(p = {sig['p_value']:.3f}). One universe, one factor and one "
+                   f"period — evidence of an effect here, not a validated strategy "
+                   f"anywhere else.")
     else:
-        verdict = (f"No demonstrated edge. The top {top_n} beat the bottom {top_n} "
-                   f"by {mean_sp:.2f}% per window across {n} tests, which "
+        verdict = (f"Momentum has not demonstrated a statistically significant "
+                   f"edge in our tested configurations. The top {top_n} beat the "
+                   f"bottom {top_n} by {mean_sp:.2f}% per window across {n} tests, "
+                   f"which "
                    f"{'a coin flip produces about ' + format(sig['p_value']*100, '.0f') + '% of the time' if sig else 'is not statistically distinguishable from chance'}. "
-                   f"That is the ordinary result for short-horizon prediction.")
+                   f"This does not prove that momentum cannot work; it means these "
+                   f"configurations did not provide sufficient evidence of "
+                   f"predictive power.")
 
     return {
         "factor": "momentum",

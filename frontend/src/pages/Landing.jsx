@@ -19,7 +19,7 @@ const FEATURES = [
   { icon: PlayCircle, title: '5. Paper-trade it, risk-free',
     desc: 'Track your portfolio against real prices with no real money. Come back in a week and find out what actually happened.' },
   { icon: History, title: 'And we show our own scorecard',
-    desc: "Our model's past calls are published with their real returns — including the periods where it has not demonstrated an edge. Nobody else does this, and it is the reason you can trust the other numbers." },
+    desc: "Our model's past calls are published with their real returns — including the periods where it has not demonstrated a statistically significant edge. Nobody else does this, and it is the reason you can trust the other numbers." },
 ]
 
 export default function Landing() {
@@ -116,7 +116,7 @@ export default function Landing() {
             ['Risk & simulation', 'Monte Carlo by normal, Student-t, i.i.d. and block bootstrap. VaR and CVaR, GARCH(1,1) volatility forecasting, risk decomposition by contribution, and Kelly-based position sizing.'],
             ['Factor research', 'Fama-French three-factor regressions with t-stats, cointegration testing for pairs, seasonality studies and a three-state Gaussian HMM for market regime.'],
             ['Options', 'Black-Scholes-Merton pricing with the full Greeks and risk-neutral probabilities — verified against the textbook case at 10.4506 versus 10.45.'],
-            ['Honesty by construction', 'Momentum backtested point-in-time: a 23%/yr edge collapsed to 11.7% (t 3.78 to 1.50) once survivorship was removed. We publish the corrected number, and the live scorecard, including where it shows no edge.'],
+            ['Honesty by construction', 'Momentum backtested point-in-time: a 23%/yr edge collapsed to 11.7% (t 3.78 to 1.50) once survivorship was removed. We publish the corrected number, and the live scorecard, including where the model has not demonstrated a statistically significant edge.'],
           ].map(([title, desc]) => (
             <div key={title} className="card space-y-2">
               <h3 className="font-semibold text-white text-sm">{title}</h3>

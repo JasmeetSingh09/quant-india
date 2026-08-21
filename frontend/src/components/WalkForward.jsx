@@ -38,6 +38,10 @@ export default function WalkForward() {
             forward so no two test windows overlap. No date ever sees data from
             after itself.
           </p>
+          <p className="text-xs text-gray-500 leading-relaxed mt-1.5">
+            A null result here means we found no evidence of predictive power in the
+            configurations tested. It is not a proof that the factor cannot work.
+          </p>
           <button onClick={() => setRun(true)} className="btn-ghost text-xs">
             Run the test
           </button>

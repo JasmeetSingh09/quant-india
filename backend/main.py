@@ -1300,9 +1300,11 @@ def alpha_compare(ticker: str = Query(...)):
         "v2": {"model_version": v2.get("model_version"), "alpha_score": v2.get("alpha_score"),
                "signal": v2.get("signal"), "factors": list(v2.get("weights_used") or {})},
         "disagreement": v2.get("disagreement"),
-        "note": ("Neither model has demonstrated predictive skill on the current "
-                 "sample. This comparison exists so the track record can settle "
-                 "it, not to imply the six-factor model is better."),
+        "note": ("Neither model has demonstrated a statistically significant edge "
+                 "in our tested configurations. This comparison exists so the "
+                 "track record can eventually settle it, not to imply the "
+                 "six-factor model is better. A difference between two scores is "
+                 "not evidence that either one predicts anything."),
     }
 
 

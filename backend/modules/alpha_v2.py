@@ -70,8 +70,11 @@ WEIGHTS_V2 = {
 # None of this makes the model validated. It makes the weights consistent with
 # what is known, which is a lower bar and the only one currently reachable.
 WEIGHT_NOTES = {
-    "momentum": "Strongest published record, and the only factor computed purely "
-                "from prices — it never waits for a company to report.",
+    "momentum": "Strongest published record elsewhere, and the only factor "
+                "computed purely from prices. It is also the only factor tested on "
+                "THIS universe, where it has not demonstrated a statistically "
+                "significant edge in our tested configurations — which is why its "
+                "weight was cut rather than raised.",
     "quality":  "Profitability and balance-sheet health. Also carries the distress "
                 "veto that stops a nearly-insolvent company scoring as cheap.",
     "growth":   "Revenue and earnings growth. Weighted moderately because fast "
@@ -257,11 +260,12 @@ def compute_v2(ticker: str, v1_result: dict = None) -> dict:
         "evidence_status": "experimental",
         "evidence_note": (
             "This model has NOT been shown to predict returns. Its largest tested "
-            "factor, momentum, did not demonstrate a statistically significant "
-            "edge across 12 walk-forward configurations after correcting for "
-            "multiple testing. That is a result about this implementation on "
-            "this universe, not a claim that momentum never works. Treat every "
-            "score as a research output, not a recommendation."),
+            "factor, momentum, has not demonstrated a statistically significant "
+            "edge in our tested configurations — 12 walk-forward runs, none "
+            "surviving correction for multiple testing. This does not prove that "
+            "momentum cannot work; it means those configurations did not provide "
+            "sufficient evidence of predictive power. Treat every score as a "
+            "research output, not a recommendation."),
         "score_scale": {"range": [-100, 100],
                         "means": "Model preference, not a predicted return."},
         # The comparison is the point of running both.

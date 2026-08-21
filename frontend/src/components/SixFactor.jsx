@@ -64,8 +64,8 @@ export default function SixFactor({ ticker }) {
       </div>
 
       {/* Beside the signal, not beneath the fold. A BUY badge on a model whose
-          only tested factor has not demonstrated an edge cannot be presented
-          without this. */}
+          only tested factor has not demonstrated a statistically significant edge
+          cannot be presented without this. */}
       {data.evidence_status === 'experimental' && (
         <div className="rounded-lg border border-amber-700/70 bg-amber-950/25 p-2.5">
           <p className="text-[11px] uppercase tracking-widest text-amber-400 mb-1">

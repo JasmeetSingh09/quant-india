@@ -741,6 +741,32 @@ ok("score" not in {k.lower() for k in _e2 if k != "sentiment"},
    "events produce no score of their own — the sentiment factor already has that job")
 
 
+# Wording: "no evidence of an effect" and "evidence of no effect" are different
+# claims, and the test can only support the first. This pins the distinction so a
+# future edit cannot quietly restore the stronger one.
+import inspect as _insp
+import walk_forward as _wf, alpha_v2 as _av2, methodology as _meth
+
+_null = _wf.run.__doc__ or ""
+_src_all = chr(10).join(_insp.getsource(m_) for m_ in (_wf, _av2, _meth))
+
+for _bad in ("no edge at all", "showed no edge", "produced no edge",
+             "momentum does not work", "proves momentum"):
+    ok(_bad.lower() not in _src_all.lower(),
+       f"shipped code never claims '{_bad}'")
+
+_note = _av2.compute_v2.__doc__ or ""
+_ev = [l for l in _src_all.split(chr(10)) if "has not demonstrated" in l]
+ok(len(_ev) >= 2, "the precise phrasing appears in more than one module")
+ok("does not prove" in _src_all.lower(),
+   "the no-evidence-is-not-disproof caveat is present in shipped code")
+
+# The verdict a user actually reads must carry both halves.
+_fake_sig = {"p_value": 1.0, "significant_at_5pct": False}
+ok("tested configurations" in _src_all,
+   "verdicts scope the claim to the configurations tested")
+
+
 # ============================ REPORT ==================================
 print("\n" + "=" * 60)
 print(f"TOTAL CHECKS: {checks}")

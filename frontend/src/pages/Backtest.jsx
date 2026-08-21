@@ -36,8 +36,9 @@ export default function Backtest() {
           A walk-forward test of a single factor ({factor === 'lowvol' ? 'low volatility' : '12-1 momentum'})
           on an NSE universe, benchmarked against the Nifty. No look-ahead (every position is
           chosen before the return it earns), transaction costs included, with a
-          significance t-test. The result is reported as-is — including when there's
-          no edge.
+          significance t-test. The result is reported as-is — including when the
+          factor has not demonstrated a statistically significant edge, which means
+          we found no evidence of predictive power rather than proof of none.
         </p>
       </div>
 
