@@ -545,10 +545,12 @@ def _verdict(buys, sells, corr, excess, by_signal=None, independence=None):
     thin = [f"{name} ({n})" for name, n in (("BUY", b_n), ("SELL", s_n))
             if 0 < n < MIN_EFFECTIVE_N]
     if thin:
-        return (f"Partly inconclusive. {detail}. {' and '.join(thin)} has too few "
-                f"signals to support any verdict — below about {MIN_EFFECTIVE_N} a "
-                f"hit rate is dominated by chance, so that side is neither working "
-                f"nor failing yet, just untested.")
+        many = len(thin) > 1
+        return (f"Partly inconclusive. {detail}. {' and '.join(thin)} "
+                f"{'have' if many else 'has'} too few signals to support any "
+                f"verdict — below about {MIN_EFFECTIVE_N} a hit rate is dominated "
+                f"by chance, so {'those sides are' if many else 'that side is'} "
+                f"neither working nor failing yet, just untested.")
 
     edges = [h for h in (b_hit, s_hit) if h is not None]
     if edges and all(45 <= h <= 55 for h in edges):
