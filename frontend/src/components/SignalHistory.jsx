@@ -53,7 +53,7 @@ export default function SignalHistory({ ticker }) {
           {latest.alpha_score > 0 ? '+' : ''}{latest.alpha_score}
         </span>
         <span className="text-xs text-gray-500">
-          {daysAgoLabel(latest.date)} · {Math.round((latest.confidence || 0) * 100)}% data coverage
+          <span title={latest.date}>{latest.date}</span> <span className="text-gray-600">({daysAgoLabel(latest.date)})</span> · {Math.round((latest.confidence || 0) * 100)}% data coverage
         </span>
       </div>
 

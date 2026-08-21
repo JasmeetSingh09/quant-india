@@ -619,6 +619,38 @@ if _b.get("measured"):
     ok(_b["listed_then"] > 0, "a measured day has a non-empty universe")
 
 
+# Portfolio health score and the suggested-allocation fix.
+from portfolio_score import score as _pscore
+from portfolio_fix import suggest as _psuggest, MAX_SINGLE as _MS
+
+_conc = _pscore({"A.NS": 58, "B.NS": 42})
+_even = _pscore({f"S{i}.NS": 10 for i in range(10)})
+ok(_conc["score"] < _even["score"], "a concentrated portfolio scores below an even one")
+ok(_even["score"] == 100.0, "ten equal holdings score 100")
+ok(_conc["label"] in ("aggressive", "very aggressive"), "and is labelled by character")
+ok("not whether it is good" in _conc["means"], "the score disclaims being a quality grade")
+ok(_conc["biggest_lever"] is not None, "the most improvable component is named")
+ok("error" in _pscore({}), "empty holdings rejected")
+ok(_pscore({"A.NS": 100})["components"]["diversification"]["value"] == 1.0,
+   "a single holding is exactly 1 effective position")
+
+# Weights that cannot be capped must say so rather than silently doing nothing.
+_two = _psuggest({"A.NS": 58, "B.NS": 42})
+if "error" not in _two:
+    _kinds = {st["action"] for st in _two.get("steps", [])}
+    ok("cap_infeasible" in _kinds,
+       "two holdings cannot reach a 25% cap, and the tool says so")
+    ok(max(_two["proposed_pct"].values()) <= 50.5,
+       "the best achievable split for two holdings is 50/50")
+    ok(_two.get("switching_cost_inr") is not None, "the switching cost is reported")
+
+ok("error" in _psuggest({"A.NS": 100}), "one holding cannot be rebalanced")
+
+_even_fix = _psuggest({f"S{i}.NS": 20 for i in range(5)})
+ok(_even_fix.get("changed") is False or "steps" in _even_fix,
+   "an already-balanced portfolio proposes nothing or explains why")
+
+
 # ============================ REPORT ==================================
 print("\n" + "=" * 60)
 print(f"TOTAL CHECKS: {checks}")

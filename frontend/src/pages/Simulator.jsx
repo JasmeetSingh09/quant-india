@@ -610,6 +610,16 @@ export default function Simulator() {
       {/* Coach the ACTIVE simulation. Weights come from the live position
           values, so suggestions reflect what the portfolio has drifted to
           rather than what it was bought at. */}
+      {/* Cash stated before any buy. Otherwise a user has to infer whether the
+          amount they type adds new capital or spends what is already there. */}
+      {pnlData && pnlData.cash != null && (
+        <p className="text-xs text-gray-400 -mt-2">
+          Cash available: <span className="font-mono text-gray-200">
+            ₹{Number(pnlData.cash).toLocaleString('en-IN')}</span>
+          <span className="text-gray-600"> · a top-up adds new capital; selling returns cash here</span>
+        </p>
+      )}
+
       {pnlData?.positions?.length >= 2 && (
         <PortfolioCoach
           holdings={Object.fromEntries(

@@ -1241,6 +1241,30 @@ def execution_preview(ticker: str = Query(...), amount: float = Query(..., gt=0)
     return r
 
 
+class FixRequest(BaseModel):
+    holdings: dict
+    initial_value: float = 100000
+    horizon_months: int = 12
+
+
+@app.post("/portfolio/suggest-fix")
+def portfolio_suggest_fix(req: FixRequest):
+    """
+    A concrete allocation and a like-for-like before/after.
+
+    Structure only — it caps concentration and sector overlap and redistributes
+    across what is already held. It does not pick stocks, because picking is a
+    forecast and the track record does not support making one. The switching
+    cost is reported as prominently as the benefit.
+    """
+    from portfolio_fix import suggest
+    r = suggest(req.holdings, initial_value=req.initial_value,
+                horizon_months=req.horizon_months)
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+
 @app.get("/methodology")
 def methodology_all():
     """

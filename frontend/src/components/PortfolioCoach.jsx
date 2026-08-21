@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { advisePortfolio, portfolioScenarios, portfolioWhatIf, trackEvent } from '../api'
+import { advisePortfolio, portfolioScenarios, portfolioWhatIf, suggestFix, trackEvent } from '../api'
 import Spinner from './Spinner'
 import { Lightbulb, AlertTriangle, Info, Check, Plus, X } from 'lucide-react'
 import Methodology from './Methodology'
@@ -101,6 +101,7 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
   const mode = MODES[focus] || MODES.live
   const advice = useMutation({ mutationFn: advisePortfolio })
   const scen   = useMutation({ mutationFn: portfolioScenarios })
+  const fix    = useMutation({ mutationFn: suggestFix })
 
   const n = Object.keys(holdings || {}).length
 
@@ -456,6 +457,106 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* A concrete allocation, and what changing to it would do. The coach
+          says what is wrong; a reader who agrees still has to work out what to
+          hold instead, which is the part they came for. */}
+      {advice.data && (
+        <div className="pt-2 border-t border-gray-800">
+          {!fix.data ? (
+            <div className="flex items-center gap-3 flex-wrap">
+              <button onClick={() => { trackEvent('fix_requested', { n_stocks: n })
+                                       fix.mutate({ holdings, initial_value: initialValue,
+                                                    horizon_months: horizonMonths }) }}
+                      disabled={fix.isPending} className="btn-primary text-xs">
+                {fix.isPending ? 'Working it out…' : 'Show me a better allocation'}
+              </button>
+              <span className="text-[11px] text-gray-500">
+                Caps concentration and sector overlap. Does not pick stocks.
+              </span>
+            </div>
+          ) : fix.data.changed === false ? (
+            <p className="text-sm text-green-400">{fix.data.note}</p>
+          ) : (
+            <div className="space-y-3">
+              <h3 className="section-title">Suggested allocation</h3>
+
+              <div className="table-wrap">
+                <table className="w-full text-sm min-w-[22rem]">
+                  <thead>
+                    <tr className="text-[11px] uppercase tracking-wide text-gray-500">
+                      <th className="text-left py-1">Holding</th>
+                      <th className="text-right py-1">Now</th>
+                      <th className="text-right py-1">Suggested</th>
+                      <th className="text-right py-1">Change</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(fix.data.proposed_pct).map(([t, pv]) => {
+                      const cv = fix.data.current_pct[t] ?? 0
+                      const d = pv - cv
+                      return (
+                        <tr key={t} className="border-t border-gray-800">
+                          <td className="py-1">{t.replace('.NS','')}</td>
+                          <td className="py-1 text-right font-mono text-gray-400">{cv.toFixed(0)}%</td>
+                          <td className="py-1 text-right font-mono text-gray-100">{pv.toFixed(0)}%</td>
+                          <td className={`py-1 text-right font-mono ${
+                            Math.abs(d) < 0.5 ? 'text-gray-600'
+                            : d > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {Math.abs(d) < 0.5 ? '—' : `${d > 0 ? '+' : ''}${d.toFixed(0)}%`}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Before and after on the SAME measurements, so the difference is
+                  the change rather than the method. */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {[['Health', fix.data.before?.health?.score, fix.data.after?.health?.score, false],
+                  ['Worst 5%', fix.data.before?.risk?.downside_pct, fix.data.after?.risk?.downside_pct, true],
+                  ['Chance of loss', fix.data.before?.risk?.loss_prob_pct, fix.data.after?.risk?.loss_prob_pct, true]]
+                  .map(([label, b, a, lowerBetter]) => (b == null || a == null) ? null : (
+                  <div key={label} className="card-sm">
+                    <p className="text-[11px] text-gray-500">{label}</p>
+                    <p className="text-sm font-mono">
+                      <span className="text-gray-400">{Number(b).toFixed(1)}</span>
+                      <span className="text-gray-600 mx-1">→</span>
+                      <span className={
+                        (lowerBetter ? Math.abs(a) < Math.abs(b) : a > b)
+                          ? 'text-green-400' : 'text-gray-300'}>
+                        {Number(a).toFixed(1)}
+                      </span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <ul className="space-y-1">
+                {fix.data.steps.map((st, i) => (
+                  <li key={i} className="text-xs text-gray-400 pl-3 relative leading-relaxed">
+                    <span className="absolute left-0 text-gray-600">·</span>{st.detail}
+                  </li>
+                ))}
+              </ul>
+
+              {/* The cost of the change, as prominent as the benefit. */}
+              <p className="text-[11px] text-amber-200/80 border-l-2 border-amber-800/60 pl-2 leading-relaxed">
+                {fix.data.cost_note}
+              </p>
+              <p className="text-[10px] text-gray-600 leading-relaxed">{fix.data.limits}</p>
+
+              {onApply && (
+                <button onClick={() => { onApply(fix.data.proposed_pct); setApplied('suggested allocation') }}
+                        className="btn-ghost text-xs">Apply this allocation</button>
+              )}
+            </div>
+          )}
+          {fix.isError && <p className="banner-error text-xs mt-2">{String(fix.error)}</p>}
         </div>
       )}
 
