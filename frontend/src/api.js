@@ -122,6 +122,7 @@ export const trackEvent = (event, props = {}) => {
 }
 
 export const suggestFix        = body => api.post('/portfolio/suggest-fix', body, { timeout: 180000 })
+export const getAlphaV2        = ticker => api.get(`/alpha/v2?ticker=${encodeURIComponent(ticker)}`, { timeout: 120000 })
 export const getMethodology    = tool => api.get(`/methodology/${tool}`)
 export const getBenchmark      = (days = 365) => api.get('/benchmark', { params: { days } })
 export const advisePortfolio   = body => api.post('/portfolio/advise', body, { timeout: 120000 })

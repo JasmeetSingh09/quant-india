@@ -10,6 +10,7 @@ import Spinner from '../components/Spinner'
 import AlphaMeter from '../components/AlphaMeter'
 import SignalHistory from '../components/SignalHistory'
 import WhySignal from '../components/WhySignal'
+import SixFactor from '../components/SixFactor'
 import StatCard from '../components/StatCard'
 import { Search, TrendingUp, TrendingDown, ArrowLeft, ExternalLink, Filter, LayoutList, LayoutGrid } from 'lucide-react'
 import { InfoTip } from '../components/Term'
@@ -778,6 +779,7 @@ function StockDetail({ ticker, onBack }) {
                   recent signals, and how signals of this kind have actually
                   performed — including when that record is too thin to mean
                   anything. */}
+              <SixFactor ticker={ticker} />
               <WhySignal ticker={ticker} />
               {alphaLoading ? <Spinner size="sm" /> : alpha && (
                 <div className="card">
