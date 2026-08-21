@@ -799,7 +799,7 @@ function StockDetail({ ticker, onBack }) {
                     ))}
                   </div>
                   <p className="text-xs text-gray-600 mt-3">
-                    Confidence: {(alpha.confidence * 100)?.toFixed(0)}%
+                    Data coverage: {(alpha.confidence * 100)?.toFixed(0)}%
                   </p>
                   <button
                     onClick={() => explain.mutate(ticker)}

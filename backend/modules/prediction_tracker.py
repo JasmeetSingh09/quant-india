@@ -248,7 +248,100 @@ def evaluate(min_days: int = 7) -> dict:
         "avg_excess_vs_nifty_pct": round(float(np.mean(excess)), 2) if excess else None,
         "verdict": _verdict(buys, sells, corr, excess),
     }
+    scorecard["by_signal"] = _by_signal(records)
+    scorecard["independence"] = _independence(records, min_days)
     return {"scorecard": scorecard, "predictions": sorted(records, key=lambda r: r["date"])}
+
+
+def _side_stats(rows, wants_down):
+    """
+    Metrics for one side of the signal.
+
+    wants_down says which direction counts as the model being RIGHT. For a SELL
+    that is a fall, so a SELL followed by a rise is a miss no matter how the
+    average looks. Reporting a SELL's average return without that framing is the
+    single most misleading number a signal scorecard can print: a positive
+    average next to the word SELL reads as success and means the opposite.
+    """
+    if not rows:
+        return None
+    r = [x["forward_return_pct"] for x in rows]
+    ex = [x["excess_pct"] for x in rows if x.get("excess_pct") is not None]
+    hits = sum(1 for v in r if (v < 0 if wants_down else v > 0))
+    return {
+        "signals": len(r),
+        "avg_return_pct": round(float(np.mean(r)), 2),
+        "median_return_pct": round(float(np.median(r)), 2),
+        # "Right" means the direction the signal called, not "went up".
+        "hit_rate_pct": round(100.0 * hits / len(r), 1),
+        "hit_means": "fell" if wants_down else "rose",
+        "avg_excess_vs_nifty_pct": round(float(np.mean(ex)), 2) if ex else None,
+        "best_pct": round(max(r), 2),
+        "worst_pct": round(min(r), 2),
+    }
+
+
+def _by_signal(records):
+    """
+    BUY and SELL scored on their own terms.
+
+    An average alone cannot distinguish 51% wins from 90% wins, and those are
+    completely different signals with the same mean. The hit rate is what tells
+    them apart, so it is reported beside every average rather than left for the
+    reader to wonder about.
+    """
+    buys  = [r for r in records if r.get("signal") and "BUY" in r["signal"]]
+    sells = [r for r in records if r.get("signal") and "SELL" in r["signal"]]
+    return {
+        "buy":  _side_stats(buys,  wants_down=False),
+        "sell": _side_stats(sells, wants_down=True),
+        "note": ("A BUY is right when the stock rises; a SELL is right when it "
+                 "FALLS. A SELL followed by a gain is a miss, even though its "
+                 "average return looks positive."),
+    }
+
+
+def _independence(records, horizon_days):
+    """
+    How many of these observations are actually independent.
+
+    Picks are snapshotted daily, so the same stock produces a new observation
+    every day. At a 21-day horizon two observations logged a day apart share 20
+    of their 21 days — they are very nearly the same trade counted twice. Saying
+    "450 matured picks" invites the reader to hear 450 independent bets, and the
+    honest figure is far smaller.
+
+    The estimate is deliberately crude and labelled as such: per stock, the
+    number of non-overlapping windows its observations could span. Precision
+    here would be false — the point is the order of magnitude, which is what
+    changes how much weight the result deserves.
+    """
+    if not records:
+        return None
+    from collections import defaultdict
+    by_t = defaultdict(list)
+    for r in records:
+        by_t[r["ticker"]].append(r["date"])
+
+    eff = 0
+    for t, dates in by_t.items():
+        ds = sorted(datetime.strptime(d, "%Y-%m-%d") for d in dates)
+        span = (ds[-1] - ds[0]).days
+        eff += max(1, int(span / max(1, horizon_days)) + 1) if len(ds) > 1 else 1
+    eff = min(eff, len(records))
+
+    return {
+        "observations": len(records),
+        "distinct_stocks": len(by_t),
+        "horizon_days": horizon_days,
+        "effective_independent_estimate": eff,
+        "overlapping": len(records) > eff,
+        "note": (f"{len(records)} observations across {len(by_t)} stocks. Because "
+                 f"picks are logged daily and each is measured over {horizon_days} "
+                 f"days, consecutive observations of the same stock overlap and are "
+                 f"not separate trades. Roughly {eff} independent windows — treat "
+                 f"that, not the raw count, as the sample size."),
+    }
 
 
 def _verdict(buys, sells, corr, excess):

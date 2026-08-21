@@ -35,7 +35,7 @@ function PickCard({ r, buy }) {
       </div>
       <div className="mt-1 flex items-center justify-between text-xs">
         <span className={`badge-${buy ? 'green' : 'red'}`}>{r.signal}</span>
-        <span className="text-gray-500">{Math.round((r.confidence || 0) * 100)}% confidence</span>
+        <span className="text-gray-500" title="How much of the model's input data was available for this stock — not the chance the signal is right.">{Math.round((r.confidence || 0) * 100)}% data coverage</span>
       </div>
       {/* factor breakdown */}
       <div className="mt-2 space-y-1">

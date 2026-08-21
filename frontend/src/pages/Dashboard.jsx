@@ -44,7 +44,7 @@ function PickCard({ r, buy }) {
       </div>
       <div className="flex items-center justify-between text-[11px] mb-2">
         <span className={`badge-${buy ? 'green' : 'red'}`}>{r.signal}</span>
-        <span className="text-gray-500">{Math.round((r.confidence || 0) * 100)}% conf.</span>
+        <span className="text-gray-500" title="How much of the model's input data was available for this stock — not the chance the signal is right.">{Math.round((r.confidence || 0) * 100)}% data</span>
       </div>
       <div className="space-y-1">
         {FACTORS.map(([k, label]) => {
@@ -191,15 +191,51 @@ function TrackRecord() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="card-sm">
-              <p className="stat-label">BUY-signal avg return</p>
-              <p className={`stat-value ${col(sc.buy_avg_return_pct)}`}>{pct(sc.buy_avg_return_pct)}</p>
-            </div>
-            <div className="card-sm">
-              <p className="stat-label">SELL-signal avg return</p>
-              <p className={`stat-value ${col(sc.sell_avg_return_pct)}`}>{pct(sc.sell_avg_return_pct)}</p>
-            </div>
+          {/* Each side is scored on its own terms. A SELL is right when the
+              stock FALLS, so colouring its average with the same rule as a BUY
+              would paint a failed SELL green. The hit rate sits beside every
+              average because a mean alone cannot tell 51% wins from 90% wins,
+              and those are completely different signals. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {[['BUY', sc.by_signal?.buy, 'rose'], ['SELL', sc.by_signal?.sell, 'fell']].map(
+              ([side, d, want]) => !d ? null : (
+              <div key={side} className="card-sm">
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="stat-label">{side} signals</p>
+                  <span className="text-[11px] text-gray-500">{d.signals} signals</span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
+                  <div>
+                    <p className="text-[11px] text-gray-500">Hit rate</p>
+                    <p className={`text-lg font-semibold ${
+                      d.hit_rate_pct >= 55 ? 'text-green-400'
+                      : d.hit_rate_pct >= 45 ? 'text-gray-200' : 'text-red-400'}`}>
+                      {d.hit_rate_pct}%
+                    </p>
+                    <p className="text-[10px] text-gray-600">share that {want}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-gray-500">Avg return</p>
+                    <p className="text-lg font-semibold text-gray-200">{pct(d.avg_return_pct)}</p>
+                    <p className="text-[10px] text-gray-600">median {pct(d.median_return_pct)}</p>
+                  </div>
+                  <div className="col-span-2 pt-1 border-t border-gray-800">
+                    <p className="text-[11px] text-gray-500">
+                      vs Nifty <span className={col(d.avg_excess_vs_nifty_pct)}>
+                        {pct(d.avg_excess_vs_nifty_pct)}</span>
+                      <span className="text-gray-600"> · best {pct(d.best_pct)} · worst {pct(d.worst_pct)}</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {sc.by_signal?.note && (
+            <p className="text-[11px] text-gray-500 leading-relaxed">{sc.by_signal.note}</p>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="card-sm">
               <p className="stat-label">BUY − SELL spread<span className="text-gray-600"> (edge)</span></p>
               <p className={`stat-value ${col(sc.buy_minus_sell_pct)}`}>{pct(sc.buy_minus_sell_pct)}</p>
@@ -210,12 +246,24 @@ function TrackRecord() {
             </div>
           </div>
 
+          {/* Picks are logged daily, so consecutive observations of one stock
+              share almost all of their measurement window. Printing the raw
+              count invites the reader to hear that many independent bets. */}
+          {sc.independence?.overlapping && (
+            <div className="rounded-lg p-3 text-xs border border-amber-800/60 bg-amber-900/10 text-amber-200/90 leading-relaxed">
+              <b>Sample size:</b> {sc.independence.note}
+            </div>
+          )}
+
           <div className={`rounded-lg p-3 text-sm border ${
             (sc.buy_minus_sell_pct ?? 0) > 0 ? 'border-green-800 bg-green-900/15 text-green-300'
                                              : 'border-yellow-800 bg-yellow-900/15 text-yellow-200'}`}>
             <b>Verdict:</b> {sc.verdict}
             <span className="block text-xs text-gray-400 mt-1">
-              {sc.matured_predictions} matured picks · alpha↔return correlation {sc.alpha_vs_return_correlation ?? '—'}
+              {sc.matured_predictions} signal observations
+              {sc.independence?.effective_independent_estimate
+                ? ` (~${sc.independence.effective_independent_estimate} independent)` : ''}
+              {' '}· alpha↔return correlation {sc.alpha_vs_return_correlation ?? '—'}
               {' '}(a value near 0 means the score barely predicts returns — expected on small samples).
             </span>
           </div>

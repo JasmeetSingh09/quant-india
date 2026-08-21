@@ -286,6 +286,23 @@ def detect_regime(
     current_label = label_map[current_state]
     current_proba = {label_map[k]: round(float(proba[-1, k]), 4) for k in range(n_states)}
 
+    # A filtered HMM posterior saturates: once the evidence favours one state
+    # strongly, the others round to zero and this prints "Bull 100%". That reads
+    # as "there is no chance the market is not bullish", which is not what the
+    # number says and not something any model can support. Report the saturation
+    # honestly instead of dressing it up as a smaller number we did not compute.
+    _top = max(current_proba.values()) if current_proba else 0.0
+    current_proba_note = (
+        "The model currently assigns essentially all weight to this state. That is "
+        "the posterior saturating on recent data, not a claim that the market "
+        "cannot change — regimes shift, and the model only sees what has already "
+        "happened."
+        if _top >= 0.999 else
+        "State probabilities from the model's filtered posterior. They describe "
+        "which regime best explains recent returns, not what happens next.")
+    current_proba_display = ("~100%" if _top >= 0.999
+                             else f"{_top*100:.1f}%")
+
     # Regime history for charting
     dates   = daily_ret.index
     history = [
@@ -348,6 +365,8 @@ def detect_regime(
         "lookback_days":   lookback_days,
         "current_regime":  current_label,
         "current_proba":   current_proba,
+        "current_proba_display": current_proba_display,
+        "current_proba_note":    current_proba_note,
         "regime_colour":   _REGIME_COLORS[current_label],
         "regime_stats":    regime_stats,
         "transition_matrix": transition,
@@ -356,7 +375,8 @@ def detect_regime(
         "model_log_ll":    round(float(hmm.log_ll), 2),
         "interpretation": (
             f"Current regime: {current_label} "
-            f"({current_proba[current_label]*100:.0f}% probability). "
+            f"({current_proba_display} model probability — the state that best "
+            f"explains recent returns, not a forecast). "
             + (
                 "In bull regimes, momentum signals are more reliable. "
                 "Increase position sizes gradually."

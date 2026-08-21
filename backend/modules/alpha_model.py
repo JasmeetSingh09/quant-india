@@ -674,7 +674,13 @@ def compute_alpha_score(
     # Scale to [-100, +100]
     alpha_score = round(raw_score * 100, 2)
 
-    # Overall confidence = weighted average of factor confidences
+    # Overall "confidence" is a weighted average of how much DATA each factor
+    # had — not a probability that the call is right. A 70% here means we saw
+    # roughly 70% of the inputs the model wants, and it would mean the same on a
+    # stock the model has no edge in whatsoever. Left unlabelled it reads as
+    # "70% chance this outperforms", which the number cannot support and which
+    # the track record actively contradicts. So it is returned with its meaning
+    # attached rather than as a bare percentage.
     confidence = round(
         w["sentiment"] * sentiment_f["confidence"] +
         w["momentum"]  * momentum_f["confidence"]  +
@@ -712,6 +718,24 @@ def compute_alpha_score(
         "signal":        signal,
         "colour":        colour,
         "confidence":    confidence,
+        "confidence_means": "data_completeness",
+        "confidence_label": "Data coverage",
+        "confidence_note": (
+            "How much of the model's input data was available for this stock — "
+            "not the probability that the signal is correct. Check the track "
+            "record for whether the signals have actually worked."),
+        "score_scale": {
+            "range": [-100, 100],
+            "means": ("Composite of momentum, quality, value and sentiment. Higher "
+                      "means the model prefers it more strongly. It is NOT a "
+                      "predicted return."),
+        },
+        "horizon_days": 21,
+        "horizon_note": ("This is a short-horizon signal, measured over about 21 "
+                         "trading days. It is not a long-term investment view."),
+        "action_note": ("SELL here means the model expects underperformance — read "
+                        "it as avoid or reduce. The model does not model short "
+                        "selling and nothing here suggests taking one."),
         "factors":       factors,
         "contributions": contributions,
         "weights_used":  w,
@@ -719,7 +743,8 @@ def compute_alpha_score(
             f"Alpha score of {alpha_score:.1f}/100. "
             f"Dominant factor: {max(contributions, key=lambda k: abs(contributions[k]))} "
             f"({contributions[max(contributions, key=lambda k: abs(contributions[k]))]:.1f} pts). "
-            f"Signal confidence: {confidence*100:.0f}%."
+            f"Data coverage: {confidence*100:.0f}% (how complete the inputs were, "
+            f"not the odds of being right)."
         ),
         "disclaimer": "Signal model only. Not financial advice.",
         "computed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),

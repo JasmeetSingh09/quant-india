@@ -48,7 +48,7 @@ function PickCard({ r, buy, onOpen }) {
       </div>
       <div className="flex items-center justify-between text-[11px] mb-2">
         <span className={`badge-${buy ? 'green' : 'red'}`}>{r.signal}</span>
-        <span className="text-gray-500">{Math.round((r.confidence || 0) * 100)}% conf.</span>
+        <span className="text-gray-500" title="How much of the model's input data was available for this stock — not the chance the signal is right.">{Math.round((r.confidence || 0) * 100)}% data</span>
       </div>
       <div className="space-y-1">
         {FACTORS.map(([k, label]) => {
