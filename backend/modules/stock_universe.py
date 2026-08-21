@@ -372,6 +372,47 @@ def search_stocks(query: str, exchange: str = "NSE", limit: int = 30) -> list:
     q_upper = query.upper()
     results = []
 
+    def _search_bhavcopy():
+        """
+        Search the symbols the exchange itself published.
+
+        The nse_stocks path below opens sqlite3 directly against DB_PATH.
+        Production runs Postgres, so on the deployed app that reads an empty
+        local file and every search returns nothing — which is what a new user
+        hits on their first action. Bhavcopy lives in the shared database
+        whichever backend is configured, and is populated nightly.
+        """
+        try:
+            from db import get_conn
+            conn = get_conn()
+            rows = conn.execute(
+                "SELECT DISTINCT symbol FROM bhavcopy_eod "
+                "WHERE day = (SELECT MAX(day) FROM bhavcopy_eod)").fetchall()
+            conn.close()
+        except Exception:
+            return []
+        out = []
+        for (sym,) in rows:
+            if not sym:
+                continue
+            base = sym.replace(".NS", "")
+            if q_upper not in base.upper():
+                continue
+            out.append({
+                "symbol": base,
+                "company_name": base,      # bhavcopy carries no long name
+                "series": None,
+                "isin": None,
+                "yf_ticker": sym,
+                "exchange": "NSE",
+            })
+        # Exact match first, then prefix, then the rest — otherwise a search for
+        # "TCS" can bury TCS beneath every symbol containing those letters.
+        out.sort(key=lambda r: (0 if r["symbol"].upper() == q_upper
+                                else 1 if r["symbol"].upper().startswith(q_upper)
+                                else 2, r["symbol"]))
+        return out[:limit]
+
     def _search_nse():
         conn = sqlite3.connect(DB_PATH)
         rows = conn.execute("""
@@ -427,7 +468,16 @@ def search_stocks(query: str, exchange: str = "NSE", limit: int = 30) -> list:
         ]
 
     if exchange.upper() in ("NSE", "ALL"):
-        results.extend(_search_nse())
+        # The legacy table first when it has data, then the exchange's own list.
+        # Ordered this way because nse_stocks carries real company names and
+        # bhavcopy carries only symbols — but bhavcopy is the one that is
+        # actually populated in production.
+        try:
+            results.extend(_search_nse())
+        except Exception:
+            pass
+        if not results:
+            results.extend(_search_bhavcopy())
     if exchange.upper() in ("BSE", "ALL"):
         results.extend(_search_bse())
 

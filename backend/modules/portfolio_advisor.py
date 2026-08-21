@@ -378,7 +378,11 @@ def advise(holdings: dict, initial_value: float = 100000,
     if wanted("behind_index"):
         try:
             from benchmark import compare, index_return
-            window = max(30, horizon_months * 30)
+            # 365/12 per month, not 30. A 30-day month makes a 12-month horizon
+            # 360 days, so the coach compared against a different Nifty window
+            # than /benchmark's 365-day default — the same index, two answers,
+            # 1.15 points apart in production.
+            window = max(30, round(horizon_months * 365 / 12))
             bench = index_return(window)
             if bench and current_return_pct is not None:
                 c = compare(current_return_pct, window)

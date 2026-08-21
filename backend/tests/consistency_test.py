@@ -121,6 +121,14 @@ record("market hours resolve in IST wherever the server runs",
        "16:30 IST closed, 11:30 IST open — verified against UTC instants, so a "
        "UTC host (Render) cannot invert the trading day")
 
+# The benchmark WINDOW must match too, not just the ticker. A 30-day month made
+# a 12-month horizon 360 days against /benchmark's 365, so the same index gave
+# two answers 1.15 points apart.
+_coach_window = max(30, round(12 * 365 / 12))
+record("benchmark window matches the /benchmark default",
+       "CLEAN" if _coach_window == 365 else "BUG",
+       f"12-month horizon resolves to {_coach_window} days, /benchmark uses 365")
+
 # ------------------------------- 6. current vs historical data separation
 print("\n6. Current vs historical separation")
 record("historical path never consults current fundamentals",
