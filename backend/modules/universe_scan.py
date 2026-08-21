@@ -145,6 +145,26 @@ def get_state() -> dict:
         "FROM alpha_scan_state WHERE id = 1"
     ).fetchone()
     scanned = conn.execute("SELECT COUNT(*) FROM alpha_scan2 WHERE alpha_score IS NOT NULL").fetchone()[0]
+    # Attempted is not the same as succeeded. Errors are stored so a bad ticker
+    # is not retried forever, which means they also count toward "done" — so a
+    # progress bar built on `done` alone can read 100% while a large share of
+    # the universe failed. That is the shape of the bug that let a 130-stock
+    # scan report itself complete.
+    # The CURRENT cycle, not the last complete one — progress is about the scan
+    # running now, and preferring last_complete would report yesterday's counts
+    # against today's total.
+    _cyc = (row[0] if row else None) or (row[6] if row and len(row) > 6 else None)
+    ok_n = err_n = 0
+    if _cyc:
+        try:
+            ok_n = conn.execute(
+                "SELECT COUNT(*) FROM alpha_scan2 WHERE cycle = ? AND alpha_score IS NOT NULL",
+                (_cyc,)).fetchone()[0]
+            err_n = conn.execute(
+                "SELECT COUNT(*) FROM alpha_scan2 WHERE cycle = ? AND alpha_score IS NULL",
+                (_cyc,)).fetchone()[0]
+        except Exception:
+            ok_n = err_n = 0
     conn.close()
     if not row:
         return {"status": "never_run", "done": 0, "total": 0, "scored_total": scanned}
@@ -154,6 +174,10 @@ def get_state() -> dict:
         "finished_at": finished, "done": done, "total": total,
         "last_complete_cycle": last_complete,
         "scored_total": scanned,
+        "succeeded": ok_n,
+        "failed": err_n,
+        "progress_note": (f"{done} of {total} attempted; {ok_n} scored, {err_n} failed."
+                          if total else f"{done} attempted; {ok_n} scored, {err_n} failed."),
         "pct": round(done / total * 100, 1) if total else 0.0,
         "running": _THREAD is not None and _THREAD.is_alive(),
     }
