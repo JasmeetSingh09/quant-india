@@ -854,6 +854,59 @@ def _t_test_vs_benchmark(port_returns: pd.Series, bench_returns: pd.Series) -> d
     }
 
 
+def _simulate_with_drift(port_returns, target_w, rebalance_freq: str,
+                         include_costs: bool):
+    """
+    Daily portfolio returns where holdings drift and are reset on schedule.
+
+    Cost is charged on ACTUAL turnover rather than as a flat per-rebalance fee.
+    A portfolio that has barely moved costs almost nothing to realign; one that
+    has run hard costs more. Charging a fixed fee regardless made the cheap case
+    look expensive and the expensive case look cheap.
+
+    Turnover is the one-way traded fraction: sum(|current - target|) / 2.
+    """
+    import numpy as _np
+    import pandas as _pd
+
+    freq_map = {"monthly": "MS", "quarterly": "QS", "yearly": "YS"}
+    rule = freq_map.get(rebalance_freq, "QS")
+    try:
+        rebal_dates = set(port_returns.resample(rule).first().index)
+    except Exception:
+        rebal_dates = set()
+
+    # Round-trip cost of moving 100% of the book: buy + sell brokerage and
+    # slippage, plus STT and stamp duty. Same figures as the flat model used.
+    cost_per_unit_turnover = (2 * 0.001) + (2 * 0.0005) + 0.001 + 0.00015
+
+    w = target_w.copy()
+    if w.sum() > 0:
+        w = w / w.sum()
+
+    out = []
+    for date, row in zip(port_returns.index, port_returns.values):
+        r = _np.nan_to_num(row, nan=0.0)
+        day_ret = float((w * r).sum())
+
+        # Positions grow by their own return; weights drift as a result.
+        w = w * (1.0 + r)
+        tot = w.sum()
+        if tot > 0:
+            w = w / tot
+
+        if date in rebal_dates:
+            turnover = float(_np.abs(w - target_w).sum()) / 2.0
+            if include_costs and turnover > 0:
+                day_ret -= turnover * cost_per_unit_turnover
+            w = target_w.copy()
+            if w.sum() > 0:
+                w = w / w.sum()
+
+        out.append(day_ret)
+
+    return _pd.Series(out, index=port_returns.index)
+
 def backtest(
     holdings: dict,
     start_date: str,
@@ -910,17 +963,22 @@ def backtest(
     port_prices  = prices[port_tickers]
     nifty_prices = prices[NIFTY_TICKER] if NIFTY_TICKER in prices.columns else None
 
-    # Daily returns
+    # Daily returns, with weights that DRIFT between rebalance dates.
+    #
+    # This previously multiplied every day's returns by the same fixed weight
+    # vector. That is not a quarterly-rebalanced portfolio — holding weights
+    # constant every single day is daily rebalancing, silently, and the cost
+    # model was charging for quarterly. It modelled continuous management and
+    # paid for occasional management, which flatters the result twice: a winner
+    # gets trimmed back daily (understating its compounding) while the trading
+    # needed to do that is never charged for.
+    #
+    # Now positions grow with their own returns and are only reset to target on
+    # an actual rebalance date, which is what a real portfolio does.
     port_returns = port_prices.pct_change().fillna(0)
-    w_array      = np.array([port_weights[t] for t in port_tickers])
-    port_daily   = pd.Series(
-        (port_returns.values * w_array).sum(axis=1),
-        index=port_prices.index
-    )
-
-    # Apply Indian transaction costs
-    if include_costs:
-        port_daily = _apply_transaction_costs(port_daily, rebalance_freq)
+    target_w     = np.array([port_weights[t] for t in port_tickers], dtype=float)
+    port_daily   = _simulate_with_drift(port_returns, target_w, rebalance_freq,
+                                        include_costs)
 
     cum_port = (1 + port_daily).cumprod() * initial_value
 

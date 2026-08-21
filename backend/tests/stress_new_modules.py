@@ -436,6 +436,43 @@ ok(_significance(1, 1) is None, "a single observation -> no test")
 ok(_significance(None, 10) is None, "missing hit count -> no test")
 
 
+# Rebalancing must let weights drift, not silently reset every day.
+import numpy as _np
+import pandas as _pd
+from simulator import _simulate_with_drift
+
+_idx = _pd.bdate_range("2024-01-01", periods=250)
+_rets = _pd.DataFrame({"A": 0.004, "B": 0.0}, index=_idx)
+_w = _np.array([0.5, 0.5])
+
+_drift = _simulate_with_drift(_rets, _w, "quarterly", include_costs=False)
+_fixed = _pd.Series((_rets.values * _w).sum(axis=1), index=_idx)
+ok(float((1 + _drift).prod()) > float((1 + _fixed).prod()),
+   "a compounding winner is allowed to run between rebalance dates")
+
+_costed = _simulate_with_drift(_rets, _w, "quarterly", include_costs=True)
+ok(float((1 + _costed).prod()) < float((1 + _drift).prod()),
+   "turnover costs reduce the return")
+
+_monthly = _simulate_with_drift(_rets, _w, "monthly", include_costs=True)
+ok(float((1 + _monthly).prod()) < float((1 + _costed).prod()),
+   "rebalancing more often costs more")
+
+# A portfolio that never moves should cost almost nothing to realign.
+_flat = _pd.DataFrame({"A": 0.0, "B": 0.0}, index=_idx)
+_a = _simulate_with_drift(_flat, _w, "quarterly", include_costs=True)
+_b = _simulate_with_drift(_flat, _w, "quarterly", include_costs=False)
+ok(abs(float((1 + _a).prod()) - float((1 + _b).prod())) < 1e-6,
+   "no drift means no turnover means no cost")
+
+ok(len(_simulate_with_drift(_rets, _w, "quarterly", True)) == len(_idx),
+   "one return per trading day")
+_nan = _pd.DataFrame({"A": [0.01, float("nan")], "B": [0.0, 0.0]},
+                     index=_pd.bdate_range("2024-01-01", periods=2))
+ok(_simulate_with_drift(_nan, _w, "quarterly", True).notna().all(),
+   "a missing return does not poison the series")
+
+
 # ============================ REPORT ==================================
 print("\n" + "=" * 60)
 print(f"TOTAL CHECKS: {checks}")

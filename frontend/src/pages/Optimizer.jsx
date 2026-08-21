@@ -128,7 +128,7 @@ export default function Optimizer() {
             <div className="space-y-1">
               {[
                 ['mvo',      'Markowitz (classic)',     'Best return for the risk — but can pile into one stock'],
-                ['hrp',      'Smart Diversify (HRP)',   'Spreads money sensibly by grouping similar stocks (2016)'],
+                ['hrp',      'Smart Diversify (HRP)',   'Hierarchical Risk Parity (Lopez de Prado, 2016): clusters stocks that move together, then splits risk between the clusters. It never inverts the covariance matrix, so it avoids the extreme weights a Sharpe optimiser produces from tiny differences in estimated return.'],
                 ['riskparity','Risk Parity (ERC)',      'Each holding contributes equal RISK, not equal money (2010)'],
                 ['maxdiv',   'Max Diversification',     'Maximises the diversification ratio (Choueifaty 2008)'],
                 ['mincvar',  'Min Tail-Risk (CVaR)',    'Minimises loss in the worst 5% of days, not just variance'],
@@ -287,7 +287,12 @@ export default function Optimizer() {
                 ))}
               </div>
               <div className="card">
-                <h3 className="font-semibold mb-3">Optimal Weights</h3>
+                <h3 className="font-semibold mb-3">Optimised Weights
+                  <span className="block text-[11px] font-normal text-gray-500 mt-0.5">
+                    Optimal for this objective under these estimates — not a universally
+                    best portfolio. Change the window or the objective and these move.
+                  </span>
+                </h3>
                 {Object.entries(mvoResult.optimal_pct || {})
                   .sort(([,a],[,b]) => b-a)
                   .map(([t,w]) => <WeightBar key={t} ticker={t} weight={w} explain={mvoResult.explanations?.[t]} />)}
