@@ -1136,6 +1136,32 @@ def liquidity_check(ticker: str):
     return a
 
 
+class StabilityRequest(BaseModel):
+    tickers: list
+    target: str = "max_sharpe"
+    max_weight: float = 1.0
+    period_months: int = 24
+    trials: int = 40
+
+
+@app.post("/optimizer/stability")
+def optimizer_stability_check(req: StabilityRequest):
+    """
+    How much do the "optimal" weights depend on estimates nobody can pin down?
+
+    Re-optimises with expected returns jittered inside their own standard error.
+    A corner solution is reported as pinned rather than stable — an unconstrained
+    optimiser that puts everything in one name does not move under perturbation,
+    and calling that robustness would be the most misleading thing here.
+    """
+    from optimizer_stability import stability
+    r = stability(req.tickers, target=req.target, max_weight=req.max_weight,
+                  period_months=req.period_months, trials=req.trials)
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+
 @app.get("/methodology")
 def methodology_all():
     """

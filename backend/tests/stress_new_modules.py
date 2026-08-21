@@ -486,6 +486,23 @@ ok(_split_factor_since("RELIANCE.NS", "2099-01-01") == 1.0,
    "a future entry date has no splits after it")
 
 
+# Optimiser stability: a corner solution must never be reported as "stable".
+from optimizer_stability import concentration_warning
+
+_c = concentration_warning({"A.NS": 48, "B.NS": 30, "C.NS": 22})
+ok(_c and _c["concentrated"], "48% in one name is flagged")
+ok(_c["top_weight_pct"] == 48, "top weight reported")
+ok("Cap position sizes" in _c["message"], "warning says what to do")
+
+ok(concentration_warning({"A.NS": 25, "B.NS": 25, "C.NS": 25, "D.NS": 25}) is None,
+   "an evenly spread portfolio raises no warning")
+ok(concentration_warning({}) is None, "empty weights -> no warning")
+
+_c2 = concentration_warning({"A.NS": 60, "B.NS": 40})
+ok(_c2 and _c2["effective_positions"] < 3,
+   "two lopsided holdings behave like fewer than 3 positions")
+
+
 # ============================ REPORT ==================================
 print("\n" + "=" * 60)
 print(f"TOTAL CHECKS: {checks}")

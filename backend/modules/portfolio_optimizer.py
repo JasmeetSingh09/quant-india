@@ -507,6 +507,11 @@ def mean_variance_optimize(
     risk_free_pct: float = None,
     current_weights: dict = None,
     turnover_lambda: float = 0.0,
+    # Additive shift on the annualised expected returns before optimising.
+    # Used only by the stability analysis, which re-runs this with returns
+    # jittered inside their own estimation error to show how much the
+    # "optimal" weights actually depend on an input nobody can pin down.
+    _mu_shift: list = None,
 ) -> dict:
     """
     Find the portfolio weights that maximise Sharpe ratio (or minimise variance).
@@ -532,6 +537,13 @@ def mean_variance_optimize(
 
     # Annualised parameters
     mu  = log_returns.mean().values * 252
+    if _mu_shift is not None:
+        try:
+            _sh = np.asarray(_mu_shift, dtype=float)
+            if _sh.shape == mu.shape:
+                mu = mu + _sh
+        except Exception:
+            pass          # a bad shift must never alter the real result
     cov = _cov(log_returns)                       # Ledoit-Wolf shrinkage
     rf  = _rf(risk_free_pct)
 
