@@ -20,6 +20,7 @@ import sqlite3
 from pathlib import Path
 from datetime import datetime, timedelta
 import numpy as np
+from db import IS_POSTGRES
 import pandas as pd
 import yfinance as yf
 
@@ -30,6 +31,36 @@ BENCHMARK = "^NSEI"
 def _conn():
     from db import get_conn      # Postgres (Supabase) if DATABASE_URL set, else SQLite
     return get_conn()
+
+
+def _add_horizon_column():
+    """
+    Record the horizon the signal itself claimed.
+
+    Evaluation horizon is a read-time choice — that is why the scorecard takes
+    min_days — but the horizon the MODEL advertised when it issued the call is a
+    property of the call, and belongs on the row. Without it a signal logged
+    under a 21-day model cannot be told apart from one logged under a different
+    model later, and the record silently mixes them.
+
+    On its own connection: a failed ALTER poisons the whole transaction on
+    Postgres, which is what previously 500'd unrelated endpoints.
+    """
+    try:
+        c = _conn()
+        try:
+            if IS_POSTGRES:
+                c.execute("ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                          "signal_horizon_days INTEGER")
+            else:
+                c.execute("ALTER TABLE predictions ADD COLUMN signal_horizon_days INTEGER")
+            c.commit()
+        except Exception:
+            pass
+        finally:
+            c.close()
+    except Exception:
+        pass
 
 
 def init_table():
@@ -55,6 +86,7 @@ def snapshot(universe: list = None) -> dict:
     alpha score, signal, and current price, so we can grade it later.
     """
     init_table()
+    _add_horizon_column()
     from alpha_model import compute_alpha_score, TOP_PICKS_UNIVERSE
     today = datetime.now().strftime("%Y-%m-%d")
 
@@ -101,9 +133,10 @@ def snapshot(universe: list = None) -> dict:
                 continue
             c.execute(
                 "INSERT OR IGNORE INTO predictions "
-                "(ticker, snapshot_date, alpha_score, signal, price_at_snapshot) "
-                "VALUES (?,?,?,?,?)",
-                (t, today, r.get("alpha_score"), r.get("signal"), round(float(px), 2)),
+                "(ticker, snapshot_date, alpha_score, signal, price_at_snapshot, "
+                "signal_horizon_days) VALUES (?,?,?,?,?,?)",
+                (t, today, r.get("alpha_score"), r.get("signal"), round(float(px), 2),
+                 int(r.get("horizon_days") or 21)),
             )
             logged += 1
         except Exception:
@@ -299,8 +332,26 @@ def evaluate(min_days: int = 7) -> dict:
     }
     scorecard["by_signal"] = _by_signal(records)
     scorecard["independence"] = _independence(records, min_days)
-    scorecard["verdict"] = _verdict(buys, sells, corr, excess,
-                                    scorecard["by_signal"], scorecard["independence"])
+
+    # The same metrics on windows that share no days. Reported ALONGSIDE the
+    # full set rather than replacing it: hiding the raw count would trade one
+    # distortion for another, and the interesting thing is how far the two
+    # disagree. When they diverge, the overlap was doing the work.
+    indep_rows = _non_overlapping(records, min_days)
+    scorecard["independent_sample"] = {
+        "observations": len(indep_rows),
+        "by_signal": _by_signal(indep_rows) if indep_rows else None,
+        "note": ("Every window here is separated from the next by at least the "
+                 "full horizon, so no two share a day. This is the sample a "
+                 "statistical claim would have to rest on."),
+    }
+    # Judge on the non-overlapping sample. Using the full one would let
+    # overlapping observations vote repeatedly for the same underlying outcome,
+    # which is exactly how a coin flip starts looking like an edge.
+    scorecard["verdict"] = _verdict(
+        buys, sells, corr, excess,
+        (scorecard["independent_sample"] or {}).get("by_signal") or scorecard["by_signal"],
+        scorecard["independence"])
     return {"scorecard": scorecard, "predictions": sorted(records, key=lambda r: r["date"])}
 
 
@@ -352,6 +403,42 @@ def _by_signal(records):
     }
 
 
+def _non_overlapping(records, horizon_days):
+    """
+    The subset of observations that genuinely do not share a measurement window.
+
+    Signals are logged daily, so at a 21-day horizon consecutive observations of
+    one stock overlap by 20 days. Estimating how much independence survives that
+    is guesswork; selecting a set that has no overlap at all is arithmetic.
+
+    Per stock, walk its observations in date order and keep one, then skip
+    forward until a date at least `horizon_days` later. Different stocks are
+    treated as independent of each other, which is itself an assumption — two
+    banks on the same day are not really independent — but it is a far weaker
+    one than pretending daily observations of the SAME stock are separate trades.
+
+    This is the honest sample. It is much smaller, and that is the finding.
+    """
+    from collections import defaultdict
+    by_t = defaultdict(list)
+    for r in records:
+        by_t[r["ticker"]].append(r)
+
+    keep = []
+    for t, rows in by_t.items():
+        rows = sorted(rows, key=lambda r: r["date"])
+        last = None
+        for r in rows:
+            try:
+                d = datetime.strptime(r["date"], "%Y-%m-%d")
+            except Exception:
+                continue
+            if last is None or (d - last).days >= horizon_days:
+                keep.append(r)
+                last = d
+    return keep
+
+
 def _independence(records, horizon_days):
     """
     How many of these observations are actually independent.
@@ -374,12 +461,11 @@ def _independence(records, horizon_days):
     for r in records:
         by_t[r["ticker"]].append(r["date"])
 
-    eff = 0
-    for t, dates in by_t.items():
-        ds = sorted(datetime.strptime(d, "%Y-%m-%d") for d in dates)
-        span = (ds[-1] - ds[0]).days
-        eff += max(1, int(span / max(1, horizon_days)) + 1) if len(ds) > 1 else 1
-    eff = min(eff, len(records))
+    # Counted, not estimated. Earlier this was span/horizon per stock, which is
+    # a plausible-looking ratio and nothing more. Building the non-overlapping
+    # set and counting it gives the actual number of windows that share no days,
+    # which is a figure that can be defended rather than hedged.
+    eff = len(_non_overlapping(records, horizon_days))
 
     all_dates = sorted(r["date"] for r in records)
     return {
@@ -388,6 +474,8 @@ def _independence(records, horizon_days):
         "horizon_days": horizon_days,
         "period": f"{all_dates[0]} to {all_dates[-1]}",
         "effective_independent_estimate": eff,
+        "independent_windows": eff,
+        "method": "counted non-overlapping windows per stock",
         "overlapping": len(records) > eff,
         # Phrased as an approximation on purpose. `eff` is an estimate of
         # effective independence under a crude assumption, not a count of unique
@@ -396,10 +484,11 @@ def _independence(records, horizon_days):
         "note": (f"{len(records)} observed prediction windows across {len(by_t)} "
                  f"stocks ({all_dates[0]} to {all_dates[-1]}). Because picks are "
                  f"logged daily and each is measured over {horizon_days} days, "
-                 f"consecutive observations of the same stock overlap heavily — "
-                 f"they correspond to roughly {eff} independent windows under this "
-                 f"approximation. Read the evidence as closer to {eff} than to "
-                 f"{len(records)}."),
+                 f"consecutive observations of the same stock overlap heavily. "
+                 f"Selecting windows that share no days at all leaves {eff} — "
+                 f"counted, not estimated. Read the evidence as closer to {eff} "
+                 f"than to {len(records)}. (Two different stocks on the same day "
+                 f"are still counted separately, which remains an assumption.)"),
     }
 
 

@@ -263,6 +263,35 @@ function TrackRecord() {
           {/* Picks are logged daily, so consecutive observations of one stock
               share almost all of their measurement window. Printing the raw
               count invites the reader to hear that many independent bets. */}
+          {/* The honest sample, beside the full one. Shown together because the
+              interesting thing is how far they disagree — when they do, the
+              overlap was doing the work. */}
+          {sc.independent_sample?.by_signal && (
+            <div className="rounded-lg border border-gray-700 bg-gray-900/40 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-2">
+                Non-overlapping windows only · {sc.independent_sample.observations} observations
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                {[['BUY', sc.independent_sample.by_signal.buy, 'rose'],
+                  ['SELL', sc.independent_sample.by_signal.sell, 'fell']].map(
+                  ([side, d, want]) => !d ? null : (
+                  <div key={side}>
+                    <p className="text-[11px] text-gray-500">{side} · {d.signals} signals</p>
+                    <p className={`text-lg font-semibold ${
+                      d.hit_rate_pct >= 55 ? 'text-green-400'
+                      : d.hit_rate_pct >= 45 ? 'text-gray-200' : 'text-red-400'}`}>
+                      {d.hit_rate_pct}%
+                    </p>
+                    <p className="text-[10px] text-gray-600">share that {want}</p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-gray-500 mt-2 leading-relaxed">
+                {sc.independent_sample.note}
+              </p>
+            </div>
+          )}
+
           {sc.independence?.overlapping && (
             <div className="rounded-lg p-3 text-xs border border-amber-800/60 bg-amber-900/10 text-amber-200/90 leading-relaxed">
               <b>Sample size:</b> {sc.independence.note}

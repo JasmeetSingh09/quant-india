@@ -94,6 +94,9 @@ function PickCard({ r, buy, onOpen }) {
       <p className="text-[9px] text-gray-700 mt-0.5">
         bars scaled per factor · momentum ±35, quality/sentiment ±25, value ±15
       </p>
+      {/* The card already navigates to the stock page; saying so turns a
+          mystery click into an offer. */}
+      <p className="text-[10px] text-green-500/80 mt-1">Why this signal →</p>
     </button>
   )
 }

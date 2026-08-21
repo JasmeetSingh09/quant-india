@@ -10,6 +10,7 @@ in a stated way — what is not allowed is a wrong number delivered confidently.
 
 import sys
 import os
+from datetime import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "modules"))
 
@@ -276,7 +277,7 @@ print(f"  risk mode findings:   {sorted(kinds_r) or 'none'}")
 # than just exercising code: a future change that flips how a SELL is scored, or
 # quietly starts counting a flat stock as a successful BUY, should fail here.
 section("track record semantics")
-from prediction_tracker import _side_stats, _independence
+from prediction_tracker import _side_stats, _independence, _non_overlapping
 
 def rows(*vals):
     return [{"forward_return_pct": v, "excess_pct": None} for v in vals]
@@ -332,7 +333,12 @@ ind = _independence(daily, 21)
 ok(ind["effective_independent_estimate"] < ind["observations"],
    "overlapping observations reduce the effective count")
 ok(ind["overlapping"] is True, "overlap flagged")
-ok("approximation" in ind["note"], "note states it is an approximation")
+ok("counted, not estimated" in ind["note"],
+   "note states the independent count is counted, not estimated")
+ok(ind.get("method") == "counted non-overlapping windows per stock",
+   "independence method is named in the payload")
+ok(ind["effective_independent_estimate"] == len(_non_overlapping(daily, 21)),
+   "reported independence equals the counted non-overlapping set")
 ok(ind["period"].startswith("2026-07-01"), "evaluation period reported")
 
 # Non-overlapping observations must NOT be discounted.
@@ -373,6 +379,35 @@ ok("some edge" in edge.lower(), "a real edge is reported as provisional")
 ok("provisional" in edge.lower(), "edge claim stays hedged")
 
 ok(MIN_EFFECTIVE_N >= 30, "independence threshold is not set trivially low")
+
+
+# Non-overlapping selection: the counted independence method.
+from prediction_tracker import _non_overlapping
+
+daily_one = [{"ticker": "A.NS", "date": f"2026-07-{d:02d}"} for d in range(1, 29)]
+sel = _non_overlapping(daily_one, 21)
+ok(len(sel) == 2, f"28 daily obs of one stock at 21d -> 2 windows (got {len(sel)})")
+gap = (datetime.strptime(sel[1]["date"], "%Y-%m-%d")
+       - datetime.strptime(sel[0]["date"], "%Y-%m-%d")).days
+ok(gap >= 21, "selected windows are at least a full horizon apart")
+
+many_stocks = [{"ticker": f"T{i}.NS", "date": "2026-07-01"} for i in range(10)]
+ok(len(_non_overlapping(many_stocks, 21)) == 10,
+   "different stocks on one day are not discounted against each other")
+
+ok(_non_overlapping([], 21) == [], "empty input -> empty selection")
+ok(len(_non_overlapping(daily_one, 1)) == 28,
+   "a 1-day horizon discounts nothing")
+ok(len(_non_overlapping(daily_one, 999)) == 1,
+   "a horizon longer than the record leaves one window")
+
+# Malformed dates must be skipped, not crash the selection.
+bad = daily_one + [{"ticker": "A.NS", "date": "not-a-date"}]
+ok(len(_non_overlapping(bad, 21)) == 2, "unparseable date skipped safely")
+
+# The counted figure must never exceed the raw count.
+ok(len(_non_overlapping(daily_one, 21)) <= len(daily_one),
+   "independent count never exceeds observations")
 
 
 # ============================ REPORT ==================================
