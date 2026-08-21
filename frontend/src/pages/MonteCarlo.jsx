@@ -4,6 +4,7 @@ import { useMutation } from '@tanstack/react-query'
 import { runMonteCarlo, compareMonteCarlo, trackEvent } from '../api'
 import Spinner from '../components/Spinner'
 import PortfolioCoach from '../components/PortfolioCoach'
+import Methodology from '../components/Methodology'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, Legend
@@ -260,6 +261,7 @@ export default function MonteCarlo() {
         horizonMonths={Math.round(years * 12)}
         onApply={w => setHoldings(w)}
       />
+      <Methodology tool="monte_carlo" />
     </div>
   )
 }

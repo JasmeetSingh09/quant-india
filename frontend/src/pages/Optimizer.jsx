@@ -8,6 +8,7 @@ import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, Cart
 import { Plus, Trash2 } from 'lucide-react'
 import { InfoTip } from '../components/Term'
 import Explainer from '../components/Explainer'
+import Methodology from '../components/Methodology'
 
 const DEFAULT_TICKERS = ['HDFCBANK.NS','TCS.NS','RELIANCE.NS','INFY.NS','HINDUNILVR.NS','SBIN.NS']
 
@@ -526,6 +527,7 @@ export default function Optimizer() {
         horizonMonths={months}
         onApply={w => setTickers(Object.keys(w))}
       />
+      <Methodology tool="optimizer" />
     </div>
   )
 }

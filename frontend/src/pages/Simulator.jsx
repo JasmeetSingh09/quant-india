@@ -9,6 +9,7 @@ import StarterHelp from '../components/StarterHelp'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend, BarChart, Bar, Cell, ReferenceLine } from 'recharts'
 import { InfoTip } from '../components/Term'
 import { Plus, Trash2, RefreshCw, TrendingUp, TrendingDown, Share2, Check } from 'lucide-react'
+import Methodology from '../components/Methodology'
 
 // Commodities you can add to a simulation (friendly name → yfinance futures ticker)
 const COMMODITY_PICKS = [
@@ -569,6 +570,7 @@ export default function Simulator() {
           focus="live"
         />
       )}
+      <Methodology tool="realtime_simulator" />
     </div>
   )
 }

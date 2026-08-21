@@ -3,6 +3,7 @@ import { useMutation } from '@tanstack/react-query'
 import { advisePortfolio, portfolioScenarios, portfolioWhatIf, trackEvent } from '../api'
 import Spinner from './Spinner'
 import { Lightbulb, AlertTriangle, Info, Check, Plus, X } from 'lucide-react'
+import Methodology from './Methodology'
 
 const sevStyle = s =>
   s === 'high'   ? 'border-red-800/60 bg-red-950/30' :
@@ -497,6 +498,7 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
           <p className="text-[11px] text-gray-600 mt-3">{scen.data.disclaimer}</p>
         </div>
       )}
+      <Methodology tool="coach" />
     </div>
   )
 }

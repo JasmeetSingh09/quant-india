@@ -121,6 +121,7 @@ export const trackEvent = (event, props = {}) => {
   try { api.post('/events/track', { event, props }).catch(() => {}) } catch { /* ignore */ }
 }
 
+export const getMethodology    = tool => api.get(`/methodology/${tool}`)
 export const getBenchmark      = (days = 365) => api.get('/benchmark', { params: { days } })
 export const advisePortfolio   = body => api.post('/portfolio/advise', body, { timeout: 120000 })
 export const portfolioWhatIf = body => api.post('/portfolio/what-if', body, { timeout: 120000 })

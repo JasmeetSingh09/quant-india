@@ -1136,6 +1136,25 @@ def liquidity_check(ticker: str):
     return a
 
 
+@app.get("/methodology")
+def methodology_all():
+    """
+    What every major tool computes, on what data, under what assumptions, and
+    what must NOT be concluded from it. Public and deliberately unflattering.
+    """
+    from methodology import all_tools
+    return all_tools()
+
+
+@app.get("/methodology/{tool}")
+def methodology_one(tool: str):
+    from methodology import for_tool
+    r = for_tool(tool)
+    if not r:
+        raise HTTPException(status_code=404, detail=f"No methodology recorded for '{tool}'.")
+    return r
+
+
 @app.get("/advice/effectiveness")
 def advice_effectiveness():
     """
