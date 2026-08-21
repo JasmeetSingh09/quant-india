@@ -659,8 +659,17 @@ ok(len(WEIGHTS_V2) == 6, "V2 has exactly six factors")
 ok("liquidity" not in WEIGHTS_V2,
    "liquidity is NOT a factor — it is an execution constraint, not attractiveness")
 ok(len(set(WEIGHTS_V2.values())) > 1, "weights are not all equal")
-ok(WEIGHTS_V2["momentum"] == max(WEIGHTS_V2.values()),
-   "momentum carries the largest weight, matching its evidence base")
+# This test previously asserted momentum should carry the LARGEST weight, on the
+# reasoning that it has the strongest published record. The walk-forward then
+# tested it on this universe across 12 configurations and found no edge surviving
+# correction for multiple testing. So the assertion inverted: the one factor
+# measured and found wanting must not hold the largest share.
+ok(WEIGHTS_V2["momentum"] < max(WEIGHTS_V2.values()),
+   "momentum is no longer the largest weight — it was tested here and failed")
+ok(WEIGHTS_V2["momentum"] > 0,
+   "but it is reduced, not removed: a null on one market is not proof of none")
+ok(WEIGHTS_V2["sentiment"] == min(WEIGHTS_V2.values()),
+   "sentiment carries the smallest weight, matching the weakest evidence base")
 ok(all(k in FACTOR_PLAIN for k in WEIGHTS_V2), "every factor has a plain-language label")
 
 # The sentence must name the WORST factor, not the mildest negative.
