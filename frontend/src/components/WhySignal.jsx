@@ -82,6 +82,14 @@ export default function WhySignal({ ticker }) {
         <span className="text-xs text-gray-500">over {horizon} trading days</span>
       </div>
 
+      {/* The same warning the six-factor panel carries. A signal shown without
+          it reads as a tested recommendation, which this is not. */}
+      <p className="text-[11px] text-amber-200/85 border-l-2 border-amber-700/70 pl-2.5 leading-relaxed">
+        <b>Experimental.</b> This model has not been shown to predict returns. Its
+        only tested factor produced no edge across 12 walk-forward configurations
+        after correcting for multiple testing.
+      </p>
+
       {/* What the score is, stated with what it is not. */}
       <p className="text-[10px] uppercase tracking-widest text-gray-500">Model context</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

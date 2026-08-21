@@ -39,19 +39,36 @@ import numpy as np
 # These are a STARTING point, not a finding. They are configurable so the app can
 # eventually answer "why these weights?" with a comparison instead of a shrug.
 WEIGHTS_V2 = {
-    "momentum":  0.25,
-    "quality":   0.20,
+    "momentum":  0.18,
+    "quality":   0.22,
     "growth":    0.15,
-    "value":     0.15,
-    "sentiment": 0.15,
-    "low_risk":  0.10,
+    "value":     0.17,
+    "sentiment": 0.10,
+    "low_risk":  0.18,
 }
 
-# My own reading differs on one of these and it is recorded rather than acted on:
-# news sentiment at a 21-day horizon has the weakest published evidence of
-# anything here, and I would start it nearer 8%. It is at 15% because that is the
-# specified starting point, and because the honest way to settle it is the
-# comparison below rather than either of our priors.
+# These changed once, on evidence rather than preference.
+#
+# Momentum fell from 25% to 18% because it is the ONLY factor that has been
+# tested on this universe, and it failed: 12 walk-forward configurations across
+# three horizons and two universe sizes produced no result surviving correction
+# for multiple testing, sign flips between adjacent settings, and a gross spread
+# smaller than trading costs in 7 of 12 cases. Giving the largest weight to the
+# one factor measured and found wanting could not be defended.
+#
+# It is reduced rather than removed. A null on 42 windows of one market is not
+# proof that momentum never works — it is a failure to demonstrate that it works
+# here. Removing it would overclaim in the opposite direction.
+#
+# Sentiment fell from 15% to 10%: weakest published evidence at this horizon, and
+# untested here.
+#
+# Low-risk rose to 18% because the low-volatility anomaly has the broadest
+# replication record of anything in this model, though it too is untested here.
+# Quality and value rose slightly for the same reason.
+#
+# None of this makes the model validated. It makes the weights consistent with
+# what is known, which is a lower bar and the only one currently reachable.
 WEIGHT_NOTES = {
     "momentum": "Strongest published record, and the only factor computed purely "
                 "from prices — it never waits for a company to report.",
@@ -237,6 +254,12 @@ def compute_v2(ticker: str, v1_result: dict = None) -> dict:
         "factor_coverage": coverage,
         "liquidity": liq,
         "horizon_days": 21,
+        "evidence_status": "experimental",
+        "evidence_note": (
+            "This model has NOT been shown to predict returns. Its largest tested "
+            "factor, momentum, produced no edge across 12 walk-forward "
+            "configurations after correcting for multiple testing. Treat every "
+            "score as a research output, not a recommendation."),
         "score_scale": {"range": [-100, 100],
                         "means": "Model preference, not a predicted return."},
         # The comparison is the point of running both.

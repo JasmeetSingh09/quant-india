@@ -63,6 +63,19 @@ export default function SixFactor({ ticker }) {
         </span>
       </div>
 
+      {/* Beside the signal, not beneath the fold. A BUY badge on a model whose
+          only tested factor showed no edge cannot be presented without this. */}
+      {data.evidence_status === 'experimental' && (
+        <div className="rounded-lg border border-amber-700/70 bg-amber-950/25 p-2.5">
+          <p className="text-[11px] uppercase tracking-widest text-amber-400 mb-1">
+            Experimental — not validated
+          </p>
+          <p className="text-xs text-amber-100/90 leading-relaxed">
+            {data.evidence_note}
+          </p>
+        </div>
+      )}
+
       {/* The sentence. This is the part that actually gets read. */}
       <p className="text-sm text-gray-200 leading-relaxed">{e.sentence}</p>
 
