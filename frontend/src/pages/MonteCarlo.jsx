@@ -160,6 +160,13 @@ export default function MonteCarlo() {
               </div>
 
               {/* Fan chart */}
+              <p className="mb-2 text-xs text-gray-400 leading-relaxed">
+                Each line is one simulated path. The band shows where most paths
+                end up: half finish above {fmt(d.percentiles.p50)}, and in the worst
+                one-in-twenty they finish near {fmt(d.percentiles.p5)}. The chart is
+                the evidence for those numbers, not a forecast of any one line.
+              </p>
+
               <div className="card">
                 <h2 className="font-semibold mb-3">Projected Portfolio Value — Outcome Range</h2>
                 <ResponsiveContainer width="100%" height={280}>

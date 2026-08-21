@@ -5,6 +5,7 @@ import Spinner from './Spinner'
 import { Lightbulb, AlertTriangle, Info, Check, Plus, X } from 'lucide-react'
 import Methodology from './Methodology'
 import { horizonLabel } from '../horizonLabel'
+import usePersistentState from '../usePersistentState'
 
 const sevStyle = s =>
   s === 'high'   ? 'border-red-800/60 bg-red-950/30' :
@@ -70,6 +71,12 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
                                          currentReturnPct = null, daysHeld = null,
                                          focus = 'live', onApply }) {
   const [applied, setApplied] = useState(null)
+  // Beginner by default. Someone who wants the covariance detail will go
+  // looking for it; someone who does not should never have to scroll past it
+  // to reach the finding. The numbers are identical either way — this changes
+  // what is shown, never what is computed.
+  const [detail, setDetail] = usePersistentState('coach.detail', 'simple')
+  const isAdvanced = detail === 'advanced'
   // User-driven tweak, distinct from the preset scenarios: they answer "what
   // could I change?", this answers "what if I change it like THIS?".
   const nHold = Object.keys(holdings || {}).length
@@ -148,9 +155,20 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
           <Lightbulb size={18} className="text-yellow-400" />
           {mode.heading}
         </h2>
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-md overflow-hidden border border-gray-700 text-[10px]">
+            {['simple', 'advanced'].map(m => (
+              <button key={m} onClick={() => setDetail(m)}
+                className={`px-2 py-1 capitalize transition-colors ${
+                  detail === m ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-gray-200'}`}>
+                {m}
+              </button>
+            ))}
+          </div>
         <button onClick={run} disabled={busy} className="btn-ghost text-xs">
           {busy ? 'Analysing…' : advice.data ? 'Re-analyse' : 'Analyse my portfolio'}
         </button>
+        </div>
       </div>
 
       {!advice.data && !busy && (
@@ -264,9 +282,47 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
             </div>
           )}
 
+          {/* Which holding drives the swings. A stock at 10% of the money can
+              drive 30% of the movement, and that gap is invisible in a weights
+              table — which is the only table most people ever see. */}
+          {isAdvanced && advice.data.risk_contributions?.length > 1 && (
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-1.5">
+                Where the risk comes from
+              </p>
+              <div className="space-y-1">
+                {advice.data.risk_contributions.map(r => (
+                  <div key={r.ticker} className="flex items-center gap-2 text-[11px]">
+                    <span className="w-20 shrink-0 text-gray-400">{r.ticker.replace('.NS','')}</span>
+                    <div className="flex-1 h-1.5 bg-gray-800 rounded-sm overflow-hidden">
+                      <div className="bg-blue-500 h-full" style={{ width: `${Math.min(r.risk_pct, 100)}%` }} />
+                    </div>
+                    <span className="w-24 text-right text-gray-500 shrink-0">
+                      {r.weight_pct}% money
+                    </span>
+                    <span className="w-20 text-right font-mono text-gray-200 shrink-0">
+                      {r.risk_pct}% risk
+                    </span>
+                    <span className={`w-12 text-right font-mono shrink-0 ${
+                      r.gap_pts > 5 ? 'text-red-400' : r.gap_pts < -5 ? 'text-green-400' : 'text-gray-600'}`}
+                      title={r.gap_pts > 0
+                        ? 'Contributes more volatility than its size suggests'
+                        : 'Contributes less volatility than its size suggests'}>
+                      {r.gap_pts > 0 ? '+' : ''}{r.gap_pts}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-gray-600 mt-1.5">
+                Money and risk are different quantities. A volatile holding at 10%
+                can drive more of your ups and downs than a stable one at 30%.
+              </p>
+            </div>
+          )}
+
           {/* Where the money actually sits by sector. Counting holdings hides
               five banks; this makes it impossible to miss. */}
-          {advice.data.sector_exposure && Object.keys(advice.data.sector_exposure).length > 1 && (
+          {isAdvanced && advice.data.sector_exposure && Object.keys(advice.data.sector_exposure).length > 1 && (
             <div>
               <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-1.5">Sector exposure</p>
               <div className="flex h-2 rounded-full overflow-hidden bg-gray-800">
@@ -307,8 +363,17 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
             </p>
           ) : (
             <div className="space-y-2">
-              {advice.data.suggestions.map((s, i) => (
+              {/* Ranked and counted. A list of warnings with no order asks the
+                  reader to decide which matters most, which is the judgement
+                  they came here to borrow. */}
+              <p className="text-xs text-gray-400 font-medium">
+                {isAdvanced || advice.data.suggestions.length <= 3
+                  ? `${advice.data.suggestions.length} thing${advice.data.suggestions.length === 1 ? '' : 's'} to look at${advice.data.suggestions.length > 1 ? ', biggest first' : ''}`
+                  : `Top 3 of ${advice.data.suggestions.length} — switch to Advanced for the rest`}
+              </p>
+              {(isAdvanced ? advice.data.suggestions : advice.data.suggestions.slice(0, 3)).map((s, i) => (
                 <div key={i} className={`flex gap-2 items-start p-3 rounded-lg border ${sevStyle(s.severity)}`}>
+                  <span className="text-[11px] font-mono text-gray-500 shrink-0 mt-0.5 w-3">{i + 1}</span>
                   {sevIcon(s.severity)}
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-200">{s.title}</p>
@@ -643,7 +708,7 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
           <p className="text-[11px] text-gray-600 mt-3">{scen.data.disclaimer}</p>
         </div>
       )}
-      <Methodology tool="coach" />
+      {isAdvanced && <Methodology tool="coach" />}
     </div>
   )
 }

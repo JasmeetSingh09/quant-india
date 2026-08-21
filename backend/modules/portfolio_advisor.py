@@ -410,8 +410,26 @@ def advise(holdings: dict, initial_value: float = 100000,
     except Exception:
         _hs = None
 
+    # Per-holding risk share, so a reader can see WHICH position drives the
+    # portfolio's swings. Money and risk are different quantities and the gap
+    # between them is the point.
+    _risk_rows = None
+    try:
+        from portfolio_optimizer import risk_decomposition
+        _rd = risk_decomposition({t: w[t] for t in tickers})
+        _risk_rows = [{
+            "ticker": c.get("ticker"),
+            "weight_pct": round(c.get("weight_pct") or 0, 1),
+            "risk_pct": round(c.get("risk_contribution_pct") or 0, 1),
+            "gap_pts": round((c.get("risk_contribution_pct") or 0)
+                             - (c.get("weight_pct") or 0), 1),
+        } for c in (_rd.get("components") or [])]
+    except Exception:
+        _risk_rows = None
+
     return {
         "health": _hs,
+        "risk_contributions": _risk_rows,
         "suggestions": tips,
         "n_suggestions": len(tips),
         "downside_pct": downside,
