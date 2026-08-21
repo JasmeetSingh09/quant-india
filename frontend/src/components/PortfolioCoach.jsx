@@ -48,6 +48,63 @@ const MODES = {
   },
 }
 
+/**
+ * Finding — the headline always, the reasoning on request.
+ *
+ * Each warning previously showed its title, its detail, its payoff and its
+ * transferable lesson all at once. Three of those stacked is a paragraph, and a
+ * reader facing three paragraphs reads none of them — the density defeated the
+ * teaching it was there to do.
+ *
+ * The number that triggered it stays visible, because that is the finding. The
+ * explanation opens when someone wants it, which is also when they will actually
+ * read it. Advanced mode opens them by default, since choosing advanced IS the
+ * request.
+ */
+function Finding({ s, i, openByDefault }) {
+  const [open, setOpen] = useState(!!openByDefault)
+  return (
+    <div className={`flex gap-2 items-start p-3 rounded-lg border ${sevStyle(s.severity)}`}>
+      <span className="text-[11px] font-mono text-gray-500 shrink-0 mt-0.5 w-3">{i + 1}</span>
+      {sevIcon(s.severity)}
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-gray-200">{s.title}</p>
+
+        {/* The size of the prize stays visible: a warning without a number is a
+            lecture, and this is the part that turns it into a decision. */}
+        {s.payoff && (
+          <p className="text-xs mt-1 font-mono text-green-400">
+            cap {s.payoff.cap_pct}% → worst case {s.payoff.downside_before}%
+            {' '}to {s.payoff.downside_after}%
+            <span className="text-green-300"> ({s.payoff.improvement_pts} pts better)</span>
+          </p>
+        )}
+
+        {(s.detail || s.lesson) && (
+          <button onClick={() => setOpen(o => !o)}
+                  aria-expanded={open}
+                  className="text-[11px] text-gray-500 hover:text-gray-300 mt-1.5 transition-colors">
+            {open ? 'Hide explanation' : 'Why does this matter?'}
+          </button>
+        )}
+
+        {open && (
+          <div className="mt-1.5 space-y-2">
+            {s.detail && (
+              <p className="text-xs text-gray-400 leading-relaxed">{s.detail}</p>
+            )}
+            {s.lesson && (
+              <p className="text-[11px] text-gray-500 pl-2 border-l-2 border-gray-700 leading-relaxed">
+                {s.lesson}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 const pctStr = v => v == null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(1)}%`
 
 /**
@@ -372,31 +429,7 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
                   : `Top 3 of ${advice.data.suggestions.length} — switch to Advanced for the rest`}
               </p>
               {(isAdvanced ? advice.data.suggestions : advice.data.suggestions.slice(0, 3)).map((s, i) => (
-                <div key={i} className={`flex gap-2 items-start p-3 rounded-lg border ${sevStyle(s.severity)}`}>
-                  <span className="text-[11px] font-mono text-gray-500 shrink-0 mt-0.5 w-3">{i + 1}</span>
-                  {sevIcon(s.severity)}
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-200">{s.title}</p>
-                    <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{s.detail}</p>
-                    {/* The size of the prize. A warning without a number is a
-                        lecture; this turns it into a decision the user can weigh. */}
-                    {s.payoff && (
-                      <p className="text-xs mt-2 font-mono text-green-400">
-                        cap {s.payoff.cap_pct}% → worst case {s.payoff.downside_before}%
-                        {' '}to {s.payoff.downside_after}%
-                        <span className="text-green-300"> ({s.payoff.improvement_pts} pts better)</span>
-                      </p>
-                    )}
-                    {/* The principle behind the finding. Fixing this portfolio is
-                        worth less than recognising the same mistake unaided next
-                        time, so the lesson sits alongside every warning. */}
-                    {s.lesson && (
-                      <p className="text-[11px] text-gray-500 mt-2 pl-2 border-l-2 border-gray-700 leading-relaxed">
-                        {s.lesson}
-                      </p>
-                    )}
-                  </div>
-                </div>
+                <Finding key={i} s={s} i={i} openByDefault={isAdvanced} />
               ))}
             </div>
           )}

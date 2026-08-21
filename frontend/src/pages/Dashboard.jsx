@@ -7,8 +7,9 @@ import Explainer from '../components/Explainer'
 import CapTierPicks from '../components/CapTierPicks'
 import Leaderboard from '../components/Leaderboard'
 import EmailOptIn from '../components/EmailOptIn'
-import { TrendingUp, TrendingDown, Sparkles, ArrowUpRight, ArrowDownRight, RefreshCw, History } from 'lucide-react'
+import { ChevronDown, TrendingUp, TrendingDown, Sparkles, ArrowUpRight, ArrowDownRight, RefreshCw, History } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
+import usePersistentState from '../usePersistentState'
 
 const NIFTY_STOCKS = ['RELIANCE.NS','TCS.NS','HDFCBANK.NS','INFY.NS','ICICIBANK.NS']
 
@@ -459,6 +460,8 @@ function NiftyLevel() {
 }
 
 export default function Dashboard() {
+  // Collapsed by default: the three questions come first, context follows.
+  const [showContext, setShowContext] = usePersistentState('dash.showContext', false)
   const { data: mcx,    isLoading: mcxLoading,    isError: mcxError    } = useQuery({ queryKey: ['mcx'],     queryFn: getMCX,        refetchInterval: 120000 })
   const { data: regime, isLoading: regimeLoading, isError: regimeError } = useQuery({ queryKey: ['regime'],  queryFn: getRegime,     staleTime: 300000 })
   const { data: news,   isLoading: newsLoading,   isError: newsError   } = useQuery({ queryKey: ['mktNews'], queryFn: getMarketNews, staleTime: 60000 })
@@ -514,8 +517,18 @@ export default function Dashboard() {
       {/* Asked once, then never again — see the component. */}
       <EmailOptIn />
 
+      {/* Market context, collapsed by default. Commodities, news and the regime
+          detail inform a decision rather than driving one, and leaving nine
+          sections expanded meant the three that matter competed with six that
+          did not. Nothing is removed — it opens in one click. */}
+      <button onClick={() => setShowContext(c => !c)}
+              aria-expanded={showContext}
+              className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors border-t border-gray-800 pt-3 w-full">
+        {showContext ? 'Hide' : 'Show'} market context — commodities, news, regime detail
+        <ChevronDown size={13} className={`transition-transform ${showContext ? 'rotate-180' : ''}`} />
+      </button>
 
-
+      {showContext && (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* MCX Commodities */}
         <div className="card col-span-1">
@@ -550,6 +563,7 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+      )}
 
       {/* Regime detail */}
       {regimeError && (
