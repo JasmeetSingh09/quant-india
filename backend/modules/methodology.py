@@ -34,10 +34,12 @@ TOOLS = {
             "published rates, and price impact is estimated from the stock's own "
             "daily traded value. Whole shares only — the remainder stays as "
             "uninvested cash.",
-            "There is still no cash account: adding a position adds fresh capital "
-            "rather than spending a balance, so you cannot run out of money. That "
-            "is convenient and unlike investing, and it is the one piece of "
-            "realism this simulator still lacks.",
+            "There is a real cash balance. Deposits, withdrawals and sale "
+            "proceeds all move through it, buying with existing cash refuses to "
+            "overspend, and money that could not buy a whole share stays "
+            "uninvested rather than vanishing. Uninvested cash counts toward "
+            "portfolio value, so idle money shows up as drag exactly as it "
+            "would in a real account.",
             "Dividends ARE credited as cash since the purchase date, so this "
             "reports total return and agrees with the historical backtest. They "
             "are not reinvested, because cash landing in an account is what "

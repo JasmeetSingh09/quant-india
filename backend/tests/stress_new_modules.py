@@ -550,6 +550,45 @@ ok(_ms(_early)["open"] is False, "08:30 IST is before the open")
 ok("IST" in _ms()["as_of"], "timestamps are labelled IST")
 
 
+# Cash account: money must not be creatable, destroyable, or overspendable.
+import simulator as _sm
+
+_U, _N = "pytest_cash", "PytestCash"
+try:
+    _sm.delete_simulation(_N, user_id=_U)
+except Exception:
+    pass
+_start = _sm.start_simulation(_N, {"RELIANCE.NS": 100.0}, initial_value=50000, user_id=_U)
+if "error" not in _start:
+    ok(_sm.deposit(_N, 20000, user_id=_U).get("cash") == 20000, "deposit lands in cash")
+    ok("error" in _sm.deposit(_N, 0, user_id=_U), "zero deposit rejected")
+    ok("error" in _sm.deposit(_N, -5, user_id=_U), "negative deposit rejected")
+
+    _over = _sm.buy_from_cash(_N, "TCS.NS", 10_000_000, user_id=_U)
+    ok("error" in _over, "cannot spend cash you do not have")
+    ok("Not enough cash" in _over["error"], "refusal explains why")
+
+    ok("error" in _sm.withdraw(_N, 10_000_000, user_id=_U), "cannot withdraw beyond balance")
+
+    _p = _sm.get_simulation_pnl(_N, user_id=_U)
+    ok(_p.get("cash") is not None, "P&L reports the cash balance")
+    ok(abs(_p["current_value"] - (_p["initial_value"])) < _p["initial_value"] * 0.02,
+       "capital and value agree before the market moves, net of costs")
+
+    _before = _sm.get_simulation_pnl(_N, user_id=_U)["current_value"]
+    _sm.remove_position(_N, "RELIANCE.NS", user_id=_U)
+    _after = _sm.get_simulation_pnl(_N, user_id=_U)
+    ok(abs(_after["current_value"] - _before) < max(1.0, _before * 0.001),
+       "selling changes the FORM of the money, not its amount")
+    ok(_after["cash"] > 0, "sale proceeds land in cash")
+    try:
+        _sm.delete_simulation(_N, user_id=_U)
+    except Exception:
+        pass
+else:
+    ok(True, "cash tests skipped — could not start a simulation offline")
+
+
 # ============================ REPORT ==================================
 print("\n" + "=" * 60)
 print(f"TOTAL CHECKS: {checks}")

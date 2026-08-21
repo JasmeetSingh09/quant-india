@@ -1164,6 +1164,50 @@ def optimizer_stability_check(req: StabilityRequest):
     return r
 
 
+class CashRequest(BaseModel):
+    amount: float
+
+
+class BuyRequest(BaseModel):
+    ticker: str
+    amount: float
+
+
+@app.post("/simulator/realtime/{name}/deposit")
+def sim_deposit(name: str, req: CashRequest, user_id: str = Depends(current_user_id)):
+    """Pay cash into a simulation. It sits uninvested until it buys something."""
+    from simulator import deposit
+    r = deposit(name, req.amount, user_id=user_id)
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+
+@app.post("/simulator/realtime/{name}/withdraw")
+def sim_withdraw(name: str, req: CashRequest, user_id: str = Depends(current_user_id)):
+    """Take cash out — only cash that is actually there."""
+    from simulator import withdraw
+    r = withdraw(name, req.amount, user_id=user_id)
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+
+@app.post("/simulator/realtime/{name}/buy")
+def sim_buy_from_cash(name: str, req: BuyRequest, user_id: str = Depends(current_user_id)):
+    """
+    Buy with money already in the simulation, refusing to overspend.
+
+    Distinct from /add, which deposits fresh capital. This is the realistic
+    path: a fixed pot where every purchase competes with every other for it.
+    """
+    from simulator import buy_from_cash
+    r = buy_from_cash(name, req.ticker.strip().upper(), req.amount, user_id=user_id)
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+
 @app.get("/execution/preview")
 def execution_preview(ticker: str = Query(...), amount: float = Query(..., gt=0)):
     """

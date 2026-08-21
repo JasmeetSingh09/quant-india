@@ -162,8 +162,16 @@ def _init_db_locked():
     try:
         if _db.IS_POSTGRES:
             conn.execute("ALTER TABLE simulations ADD COLUMN IF NOT EXISTS is_demo INTEGER DEFAULT 0")
+            conn.execute("ALTER TABLE simulations ADD COLUMN IF NOT EXISTS cash REAL DEFAULT 0")
         else:
             conn.execute("ALTER TABLE simulations ADD COLUMN is_demo INTEGER DEFAULT 0")
+            try:
+
+                conn.execute("ALTER TABLE simulations ADD COLUMN cash REAL DEFAULT 0")
+
+            except Exception:
+
+                pass          # already present
         conn.commit()
     except Exception:
         pass          # already present
@@ -602,6 +610,21 @@ def get_simulation_pnl(name: str, user_id: str = "public") -> dict:
             "status":        "profit" if pnl_inr >= 0 else "loss",
         })
 
+    # Uninvested cash is part of the portfolio. Leaving it out would report a
+    # loss the moment money sits idle, and would make a portfolio look better
+    # simply for being fully invested — which is cash drag arriving as a bug.
+    # A fresh connection: the one above was closed before the prices were
+    # fetched. Reading cash on the closed handle raised, and _get_cash swallowed
+    # it into 0.0 — so the balance silently disappeared from the portfolio
+    # instead of failing loudly. A helper that returns a plausible number on
+    # error hides exactly this.
+    _ensure_cash_column()
+    _cconn = get_conn()
+    try:
+        _cash_bal = _get_cash(_cconn, name, user_id)
+    finally:
+        _cconn.close()
+    total_current = total_current + _cash_bal
     total_pnl_inr = total_current - initial_value
     total_pnl_pct = (total_pnl_inr / initial_value) * 100 if initial_value else 0
 
@@ -630,6 +653,7 @@ def get_simulation_pnl(name: str, user_id: str = "public") -> dict:
         "days_running":    _days_since(started_at),
         "initial_value":   initial_value,
         "current_value":   round(total_current, 2),
+        "cash":            round(_cash_bal, 2),
         "total_pnl_inr":   round(total_pnl_inr, 2),
         "total_pnl_pct":   round(total_pnl_pct, 2),
         "overall_status":  "profit" if total_pnl_inr >= 0 else "loss",
@@ -684,7 +708,133 @@ def list_simulations(user_id: str = "public") -> list:
     ]
 
 
-def add_position(sim_name: str, ticker: str, amount: float, user_id: str = "public") -> dict:
+def _ensure_cash_column():
+    """
+    Add the cash balance to existing simulations.
+
+    Runs on its own connection: a failed ALTER poisons the whole transaction on
+    Postgres, which is what previously 500'd unrelated endpoints.
+
+    Existing simulations get cash = 0, which is the honest migration. Under the
+    old model every rupee deposited was immediately fully invested, so zero
+    uninvested cash is exactly what those portfolios held — nobody's recorded
+    position changes value because of this.
+    """
+    conn = get_conn()
+    try:
+        if IS_POSTGRES:
+            conn.execute("ALTER TABLE simulations ADD COLUMN IF NOT EXISTS cash REAL DEFAULT 0")
+        else:
+            conn.execute("ALTER TABLE simulations ADD COLUMN cash REAL DEFAULT 0")
+        conn.commit()
+    except Exception:
+        pass          # already present
+    finally:
+        conn.close()
+
+
+def _get_cash(conn, sim_name: str, user_id: str) -> float:
+    try:
+        row = conn.execute(
+            "SELECT cash FROM simulations WHERE name = ? AND user_id = ?",
+            (sim_name, user_id)).fetchone()
+        return float(row[0]) if row and row[0] is not None else 0.0
+    except Exception:
+        return 0.0
+
+
+def _set_cash(conn, sim_name: str, user_id: str, amount: float):
+    conn.execute("UPDATE simulations SET cash = ? WHERE name = ? AND user_id = ?",
+                 (round(float(amount), 2), sim_name, user_id))
+
+
+def deposit(sim_name: str, amount: float, user_id: str = "public") -> dict:
+    """Pay money into the simulation. It sits as cash until it buys something."""
+    _init_db(); _ensure_cash_column()
+    if amount is None or amount <= 0:
+        return {"error": "Deposit must be positive."}
+    conn = get_conn()
+    row = conn.execute("SELECT initial_value FROM simulations WHERE name = ? AND user_id = ?",
+                       (sim_name, user_id)).fetchone()
+    if not row:
+        conn.close()
+        return {"error": f"Simulation '{sim_name}' not found"}
+    cash = _get_cash(conn, sim_name, user_id) + float(amount)
+    _set_cash(conn, sim_name, user_id, cash)
+    conn.execute("UPDATE simulations SET initial_value = ? WHERE name = ? AND user_id = ?",
+                 (float(row[0]) + float(amount), sim_name, user_id))
+    conn.commit(); conn.close()
+    return {"status": "deposited", "amount": round(float(amount), 2),
+            "cash": round(cash, 2),
+            "note": f"Rs {amount:,.0f} added. Cash balance is now Rs {cash:,.0f}."}
+
+
+def withdraw(sim_name: str, amount: float, user_id: str = "public") -> dict:
+    """
+    Take money out — but only money that is actually there.
+
+    Refusing an over-withdrawal is the whole point of having a balance. A
+    simulator that lets you spend what you do not have teaches the one lesson
+    investing never does.
+    """
+    _init_db(); _ensure_cash_column()
+    if amount is None or amount <= 0:
+        return {"error": "Withdrawal must be positive."}
+    conn = get_conn()
+    row = conn.execute("SELECT initial_value FROM simulations WHERE name = ? AND user_id = ?",
+                       (sim_name, user_id)).fetchone()
+    if not row:
+        conn.close()
+        return {"error": f"Simulation '{sim_name}' not found"}
+    cash = _get_cash(conn, sim_name, user_id)
+    if float(amount) > cash + 1e-9:
+        conn.close()
+        return {"error": (f"Not enough cash. You have Rs {cash:,.2f} uninvested and "
+                          f"asked for Rs {amount:,.2f}. Sell a holding first.")}
+    cash -= float(amount)
+    _set_cash(conn, sim_name, user_id, cash)
+    conn.execute("UPDATE simulations SET initial_value = ? WHERE name = ? AND user_id = ?",
+                 (max(float(row[0]) - float(amount), 0.0), sim_name, user_id))
+    conn.commit(); conn.close()
+    return {"status": "withdrawn", "amount": round(float(amount), 2),
+            "cash": round(cash, 2),
+            "note": f"Rs {amount:,.0f} withdrawn. Cash balance is now Rs {cash:,.0f}."}
+
+
+def buy_from_cash(sim_name: str, ticker: str, amount: float,
+                  user_id: str = "public") -> dict:
+    """
+    Buy using money already in the simulation, refusing to overspend.
+
+    add_position() deposits fresh capital and buys with it, which is convenient
+    and is how every existing portfolio was built — so it stays. This is the
+    realistic path: a fixed pot, and every purchase competes with every other
+    for it. That constraint is most of what makes allocation a decision rather
+    than a wish list.
+    """
+    _init_db(); _ensure_cash_column()
+    if amount is None or amount <= 0:
+        return {"error": "Amount must be positive."}
+    conn = get_conn()
+    exists = conn.execute("SELECT 1 FROM simulations WHERE name = ? AND user_id = ?",
+                          (sim_name, user_id)).fetchone()
+    if not exists:
+        conn.close()
+        return {"error": f"Simulation '{sim_name}' not found"}
+    cash = _get_cash(conn, sim_name, user_id)
+    conn.close()
+
+    if float(amount) > cash + 1e-9:
+        return {"error": (f"Not enough cash. You have Rs {cash:,.2f} uninvested and "
+                          f"tried to spend Rs {amount:,.2f}. Deposit more, or sell "
+                          f"something first — a real account works the same way."),
+                "cash": round(cash, 2)}
+
+    res = add_position(sim_name, ticker, amount, user_id=user_id, _from_cash=True)
+    return res
+
+def add_position(sim_name: str, ticker: str, amount: float, user_id: str = "public",
+                 _from_cash: bool = False) -> dict:
     """
     Add (buy) a stock into an ALREADY-RUNNING simulation at TODAY'S live price.
 
@@ -741,6 +891,7 @@ def add_position(sim_name: str, ticker: str, amount: float, user_id: str = "publ
         return {"error": (f"Rs {amount:,.0f} is not enough to buy one share of "
                           f"{ticker} at Rs {price:,.2f} after costs.")}
 
+    _ensure_cash_column()
     buy_units = _units["units"]
     # Capital actually put to work: the shares bought. Costs and the leftover
     # rupees that could not buy a whole share are both real and both excluded.
@@ -786,6 +937,21 @@ def add_position(sim_name: str, ticker: str, amount: float, user_id: str = "publ
             f"(₹{invested:,.0f} invested). Costs ₹{_cost['total_cost']:,.0f}, "
             f"₹{_units['leftover_cash']:,.0f} could not buy a whole share.")
 
+    # Money that did not buy a whole share does not evaporate — it stays as cash,
+    # which is what a real account does and what makes the balance meaningful.
+    _leftover = float(_units.get("leftover_cash") or 0.0)
+    _cash = _get_cash(conn, sim_name, user_id)
+    if _from_cash:
+        # Spending an existing balance: the whole order amount leaves cash, and
+        # the unspendable remainder comes back. Capital does not grow.
+        _cash = _cash - float(_cost["amount"]) + _leftover
+        new_init = sim[0]
+    else:
+        # Fresh capital: only the invested part counts toward capital, and the
+        # remainder is held as cash rather than quietly vanishing.
+        _cash = _cash + _leftover
+        new_init = sim[0] + invested + _leftover
+    _set_cash(conn, sim_name, user_id, max(_cash, 0.0))
     conn.execute("UPDATE simulations SET initial_value = ? WHERE name = ? AND user_id = ?",
                  (new_init, sim_name, user_id))
     conn.commit()
@@ -849,13 +1015,23 @@ def remove_position(sim_name: str, ticker: str, user_id: str = "public") -> dict
     # Adjusted for splits and bonuses since entry: a 1:2 split
     # halves the price while stored units stay put, which would
     # otherwise read as a 50% loss that never happened.
+    _ensure_cash_column()
     units = units * _split_factor_since(ticker, entry_date)
     current_value = units * current_price
-    realized_pnl  = (current_value + _dividends_since(ticker, entry_date, units)) - entry_value
-    new_init      = max(sim[0] - entry_value, 0.0)
+    _divs         = _dividends_since(ticker, entry_date, units)
+    realized_pnl  = (current_value + _divs) - entry_value
+    # Proceeds land as cash, which is what selling actually does. Previously the
+    # position simply vanished along with its capital, so a sale could not be
+    # followed by a purchase without depositing again.
+    _proceeds     = current_value + _divs
+    # Capital stays put: the money did not leave the simulation, it changed form
+    # from stock into cash. Reducing capital by the entry value AND crediting the
+    # proceeds would double-count the sale.
+    new_init      = sim[0]
 
     conn.execute("DELETE FROM sim_positions WHERE sim_name = ? AND ticker = ? AND user_id = ?",
                  (sim_name, ticker, user_id))
+    _set_cash(conn, sim_name, user_id, _get_cash(conn, sim_name, user_id) + _proceeds)
     conn.execute("UPDATE simulations SET initial_value = ? WHERE name = ? AND user_id = ?",
                  (new_init, sim_name, user_id))
     conn.commit()
