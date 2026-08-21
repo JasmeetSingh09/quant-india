@@ -503,6 +503,37 @@ ok(_c2 and _c2["effective_positions"] < 3,
    "two lopsided holdings behave like fewer than 3 positions")
 
 
+# Execution realism: costs, whole shares, market hours, impact by liquidity.
+from execution import cost_breakdown, units_for, market_status, estimate_slippage_pct
+
+_c = cost_breakdown("RELIANCE.NS", 100000)
+ok(_c["total_cost"] > 0, "a trade costs something")
+ok(_c["invested_after_costs"] < 100000, "costs reduce what gets invested")
+ok(abs(_c["charges"]["stt"] - 100) < 1, "STT is 0.1% of turnover")
+ok(_c["total_cost_pct"] < 1, "a liquid large-cap trade costs well under 1%")
+
+_illiq = cost_breakdown("DSKULKARNI.NS", 100000)
+ok(_illiq["total_cost_pct"] > _c["total_cost_pct"],
+   "an illiquid stock costs more to trade than a liquid one")
+
+ok("error" in cost_breakdown("RELIANCE.NS", 0), "zero amount rejected")
+ok("error" in cost_breakdown("RELIANCE.NS", -5), "negative amount rejected")
+
+_u = units_for(99753, 1317.0)
+ok(_u["units"] == 75 and _u["fractional"] is False, "whole shares only")
+ok(_u["leftover_cash"] > 0, "the remainder stays as uninvested cash")
+ok(units_for(100, 1317.0)["units"] == 0, "too little money buys nothing")
+ok("error" in units_for(1000, 0), "zero price rejected")
+
+_m = market_status()
+ok(isinstance(_m["open"], bool) and _m["note"], "market status always answers")
+
+_s = estimate_slippage_pct("RELIANCE.NS", 1000)
+ok(0 <= _s["slippage_pct"] <= 0.05, "slippage stays inside the modelled cap")
+ok(estimate_slippage_pct("NOTREAL9Z.NS", 1000)["slippage_pct"] > 0,
+   "unknown ticker still charges a nominal impact")
+
+
 # ============================ REPORT ==================================
 print("\n" + "=" * 60)
 print(f"TOTAL CHECKS: {checks}")

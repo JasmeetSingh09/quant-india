@@ -1162,6 +1162,20 @@ def optimizer_stability_check(req: StabilityRequest):
     return r
 
 
+@app.get("/execution/preview")
+def execution_preview(ticker: str = Query(...), amount: float = Query(..., gt=0)):
+    """
+    What this trade would cost before you place it — itemised charges plus an
+    estimated price impact scaled by the stock's own daily turnover.
+    """
+    from execution import cost_breakdown, market_status
+    r = cost_breakdown(ticker.strip().upper(), amount, side="buy")
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    r["market"] = market_status()
+    return r
+
+
 @app.get("/methodology")
 def methodology_all():
     """

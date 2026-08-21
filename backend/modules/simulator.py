@@ -660,9 +660,36 @@ def add_position(sim_name: str, ticker: str, amount: float, user_id: str = "publ
         conn.close()
         return {"error": f"Could not fetch a live price for {ticker}."}
 
-    now      = datetime.now().isoformat()
-    buy_units = amount / price
-    new_init  = sim[0] + amount
+    now = datetime.now().isoformat()
+
+    # Charge what the trade would actually cost, and buy whole shares with what
+    # is left. Previously the full amount bought stock at the displayed price in
+    # fractional units, instantly, at any hour — so the paper simulator and the
+    # historical backtest disagreed about whether trading is free. Slippage is
+    # scaled by the order's size against the stock's own daily turnover, which is
+    # what decides whether an order moves the price.
+    from execution import cost_breakdown, units_for, market_status
+    _mkt  = market_status()
+    _cost = cost_breakdown(ticker, amount, side="buy")
+    if "error" in _cost:
+        conn.close()
+        return {"error": _cost["error"]}
+    _net   = _cost["invested_after_costs"]
+    _units = units_for(_net, price)
+    if "error" in _units:
+        conn.close()
+        return {"error": _units["error"]}
+    if _units["units"] <= 0:
+        conn.close()
+        return {"error": (f"Rs {amount:,.0f} is not enough to buy one share of "
+                          f"{ticker} at Rs {price:,.2f} after costs.")}
+
+    buy_units = _units["units"]
+    # Capital actually put to work: the shares bought. Costs and the leftover
+    # rupees that could not buy a whole share are both real and both excluded.
+    invested  = buy_units * price
+    amount    = invested
+    new_init  = sim[0] + invested
 
     existing = conn.execute(
         "SELECT units, entry_value FROM sim_positions WHERE sim_name = ? AND ticker = ? AND user_id = ?",
@@ -683,7 +710,9 @@ def add_position(sim_name: str, ticker: str, amount: float, user_id: str = "publ
             (tot_units, tot_entry, round(blended, 4), alloc_pct, sim_name, ticker, user_id)
         )
         status, note = "topped_up", (
-            f"Added ₹{amount:,.0f} more of {ticker} at ₹{price}. "
+            f"Bought {buy_units} more share(s) of {ticker} at ₹{price:,.2f} "
+            f"(₹{invested:,.0f} invested). Costs ₹{_cost['total_cost']:,.0f}, "
+            f"₹{_units['leftover_cash']:,.0f} left uninvested. "
             f"Blended entry now ₹{blended:,.2f}."
         )
     else:
@@ -695,7 +724,10 @@ def add_position(sim_name: str, ticker: str, amount: float, user_id: str = "publ
                entry_price, entry_value, entry_date)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (user_id, sim_name, ticker, _company_name(ticker), alloc_pct, buy_units, price, amount, now))
-        status, note = "added", f"Bought {ticker} at ₹{price} with ₹{amount:,.0f} of new capital."
+        status, note = "added", (
+            f"Bought {buy_units} share(s) of {ticker} at ₹{price:,.2f} "
+            f"(₹{invested:,.0f} invested). Costs ₹{_cost['total_cost']:,.0f}, "
+            f"₹{_units['leftover_cash']:,.0f} could not buy a whole share.")
 
     conn.execute("UPDATE simulations SET initial_value = ? WHERE name = ? AND user_id = ?",
                  (new_init, sim_name, user_id))
@@ -711,6 +743,15 @@ def add_position(sim_name: str, ticker: str, amount: float, user_id: str = "publ
         "invested":     round(amount, 2),
         "new_capital":  round(new_init, 2),
         "note":         note,
+        # Returned so the interface can show what the trade cost and when it
+        # would really have filled, rather than only what the user typed.
+        "execution": {
+            "executed_at": now,
+            "market": _mkt,
+            "costs": _cost,
+            "shares": buy_units,
+            "leftover_cash": _units["leftover_cash"],
+        },
     }
 
 
