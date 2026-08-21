@@ -560,7 +560,12 @@ except Exception:
     pass
 _start = _sm.start_simulation(_N, {"RELIANCE.NS": 100.0}, initial_value=50000, user_id=_U)
 if "error" not in _start:
-    ok(_sm.deposit(_N, 20000, user_id=_U).get("cash") == 20000, "deposit lands in cash")
+    # Assert the CHANGE, not the absolute. Opening a simulation now seeds cash
+    # with the remainder that could not buy a whole share, so a fixed expected
+    # total encodes an assumption that is no longer true.
+    _before_cash = _sm.get_simulation_pnl(_N, user_id=_U).get("cash", 0)
+    _after_cash = _sm.deposit(_N, 20000, user_id=_U).get("cash")
+    ok(abs((_after_cash - _before_cash) - 20000) < 1, "a deposit increases cash by its amount")
     ok("error" in _sm.deposit(_N, 0, user_id=_U), "zero deposit rejected")
     ok("error" in _sm.deposit(_N, -5, user_id=_U), "negative deposit rejected")
 

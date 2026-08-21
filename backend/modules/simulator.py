@@ -464,20 +464,41 @@ def start_simulation(
         for t, p, nm in _ex.map(_resolve, list(holdings.keys())):
             resolved[t] = (p, nm)
 
+    from execution import cost_breakdown, units_for
+    # Costs are genuinely spent; the remainder that could not buy a whole share
+    # is still the user's money and becomes the opening cash balance.
+    opening_cost = 0.0
+    opening_cash = 0.0
     for ticker, pct in holdings.items():
         price, cname = resolved.get(ticker, (None, ticker))
         if price is None or price <= 0:
             failed.append(ticker)
             continue
+        # Starting a simulation is buying, and buying costs money. This path
+        # skipped the cost model entirely while add_position applied it, so a
+        # brand-new portfolio opened at exactly break-even — flattering, and
+        # inconsistent with the same purchase made a minute later through /add.
         alloc_value = initial_value * pct / 100
-        units       = alloc_value / price
+        _c = cost_breakdown(ticker, alloc_value, side="buy")
+        _spend = _c.get("invested_after_costs", alloc_value) if "error" not in _c else alloc_value
+        _u = units_for(_spend, price)
+        units = _u.get("units", 0) if "error" not in _u else 0
+        if units <= 0:
+            failed.append(ticker)
+            continue
+        invested_value = units * price
+        opening_cost += (_c.get("total_cost", 0.0) if "error" not in _c else 0.0)
+        opening_cash += (_u.get("leftover_cash", 0.0) if "error" not in _u else 0.0)
         positions.append({
             "ticker":        ticker,
             "company_name":  cname,
             "allocation_pct":pct,
             "units":         units,
             "entry_price":   price,
-            "entry_value":   alloc_value,
+            # Entry value is what was actually put into the stock. Recording the
+            # pre-cost figure would hide the cost inside a phantom loss on day
+            # one instead of showing it as the cost it is.
+            "entry_value":   invested_value,
             "entry_date":    now,
         })
 
@@ -493,6 +514,14 @@ def start_simulation(
             "VALUES (?, ?, ?, ?, ?, 'active', ?)",
             (user_id, name, initial_value, started, now, 1 if is_demo else 0)
         )
+        # Seed the balance with what could not be invested, so capital is
+        # conserved: stock + cash + costs = the money paid in.
+        _ensure_cash_column()
+        try:
+            conn.execute("UPDATE simulations SET cash = ? WHERE name = ? AND user_id = ?",
+                         (round(opening_cash, 2), name, user_id))
+        except Exception:
+            pass
         for p in positions:
             conn.execute("""
                 INSERT INTO sim_positions
