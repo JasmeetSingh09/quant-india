@@ -160,6 +160,21 @@ export default function MonteCarlo() {
               </div>
 
               {/* Fan chart */}
+              <div className="mb-3 rounded-lg border border-gray-700 bg-gray-900/60 p-3">
+                <p className="text-[11px] uppercase tracking-widest text-gray-500 mb-1">
+                  What this does and does not tell you
+                </p>
+                <p className="text-xs text-gray-300 leading-relaxed">
+                  This is a <b>risk analysis</b> — not a guarantee, and not a
+                  personalised investment recommendation.
+                </p>
+                <p className="text-xs text-gray-400 leading-relaxed mt-1.5">
+                  Simulations describe what could have happened under the stated
+                  assumptions. They do not predict future returns. Real execution
+                  costs, liquidity and bid/ask spreads may differ from the simulation.
+                </p>
+              </div>
+
               <p className="mb-2 text-xs text-gray-400 leading-relaxed">
                 Each line is one simulated path. The band shows where most paths
                 end up: half finish above {fmt(d.percentiles.p50)}, and in the worst

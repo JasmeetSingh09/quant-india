@@ -105,6 +105,38 @@ function Finding({ s, i, openByDefault }) {
   )
 }
 
+/**
+ * Limits — what this is, and what it is not, beside the recommendation itself.
+ *
+ * The methodology panel is collapsed by default, which is right for how a
+ * number was computed and wrong for what it can support. A reader who never
+ * opens it should still be unable to mistake a risk analysis for a forecast, so
+ * this is always visible and sits next to the recommendation rather than at the
+ * foot of the page.
+ *
+ * Deliberately short. A long disclaimer is skipped, and a skipped disclaimer
+ * protects nobody.
+ */
+function Limits() {
+  return (
+    <div className="rounded-lg border border-gray-700 bg-gray-900/60 p-3">
+      <p className="text-[11px] uppercase tracking-widest text-gray-500 mb-1">
+        What this does and does not tell you
+      </p>
+      <p className="text-xs text-gray-300 leading-relaxed">
+        This is a <b>risk analysis</b> — not a guarantee, and not a personalised
+        investment recommendation.
+      </p>
+      <p className="text-xs text-gray-400 leading-relaxed mt-1.5">
+        Historical returns and simulations describe what has happened, or what
+        could have happened under the stated assumptions. They do not predict
+        future returns. Real execution costs, liquidity and bid/ask spreads may
+        differ from the simulation.
+      </p>
+    </div>
+  )
+}
+
 const pctStr = v => v == null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(1)}%`
 
 /**
@@ -282,6 +314,8 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
               </p>
             </div>
           )}
+
+          <Limits />
 
           {/* The comparison most apps leave out. Shown before the findings
               because "you are behind the index" reframes everything below it,
@@ -647,6 +681,7 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
                 {fix.data.cost_note}
               </p>
               <p className="text-[10px] text-gray-600 leading-relaxed">{fix.data.limits}</p>
+              <Limits />
 
               {onApply && (
                 <button onClick={() => { onApply(fix.data.proposed_pct); setApplied('suggested allocation') }}
