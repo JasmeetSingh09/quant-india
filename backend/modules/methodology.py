@@ -68,8 +68,10 @@ TOOLS = {
             "that were delisted, merged or went bankrupt are absent from the "
             "universe entirely, which flatters any historical result — this is "
             "survivorship bias and it is not corrected here.",
-            "You could have bought the amount shown at the prices shown. No "
-            "liquidity limit is applied to historical fills.",
+            "Fills happen at the quoted price regardless of size, but holdings "
+            "that would be a large share of their own daily turnover are now "
+            "flagged with the figure — so a backtest that could not have been "
+            "executed says so instead of reporting a clean return.",
             "You chose these stocks without knowing what happened next. The app "
             "cannot enforce that, and picking names you already know did well is "
             "the easiest way to produce a meaningless backtest.",

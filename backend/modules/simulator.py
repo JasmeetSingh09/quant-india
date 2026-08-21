@@ -1345,6 +1345,43 @@ def backtest(
 
     cum_port = (1 + port_daily).cumprod() * initial_value
 
+    # Could these positions actually have been traded at this size? The live
+    # simulator charges impact scaled by daily turnover; the backtest did not,
+    # so the same order was frictionless here and cost 5% there. One app should
+    # not hold two views on whether a trade is possible.
+    liquidity_check = None
+    try:
+        from execution import estimate_slippage_pct
+        _flags, _worst = [], 0.0
+        for _t, _w in port_weights.items():
+            _size = float(initial_value) * float(_w)
+            _sl = estimate_slippage_pct(_t, _size)
+            _part = _sl.get("participation_pct")
+            if _part is not None and _part > 10:
+                _flags.append({"ticker": _t, "position": round(_size, 2),
+                               "participation_pct": _part, "note": _sl["note"]})
+                _worst = max(_worst, _part)
+        if _flags:
+            liquidity_check = {
+                "tradeable_at_this_size": False,
+                "flagged": sorted(_flags, key=lambda f: -f["participation_pct"]),
+                "note": (f"{len(_flags)} holding(s) would be a large share of their "
+                         f"own daily turnover at this portfolio size — the worst is "
+                         f"{_worst:,.0f}% of a typical day. This backtest fills them "
+                         f"at the quoted price anyway, so its return is optimistic "
+                         f"by an amount it cannot measure."),
+            }
+        else:
+            liquidity_check = {
+                "tradeable_at_this_size": True,
+                "flagged": [],
+                "note": "Every holding is small against its own daily turnover at "
+                        "this portfolio size, so fills at the quoted price are "
+                        "a reasonable assumption.",
+            }
+    except Exception:
+        liquidity_check = None
+
     # Which of these actually existed at the start? A holding that listed later
     # is quietly started mid-period, which flatters the result and is invisible.
     survivorship = None
@@ -1504,6 +1541,7 @@ def backtest(
         # holdings did not all exist at the start is measuring something
         # other than what it claims.
         "survivorship":      survivorship,
+        "liquidity":         liquidity_check,
         "significance_test": significance,
         "tickers_used":      port_tickers,
         "missing_tickers":   [t for t in tickers if t not in port_tickers],
