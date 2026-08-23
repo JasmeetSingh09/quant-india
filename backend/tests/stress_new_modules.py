@@ -1213,6 +1213,68 @@ ok(_coach_jsx2.index("Test it before you pay for it")
    "the crash test sits ABOVE the apply button, not after it")
 
 
+# ================= FACTOR STRATEGIES ==================================
+# The obvious build is a lab comparing all six factors as strategies. Four of
+# them cannot be built without look-ahead, and the tests here are mostly about
+# making sure those four never quietly acquire an equity curve.
+import factor_strategies as _fs
+
+ok(set(_fs.CANNOT_BACKTEST) == {"quality", "growth", "value", "sentiment"},
+   f"exactly the fundamentals/news factors are blocked: {set(_fs.CANNOT_BACKTEST)}")
+ok("momentum" not in _fs.CANNOT_BACKTEST,
+   "momentum is testable: it is rebuilt from prices alone")
+ok("low_risk" not in _fs.CANNOT_BACKTEST,
+   "low volatility is testable: realised vol comes from prices")
+for _f, _why in _fs.CANNOT_BACKTEST.items():
+    ok("look-ahead" in _why or "cannot be rewound" in _why or "never archived" in _why
+       or "published years later" in _why,
+       f"{_f} names the data problem: {_why[:50]}")
+
+# The blocked four must never appear with a return figure attached.
+_fsr = _fs.compare()
+ok("tested" in _fsr and "cannot_backtest" in _fsr, "both lists are returned")
+_blocked_names = {b["factor"] for b in _fsr["cannot_backtest"]}
+_tested_names = {t["factor"] for t in _fsr["tested"]}
+ok(not (_blocked_names & _tested_names),
+   "a blocked factor never also appears as a tested strategy")
+for _b in _fsr["cannot_backtest"]:
+    ok("cagr_pct" not in _b,
+       f"{_b['factor']} carries no return figure it could not have earned")
+    ok(_b["testable"] is False, f"{_b['factor']} is flagged untestable")
+
+# Together they must still account for all six, or the page implies the model
+# has fewer factors than it does.
+ok(len(_blocked_names | _tested_names) == 6,
+   f"tested plus blocked covers all six factors, got "
+   f"{len(_blocked_names | _tested_names)}")
+
+if _fsr["tested"]:
+    for _t in _fsr["tested"]:
+        ok(_t.get("cagr_pct") is not None, f"{_t['factor']} reports a return")
+        ok(_t.get("max_drawdown_pct") is not None,
+           f"{_t['factor']} reports risk beside return")
+        ok(_t.get("vs_benchmark") in ("ahead", "behind", "matched"),
+           f"{_t['factor']} is placed against the benchmark")
+        # An excess of 0.01 points is not beating anything. Counting it as a win
+        # would let a strategy that matched the index be reported as beating it.
+        _ex = _t.get("excess_vs_benchmark_pct")
+        if _ex is not None and abs(_ex) < _fsr["meaningful_excess_pct"]:
+            ok(_t["vs_benchmark"] == "matched",
+               f"{_t['factor']} excess {_ex} is reported as matched, not ahead")
+
+ok("No best strategy is named" in _fsr["no_winner_named"],
+   "the comparison refuses to crown a winner")
+ok("survivorship" in _fsr["limits"].lower(),
+   "the limits name survivorship")
+ok("everything worth testing" in _fsr["why_only_two"],
+   "the page says why leaving the four out silently would have misled")
+
+_fst_jsx = io.open("../frontend/src/components/FactorStrategies.jsx",
+                   encoding="utf-8").read()
+ok("cannot_backtest" in _fst_jsx, "the UI renders the blocked factors")
+ok("why_matched" in _fst_jsx, "the UI explains matched vs beaten")
+
+
 # ================= FACTOR EVIDENCE TABLE ==============================
 # The app said momentum was unproven and said nothing about the other five. A
 # reader who sees one factor honestly marked unproven assumes the silent ones

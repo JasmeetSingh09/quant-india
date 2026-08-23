@@ -1423,6 +1423,17 @@ class ShockRequest(BaseModel):
     initial_value: float = 100000
 
 
+@app.get("/factors/strategies")
+def factor_strategy_comparison(start: str = Query("2019-01-01"),
+                               fraction: float = Query(0.2, ge=0.05, le=0.5)):
+    """
+    Every factor strategy that can be backtested without look-ahead, plus an
+    explicit list of the ones that cannot and why. Heavy: downloads a universe.
+    """
+    from factor_strategies import compare
+    return compare(start=start, fraction=fraction)
+
+
 @app.get("/factors/evidence")
 def factor_evidence_table(full: bool = Query(False)):
     """

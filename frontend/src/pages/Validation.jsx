@@ -1,5 +1,6 @@
 import FactorEvidence from '../components/FactorEvidence'
 import WalkForward from '../components/WalkForward'
+import FactorStrategies from '../components/FactorStrategies'
 import ErrorBoundary from '../components/ErrorBoundary'
 
 /**
@@ -16,6 +17,10 @@ export default function Validation() {
     <div className="p-4 sm:p-6 space-y-4 max-w-5xl mx-auto">
       <ErrorBoundary name="factor evidence"><FactorEvidence /></ErrorBoundary>
       <ErrorBoundary name="walk-forward test"><WalkForward /></ErrorBoundary>
+      {/* Last because it is the heaviest and the most specific: two factors
+          actually traded as strategies, after the table that says which six
+          exist and the test that says what happened to the one. */}
+      <ErrorBoundary name="factor strategies"><FactorStrategies /></ErrorBoundary>
     </div>
   )
 }
