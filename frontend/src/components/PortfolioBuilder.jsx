@@ -185,7 +185,7 @@ export default function PortfolioBuilder({ embedded = false }) {
                   <p className="stat-value text-green-400">{rupee(r.outcome.p95_value)}</p>
                 </div>
                 <div className="card-sm">
-                  <p className="stat-label">Chance of a loss</p>
+                  <p className="stat-label">Paths ending in a loss</p>
                   <p className="stat-value">{r.outcome.probability_of_loss_pct}%</p>
                 </div>
               </div>

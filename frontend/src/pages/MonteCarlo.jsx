@@ -159,11 +159,11 @@ export default function MonteCarlo() {
                   </p>
                 </div>
                 <div className="card-sm">
-                  <p className="stat-label">Chance of Loss<InfoTip k="prob_loss" /></p>
+                  <p className="stat-label">Paths ending below start<InfoTip k="prob_loss" /></p>
                   <p className="stat-value text-red-400">{d.probability_of_loss_pct}%</p>
                 </div>
                 <div className="card-sm">
-                  <p className="stat-label">Chance of Doubling</p>
+                  <p className="stat-label">Paths that more than doubled</p>
                   <p className="stat-value text-green-400">{d.probability_of_doubling_pct}%</p>
                 </div>
                 <div className="card-sm">
@@ -253,8 +253,9 @@ export default function MonteCarlo() {
                     unlucky ones, and the middle line is the typical (median) result. The wider the spread,
                     the more uncertain your outcome.</p>
                   <p><b>The result:</b> the most likely outcome is around <b>{fmt(d.median_value)}</b>, with
-                    a <b>{d.probability_of_loss_pct}%</b> chance of ending below what you put in. In a really
-                    bad year (worst 5%), you could be down to about <b>{fmt(d.percentiles.p5)}</b>.</p>
+                    <b>{d.probability_of_loss_pct}%</b> of simulated paths finishing below what you put
+                    in. The worst 5% of paths ended around <b>{fmt(d.percentiles.p5)}</b>. Those are
+                    shares of these simulations under their assumptions, not the chance of it happening.</p>
                 </Explainer>
               </div>
 

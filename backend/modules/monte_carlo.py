@@ -231,12 +231,24 @@ def _summarise_paths(final_values: np.ndarray, initial_value: float, horizon_day
         "probability_of_doubling_pct": prob_2x,
         "worst_case_p1":  pct(1),
         "best_case_p99":  pct(99),
+        # This used to phrase the loss figure as a probability of a future
+        # event. The simulation resampled the past; it does not know the future
+        # and cannot put a number on it. What it actually measured is how many
+        # of ITS OWN paths finished where, which is a different and defensible
+        # statement. (The old wording is not quoted here on purpose: the test
+        # guarding this greps the module, and a comment reproducing the banned
+        # phrase would defeat its own guard.)
+        #
+        # The same rule is already enforced on the target calculation. Saying it
+        # one way there and the other way here made the app contradict itself.
         "interpretation": (
-            f"After {round(horizon_days/252,1)} year(s), the median outcome is "
-            f"₹{median:,.0f} (from ₹{initial_value:,.0f}). "
-            f"There is a {prob_loss:.0f}% chance of ending below your starting capital, "
-            f"and a {prob_2x:.0f}% chance of doubling. "
-            f"In the worst 5% of scenarios you end with ₹{pct(5):,.0f} or less."
+            f"After {round(horizon_days/252,1)} year(s), the median simulated "
+            f"outcome is ₹{median:,.0f} (from ₹{initial_value:,.0f}). "
+            f"{prob_loss:.0f}% of simulated paths finished below your starting "
+            f"capital and {prob_2x:.0f}% finished at more than double it. "
+            f"The worst 5% of paths ended at ₹{pct(5):,.0f} or less. "
+            f"These are shares of THESE simulations under their stated "
+            f"assumptions, not the chance of any of it happening."
         ),
     }
 

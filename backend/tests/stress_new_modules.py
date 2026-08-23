@@ -1005,6 +1005,123 @@ ok("Effective positions" in _fix_jsx, "the before/after shows effective position
 ok("Heaviest sector" in _fix_jsx, "the before/after shows the sector change")
 
 
+# ================= UI/API SHAPE CONTRACTS =============================
+# /alpha/signal-history returns {ticker, history: [...]}, not a bare array.
+# WhySignal.jsx did `(hist || []).slice(0, 4)`, which handed back the OBJECT
+# and threw "(a || []).slice is not a function" on every stock page. The panel
+# next to it read the same endpoint correctly, so nothing looked wrong in
+# review — the two consumers simply disagreed about the shape.
+_why_jsx = io.open("../frontend/src/components/WhySignal.jsx", encoding="utf-8").read()
+ok("(hist || []).slice" not in _why_jsx,
+   "WhySignal no longer slices the response object directly")
+ok("hist?.history" in _why_jsx, "WhySignal reads the history array off the payload")
+ok("Array.isArray(hist)" in _why_jsx,
+   "both shapes are accepted so a cached old response cannot revive the crash")
+
+_sig_jsx = io.open("../frontend/src/components/SignalHistory.jsx", encoding="utf-8").read()
+ok("data?.history" in _sig_jsx, "SignalHistory reads the same field the API sends")
+
+# And the API really does send that shape.
+_main_src = io.open("main.py", encoding="utf-8").read()
+ok('"history": get_signal_history' in _main_src,
+   "signal-history wraps its list in a history field")
+
+
+# ================= SHOCK SCENARIOS ====================================
+# "What happens to me if X falls 20%" — one event, not a distribution. The
+# arithmetic here is exactly checkable, which is the point of pinning it.
+from portfolio_shock import shock as _shk, presets_for as _presets
+
+_H = {"RELIANCE.NS": 25, "TCS.NS": 20, "INFY.NS": 20,
+      "HDFCBANK.NS": 20, "SUNPHARMA.NS": 15}
+
+_mk = _shk(_H, "market", -20.0, initial_value=1000000)
+ok("error" not in _mk, f"market shock runs: {_mk.get('error', 'ok')}")
+
+if "error" not in _mk:
+    # A directly shocked stock must move by the shock exactly, not by its beta
+    # against itself — which is 1 by construction and would smuggle an estimate
+    # in where an exact number was meant.
+    _st = _shk(_H, "stock", -40.0, target="RELIANCE.NS", initial_value=1000000)
+    ok("error" not in _st, "single-stock shock runs")
+    if "error" not in _st:
+        _r = [h for h in _st["holdings"] if h["ticker"] == "RELIANCE.NS"][0]
+        ok(_r.get("pinned") is True, "the shocked stock is pinned, not beta-scaled")
+        ok(abs(_r["move_pct"] - (-40.0)) < 1e-6,
+           f"the shocked stock moves by exactly the shock, got {_r['move_pct']}")
+        # 25% of the book falling 40% is exactly 10 points of the portfolio.
+        ok(abs(_r["impact_pts"] - (-10.0)) < 0.05,
+           f"25% weight x -40% = -10 pts, got {_r['impact_pts']}")
+
+    # A sector shock hits every holding in that sector by the full amount.
+    _se = _shk(_H, "sector", -30.0, target="IT", initial_value=1000000)
+    ok("error" not in _se, "sector shock runs")
+    if "error" not in _se:
+        _it = [h for h in _se["holdings"] if h.get("pinned")]
+        ok(len(_it) >= 2, f"both IT holdings are pinned, got {len(_it)}")
+        for _h in _it:
+            ok(abs(_h["move_pct"] - (-30.0)) < 1e-6,
+               f"{_h['ticker']} moves by the sector shock exactly")
+        ok(abs(_se["by_sector"].get("IT", 0) - (-12.0)) < 0.05,
+           f"40% in IT falling 30% is -12 pts, got {_se['by_sector'].get('IT')}")
+
+    # Cash does not move, so it scales the loss down exactly.
+    _c20 = _shk(_H, "market", -20.0, cash_pct=20, initial_value=1000000)
+    ok(abs(_c20["change_pct"] - _mk["change_pct"] * 0.8) < 0.05,
+       f"20% cash scales the move by 0.8: {_mk['change_pct']} -> {_c20['change_pct']}")
+    ok(abs(_c20["change_pct"]) < abs(_mk["change_pct"]),
+       "holding cash cushions a fall")
+
+    # A fall must lose money and a rise must make it. Sign errors here would be
+    # invisible in a chart and catastrophic in a decision.
+    ok(_mk["change_pct"] < 0, f"a market fall loses money, got {_mk['change_pct']}")
+    ok(_mk["after_value"] < _mk["initial_value"], "the value after a crash is lower")
+    _up = _shk(_H, "market", 20.0, initial_value=1000000)
+    ok(_up["change_pct"] > 0, f"a market rise gains, got {_up['change_pct']}")
+
+    # The parts must add up to the whole.
+    _sum_pts = sum(h["impact_pts"] for h in _mk["holdings"]
+                   if h.get("impact_pts") is not None)
+    ok(abs(_sum_pts - _mk["change_pct"]) < 0.05,
+       f"per-holding impacts sum to the total: {_sum_pts:.2f} vs {_mk['change_pct']}")
+    _sum_sec = sum(_mk["by_sector"].values())
+    ok(abs(_sum_sec - _mk["change_pct"]) < 0.05,
+       f"sector impacts sum to the total: {_sum_sec:.2f} vs {_mk['change_pct']}")
+
+    # No scenario may carry a likelihood. A "12% chance of a crash" would be the
+    # most quotable number on the page and the least defensible.
+    _txt = str(_mk)
+    for _banned in ("probability", "chance of", "likely to happen", "odds of"):
+        ok(_banned not in _txt.lower().replace("not the chance", ""),
+           f"no scenario claims a likelihood ('{_banned}')")
+    ok("optimistic" in _mk["limits"].lower(),
+       "the limits admit normal-period betas understate a real crash")
+
+# Offering "IT falls 30%" to someone holding no IT is how a scenario tool loses
+# credibility, so presets are built from the actual book.
+_p = _presets(_H)
+_labels = [x["label"] for x in _p]
+ok(any("IT" in l for l in _labels), "a sector held is offered")
+_no_it = _presets({"RELIANCE.NS": 60, "SUNPHARMA.NS": 40})
+ok(not any("IT falls" in x["label"] for x in _no_it),
+   f"a sector NOT held is not offered: {[x['label'] for x in _no_it]}")
+
+ok("error" in _shk({}, "market", -20), "an empty portfolio is refused")
+ok("error" in _shk(_H, "nonsense", -20), "an unknown scenario is refused")
+ok("error" in _shk(_H, "stock", -20, target="NOTHELD.NS"),
+   "shocking a stock you do not hold is refused")
+ok("error" in _shk(_H, "market", -400), "an impossible shock size is refused")
+
+# The phrasing rule, in the module a user reads most.
+_mc_src2 = _insp.getsource(__import__("monte_carlo"))
+ok("chance of ending below" not in _mc_src2,
+   "monte carlo no longer claims a chance of ending below start")
+ok("of simulated paths finished below" in _mc_src2,
+   "monte carlo states a share of its own paths instead")
+_shock_jsx = io.open("../frontend/src/components/ShockLab.jsx", encoding="utf-8").read()
+ok("will this happen" in _shock_jsx, "the UI says what the tool does not answer")
+
+
 # ================= BLACK-LITTERMAN DISPLAY (item 3) ===================
 # The optimiser always returned the whole chain; the page rendered only the
 # final weights. These checks are about the CONTRACT the panel depends on, so

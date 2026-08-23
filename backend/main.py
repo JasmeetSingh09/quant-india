@@ -1375,6 +1375,39 @@ class StrategyCompareRequest(BaseModel):
     initial_value: float = 100000
 
 
+class ShockRequest(BaseModel):
+    holdings: dict
+    kind: str = "market"
+    magnitude_pct: float = -20.0
+    target: Optional[str] = None
+    cash_pct: float = 0.0
+    initial_value: float = 100000
+
+
+@app.post("/portfolio/shock")
+def portfolio_shock_scenario(req: ShockRequest):
+    """
+    One specific event, and where the damage lands in this portfolio.
+
+    Answers "where would this hurt me", never "will this happen" — no
+    probability is attached to any scenario, because none is estimated.
+    """
+    from portfolio_shock import shock
+    r = shock(req.holdings, kind=req.kind, magnitude_pct=req.magnitude_pct,
+              target=req.target, cash_pct=req.cash_pct,
+              initial_value=req.initial_value)
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+
+@app.post("/portfolio/shock/presets")
+def portfolio_shock_presets(req: ShockRequest):
+    """The scenarios that make sense for THIS portfolio."""
+    from portfolio_shock import presets_for
+    return {"presets": presets_for(req.holdings)}
+
+
 @app.post("/strategy/compare")
 def strategy_comparison(req: StrategyCompareRequest):
     """

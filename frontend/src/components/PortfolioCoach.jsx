@@ -775,7 +775,7 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {[['Health', fix.data.before?.health?.score, fix.data.after?.health?.score, false],
                   ['Worst 5%', fix.data.before?.risk?.downside_pct, fix.data.after?.risk?.downside_pct, true],
-                  ['Chance of loss', fix.data.before?.risk?.loss_prob_pct, fix.data.after?.risk?.loss_prob_pct, true]]
+                  ['Paths ending in a loss', fix.data.before?.risk?.loss_prob_pct, fix.data.after?.risk?.loss_prob_pct, true]]
                   .map(([label, b, a, lowerBetter]) => (b == null || a == null) ? null : (
                   <div key={label} className="card-sm">
                     <p className="text-[11px] text-gray-500">{label}</p>

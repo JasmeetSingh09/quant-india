@@ -128,6 +128,8 @@ export const getEvents         = t => api.get(`/events/${encodeURIComponent(t)}`
 export const getPortfolioFit   = body => api.post('/portfolio/fit', body, { timeout: 120000 })
 export const getWalkForward    = () => api.get('/validation/walk-forward', { timeout: 240000 })
 export const getRegimeWeights  = () => api.get('/regime/weights')
+export const shockPortfolio  = body => api.post('/portfolio/shock', body, { timeout: 180000 })
+export const shockPresets    = body => api.post('/portfolio/shock/presets', body, { timeout: 60000 })
 export const compareStrategies = body => api.post('/strategy/compare', body, { timeout: 240000 })
 export const getMethodology    = tool => api.get(`/methodology/${tool}`)
 export const getBenchmark      = (days = 365) => api.get('/benchmark', { params: { days } })

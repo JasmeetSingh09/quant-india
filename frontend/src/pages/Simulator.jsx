@@ -4,6 +4,8 @@ import { useQueries, useQuery, useMutation, useQueryClient } from '@tanstack/rea
 import { getPrice, startSimulation, getSimulationPnl, getSimulations, deleteSimulation, runBacktest, getSimHistory, addSimPosition, removeSimPosition } from '../api'
 import Spinner from '../components/Spinner'
 import PortfolioCoach from '../components/PortfolioCoach'
+import ShockLab from '../components/ShockLab'
+import ErrorBoundary from '../components/ErrorBoundary'
 import { trackEvent, createShare } from '../api'
 import StarterHelp from '../components/StarterHelp'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend, BarChart, Bar, Cell, ReferenceLine } from 'recharts'
@@ -631,6 +633,20 @@ export default function Simulator() {
           focus="live"
         />
       )}
+
+      {/* One specific event, rather than a distribution over all of them. The
+          Monte Carlo page says what might happen; this says where it would
+          land. Both matter, and neither replaces the other. */}
+      {pnlData?.positions?.length >= 2 && (
+        <ErrorBoundary name="scenario test">
+          <ShockLab
+            holdings={Object.fromEntries(
+              pnlData.positions.map(p => [p.ticker, p.allocation_pct ?? p.current_value]))}
+            initialValue={pnlData.current_value || pnlData.initial_value || 100000}
+          />
+        </ErrorBoundary>
+      )}
+
       <Methodology tool="realtime_simulator" />
     </div>
   )
