@@ -796,12 +796,31 @@ def black_litterman_optimize(
         "expected_annual_return_pct":  exp_ret,
         "expected_annual_vol_pct":     exp_vol,
         "expected_sharpe":             sharpe,
+        # "Stocks with positive sentiment received higher allocations" was not
+        # true, and the panel that displays the views made it obvious: on one
+        # live run INFY took the largest increase on a view of +0.02%, TCS
+        # gained 15 points on a NEGATIVE view, and HDFCBANK went to zero on the
+        # same negative view TCS had — the difference being its confidence and
+        # its covariance with everything else.
+        #
+        # A weight shift is not a function of view sign. It is the equilibrium,
+        # the covariance, the view, the view's confidence and the position cap,
+        # solved together. So the text now names what actually moved and lets
+        # the table show the rest, instead of asserting a monotonic story the
+        # numbers contradict.
         "interpretation": (
             (
-                "Black-Litterman adjusted the equilibrium weights using your sentiment views. "
-                f"Stocks with positive sentiment received higher allocations. "
-                f"Largest weight increase: {max(weight_shifts, key=weight_shifts.get)} "
-                f"(+{max(weight_shifts.values()):.2f}%)."
+                "Black-Litterman blended your sentiment views into the market's "
+                "equilibrium returns. A view's effect depends on its confidence "
+                "and on how the stock moves with the others, not on its sign "
+                "alone — a mildly negative view on a stock that diversifies the "
+                "rest can still end up with more weight, and a strong view on a "
+                "stock that duplicates existing risk can end up with less. "
+                f"Largest increase: {max(weight_shifts, key=weight_shifts.get).replace('.NS','')} "
+                f"({max(weight_shifts.values()):+.1f} pts). "
+                f"Largest decrease: {min(weight_shifts, key=weight_shifts.get).replace('.NS','')} "
+                f"({min(weight_shifts.values()):+.1f} pts). "
+                "The per-stock table shows which of the two explains each move."
             ) if has_views else
             (
                 "No views supplied, so weights follow the market-equilibrium portfolio. "

@@ -149,7 +149,11 @@ export const getPredictionTrack = (minDays = 7) => api.get(`/predictions/track?m
 export const runMVO         = body => api.post('/optimizer/mvo', body)
 export const runBL          = body => api.post('/optimizer/black-litterman', body)
 export const getFrontier    = body => api.post('/optimizer/frontier', body)
-export const autoOptimize   = body => api.post('/optimizer/auto', body)
+// Runs FinBERT over every ticker before it optimises anything, so it is
+// nowhere near the 60s default — it aborted mid-pipeline and surfaced as a
+// spinner that never resolved. Every other alpha-backed call already
+// carries its own timeout; this one was missed.
+export const autoOptimize   = body => api.post('/optimizer/auto', body, { timeout: 240000 })
 export const runHRP         = body => api.post('/optimizer/hrp', body)
 export const runRiskParity  = body => api.post('/optimizer/risk-parity', body)
 export const runMaxDiversification = body => api.post('/optimizer/max-diversification', body)

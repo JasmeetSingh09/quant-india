@@ -2,6 +2,7 @@ import { useState } from 'react'
 import usePersistentState from '../usePersistentState'
 import { useMutation } from '@tanstack/react-query'
 import { runMVO, runBL, getFrontier, autoOptimize, runHRP, runRiskParity, runMaxDiversification, runMinCVaR, runRegimeAdaptive } from '../api'
+import BlackLitterman from '../components/BlackLitterman'
 import Spinner from '../components/Spinner'
 import PortfolioCoach from '../components/PortfolioCoach'
 import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceDot, LineChart, Line } from 'recharts'
@@ -488,10 +489,14 @@ export default function Optimizer() {
                     ))}
                   </div>
                 </div>
-                <div className="mt-4 p-3 bg-gray-800 rounded-lg">
-                  <p className="text-xs text-gray-300">{autoResult.bl_result?.interpretation}</p>
-                </div>
               </div>
+
+              {/* The chain behind those weights: equilibrium, views, posterior.
+                  The optimiser has always returned all three; the page was
+                  showing only the last one, which is the part that makes
+                  Black-Litterman look like every other box that emits
+                  percentages. */}
+              <BlackLitterman bl={autoResult.bl_result} />
             </div>
           )}
         </div>

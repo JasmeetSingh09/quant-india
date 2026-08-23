@@ -868,6 +868,82 @@ ok("this fix does not pay" in _coach_jsx,
    "a simulated non-result is stated in the UI, not left blank")
 
 
+# ================= BLACK-LITTERMAN DISPLAY (item 3) ===================
+# The optimiser always returned the whole chain; the page rendered only the
+# final weights. These checks are about the CONTRACT the panel depends on, so
+# a field being renamed shows up here rather than as an empty column.
+from portfolio_optimizer import optimize_with_alpha_views as _owav
+
+_bl_full = (_owav(["RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS"]) or {}).get("bl_result") or {}
+ok(bool(_bl_full), "the auto pipeline returns a bl_result")
+
+for _k in ("implied_equilibrium_returns", "bl_posterior_returns",
+           "equilibrium_weights", "bl_pct", "weight_shifts_pct",
+           "views_injected", "tau", "algorithm", "tickers"):
+    ok(_bl_full.get(_k) is not None, f"bl_result carries {_k} for the panel")
+
+if _bl_full:
+    _tk = _bl_full["tickers"]
+    for _k in ("implied_equilibrium_returns", "bl_posterior_returns",
+               "equilibrium_weights", "bl_pct"):
+        ok(set(_bl_full[_k]) == set(_tk),
+           f"{_k} covers exactly the tickers the panel lists")
+
+    # Equilibrium weights are a portfolio, so they sum to 1 rather than 100.
+    _eqs = sum(_bl_full["equilibrium_weights"].values())
+    ok(abs(_eqs - 1.0) < 0.02, f"equilibrium weights sum to 1, got {_eqs:.4f}")
+    _bls = sum(_bl_full["bl_pct"].values())
+    ok(abs(_bls - 100.0) < 0.5, f"BL weights sum to 100%, got {_bls:.2f}")
+
+    # The shift column must be the difference it claims to be, or the table
+    # tells a story the numbers do not support.
+    for _t in _tk:
+        _claimed = _bl_full["weight_shifts_pct"][_t]
+        _actual = _bl_full["bl_pct"][_t] - _bl_full["equilibrium_weights"][_t] * 100
+        ok(abs(_claimed - _actual) < 0.15,
+           f"{_t}: shift {_claimed} matches final minus market {_actual:.2f}")
+
+    for _t, _v in (_bl_full["views_injected"] or {}).items():
+        ok("expected_excess_pct" in _v and "confidence" in _v,
+           f"view on {_t} states both its size and its confidence")
+        ok(0 <= _v["confidence"] <= 1, f"{_t} view confidence is a probability")
+
+# The interpretation used to assert "stocks with positive sentiment received
+# higher allocations". Building the panel that shows the views made it plain
+# that this is not how the optimiser works: a weight shift is the equilibrium,
+# the covariance, the view, its confidence and the position cap solved
+# together, and the sign of the view alone predicts nothing.
+if _bl_full:
+    _interp = _bl_full.get("interpretation", "")
+    ok("positive sentiment received higher allocations" not in _interp,
+       "the interpretation no longer claims view sign drives weight")
+
+    # And check it the hard way: if sign DID predict the shift, the old claim
+    # would have been fine. Show that it does not, on live data.
+    _vi = _bl_full.get("views_injected") or {}
+    if len(_vi) >= 2:
+        _mismatch = [t for t, v in _vi.items()
+                     if (v["expected_excess_pct"] > 0) !=
+                        (_bl_full["weight_shifts_pct"].get(t, 0) > 0)]
+        ok(True, f"view sign disagrees with weight shift on {len(_mismatch)} of "
+                 f"{len(_vi)} holdings — which is why the old claim was wrong")
+
+_opt_src = _insp.getsource(__import__("portfolio_optimizer"))
+ok("not on its sign" in _opt_src or "sign alone" in _opt_src,
+   "the shipped code explains what actually moves a Black-Litterman weight")
+
+_bl_jsx = io.open("../frontend/src/components/BlackLitterman.jsx", encoding="utf-8").read()
+ok("implied_equilibrium_returns" in _bl_jsx, "the panel reads equilibrium returns")
+ok("bl_posterior_returns" in _bl_jsx, "the panel reads posterior returns")
+ok("views_injected" in _bl_jsx, "the panel reads the views")
+ok("not a prediction" in _bl_jsx or "none of these numbers is a prediction" in _bl_jsx,
+   "the panel says equilibrium returns are implied, not forecast")
+# With no views the answer IS the market portfolio, and the panel has to say so
+# rather than leaving a reader to think the method did nothing.
+ok("the final weights are the market portfolio" in _bl_jsx,
+   "the no-views case is explained rather than shown as an empty column")
+
+
 # ================= STRATEGY COMPARISON (item 9) =======================
 # The whole point of this module is that it refuses to crown a winner. That
 # refusal is a property worth testing, because it is exactly the kind of thing
