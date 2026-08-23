@@ -580,6 +580,36 @@ def _days_since(iso) -> int | None:
     except Exception:
         return None
 
+def _market_note(positions: list) -> str | None:
+    """
+    Explain a flat portfolio when the explanation is 'the market was shut'.
+
+    Returns None when anything has actually moved, because a note that appears
+    every time is a note nobody reads.
+    """
+    if not positions:
+        return None
+    moved = [p for p in positions if abs(p.get("pnl_pct") or 0) > 0.001]
+    if moved:
+        return None
+    try:
+        from data_fetcher import is_market_open
+        if is_market_open():
+            # Flat while open is unusual enough to be worth flagging as odd
+            # rather than explaining away.
+            return ("Every holding is showing exactly its entry price while the "
+                    "market is open. That is unusual — prices may be stale.")
+    except Exception:
+        pass
+    day = datetime.now().strftime("%A")
+    weekend = day in ("Saturday", "Sunday")
+    return (f"NSE is closed{' for the weekend' if weekend else ''}, so the last "
+            f"traded price is still the one you bought at. Nothing has moved "
+            f"because nothing has traded — this is not a stalled feed. Any "
+            f"difference from your starting capital is the cost of opening the "
+            f"positions, shown in the breakdown above.")
+
+
 def get_simulation_pnl(name: str, user_id: str = "public") -> dict:
     """
     Fetch live prices for all positions in a simulation and compute P&L.
@@ -721,6 +751,12 @@ def get_simulation_pnl(name: str, user_id: str = "public") -> dict:
                      "stamp duty, GST and estimated impact, plus any rupees that "
                      "could not buy a whole share."),
         },
+        # A simulation opened on a Friday and checked on a Sunday shows the
+        # same price it opened at, a flat line, and 0.00% on every holding —
+        # which is indistinguishable from a broken price feed, and gets read as
+        # one. The prices are right; nothing has traded. Saying so is the whole
+        # fix, and it costs one sentence.
+        "market_note":     _market_note(positions),
         "overall_status":  "profit" if total_pnl_inr >= 0 else "loss",
         "positions":       positions,
         "best_performer":  positions[0]["ticker"] if positions else None,

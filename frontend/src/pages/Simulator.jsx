@@ -375,6 +375,34 @@ export default function Simulator() {
                         </p>
                       </div>
                     </div>
+
+                    {/* The API has always split this figure into market movement
+                        and dealing costs, and the page threw the split away. On
+                        a two-day-old simulation the entire P&L is the cost of
+                        opening the positions, which reads as "my stocks lost
+                        money" unless it is attributed. */}
+                    {pnlData.pnl_breakdown && Math.abs(pnlData.pnl_breakdown.costs_inr) >= 1 && (
+                      <p className="text-xs text-gray-400 -mt-1">
+                        Of that,{' '}
+                        <span className={pnlData.pnl_breakdown.market_inr >= 0
+                          ? 'text-green-400' : 'text-red-400'}>
+                          &#8377;{Math.abs(pnlData.pnl_breakdown.market_inr).toFixed(0)}
+                        </span>
+                        {' '}is how your holdings moved and{' '}
+                        <span className="text-gray-300">
+                          &#8377;{Math.abs(pnlData.pnl_breakdown.costs_inr).toFixed(0)}
+                        </span>
+                        {' '}is what it cost to buy them.
+                      </p>
+                    )}
+
+                    {/* Flat is not the same as broken. */}
+                    {pnlData.market_note && (
+                      <p className="text-xs text-gray-400 border-l-2 border-gray-700 pl-2.5 leading-relaxed">
+                        {pnlData.market_note}
+                      </p>
+                    )}
+
                     {/* Portfolio value over time — builds as it auto-refreshes */}
                     {histData?.snapshots?.length > 1 ? (
                       <div>

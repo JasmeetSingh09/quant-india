@@ -1027,6 +1027,35 @@ ok('"history": get_signal_history' in _main_src,
    "signal-history wraps its list in a history field")
 
 
+# ================= FLAT IS NOT BROKEN =================================
+# A simulation opened Friday and checked Sunday shows entry == current, a flat
+# line and 0.00% everywhere. That is correct — nothing traded — but it is
+# indistinguishable from a dead price feed, and it was read as one.
+from simulator import _market_note as _mn
+
+_flat = [{"ticker": "SBIN.NS", "pnl_pct": 0.0}, {"ticker": "INFY.NS", "pnl_pct": 0.0}]
+_moved = [{"ticker": "SBIN.NS", "pnl_pct": 0.0}, {"ticker": "INFY.NS", "pnl_pct": 1.4}]
+
+_n = _mn(_flat)
+ok(_n is not None, "a completely flat portfolio gets an explanation")
+if _n:
+    ok("not a stalled feed" in _n or "nothing has traded" in _n.lower(),
+       "the note says the feed is fine, which is the actual question being asked")
+    ok("cost of opening" in _n.lower(),
+       "the note attributes the difference from starting capital to dealing costs")
+
+# A note that appears every time is a note nobody reads.
+ok(_mn(_moved) is None, "no note once anything has actually moved")
+ok(_mn([]) is None, "no note for an empty portfolio")
+
+# The split the UI needs has always been in the payload; the page ignored it.
+_sim_jsx = io.open("../frontend/src/pages/Simulator.jsx", encoding="utf-8").read()
+ok("pnl_breakdown" in _sim_jsx, "the page renders the market-vs-costs split")
+ok("market_note" in _sim_jsx, "the page renders the flat-market explanation")
+ok("cost to buy them" in _sim_jsx,
+   "the costs half of the split is labelled as costs, not as a loss")
+
+
 # ================= SHOCK SCENARIOS ====================================
 # "What happens to me if X falls 20%" — one event, not a distribution. The
 # arithmetic here is exactly checkable, which is the point of pinning it.
