@@ -60,7 +60,12 @@ export default function WhySignal({ ticker }) {
 
   const side = buy ? track?.scorecard?.by_signal?.buy : track?.scorecard?.by_signal?.sell
   const indep = track?.scorecard?.independence
-  const rows = (hist || []).slice(0, 4)
+  // /alpha/signal-history returns {ticker, history: [...]}, not a bare array.
+  // `hist || []` therefore handed back the OBJECT, and .slice on an object threw
+  // "(a || []).slice is not a function" — killing this panel on every stock.
+  // SignalHistory.jsx reads the same endpoint correctly; only this one did not.
+  // Both shapes are accepted so a cached older response cannot bring it back.
+  const rows = (Array.isArray(hist) ? hist : (hist?.history ?? [])).slice(0, 4)
 
   return (
     <div className="card space-y-4">
