@@ -13,6 +13,7 @@ Three inputs feed it:
                 and the simulated downside
 """
 
+import math
 from datetime import datetime
 
 SEV = {"high": 3, "medium": 2, "low": 1}
@@ -147,16 +148,176 @@ def _cap_payoff(weights: dict, initial_value: float, horizon_months: int,
         if after is None:
             return None
         gain = round(abs(current_downside) - abs(after), 1)
-        if gain <= 0.5:      # not worth claiming an improvement this small
-            return None
         return {"cap_pct": cap_pct, "downside_before": current_downside,
-                "downside_after": after, "improvement_pts": gain}
+                "downside_after": after, "improvement_pts": gain,
+                # Below half a point is noise in a 4,000-path simulation, and a
+                # negative gain means the cap made things worse — which happens
+                # when the oversized holding is the STEADIEST one, so trimming
+                # it moves money into more volatile names. Both are real answers
+                # and neither is an improvement to advertise.
+                "improved": gain > 0.5}
     except Exception:
         return None
 
 
-def _tip(severity, kind, title, detail, tickers=None):
-    return {"severity": severity, "kind": kind, "title": title,
+SEV_RANK = {"high": 3, "medium": 2, "low": 1}
+
+
+def _verdict(w, sectors, tips, downside, max_loss_pct, bench, alpha):
+    """
+    The judgement, before the numbers.
+
+    A reader opening the coach wants to know one thing first: is this portfolio
+    all right or not. Leading with profit and loss answers a different question
+    — it says how the market moved, not whether the thing they built is sound —
+    and a portfolio can be up 12% and badly constructed, or down 8% and fine.
+
+    So the verdict is assembled from findings that were already measured, never
+    from new claims. Strengths have to be EARNED against a stated threshold: if
+    nothing qualifies, the strengths list comes back empty and says so. An
+    encouraging line invented to balance the criticism would make every other
+    line in this panel worth less.
+    """
+    n = len(w)
+    if not n:
+        return None
+    biggest = max(w, key=w.get)
+    top_w = w[biggest]
+    kinds = {t["kind"] for t in tips}
+    bad = [t for t in tips if t.get("tone") != "good"]
+    highs = [t for t in bad if t["severity"] == "high"]
+    meds = [t for t in bad if t["severity"] == "medium"]
+
+    strengths = [{"title": t["title"], "evidence": t["detail"]}
+                 for t in tips if t.get("tone") == "good"]
+
+    # Each of these is a threshold the portfolio had to clear, quoted back with
+    # the number that cleared it, so a strength is checkable rather than kind.
+    if n >= 8 and top_w <= 25:
+        strengths.append({
+            "title": "No single holding can sink it",
+            "evidence": f"{n} holdings, and the largest is {top_w:.0f}% of the money.",
+        })
+    elif n >= 5 and top_w <= 35 and "concentration" not in kinds:
+        strengths.append({
+            "title": "Position sizes are reasonable",
+            "evidence": f"{n} holdings, largest {top_w:.0f}% — under the 35% line "
+                        f"where one name starts driving the whole result.",
+        })
+
+    # Only worth saying when the scan actually covered most of the book. On one
+    # scored holding out of ten this read as "the model approves", when what it
+    # meant was "the model has not looked".
+    if alpha and "weak_alpha" not in kinds and len(alpha) >= max(2, (n + 1) // 2):
+        strengths.append({
+            "title": "The model does not dislike anything it has scored",
+            "evidence": (f"{len(alpha)} of your {n} holdings have a current score, "
+                         f"and none is low enough to flag."
+                         + ("" if len(alpha) == n else
+                            f" The other {n - len(alpha)} have not been scanned yet.")),
+        })
+
+    if downside is not None and max_loss_pct and abs(downside) <= abs(max_loss_pct):
+        strengths.append({
+            "title": "The worst case is inside what you said you would accept",
+            "evidence": f"Simulated downside {downside:.0f}% against the "
+                        f"{abs(max_loss_pct):.0f}% you set.",
+        })
+
+    if n >= 3 and "correlated" not in kinds:
+        strengths.append({
+            "title": "The holdings do not all move together",
+            "evidence": "No pair crossed the correlation level where two "
+                        "positions are effectively one.",
+        })
+
+    if "illiquid" not in kinds and n >= 1:
+        strengths.append({
+            "title": "You could actually get out",
+            "evidence": "Every position is small against its stock's normal "
+                        "daily volume, so selling would not move the price.",
+        })
+
+    if bench and bench.get("verdict") == "ahead":
+        strengths.append({
+            "title": f"Ahead of the {bench.get('benchmark', 'index')}",
+            "evidence": f"{bench.get('difference_pct')} points ahead over the "
+                        f"period held. One period, so not yet skill.",
+        })
+
+    # Concerns are the findings themselves, ordered as they already are, with
+    # the measured effect attached where an effect was actually simulated.
+    concerns = []
+    for t in tips:
+        if t.get("tone") == "good":
+            continue          # already counted as a strength
+        if t["severity"] == "low" and (highs or meds):
+            continue          # smaller items stay in the full findings list
+        concerns.append({
+            "title": t["title"],
+            "severity": t["severity"],
+            "kind": t["kind"],
+            "evidence": t["detail"],
+            "effect": t.get("payoff"),
+            # Three different states, and collapsing them loses the useful one.
+            # "Not simulated" means we do not know. "Simulated, no gain" means we
+            # checked and the obvious fix does not pay — which is the answer that
+            # saves someone a trade.
+            "effect_note": (
+                None if (t.get("payoff") or {}).get("improved") else
+                ("Simulated: this fix does not improve the worst case."
+                 if t.get("payoff") else
+                 "Effect of fixing this is not separately simulated.")),
+        })
+
+    if not bad:
+        call = "Nothing to fix that the model can see."
+        because = ("No finding crossed a threshold. That is not the same as "
+                   "'this is a good portfolio' — the checks it passed are the "
+                   "checks listed below, and no others.")
+    elif highs:
+        call = (f"{len(highs)} thing{'' if len(highs) == 1 else 's'} to fix "
+                f"before this is sound.")
+        because = highs[0]["title"]
+    elif meds:
+        call = (f"Structurally sound, with {len(meds)} "
+                f"thing{'' if len(meds) == 1 else 's'} worth a look.")
+        because = meds[0]["title"]
+    else:
+        call = "Structurally sound. Only minor notes."
+        because = bad[0]["title"]
+
+    return {
+        "call": call,
+        "because": because,
+        "strengths": strengths,
+        "concerns": concerns,
+        "n_strengths": len(strengths),
+        "n_concerns": len(concerns),
+        # An empty strengths list is a real answer, not a rendering bug, and the
+        # UI needs to be able to say which.
+        "no_strengths_note": (None if strengths else
+                              "Nothing here cleared the bar for a strength. The "
+                              "thresholds are the same ones used to raise the "
+                              "concerns above, so this is a measurement, not a "
+                              "judgement of you."),
+        "scope": ("Judged on structure — spread, sector mix, correlation, "
+                  "liquidity and simulated downside. Not on returns: a "
+                  "portfolio can be up and badly built, or down and fine."),
+    }
+
+
+def _tip(severity, kind, title, detail, tickers=None, tone="concern"):
+    """
+    tone distinguishes a finding that is bad news from one that is good news.
+
+    Severity alone could not: the sector check emits "72% in banking" and
+    "spread across 9 sectors" under the same kind, and the second one is a
+    compliment. Sorted by severity into one list, that compliment appeared
+    under "what concerns me", which is the fastest way to teach a reader that
+    the section headings mean nothing.
+    """
+    return {"severity": severity, "kind": kind, "title": title, "tone": tone,
             "detail": detail, "lesson": LESSONS.get(kind), "tickers": tickers or []}
 
 
@@ -253,7 +414,7 @@ def advise(holdings: dict, initial_value: float = 100000,
                 f"Spread across {len(sectors)} sectors — no single one dominates",
                 f"Your largest sector exposure is {top_sector} at {top_pct:.0f}%. "
                 f"This is what real diversification looks like: the things that can "
-                f"go wrong are genuinely different from each other."))
+                f"go wrong are genuinely different from each other.", tone="good"))
 
     # ---- 3. concentration of RISK (different from money) ----------------
     try:
@@ -323,16 +484,30 @@ def advise(holdings: dict, initial_value: float = 100000,
     # by 8 points" is a decision the user can actually weigh.
     for tip in tips:
         if tip["kind"] in ("concentration", "sector_concentration") and tip["tickers"]:
-            cap = float(max(20, 100 // max(len(tickers), 1)))
+            # Ceiling, not floor. With 3 holdings 100 // 3 gives 33, three
+            # positions at 33% only reach 99%, and the scenario is rejected as
+            # infeasible — so the payoff silently disappeared for exactly the
+            # small, concentrated portfolios that most need to see it.
+            n_t = max(len(tickers), 1)
+            cap = max(20.0, math.ceil(10000.0 / n_t) / 100.0)
             payoff = _cap_payoff({t: w[t] for t in tickers}, initial_value,
                                  horizon_months, cap, downside)
-            if payoff:
+            if payoff and payoff["improved"]:
                 tip["payoff"] = payoff
                 tip["detail"] += (
                     f" Concretely: capping every holding at {cap:.0f}% moves your "
                     f"worst case from {payoff['downside_before']:.0f}% to "
                     f"{payoff['downside_after']:.0f}% — {payoff['improvement_pts']:.1f} "
                     f"points of downside removed without predicting anything.")
+            elif payoff:
+                tip["payoff"] = payoff
+                tip["detail"] += (
+                    f" Worth knowing: capping every holding at {cap:.0f}% does NOT "
+                    f"improve the worst case here — it moves from "
+                    f"{payoff['downside_before']:.0f}% to {payoff['downside_after']:.0f}%. "
+                    f"The oversized holding is also the steadiest one, so trimming it "
+                    f"pushes money into names that move more. The concentration is "
+                    f"still real, but this particular fix is not the one that pays.")
             break     # one simulation is enough; they share the same fix
 
     # ---- 6b. can you actually trade what you hold? -----------------------
@@ -431,7 +606,15 @@ def advise(holdings: dict, initial_value: float = 100000,
     except Exception:
         _risk_rows = None
 
+    # Built last, from findings that are already final, so the verdict can
+    # never disagree with the list underneath it.
+    try:
+        _v = _verdict(w, sectors, tips, downside, max_loss_pct, bench, alpha)
+    except Exception:
+        _v = None
+
     return {
+        "verdict": _v,
         "health": _hs,
         "risk_contributions": _risk_rows,
         "suggestions": tips,

@@ -49,6 +49,96 @@ const MODES = {
 }
 
 /**
+ * Verdict — the judgement, before the numbers.
+ *
+ * This panel used to open with profit and loss, which answers a question nobody
+ * was asking. P&L says how the market moved; it does not say whether the thing
+ * you built is sound. A portfolio can be up 12% and badly constructed, or down
+ * 8% and completely fine, and leading with the number teaches the reader to
+ * confuse the two.
+ *
+ * So the call comes first, then what is good, then what is not. Strengths are
+ * measured the same way the concerns are — when nothing clears the bar the
+ * section says so rather than reaching for something encouraging.
+ */
+function Verdict({ v }) {
+  if (!v) return null
+  const bad = v.concerns.some(c => c.severity === 'high')
+  const tone = bad ? 'border-red-800/70 bg-red-950/25'
+             : v.concerns.length ? 'border-yellow-800/60 bg-yellow-950/15'
+             : 'border-green-800/70 bg-green-950/20'
+
+  return (
+    <div className={`p-3.5 rounded-lg border ${tone} space-y-3`}>
+      <div>
+        <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">The verdict</p>
+        <p className="text-base font-semibold text-gray-100 leading-snug">{v.call}</p>
+        <p className="text-xs text-gray-400 mt-1 leading-relaxed">{v.because}</p>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-green-500/90 mb-1.5">
+            What&rsquo;s good
+          </p>
+          {v.strengths.length === 0 ? (
+            <p className="text-xs text-gray-500 leading-relaxed">{v.no_strengths_note}</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {v.strengths.map((st, i) => (
+                <li key={i} className="text-xs">
+                  <span className="text-gray-200">{st.title}</span>
+                  <span className="block text-gray-500 mt-0.5 leading-relaxed">{st.evidence}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-red-400/90 mb-1.5">
+            What concerns me
+          </p>
+          {v.concerns.length === 0 ? (
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Nothing crossed a threshold. The checks it passed are the ones listed
+              here, and no others.
+            </p>
+          ) : (
+            <ul className="space-y-1.5">
+              {v.concerns.map((c, i) => (
+                <li key={i} className="text-xs">
+                  <span className={c.severity === 'high' ? 'text-red-300' : 'text-yellow-200/90'}>
+                    {c.title}
+                  </span>
+                  {/* The estimated effect, or an honest statement of which kind
+                      of "no number" this is. "We did not check" and "we checked
+                      and it does not help" mean opposite things to someone
+                      deciding whether to place a trade. */}
+                  {c.effect?.improved ? (
+                    <span className="block font-mono text-green-400 mt-0.5">
+                      fixing this: worst case {c.effect.downside_before}% →
+                      {' '}{c.effect.downside_after}% ({c.effect.improvement_pts} pts better)
+                    </span>
+                  ) : (
+                    <span className="block text-gray-500 mt-0.5 leading-relaxed">
+                      {c.effect_note}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      <p className="text-[10px] text-gray-600 leading-relaxed">{v.scope}</p>
+    </div>
+  )
+}
+
+
+/**
  * Finding — the headline always, the reasoning on request.
  *
  * Each warning previously showed its title, its detail, its payoff and its
@@ -71,12 +161,20 @@ function Finding({ s, i, openByDefault }) {
         <p className="text-sm font-medium text-gray-200">{s.title}</p>
 
         {/* The size of the prize stays visible: a warning without a number is a
-            lecture, and this is the part that turns it into a decision. */}
+            lecture, and this is the part that turns it into a decision.
+
+            When the simulation says the fix does NOT help, that is reported in
+            the same place rather than hidden. Painting a worse outcome green
+            because it came from the "improvement" field would be the single
+            most misleading thing this panel could do. */}
         {s.payoff && (
-          <p className="text-xs mt-1 font-mono text-green-400">
+          <p className={`text-xs mt-1 font-mono ${
+            s.payoff.improved ? 'text-green-400' : 'text-yellow-400/90'}`}>
             cap {s.payoff.cap_pct}% → worst case {s.payoff.downside_before}%
             {' '}to {s.payoff.downside_after}%
-            <span className="text-green-300"> ({s.payoff.improvement_pts} pts better)</span>
+            {s.payoff.improved
+              ? <span className="text-green-300"> ({s.payoff.improvement_pts} pts better)</span>
+              : <span className="text-yellow-300/90"> (no improvement — this fix does not pay)</span>}
           </p>
         )}
 
@@ -272,6 +370,9 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
 
       {advice.data && (
         <>
+          {/* First, before the score and long before the P&L. */}
+          <Verdict v={advice.data.verdict} />
+
           {/* One number the reader can act on, with the five that produced it
               underneath. Labelled by CHARACTER, not quality: a concentrated
               portfolio is aggressive, not bad, and calling it bad would import

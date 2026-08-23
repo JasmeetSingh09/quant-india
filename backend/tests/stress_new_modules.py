@@ -767,6 +767,78 @@ ok("tested configurations" in _src_all,
    "verdicts scope the claim to the configurations tested")
 
 
+# ================= COACH VERDICT ======================================
+# The coach now leads with a judgement instead of P&L. The properties worth
+# holding are the ones that keep it honest, not the ones that keep it positive.
+from portfolio_advisor import advise as _advise, _cap_payoff as _cp
+
+_conc = _advise({"RELIANCE.NS": 55, "TCS.NS": 25, "INFY.NS": 20},
+                initial_value=100000, horizon_months=12, max_loss_pct=15)
+_spread = _advise({"RELIANCE.NS": 10, "TCS.NS": 10, "HDFCBANK.NS": 10, "INFY.NS": 10,
+                   "ITC.NS": 10, "SUNPHARMA.NS": 10, "MARUTI.NS": 10, "LT.NS": 10,
+                   "TITAN.NS": 10, "ASIANPAINT.NS": 10},
+                  initial_value=100000, horizon_months=12, max_loss_pct=30)
+
+for _label, _r in (("concentrated", _conc), ("spread", _spread)):
+    _v = _r.get("verdict")
+    ok(_v is not None, f"{_label}: a verdict is returned")
+    if not _v:
+        continue
+    ok(bool(_v.get("call")), f"{_label}: the verdict states a call")
+    ok(bool(_v.get("because")), f"{_label}: the call says what drove it")
+
+    # A compliment must never appear under "what concerns me". The sector check
+    # emits praise and criticism under one kind, and severity alone could not
+    # tell them apart.
+    _good_titles = {t["title"] for t in _r["suggestions"] if t.get("tone") == "good"}
+    _concern_titles = {c["title"] for c in _v["concerns"]}
+    ok(not (_good_titles & _concern_titles),
+       f"{_label}: no good-news finding is listed as a concern")
+
+    # Strengths are earned, and an empty list is a real answer.
+    if not _v["strengths"]:
+        ok(bool(_v["no_strengths_note"]),
+           f"{_label}: an empty strengths list explains itself")
+    for _st in _v["strengths"]:
+        ok(bool(_st.get("evidence")), f"{_label}: strength cites its evidence")
+
+    # Every concern says something about effect, and the three states stay
+    # distinguishable.
+    for _c in _v["concerns"]:
+        _has = (_c.get("effect") or {}).get("improved")
+        ok(bool(_has) or bool(_c.get("effect_note")),
+           f"{_label}: concern reports effect or says why it has none")
+        if _c.get("effect") and not _c["effect"]["improved"]:
+            ok("does not improve" in (_c["effect_note"] or ""),
+               f"{_label}: a simulated non-result is not silence")
+
+# The alpha strength must not claim approval the scan never gave. With one
+# scored holding out of ten it read as "the model approves" when it meant
+# "the model has not looked".
+_sv = _spread.get("verdict") or {}
+_alpha_str = [x for x in _sv.get("strengths", []) if "does not dislike" in x["title"]]
+if _alpha_str:
+    import re as _re
+    _m = _re.search(r"(\d+) of your (\d+)", _alpha_str[0]["evidence"])
+    ok(_m is not None, "alpha strength states its coverage")
+    if _m:
+        ok(int(_m.group(1)) * 2 >= int(_m.group(2)),
+           f"alpha strength only claimed with majority coverage: {_alpha_str[0]['evidence']}")
+
+# The cap must be feasible. 100 // 3 = 33 makes three positions sum to 99% and
+# the scenario was rejected, so the payoff vanished for exactly the small
+# concentrated books that most needed it.
+import math as _math
+for _n in (3, 6, 7, 9, 11):
+    _cap = max(20.0, _math.ceil(10000.0 / _n) / 100.0)
+    ok(_cap * _n >= 100.0, f"cap {_cap}% x {_n} holdings is feasible")
+
+_src_adv = _insp.getsource(__import__("portfolio_advisor"))
+ok("tone" in _src_adv, "findings carry a tone so praise is not filed as criticism")
+ok("P&L" in _src_adv or "profit and loss" in _src_adv.lower(),
+   "the code records why the verdict leads instead of the return")
+
+
 # ================= STRATEGY COMPARISON (item 9) =======================
 # The whole point of this module is that it refuses to crown a winner. That
 # refusal is a property worth testing, because it is exactly the kind of thing
