@@ -16,6 +16,7 @@ of this file is to stop "it exists" being mistaken for "it works".
 """
 
 import json
+import re
 import sys
 import urllib.error
 import urllib.parse
@@ -254,6 +255,109 @@ if sc:
           f"[{sig.get('ci95_low_pct')}, {sig.get('ci95_high_pct')}]" if sig else "no test")
 else:
     check("recon", "track record", None, "no scorecard returned")
+
+
+# ---------------------------------------------------------------------------
+# Pass 4: the features added in this round, checked against the DEPLOYED app.
+#
+# Each of these was verified once by hand when it shipped. That is not the same
+# as being verifiable, and "I checked it in production" is worth very little a
+# month later. These run the same checks on demand.
+# ---------------------------------------------------------------------------
+print("")
+print("--- new features, in production ---")
+SEC = "new features"
+
+st, sc = api("/strategy/compare", "POST",
+             {"tickers": ["RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS"]})
+if st != 200:
+    check(SEC, "strategy comparison responds", None, f"HTTP {st}")
+else:
+    names = [x["strategy"] for x in sc.get("strategies", [])]
+    check(SEC, "three construction methods are measured",
+          len(names) >= 3, ", ".join(names))
+    check(SEC, "Black-Litterman is not silently dropped",
+          "Black-Litterman" in names,
+          "it reports weights under bl_pct, not optimal_pct")
+    check(SEC, "no winner is named",
+          not [k for k in sc if "best" in k or "recommend" in k]
+          and bool(sc.get("no_winner_named")),
+          "no best/recommended key exists for a UI to render")
+    days = {x["days"] for x in sc.get("strategies", [])}
+    check(SEC, "every method shares one measurement window",
+          len(days) == 1, f"days per strategy: {days}")
+    eq = [x for x in sc.get("strategies", []) if x["strategy"] == "Equal weight"]
+    check(SEC, "equal weight is charged no turnover it did not do",
+          bool(eq) and eq[0]["turnover_pct"] == 0,
+          f"turnover {eq[0]['turnover_pct']}%" if eq else "no equal-weight row")
+
+st, ad = api("/portfolio/advise", "POST",
+             {"holdings": {"RELIANCE.NS": 55, "TCS.NS": 25, "INFY.NS": 20},
+              "initial_value": 100000, "horizon_months": 12, "max_loss_pct": 15})
+if st != 200:
+    check(SEC, "coach responds", None, f"HTTP {st}")
+else:
+    v = ad.get("verdict") or {}
+    check(SEC, "the coach leads with a verdict", bool(v.get("call")),
+          v.get("call", "")[:70])
+    good = {t["title"] for t in ad.get("suggestions", []) if t.get("tone") == "good"}
+    conc = {c["title"] for c in v.get("concerns", [])}
+    check(SEC, "no compliment is filed under concerns",
+          not (good & conc),
+          f"{len(good)} good-news finding(s), none listed as a concern")
+    for stt in v.get("strengths", []):
+        if "does not dislike" in stt["title"]:
+            m = re.search(r"(\d+) of your (\d+)", stt["evidence"])
+            check(SEC, "the alpha strength states its coverage",
+                  m is not None and int(m.group(1)) * 2 >= int(m.group(2)),
+                  stt["evidence"][:70])
+    effs = [c for c in v.get("concerns", []) if c.get("effect")]
+    check(SEC, "a simulated non-result is reported, not hidden",
+          all(e["effect"]["improved"] or "does not improve" in (e["effect_note"] or "")
+              for e in effs) if effs else None,
+          f"{len(effs)} concern(s) carry a simulated effect")
+
+st, mc = api("/montecarlo/simulate", "POST",
+             {"holdings": {"RELIANCE.NS": 40, "TCS.NS": 30, "INFY.NS": 30},
+              "initial_value": 100000, "horizon_days": 252,
+              "n_simulations": 4000, "target_value": 125000})
+if st != 200:
+    check(SEC, "monte carlo responds", None, f"HTTP {st}")
+else:
+    summ = mc.get("summary") or mc
+    dd = summ.get("drawdown") or {}
+    tg = summ.get("target") or {}
+    check(SEC, "the fall along the way is reported, not just the ending value",
+          dd.get("median_max_drawdown_pct") is not None,
+          f"median worst fall {dd.get('median_max_drawdown_pct')}%")
+    check(SEC, "every reported drawdown is a fall",
+          bool(dd) and all(x <= 0 for k, x in dd.items()
+                           if k.endswith("drawdown_pct")),
+          f"worst {dd.get('worst_max_drawdown_pct')}%")
+    check(SEC, "the target is a share of simulations, not a chance",
+          bool(tg) and "not the chance" in tg.get("note", "").lower(),
+          f"{tg.get('share_of_simulations_pct')}% of paths reach the target")
+
+st, au = api("/optimizer/auto", "POST",
+             {"tickers": ["RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS"]})
+bl = (au or {}).get("bl_result") or {}
+if st != 200 or not bl:
+    check(SEC, "black-litterman pipeline responds", None, f"HTTP {st}")
+else:
+    check(SEC, "the whole BL chain is returned for display",
+          all(bl.get(k) is not None for k in
+              ("implied_equilibrium_returns", "bl_posterior_returns",
+               "equilibrium_weights", "views_injected", "tau")),
+          "equilibrium, views, posterior and weights all present")
+    bad = [t for t in bl.get("tickers", [])
+           if abs(bl["weight_shifts_pct"][t]
+                  - (bl["bl_pct"][t] - bl["equilibrium_weights"][t] * 100)) > 0.15]
+    check(SEC, "the shift column is the difference it claims to be",
+          not bad, f"mismatched: {bad}" if bad else "final minus market, every row")
+    check(SEC, "the summary no longer claims view sign drives weight",
+          "positive sentiment received higher allocations"
+          not in bl.get("interpretation", ""),
+          "on live data two negative-view stocks gained weight")
 
 
 # ══════════════════════════════════ REPORT ══════════════════════════════════
