@@ -1,4 +1,5 @@
 import usePersistentState from '../usePersistentState'
+import ErrorBoundary from './ErrorBoundary'
 
 /**
  * TabShell — shared tab-page layout used by MyStocks, Markets,
@@ -43,8 +44,16 @@ export default function TabShell({ tabs, persistKey }) {
       </div>
 
       {/* Content */}
+      {/* One boundary per tab, keyed and named by label. Without it a single
+          broken tab took the whole route down and the message named only "page",
+          so the report came back as "the stocks page blanked out" with nothing
+          to narrow it. Now the other tabs keep working and the failure says
+          which one it was. The key resets a crashed boundary when the user
+          switches tabs, so one failure doesn't wedge the shell. */}
       <div className="flex-1 overflow-y-auto">
-        <Component />
+        <ErrorBoundary name={tabs[safeIdx].label} key={tabs[safeIdx].label}>
+          <Component />
+        </ErrorBoundary>
       </div>
     </div>
   )
