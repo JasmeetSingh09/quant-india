@@ -61,11 +61,32 @@ for _ in range(40):
         if vol is not None:
             check(math.isfinite(vol) and vol>=0, "frontier_vol_bad", str(pt))
 
+# This loop demanded success from invented tickers and logged 40 failures for
+# the code behaving correctly. Patching _get_returns synthesises PRICES, which
+# is enough for BL and the frontier above, but optimize_with_alpha_views runs
+# the alpha model — fundamentals and news, per company — and you cannot
+# synthesise a company. On V0.NS there is genuinely nothing to score, so an
+# explicit error is the right answer.
+#
+# A suite that is permanently red is worse than no suite: it teaches everyone
+# reading it that red means nothing. So the check is now the property actually
+# worth holding — that an unscoreable universe degrades cleanly rather than
+# crashing or emitting weights the model cannot justify.
 for _ in range(40):
     k=int(rng.integers(2,6)); tickers=[f"V{i}.NS" for i in range(k)]
     views={t: float(rng.uniform(-20,20)) for t in tickers}
-    r = PO.optimize_with_alpha_views(tickers, views)
-    if "error" in r: check(False,"alphaview_errored", r.get("error")); continue
+    try:
+        r = PO.optimize_with_alpha_views(tickers, views)
+    except Exception as e:
+        check(False,"alphaview_crashed", f"{type(e).__name__}: {e}"); continue
+    check(isinstance(r, dict), "alphaview_not_dict", str(type(r)))
+    if "error" in r:
+        check(bool(str(r["error"]).strip()), "alphaview_blank_error", repr(r.get("error")))
+        # An optimiser that could not score anything must not also hand back
+        # weights — that combination is how a failure reaches a user as advice.
+        check(not r.get("optimal_weights"), "alphaview_weights_despite_error",
+              str(r.get("optimal_weights")))
+        continue
     w=r.get("optimal_weights",{})
     if w: check(abs(sum(w.values())-1.0)<1e-2,"alphaview_not_simplex",f"sum={sum(w.values())}")
 
