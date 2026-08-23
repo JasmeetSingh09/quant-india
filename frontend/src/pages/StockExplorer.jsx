@@ -945,8 +945,22 @@ export default function StockExplorer() {
     if (!p && ticker) setTicker('')
   }, [searchParams])
 
+  // The two halves of this page, each named. The inner panels already carry
+  // their own boundaries, but everything outside them — the metrics header,
+  // the price chart, the financials, the sentiment block — fell straight
+  // through to the route boundary, whose message says only "page". That is how
+  // the last report arrived: "stocks page blanked out", with no way to tell
+  // whether the list or the detail view did it.
   if (ticker) {
-    return <StockDetail ticker={ticker} onBack={goBack} />
+    return (
+      <ErrorBoundary name="stock detail" key={ticker}>
+        <StockDetail ticker={ticker} onBack={goBack} />
+      </ErrorBoundary>
+    )
   }
-  return <StocksList onSelect={selectTicker} />
+  return (
+    <ErrorBoundary name="stock list">
+      <StocksList onSelect={selectTicker} />
+    </ErrorBoundary>
+  )
 }
