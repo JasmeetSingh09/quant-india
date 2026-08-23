@@ -262,8 +262,23 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
   // looking for it; someone who does not should never have to scroll past it
   // to reach the finding. The numbers are identical either way — this changes
   // what is shown, never what is computed.
-  const [detail, setDetail] = usePersistentState('coach.detail', 'simple')
-  const isAdvanced = detail === 'advanced'
+  // Three levels, because two forced a bad choice. "Simple" hid the benchmark
+  // and the tax position, which are not advanced ideas - they are the two
+  // numbers that decide whether the portfolio is working. "Advanced" then had
+  // to carry those alongside risk decomposition and sector attribution, so
+  // anyone who wanted to know how they were doing against the index got a page
+  // of factor mathematics with it.
+  //
+  // Beginner answers "is this all right". Intermediate adds the measurements
+  // behind that answer. Advanced adds the attribution behind the measurements.
+  // Nothing is removed at a lower level that changes the conclusion - the
+  // verdict and its concerns are identical at all three, which is the property
+  // that makes graduated disclosure honest rather than a filtered story.
+  const [detail, setDetail] = usePersistentState('coach.detail', 'beginner')
+  // 'simple' was the old default and is still in people's localStorage.
+  const level = detail === 'simple' ? 'beginner' : detail
+  const isAdvanced = level === 'advanced'
+  const isIntermediate = level === 'intermediate' || isAdvanced
   // User-driven tweak, distinct from the preset scenarios: they answer "what
   // could I change?", this answers "what if I change it like THIS?".
   const nHold = Object.keys(holdings || {}).length
@@ -344,10 +359,13 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
         </h2>
         <div className="flex items-center gap-2">
           <div className="flex rounded-md overflow-hidden border border-gray-700 text-[10px]">
-            {['simple', 'advanced'].map(m => (
+            {['beginner', 'intermediate', 'advanced'].map(m => (
               <button key={m} onClick={() => setDetail(m)}
+                title={m === 'beginner' ? 'The verdict and what drives it'
+                     : m === 'intermediate' ? 'Adds the index comparison, tax and every finding'
+                     : 'Adds risk attribution, sector exposure and the method'}
                 className={`px-2 py-1 capitalize transition-colors ${
-                  detail === m ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-gray-200'}`}>
+                  level === m ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-gray-200'}`}>
                 {m}
               </button>
             ))}
@@ -396,6 +414,10 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
                 )}
               </div>
               <p className="text-xs text-gray-400 mt-1">{advice.data.health.band_note}</p>
+              {/* The five factors behind the score. The score itself stays at
+                  every level; the arithmetic that produced it is a measurement,
+                  which is where intermediate starts. */}
+              {isIntermediate && (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-3 gap-y-1 mt-2">
                 {Object.entries(advice.data.health.components)
                   .filter(([, c]) => c.score != null)
@@ -410,6 +432,7 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
                   </div>
                 ))}
               </div>
+              )}
               <p className="text-[10px] text-gray-600 mt-2 leading-relaxed">
                 {advice.data.health.means}
               </p>
@@ -421,7 +444,7 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
           {/* The comparison most apps leave out. Shown before the findings
               because "you are behind the index" reframes everything below it,
               and shown in red when it is bad rather than quietly in grey. */}
-          {advice.data.benchmark?.verdict && (
+          {isIntermediate && advice.data.benchmark?.verdict && (
             <div className={`p-3 rounded-lg border text-sm ${
               advice.data.benchmark.verdict === 'behind'
                 ? 'border-red-800 bg-red-950/30'
@@ -450,7 +473,7 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
 
           {/* What the gain is actually worth. Only a live portfolio has a real
               holding period, so this never appears on a designed one. */}
-          {mode.showTax && advice.data.tax && !advice.data.tax.error && (
+          {isIntermediate && mode.showTax && advice.data.tax && !advice.data.tax.error && (
             <div className="p-3 rounded-lg border border-gray-700 bg-gray-900/40">
               <div className="flex items-baseline justify-between gap-3 flex-wrap">
                 <span className="text-sm font-medium text-gray-200">
@@ -559,11 +582,11 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
                   reader to decide which matters most, which is the judgement
                   they came here to borrow. */}
               <p className="text-xs text-gray-400 font-medium">
-                {isAdvanced || advice.data.suggestions.length <= 3
+                {isIntermediate || advice.data.suggestions.length <= 3
                   ? `${advice.data.suggestions.length} thing${advice.data.suggestions.length === 1 ? '' : 's'} to look at${advice.data.suggestions.length > 1 ? ', biggest first' : ''}`
-                  : `Top 3 of ${advice.data.suggestions.length} — switch to Advanced for the rest`}
+                  : `Top 3 of ${advice.data.suggestions.length} — switch to Intermediate for the rest`}
               </p>
-              {(isAdvanced ? advice.data.suggestions : advice.data.suggestions.slice(0, 3)).map((s, i) => (
+              {(isIntermediate ? advice.data.suggestions : advice.data.suggestions.slice(0, 3)).map((s, i) => (
                 <Finding key={i} s={s} i={i} openByDefault={isAdvanced} />
               ))}
             </div>

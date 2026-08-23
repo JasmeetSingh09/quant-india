@@ -744,6 +744,7 @@ ok("score" not in {k.lower() for k in _e2 if k != "sentiment"},
 # Wording: "no evidence of an effect" and "evidence of no effect" are different
 # claims, and the test can only support the first. This pins the distinction so a
 # future edit cannot quietly restore the stronger one.
+import io
 import inspect as _insp
 import walk_forward as _wf, alpha_v2 as _av2, methodology as _meth
 
@@ -837,6 +838,34 @@ _src_adv = _insp.getsource(__import__("portfolio_advisor"))
 ok("tone" in _src_adv, "findings carry a tone so praise is not filed as criticism")
 ok("P&L" in _src_adv or "profit and loss" in _src_adv.lower(),
    "the code records why the verdict leads instead of the return")
+
+
+# ================= GRADUATED DISCLOSURE ===============================
+# Three levels are only honest if the conclusion is the same at all three.
+# Hiding a measurement is disclosure; hiding a concern is a filtered story.
+_coach_jsx = io.open("../frontend/src/components/PortfolioCoach.jsx",
+                     encoding="utf-8").read()
+
+ok("<Verdict v={advice.data.verdict} />" in _coach_jsx,
+   "the verdict renders at every level, ungated by detail")
+_verdict_line = [l for l in _coach_jsx.split(chr(10))
+                 if "<Verdict v=" in l][0]
+ok("isAdvanced" not in _verdict_line and "isIntermediate" not in _verdict_line,
+   "no disclosure level can hide the verdict or its concerns")
+
+for _lvl in ("beginner", "intermediate", "advanced"):
+    ok(f"'{_lvl}'" in _coach_jsx, f"{_lvl} level exists in the picker")
+
+# The old two-level key is still in real browsers' localStorage, and a stale
+# 'simple' must land somewhere real rather than matching no level at all.
+ok("detail === 'simple' ? 'beginner'" in _coach_jsx,
+   "the retired 'simple' setting still resolves to a live level")
+
+# A non-improvement must not be rendered in the improvement colour.
+ok("s.payoff.improved ? 'text-green-400'" in _coach_jsx,
+   "the payoff colour is driven by whether it actually improved")
+ok("this fix does not pay" in _coach_jsx,
+   "a simulated non-result is stated in the UI, not left blank")
 
 
 # ================= STRATEGY COMPARISON (item 9) =======================
