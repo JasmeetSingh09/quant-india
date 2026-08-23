@@ -868,6 +868,80 @@ ok("this fix does not pay" in _coach_jsx,
    "a simulated non-result is stated in the UI, not left blank")
 
 
+# ================= MONTE CARLO DRAWDOWN + TARGET (item 4) =============
+# Synthetic paths, because on constructed data the right answer is known
+# exactly and a subtle sign or axis error cannot hide behind plausible noise.
+import numpy as _mnp
+from monte_carlo import drawdown_stats as _dds, target_probability as _tp
+
+# A path that only rises can never have fallen.
+_rise = _mnp.array([[110.0, 120.0, 130.0, 140.0]])
+_r = _dds(_rise, 100.0)
+ok(_r["worst_max_drawdown_pct"] == 0.0,
+   f"a monotonically rising path has no drawdown, got {_r['worst_max_drawdown_pct']}")
+
+# 100 -> 50 -> 100 is exactly a 50% fall, whatever it recovers to.
+_v = _mnp.array([[100.0, 50.0, 100.0]])
+_r = _dds(_v, 100.0)
+ok(abs(_r["worst_max_drawdown_pct"] - (-50.0)) < 1e-6,
+   f"a halving is reported as -50%, got {_r['worst_max_drawdown_pct']}")
+
+# A fall on the FIRST day must count. Without prepending the starting value the
+# first point becomes its own peak and the opening loss disappears.
+_d1 = _mnp.array([[80.0, 80.0, 80.0]])
+_r = _dds(_d1, 100.0)
+ok(abs(_r["worst_max_drawdown_pct"] - (-20.0)) < 1e-6,
+   f"a day-one fall counts as drawdown, got {_r['worst_max_drawdown_pct']}")
+
+# Severity ordering: worst is the deepest, p25 the shallowest.
+_mixed = _mnp.array([[100.0, 95.0, 100.0], [100.0, 70.0, 90.0],
+                     [100.0, 50.0, 60.0], [100.0, 99.0, 105.0]])
+_r = _dds(_mixed, 100.0)
+ok(_r["worst_max_drawdown_pct"] <= _r["p95_max_drawdown_pct"] <=
+   _r["median_max_drawdown_pct"] <= _r["p25_max_drawdown_pct"],
+   f"drawdown percentiles are ordered by severity: {_r}")
+for _k, _val in _r.items():
+    if _k.endswith("drawdown_pct"):
+        ok(_val <= 0, f"{_k} is a fall, not a gain ({_val})")
+
+# A deeper threshold can never catch more paths than a shallower one.
+ok(_r["share_over_35pct_fall"] <= _r["share_over_20pct_fall"],
+   f"share past 35% cannot exceed share past 20%: {_r['share_over_35pct_fall']} "
+   f"vs {_r['share_over_20pct_fall']}")
+
+ok(_dds(None, 100.0) == {}, "no paths returns empty rather than inventing zeros")
+ok(_dds(_mnp.array([]), 100.0) == {}, "an empty array returns empty")
+
+# --- target ---
+_fv = _mnp.array([90000.0, 100000.0, 110000.0, 130000.0])
+ok(_tp(_fv, 100000.0, 50000.0)["share_of_simulations_pct"] == 100.0,
+   "a target below every outcome is reached by every path")
+ok(_tp(_fv, 100000.0, 999999.0)["share_of_simulations_pct"] == 0.0,
+   "a target above every outcome is reached by none")
+_t = _tp(_fv, 100000.0, 110000.0)
+ok(_t["share_of_simulations_pct"] == 50.0,
+   f"2 of 4 paths at or above the target is 50%, got {_t['share_of_simulations_pct']}")
+ok(abs(_t["target_return_pct"] - 10.0) < 1e-6,
+   f"110k from 100k needs +10%, got {_t['target_return_pct']}")
+
+# The phrasing rule: a share of these simulations, never a probability of the
+# future. This is the one sentence a user is most likely to quote back.
+ok("not the chance" in _t["note"].lower(),
+   "the target note refuses to call itself a chance of happening")
+ok("share" in _t["note"].lower(), "the target note says what it IS")
+ok(_tp(_fv, 100000.0, None) == {}, "no target returns empty")
+ok(_tp(None, 100000.0, 110000.0) == {}, "no paths returns empty")
+
+# End to end: the wiring from request through to summary.
+_mc_ui = io.open("../frontend/src/pages/MonteCarlo.jsx", encoding="utf-8").read()
+ok("target_value" in _mc_ui, "the page sends a target when one is set")
+ok("drawdown" in _mc_ui, "the page renders the drawdown panel")
+ok("share_over_20pct_fall" in _mc_ui, "the page shows how many paths fell past 20%")
+_mc_src = _insp.getsource(__import__("monte_carlo"))
+ok("not the chance of it" in _mc_src or "not the chance" in _mc_src,
+   "the shipped module carries the probability-phrasing rule")
+
+
 # ================= BLACK-LITTERMAN DISPLAY (item 3) ===================
 # The optimiser always returned the whole chain; the page rendered only the
 # final weights. These checks are about the CONTRACT the panel depends on, so
