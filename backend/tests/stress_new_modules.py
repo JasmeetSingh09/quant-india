@@ -1097,6 +1097,13 @@ _fh.record(_T, "v2", alpha_score=22.0, price=101.2, captured_at="2026-08-23",
                     "growth": {"score": 57}, "value": {"score": 18},
                     "sentiment": {"score": 11}, "low_risk": {"score": 26}})
 
+# Neither alpha model returns a price, so record() has to source it. Without a
+# price there is nothing for a factor to diverge FROM, and the whole feature is
+# inert while still looking like it works.
+_src_rec = _insp.getsource(_fh.record)
+ok("get_current_price" in _src_rec,
+   "record sources the price itself, since neither model supplies one")
+
 _c = _fh.change(_T, days=30)
 ok(_c["status"] == "ok", f"two observations produce a change: {_c['status']}")
 if _c["status"] == "ok":

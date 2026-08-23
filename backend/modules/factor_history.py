@@ -106,6 +106,19 @@ def record(ticker: str, model: str, alpha_score=None, factors: dict = None,
             except Exception:
                 return None
 
+        # Neither alpha model returns a price, so without this every row landed
+        # with price NULL — and divergence, which is entirely about a factor
+        # moving differently from the price, had nothing to compare against.
+        # get_current_price is cached, and during a scan the price for this
+        # ticker was just used to compute momentum, so this is almost always a
+        # memory hit. A failure here loses the price, never the observation.
+        if price is None:
+            try:
+                from data_fetcher import get_current_price
+                price = (get_current_price(ticker) or {}).get("price")
+            except Exception:
+                price = None
+
         # One row per ticker per DAY per model. A user refreshing a stock page
         # ten times should not create ten observations and make a day look
         # busier than it was.
