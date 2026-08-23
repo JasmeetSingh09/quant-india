@@ -60,6 +60,9 @@ export default function MonteCarlo() {
   const [capital, setCapital]   = usePersistentState('mc.capital', 100000)
   const [years, setYears]       = usePersistentState('mc.years', 1)
   const [method, setMethod]     = usePersistentState('mc.method', 'bootstrap')
+  // A value the user is aiming at. Answered as a share of simulations,
+  // never as the chance of reaching it.
+  const [target, setTarget]     = usePersistentState('mc.target', '')
 
   const sim = useMutation({ mutationFn: runMonteCarlo })
   const cmp = useMutation({ mutationFn: compareMonteCarlo })
@@ -67,6 +70,7 @@ export default function MonteCarlo() {
   const body = () => ({
     holdings, initial_value: Number(capital),
     horizon_days: Math.round(years * 252), n_simulations: 10000, method,
+    target_value: target ? Number(target) : null,
   })
 
   // Both endpoints require allocations to sum to 100% — gate the buttons on it
@@ -112,6 +116,15 @@ export default function MonteCarlo() {
               <option value="t">Fat-tailed (Student's t)</option>
               <option value="normal">Normal distribution</option>
             </select>
+          </div>
+
+          <div>
+            <label className="label">Target value (optional)</label>
+            <input type="number" className="input" placeholder="e.g. 125000"
+                   value={target} onChange={e => setTarget(e.target.value)} />
+            <p className="text-[10px] text-gray-600 mt-1">
+              Answered as the share of simulations that reach it, not the chance it happens.
+            </p>
           </div>
           <button className="btn-primary w-full" onClick={() => { trackEvent('montecarlo_run', { n_stocks: Object.keys(holdings).length })
                            sim.mutate(body()) }} disabled={sim.isPending || !allocOk}>
@@ -174,6 +187,38 @@ export default function MonteCarlo() {
                   costs, liquidity and bid/ask spreads may differ from the simulation.
                 </p>
               </div>
+
+              {/* What the ending value cannot show: how far the path fell on the
+                  way. That is the part a person has to sit through, and the part
+                  that makes them sell at the bottom. */}
+              {d.drawdown?.median_max_drawdown_pct != null && (
+                <div className="mb-3">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-1.5">
+                    How far it fell along the way
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[['Typical worst fall', `${d.drawdown.median_max_drawdown_pct}%`],
+                      ['1 in 20 paths fell', `${d.drawdown.p95_max_drawdown_pct}%`],
+                      ['Worst path fell', `${d.drawdown.worst_max_drawdown_pct}%`],
+                      ['Fell over 20%', `${d.drawdown.share_over_20pct_fall}% of paths`]]
+                      .map(([label, val]) => (
+                      <div key={label} className="card-sm">
+                        <p className="text-[11px] text-gray-500">{label}</p>
+                        <p className="text-sm font-mono text-red-400">{val}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-gray-600 mt-1.5 leading-relaxed">
+                    {d.drawdown.note}
+                  </p>
+                </div>
+              )}
+
+              {d.target?.share_of_simulations_pct != null && (
+                <p className="mb-3 text-xs text-gray-300 leading-relaxed border-l-2 border-gray-700 pl-2.5">
+                  {d.target.note}
+                </p>
+              )}
 
               <p className="mb-2 text-xs text-gray-400 leading-relaxed">
                 Each line is one simulated path. The band shows where most paths

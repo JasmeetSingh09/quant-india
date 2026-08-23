@@ -324,6 +324,9 @@ class MonteCarloRequest(BaseModel):
     horizon_days:  int = 252
     n_simulations: int = 10_000
     method: str = "bootstrap"
+    # A value the user is aiming at. Answered as a share of simulations, never
+    # as the chance of reaching it.
+    target_value: Optional[float] = None
 
 class BlackScholesRequest(BaseModel):
     spot:        float
@@ -1366,6 +1369,29 @@ def events_check(ticker: str):
     return detect(ticker)
 
 
+class StrategyCompareRequest(BaseModel):
+    tickers: list
+    current_weights: dict = None
+    initial_value: float = 100000
+
+
+@app.post("/strategy/compare")
+def strategy_comparison(req: StrategyCompareRequest):
+    """
+    Equal weight vs mean-variance vs Black-Litterman, measured identically.
+
+    Deliberately names no winner. The highest past return is usually the one
+    that took the most risk, traded the most, or was luckiest, and none of
+    those repeat on demand.
+    """
+    from strategy_compare import compare
+    r = compare(req.tickers, initial_value=req.initial_value,
+                current_weights=req.current_weights)
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+
 @app.get("/methodology")
 def methodology_all():
     """
@@ -1979,6 +2005,7 @@ def montecarlo_simulate(req: MonteCarloRequest):
     result = mc_simulate(
         req.holdings, req.initial_value, req.horizon_days,
         req.n_simulations, method=req.method,
+        target_value=req.target_value,
     )
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])

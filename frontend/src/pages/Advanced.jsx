@@ -7,6 +7,7 @@ import Seasonality from './Seasonality'
 import Research from './Research'
 import Backtest from './Backtest'
 import WalkForward from '../components/WalkForward'
+import StrategyCompare from '../components/StrategyCompare'
 
 /**
  * Advanced Centre — the quantitative tools, gathered in one place.
@@ -22,6 +23,9 @@ const TABS = [
   // question than anything else these tools can compute, and burying it at the
   // end would say the opposite.
   { label: 'Validation',  Component: WalkForward },
+  // Next to Validation for the same reason it is first: 'which method
+  // should build this?' is a validation question, not a tooling one.
+  { label: 'Methods',     Component: StrategyCompare },
   { label: 'Risk',        Component: RiskLab },
   { label: 'Factors',     Component: Factors },
   { label: 'Signals',     Component: Research },

@@ -767,6 +767,55 @@ ok("tested configurations" in _src_all,
    "verdicts scope the claim to the configurations tested")
 
 
+# ================= STRATEGY COMPARISON (item 9) =======================
+# The whole point of this module is that it refuses to crown a winner. That
+# refusal is a property worth testing, because it is exactly the kind of thing
+# a later "helpful" edit removes.
+import strategy_compare as _sc
+
+_r = _sc.compare(["RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS"])
+ok("error" not in _r, f"strategy compare runs: {_r.get('error', 'ok')}")
+
+if "error" not in _r:
+    _names = [x["strategy"] for x in _r["strategies"]]
+    ok(len(_names) >= 3, f"at least 3 methods measured, got {len(_names)}")
+    ok("Equal weight" in _names, "equal weight baseline is always present")
+    # The bl_pct key mismatch silently dropped this one and looked like the
+    # method failing rather than a lookup missing.
+    ok("Black-Litterman" in _names, "Black-Litterman is not silently dropped")
+    ok("Mean-variance" in _names, "mean-variance is not silently dropped")
+
+    ok("no_winner_named" in _r and len(_r["no_winner_named"]) > 40,
+       "the refusal to name a winner is returned to the caller")
+    ok("best" not in _r, "no 'best' key exists for a UI to render as a winner")
+    ok("recommended" not in _r, "no 'recommended' key exists either")
+
+    # Every method must be measured over the same window on the same data,
+    # or the comparison measures the window rather than the method.
+    _days = {x["days"] for x in _r["strategies"]}
+    ok(len(_days) == 1, f"all methods share one measurement window: {_days}")
+
+    for _x in _r["strategies"]:
+        ok(_x.get("volatility_pct") is not None and _x.get("max_drawdown_pct") is not None,
+           f"{_x['strategy']} reports risk beside return")
+        ok(_x.get("max_drawdown_pct") <= 0, f"{_x['strategy']} drawdown is a fall, not a gain")
+        ok(_x.get("turnover_pct") is not None and _x.get("cost_of_turnover_pct") is not None,
+           f"{_x['strategy']} reports what the trading cost")
+        ok(_x.get("why"), f"{_x['strategy']} says what the method assumes")
+
+    # Equal weight rebalances to itself, so it can never carry turnover cost.
+    _eq = [x for x in _r["strategies"] if x["strategy"] == "Equal weight"][0]
+    ok(_eq["turnover_pct"] == 0, "equal weight charges no turnover it did not do")
+
+    _src_sc = _insp.getsource(_sc)
+    ok("survivorship" in _src_sc.lower(), "the limits name survivorship")
+    ok("limits" in _r and len(_r["limits"]) > 40, "limits are returned, not just documented")
+
+# Too few names must refuse rather than compare a two-stock 'portfolio'.
+_short = _sc.compare(["RELIANCE.NS", "TCS.NS"])
+ok("error" in _short, "fewer than 3 tickers is refused, not silently compared")
+
+
 # ============================ REPORT ==================================
 print("\n" + "=" * 60)
 print(f"TOTAL CHECKS: {checks}")

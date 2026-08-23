@@ -134,6 +134,73 @@ def _portfolio_daily_returns(holdings: dict, lookback_days: int = 504) -> pd.Ser
     return series
 
 
+def drawdown_stats(paths, initial_value: float) -> dict:
+    """
+    How far each simulated path fell from its own running peak.
+
+    Reported because the ending value cannot describe the journey. Two paths
+    finishing at the same number are not the same experience if one of them
+    lost 45% on the way, and the drawdown is the part people actually have to
+    live through — and the part that makes them sell at the bottom.
+    """
+    try:
+        import numpy as _np
+        if paths is None or getattr(paths, "size", 0) == 0:
+            return {}
+        arr = _np.asarray(paths, dtype=float)
+        if arr.ndim != 2 or arr.shape[1] < 2:
+            return {}
+        # Prepend the starting value so a fall on day one counts as a drawdown.
+        start = _np.full((arr.shape[0], 1), float(initial_value))
+        full = _np.hstack([start, arr])
+        peaks = _np.maximum.accumulate(full, axis=1)
+        dd = (full / peaks - 1.0) * 100.0
+        worst = dd.min(axis=1)
+        return {
+            "median_max_drawdown_pct": round(float(_np.median(worst)), 2),
+            "p25_max_drawdown_pct": round(float(_np.percentile(worst, 75)), 2),
+            "p95_max_drawdown_pct": round(float(_np.percentile(worst, 5)), 2),
+            "worst_max_drawdown_pct": round(float(worst.min()), 2),
+            "share_over_20pct_fall": round(float((worst < -20).mean()) * 100, 1),
+            "share_over_35pct_fall": round(float((worst < -35).mean()) * 100, 1),
+            "note": ("Maximum fall from a running peak within each simulated path. "
+                     "The ending value cannot show this — two paths finishing at the "
+                     "same number are different experiences if one fell 45% first."),
+        }
+    except Exception:
+        return {}
+
+
+def target_probability(final_values, initial_value: float, target_value: float) -> dict:
+    """
+    Share of simulated paths finishing at or above a value the user chose.
+
+    Phrased as a share of simulations, never as a chance of it happening. The
+    simulation only knows the past it resampled; calling its output a
+    probability of a future event claims something it cannot support.
+    """
+    try:
+        import numpy as _np
+        if final_values is None or target_value is None:
+            return {}
+        fv = _np.asarray(final_values, dtype=float)
+        if fv.size == 0 or float(initial_value) <= 0:
+            return {}
+        hit = float((fv >= float(target_value)).mean()) * 100
+        needed = (float(target_value) / float(initial_value) - 1) * 100
+        return {
+            "target_value": round(float(target_value), 2),
+            "target_return_pct": round(needed, 2),
+            "share_of_simulations_pct": round(hit, 1),
+            "note": (f"{hit:.0f}% of simulated paths finished at or above "
+                     f"Rs {float(target_value):,.0f}, which needs a "
+                     f"{needed:+.1f}% return. That is a share of THESE simulations "
+                     f"under their stated assumptions, not the chance of it "
+                     f"happening."),
+        }
+    except Exception:
+        return {}
+
 def _summarise_paths(final_values: np.ndarray, initial_value: float, horizon_days: int) -> dict:
     """Compute summary statistics from an array of simulated final values."""
     final_values = np.sort(final_values)
@@ -220,6 +287,10 @@ def simulate(
     t_dof: int = 5,
     seed: int = None,
     with_charts: bool = True,
+    # A value the user is aiming at. Reported as a SHARE of simulations, never
+    # as a chance of reaching it — the simulation knows only the past it
+    # resampled.
+    target_value: float = None,
 ) -> dict:
     """
     Run a Monte Carlo simulation of a portfolio's future value.
@@ -348,6 +419,13 @@ def simulate(
     final_values = paths[:, -1].astype(np.float64)
 
     summary = _summarise_paths(final_values, initial_value, horizon_days)
+
+    # The journey, not just the destination. Ending-value percentiles cannot
+    # distinguish a steady drift from a path that fell 45% and recovered, and
+    # the fall is the part a person has to sit through.
+    summary["drawdown"] = drawdown_stats(paths, initial_value)
+    if target_value is not None:
+        summary["target"] = target_probability(final_values, initial_value, target_value)
 
     # compare_methods only reads the summary stats, so let it skip the chart
     # work entirely rather than build payloads it throws away.

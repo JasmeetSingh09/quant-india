@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import ErrorBoundary from '../components/ErrorBoundary'
+import AlphaVsFit from '../components/AlphaVsFit'
 import {
   getPrice, getMetrics, getAlphaScore, getSentiment, getStockNews,
   searchStocks, explainAlpha, getIntraday, getVolForecast,
@@ -785,6 +786,7 @@ function StockDetail({ ticker, onBack }) {
                   the page broke; these tell you WHICH panel, which is the
                   difference between a fix and a search. */}
               <ErrorBoundary name="what's happening"><StockContext ticker={ticker} /></ErrorBoundary>
+              <ErrorBoundary name="alpha vs fit"><AlphaVsFit ticker={ticker} /></ErrorBoundary>
               <ErrorBoundary name="six-factor view"><SixFactor ticker={ticker} /></ErrorBoundary>
               <ErrorBoundary name="why this signal"><WhySignal ticker={ticker} /></ErrorBoundary>
               {alphaLoading ? <Spinner size="sm" /> : alpha && (
