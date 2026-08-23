@@ -1163,6 +1163,56 @@ ok("Edge " not in _fc_jsx.replace("Edge score", ""),
    "the UI renders no edge score")
 
 
+# ================= DOES THE SUGGESTION SURVIVE A FALL? ================
+# The coach can say a change improves structure. Structure is not money, and
+# this is the join that checks whether the suggestion actually costs less in
+# the fall it is meant to protect against.
+from portfolio_shock import compare as _cmp
+
+_cur = {"RELIANCE.NS": 55, "TCS.NS": 25, "INFY.NS": 20}
+_sug = {"RELIANCE.NS": 34, "TCS.NS": 33, "INFY.NS": 33}
+
+_cm = _cmp(_cur, _sug, kind="market", magnitude_pct=-20.0, initial_value=1000000)
+ok("error" not in _cm, f"comparison runs: {_cm.get('error', 'ok')}")
+
+if "error" not in _cm:
+    ok("current" in _cm and "suggested" in _cm, "both portfolios are reported")
+    # One shock, one set of betas, so the difference is the allocation and
+    # nothing else. Same scenario string proves they went through together.
+    ok(abs(_cm["difference_pts"]
+           - (_cm["suggested"]["change_pct"] - _cm["current"]["change_pct"])) < 0.02,
+       "the stated difference equals suggested minus current")
+    ok(_cm["suggested_is_better"] == (_cm["difference_pts"] > 0.05),
+       "the better/worse flag agrees with the arithmetic")
+
+    # The case this exists for: a change that improves structure and still
+    # loses more in a sector fall, because rebalancing out of one big holding
+    # concentrates a sector. Equal-weighting these three raises IT from 45% to
+    # 66%, so an IT shock must hurt the suggestion MORE.
+    _it = _cmp(_cur, _sug, kind="sector", magnitude_pct=-30.0, target="IT",
+               initial_value=1000000)
+    if "error" not in _it:
+        ok(_it["suggested_is_better"] is False,
+           f"equal-weighting into IT is correctly reported as worse in an IT "
+           f"crash: {_it['difference_pts']} pts")
+        ok("does not automatically mean" in _it["verdict"],
+           "the verdict says better structure is not automatically a smaller fall")
+
+    ok("one scenario is not a verdict" in _cm["limits"],
+       "the limits warn against deciding on a single scenario")
+
+# A comparison that cannot run must refuse rather than compare one side.
+ok("error" in _cmp({}, _sug), "an empty current portfolio is refused")
+ok("error" in _cmp(_cur, {}), "an empty suggested portfolio is refused")
+
+_coach_jsx2 = io.open("../frontend/src/components/PortfolioCoach.jsx",
+                      encoding="utf-8").read()
+ok("compareShock" in _coach_jsx2, "the coach can run the comparison")
+ok(_coach_jsx2.index("Test it before you pay for it")
+   < _coach_jsx2.index("Apply this allocation"),
+   "the crash test sits ABOVE the apply button, not after it")
+
+
 # ================= FACTOR EVIDENCE TABLE ==============================
 # The app said momentum was unproven and said nothing about the other five. A
 # reader who sees one factor honestly marked unproven assumes the silent ones

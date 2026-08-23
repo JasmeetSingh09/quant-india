@@ -231,6 +231,68 @@ def shock(holdings: dict, kind: str = "market", magnitude_pct: float = -20.0,
     }
 
 
+def compare(current: dict, proposed: dict, kind: str = "market",
+            magnitude_pct: float = -20.0, target: str = None,
+            initial_value: float = 100000) -> dict:
+    """
+    The same event, applied to what you hold and to what was suggested.
+
+    The coach can say a change lowers your health score's risk component and
+    raises your effective positions. Neither of those is money. This answers the
+    question a person actually has before they pay brokerage to rebalance: in
+    the bad case this is supposed to protect me from, am I better off?
+
+    Both portfolios go through one shock with one set of betas, so the
+    difference is the allocation and nothing else.
+    """
+    a = shock(current, kind=kind, magnitude_pct=magnitude_pct, target=target,
+              initial_value=initial_value)
+    if "error" in a:
+        return {"error": f"Current portfolio: {a['error']}"}
+    b = shock(proposed, kind=kind, magnitude_pct=magnitude_pct, target=target,
+              initial_value=initial_value)
+    if "error" in b:
+        return {"error": f"Suggested portfolio: {b['error']}"}
+
+    diff_pts = round(b["change_pct"] - a["change_pct"], 2)
+    diff_inr = round(b["after_value"] - a["after_value"], 0)
+    better = diff_pts > 0.05
+
+    if better:
+        verdict = (f"In this scenario the suggested portfolio loses "
+                   f"{abs(diff_pts):.1f} points less — about "
+                   f"Rs {abs(diff_inr):,.0f} on Rs {initial_value:,.0f}.")
+    elif diff_pts < -0.05:
+        # The case worth building this for. A change can raise a health score
+        # and still leave you worse off in the fall it was meant to protect
+        # against, and nothing else in the app would have caught that.
+        verdict = (f"In this scenario the suggested portfolio loses "
+                   f"{abs(diff_pts):.1f} points MORE — about "
+                   f"Rs {abs(diff_inr):,.0f} worse on Rs {initial_value:,.0f}. "
+                   f"Better structure does not automatically mean a smaller "
+                   f"fall in every event.")
+    else:
+        verdict = ("In this scenario the two are within a rounding error of "
+                   "each other. Whatever the change is worth, it is not "
+                   "visible here.")
+
+    return {
+        "scenario": a["scenario"],
+        "current": {"change_pct": a["change_pct"], "after_value": a["after_value"],
+                    "by_sector": a["by_sector"], "hurt_most": a["hurt_most"]},
+        "suggested": {"change_pct": b["change_pct"], "after_value": b["after_value"],
+                      "by_sector": b["by_sector"], "hurt_most": b["hurt_most"]},
+        "difference_pts": diff_pts,
+        "difference_inr": diff_inr,
+        "suggested_is_better": better,
+        "verdict": verdict,
+        "how": a["how"],
+        "limits": (a["limits"] + " And one scenario is not a verdict on a "
+                   "rebalance: a change that helps in a market fall can hurt in "
+                   "a sector one, so try more than the first button."),
+    }
+
+
 PRESETS = [
     {"key": "crash_10", "kind": "market", "magnitude_pct": -10.0, "label": "Market falls 10%"},
     {"key": "crash_20", "kind": "market", "magnitude_pct": -20.0, "label": "Market falls 20%"},

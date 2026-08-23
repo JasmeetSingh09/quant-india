@@ -1387,6 +1387,33 @@ class StrategyCompareRequest(BaseModel):
     initial_value: float = 100000
 
 
+class ShockCompareRequest(BaseModel):
+    current: dict
+    proposed: dict
+    kind: str = "market"
+    magnitude_pct: float = -20.0
+    target: Optional[str] = None
+    initial_value: float = 100000
+
+
+@app.post("/portfolio/shock/compare")
+def portfolio_shock_compare(req: ShockCompareRequest):
+    """
+    The same event applied to what you hold and to what was suggested.
+
+    The coach can say a change improves structure. This says whether it
+    actually costs you less in the fall it is supposed to protect against —
+    which is not the same question, and sometimes has the opposite answer.
+    """
+    from portfolio_shock import compare
+    r = compare(req.current, req.proposed, kind=req.kind,
+                magnitude_pct=req.magnitude_pct, target=req.target,
+                initial_value=req.initial_value)
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+
 class ShockRequest(BaseModel):
     holdings: dict
     kind: str = "market"

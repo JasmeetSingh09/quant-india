@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { advisePortfolio, portfolioScenarios, portfolioWhatIf, suggestFix, trackEvent } from '../api'
+import { advisePortfolio, portfolioScenarios, portfolioWhatIf, suggestFix, trackEvent, compareShock } from '../api'
 import Spinner from './Spinner'
 import { Lightbulb, AlertTriangle, Info, Check, Plus, X } from 'lucide-react'
 import Methodology from './Methodology'
@@ -286,6 +286,9 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
   const [cap, setCap] = useState(Math.max(minCap, 30))
   const [hz, setHz]   = useState(horizonMonths)
   const whatIf = useMutation({ mutationFn: portfolioWhatIf })
+  // Does the suggested change actually survive a fall better? The health
+  // score cannot answer that; it scores structure, and structure is not money.
+  const crash = useMutation({ mutationFn: compareShock })
   // Per-stock editing: change any weight, drop a name, add a new one. Seeded
   // from the current portfolio the first time the panel is opened.
   const [edit, setEdit] = useState(null)
@@ -863,6 +866,60 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
               </p>
               <p className="text-[10px] text-gray-600 leading-relaxed">{fix.data.limits}</p>
               <Limits />
+
+              {/* Test the suggestion against the thing it is meant to protect
+                  from, BEFORE the apply button. A change can raise the health
+                  score and still leave you worse off in a fall — rebalancing
+                  out of one large holding can quietly concentrate a sector —
+                  and nothing else in the app would catch that. */}
+              <div className="border-t border-gray-800 pt-3 space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] uppercase tracking-wide text-gray-500">
+                    Test it before you pay for it
+                  </span>
+                  {[['market', -20, null, 'Market -20%'],
+                    ['market', -30, null, 'Market -30%']].map(([k, m, t, label]) => (
+                    <button key={label} disabled={crash.isPending}
+                      onClick={() => crash.mutate({ current: holdings,
+                        proposed: fix.data.proposed_pct, kind: k,
+                        magnitude_pct: m, target: t, initial_value: initialValue })}
+                      className="btn-ghost text-[11px] py-0.5">{label}</button>
+                  ))}
+                </div>
+
+                {crash.isPending && <Spinner size="sm" />}
+                {crash.isError && <p className="banner-error text-xs">{String(crash.error)}</p>}
+
+                {crash.data && (
+                  <div className={`p-2.5 rounded-lg border ${
+                    crash.data.suggested_is_better
+                      ? 'border-green-800/70 bg-green-950/20'
+                      : 'border-yellow-800/70 bg-yellow-950/15'}`}>
+                    <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">
+                      {crash.data.scenario}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                      <div>
+                        <span className="text-gray-500 font-sans">You now: </span>
+                        <span className="text-red-400">{crash.data.current.change_pct}%</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 font-sans">Suggested: </span>
+                        <span className={crash.data.suggested_is_better
+                          ? 'text-green-400' : 'text-red-400'}>
+                          {crash.data.suggested.change_pct}%
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-300 mt-1.5 leading-relaxed">
+                      {crash.data.verdict}
+                    </p>
+                    <p className="text-[10px] text-gray-600 mt-1 leading-relaxed">
+                      {crash.data.limits}
+                    </p>
+                  </div>
+                )}
+              </div>
 
               {onApply && (
                 <button onClick={() => { onApply(fix.data.proposed_pct); setApplied('suggested allocation') }}

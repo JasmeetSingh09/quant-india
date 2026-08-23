@@ -132,6 +132,7 @@ export const getFactorEvidence   = (full=false) => api.get(`/factors/evidence?fu
 export const getFactorChange     = (t, days=30) => api.get(`/factors/change?ticker=${encodeURIComponent(t)}&days=${days}`)
 export const getFactorDivergence = (t, days=30) => api.get(`/factors/divergence?ticker=${encodeURIComponent(t)}&days=${days}`)
 export const getFactorCoverage   = () => api.get('/factors/coverage')
+export const compareShock    = body => api.post('/portfolio/shock/compare', body, { timeout: 240000 })
 export const shockPortfolio  = body => api.post('/portfolio/shock', body, { timeout: 180000 })
 export const shockPresets    = body => api.post('/portfolio/shock/presets', body, { timeout: 60000 })
 export const compareStrategies = body => api.post('/strategy/compare', body, { timeout: 240000 })
