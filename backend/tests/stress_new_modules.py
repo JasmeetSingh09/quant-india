@@ -1056,6 +1056,106 @@ ok("cost to buy them" in _sim_jsx,
    "the costs half of the split is labelled as costs, not as a loss")
 
 
+# ================= FACTOR HISTORY + DIVERGENCE ========================
+# Step 1 of the edge work: write down what each factor scored, so "what
+# changed" has a factual answer. Nothing here predicts anything, and the tests
+# are mostly about making sure it never starts claiming that it does.
+import factor_history as _fh
+
+_T = "ZZTEST.NS"
+# Clear anything a previous run left behind. Without this the "one observation
+# reports too_short" check passes on a clean database and fails on every run
+# after, which is the worst kind of test: one that is green exactly once.
+_fh._init()
+try:
+    from db import get_conn as _gc
+    _c0 = _gc()
+    _c0.execute("DELETE FROM factor_history WHERE ticker = ?", (_T,))
+    _c0.commit(); _c0.close()
+except Exception:
+    pass
+
+_fh.record(_T, "v2", alpha_score=10.0, price=100.0, captured_at="2026-07-24",
+           factors={"momentum": {"score": 5}, "quality": {"score": 50},
+                    "growth": {"score": 40}, "value": {"score": 30},
+                    "sentiment": {"score": 2}, "low_risk": {"score": 20}})
+
+# One observation is not a change, and must not be reported as zero change.
+_one = _fh.change(_T, days=30)
+ok(_one["status"] == "too_short",
+   f"a single observation reports too_short, not a flat zero: {_one['status']}")
+ok("not the same as nothing changing" in _one.get("note", ""),
+   "the too_short note distinguishes 'not watching long enough' from 'nothing moved'")
+
+_empty = _fh.change("NOSUCHTICKER.NS", days=30)
+ok(_empty["status"] == "no_history", "an unseen stock reports no_history")
+ok("cannot be backfilled" in _empty.get("note", ""),
+   "the empty state explains why history cannot be recovered")
+
+_fh.record(_T, "v2", alpha_score=22.0, price=101.2, captured_at="2026-08-23",
+           factors={"momentum": {"score": 1}, "quality": {"score": 61},
+                    "growth": {"score": 57}, "value": {"score": 18},
+                    "sentiment": {"score": 11}, "low_risk": {"score": 26}})
+
+_c = _fh.change(_T, days=30)
+ok(_c["status"] == "ok", f"two observations produce a change: {_c['status']}")
+if _c["status"] == "ok":
+    ok(abs(_c["factors"]["growth"]["change"] - 17.0) < 1e-6,
+       f"growth 40 -> 57 is +17, got {_c['factors']['growth']['change']}")
+    ok(abs(_c["factors"]["value"]["change"] - (-12.0)) < 1e-6,
+       "a factor that fell reports a negative change")
+    ok(abs(_c["price_change_pct"] - 1.2) < 0.01,
+       f"price 100 -> 101.2 is +1.2%, got {_c['price_change_pct']}")
+    ok(len(_c["factors"]) == 6, f"all six v2 factors are tracked, got {len(_c['factors'])}")
+    ok("not a forecast" in _c["means"], "the change output disclaims prediction")
+
+# Writing twice on one day must not manufacture a second observation.
+_fh.record(_T, "v2", alpha_score=23.0, price=101.5, captured_at="2026-08-23",
+           factors={"growth": {"score": 58}})
+_rows = [r for r in _fh.history(_T, model="v2") if r["captured_at"] == "2026-08-23"]
+ok(len(_rows) == 1, f"one row per ticker per day per model, got {len(_rows)}")
+
+# Divergence: the point of the whole exercise, and the place a circular claim
+# would hide.
+_d = _fh.divergences(_T, days=30)
+ok("divergences" in _d, "divergence returns a list")
+_kinds = [x["kind"] for x in _d["divergences"]]
+ok("fundamentals_up_price_flat" in _kinds,
+   f"growth+quality+sentiment up on a flat price is flagged: {_kinds}")
+
+# Momentum IS price and value is price over fundamentals. Counting either as
+# independent confirmation that "the price has not reacted" would be using the
+# price as evidence about itself.
+for _x in _d["divergences"]:
+    for _f in _x.get("factors", []):
+        ok(_f not in ("momentum", "value"),
+           f"price-linked factor '{_f}' is not used as independent evidence")
+ok(set(_d["price_linked_excluded"]) == {"momentum", "value"},
+   "the excluded factors are named in the output")
+ok("evidence about itself" in _d["why_excluded"], "the exclusion explains itself")
+
+# The label that keeps this a research tool rather than a signal.
+ok("has been tested against future returns" in _d["not_a_signal"],
+   "divergences are labelled untested")
+ok("momentum" in _d["not_a_signal"],
+   "the disclaimer cites the factor that actually failed walk-forward here")
+ok(_d["status_label"] in ("observation", "nothing_unusual"),
+   f"status is an observation label, never a recommendation: {_d['status_label']}")
+
+# No score. A single number would imply the app knows which changes matter.
+_txt = str(_d)
+for _banned in ("edge_score", "edge score", "opportunity_score", "buy", "recommend"):
+    ok(_banned not in _txt.lower(),
+       f"no scoring or recommendation language leaks in ('{_banned}')")
+
+_src_fh = _insp.getsource(_fh)
+ok("PRICE_LINKED" in _src_fh, "the price-linked distinction is explicit in code")
+_fc_jsx = io.open("../frontend/src/components/FactorChange.jsx", encoding="utf-8").read()
+ok("not_a_signal" in _fc_jsx, "the UI renders the untested label")
+ok("Edge " not in _fc_jsx.replace("Edge score", ""),
+   "the UI renders no edge score")
+
+
 # ================= SHOCK SCENARIOS ====================================
 # "What happens to me if X falls 20%" — one event, not a distribution. The
 # arithmetic here is exactly checkable, which is the point of pinning it.

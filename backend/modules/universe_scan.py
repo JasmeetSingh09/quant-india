@@ -243,6 +243,17 @@ def _save_result(ticker: str, cycle: str, r: dict):
     conn.commit()
     conn.close()
 
+    # Write the same scores to the history table, so "what changed" has a
+    # factual answer later. Never allowed to break a scan: a lost observation
+    # is a gap in history, not a broken product.
+    try:
+        from factor_history import record as _fh_record
+        if not r.get("error"):
+            _fh_record(ticker, "v1", alpha_score=r.get("alpha_score"),
+                       factors=f, price=(r.get("price") or r.get("current_price")))
+    except Exception:
+        pass
+
 
 def _already_done(cycle: str) -> set:
     """Tickers finished in THIS cycle — the basis for resuming after a restart."""

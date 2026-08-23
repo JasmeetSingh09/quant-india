@@ -1284,6 +1284,18 @@ def alpha_v2_score(ticker: str = Query(..., description="NSE ticker e.g. TCS.NS"
         raise HTTPException(status_code=400, detail=r["error"])
     r["explanation"] = explain(r)
     r["weight_reasons"] = WEIGHT_NOTES
+
+    # Opportunistic capture. The nightly scan runs the four-factor model, so
+    # growth and low_risk are only ever computed here — if this path does not
+    # write them down, those two factors have no history at all. One row per
+    # stock per day, so refreshing a page does not manufacture observations.
+    try:
+        from factor_history import record as _fh
+        _fh(r.get("ticker") or ticker.strip().upper(), "v2",
+            alpha_score=r.get("alpha_score"), factors=r.get("factors"),
+            price=r.get("price"))
+    except Exception:
+        pass
     return r
 
 
@@ -1382,6 +1394,49 @@ class ShockRequest(BaseModel):
     target: Optional[str] = None
     cash_pct: float = 0.0
     initial_value: float = 100000
+
+
+@app.get("/factors/history")
+def factor_history_read(ticker: str = Query(...), model: str = Query(None),
+                        limit: int = Query(90, ge=2, le=400)):
+    """Recorded factor scores over time for one stock."""
+    from factor_history import history
+    return {"ticker": ticker.strip().upper(),
+            "history": history(ticker, model=model, limit=limit)}
+
+
+@app.get("/factors/change")
+def factor_change_read(ticker: str = Query(...), days: int = Query(30, ge=2, le=365),
+                       model: str = Query(None)):
+    """
+    What moved over the window, and what did not.
+
+    Describes change. Makes no claim that a change predicts anything — that
+    question needs walk-forward evidence this does not have.
+    """
+    from factor_history import change
+    return change(ticker.strip().upper(), days=days, model=model)
+
+
+@app.get("/factors/divergence")
+def factor_divergence_read(ticker: str = Query(...),
+                           days: int = Query(30, ge=2, le=365),
+                           model: str = Query(None)):
+    """
+    Places where different parts of the story disagree.
+
+    Observations, not opportunities. Nothing here has been tested against
+    future returns.
+    """
+    from factor_history import divergences
+    return divergences(ticker.strip().upper(), days=days, model=model)
+
+
+@app.get("/factors/coverage")
+def factor_history_coverage():
+    """How much history exists — the honest answer to 'why is this empty'."""
+    from factor_history import coverage
+    return coverage()
 
 
 @app.post("/portfolio/shock")
