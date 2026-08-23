@@ -60,6 +60,26 @@ def _cap_sectors(weights: dict, cap: float) -> dict:
     except Exception:
         return weights
     w = dict(weights)
+
+    # A cap below an equal split across the sectors present cannot be met by
+    # ANY allocation: two sectors cannot both sit under 40%, because they have
+    # to add to 100. The loop below did not detect that. It capped Oil & Gas to
+    # 40, pushed the freed 15 into IT which then breached at 60, capped IT,
+    # pushed it back, and oscillated until the iteration limit — returning
+    # whichever end of the swing it stopped on. On a real 55/45 book that meant
+    # handing back a 60% top sector as the FIX for a 55% one.
+    #
+    # Raise the cap to what is actually achievable and the constraint becomes
+    # solvable: with two sectors that is 50% each, which is still an
+    # improvement on 55/45 and, unlike the old answer, is actually reachable.
+    try:
+        from portfolio_advisor import _sector_of as _so
+        present = {_so(t) for t in w if _so(t)}
+        if present:
+            cap = max(float(cap), 100.0 / len(present))
+    except Exception:
+        pass
+
     for _ in range(10):
         by_sector: dict = {}
         for t, v in w.items():
@@ -83,6 +103,22 @@ def _cap_sectors(weights: dict, cap: float) -> dict:
             for t in outside:
                 w[t] += freed * (w[t] / out_tot)
         w = _normalise(w)
+
+    # Insurance against any future change to the loop above: the caller is
+    # asking for LESS sector concentration, so returning more of it is never a
+    # valid answer. If that happens, give back what we were handed.
+    try:
+        def _top(d):
+            agg = {}
+            for t, v in d.items():
+                sec = _so(t)
+                if sec:
+                    agg[sec] = agg.get(sec, 0.0) + v
+            return max(agg.values()) if agg else 0.0
+        if _top(w) > _top(weights) + 1e-9:
+            return dict(weights)
+    except Exception:
+        pass
     return w
 
 
@@ -198,6 +234,33 @@ def suggest(holdings: dict, initial_value: float = 100000,
         except Exception:
             return None
 
+    # This module caps stock weights and caps sectors, so it changes both the
+    # concentration and the sector mix by construction. Neither was reported.
+    # A reader saw "health 37 -> 52" and had to take the number on trust,
+    # when the two things the fix actually DID are countable.
+    def _shape(w: dict) -> dict:
+        try:
+            from portfolio_advisor import _sector_exposure as _se
+            shares = [v / 100.0 for v in w.values() if v and v > 0]
+            hhi = sum(x * x for x in shares)
+            # 1/HHI: how many positions this behaves like, as opposed to how
+            # many it contains. Ten holdings with 55% in one behave like about
+            # three, and that gap is the whole point of showing it.
+            eff = round(1.0 / hhi, 1) if hhi > 0 else None
+            secs = _se(w) or {}
+            top_sec, top_pct = (max(secs.items(), key=lambda kv: kv[1])
+                                if secs else (None, None))
+            return {
+                "holdings": len([v for v in w.values() if v and v > 0]),
+                "effective_positions": eff,
+                "top_sector": top_sec,
+                "top_sector_pct": round(top_pct, 1) if top_pct is not None else None,
+                "sectors": {k: round(v, 1) for k, v in
+                            sorted(secs.items(), key=lambda kv: -kv[1])},
+            }
+        except Exception:
+            return {}
+
     before_m, after_m = _measure(cur), _measure(prop)
     before_h, after_h = _health(cur), _health(prop)
 
@@ -210,8 +273,8 @@ def suggest(holdings: dict, initial_value: float = 100000,
         "current_pct": {t: round(v, 2) for t, v in cur.items()},
         "proposed_pct": {t: round(v, 2) for t, v in sorted(prop.items(), key=lambda kv: -kv[1])},
         "steps": steps,
-        "before": {"risk": before_m, "health": before_h},
-        "after": {"risk": after_m, "health": after_h},
+        "before": {"risk": before_m, "health": before_h, "shape": _shape(cur)},
+        "after": {"risk": after_m, "health": after_h, "shape": _shape(prop)},
         "turnover_pct": round(turnover, 1),
         "switching_cost_inr": switch_cost,
         "cost_note": (f"Moving to this allocation trades about {turnover:.0f}% of the "

@@ -942,6 +942,69 @@ ok("not the chance of it" in _mc_src or "not the chance" in _mc_src,
    "the shipped module carries the probability-phrasing rule")
 
 
+# ================= FIX BEFORE/AFTER SHAPE =============================
+# portfolio_fix caps stock weights and caps sectors, so it changes the
+# concentration and the sector mix by construction. Neither was reported, and
+# reporting them turned up a real defect immediately.
+from portfolio_fix import suggest as _sug, _cap_sectors as _cs
+
+_cases = [
+    ("two sectors", {"RELIANCE.NS": 55, "TCS.NS": 25, "INFY.NS": 20}),
+    ("four sectors", {"RELIANCE.NS": 40, "TCS.NS": 20, "HDFCBANK.NS": 20,
+                      "SUNPHARMA.NS": 20}),
+]
+for _name, _h in _cases:
+    _f = _sug(_h, initial_value=100000)
+    if "error" in _f or not _f.get("changed"):
+        continue
+    _b, _a = _f["before"].get("shape") or {}, _f["after"].get("shape") or {}
+    ok(bool(_b) and bool(_a), f"{_name}: before and after both report shape")
+    ok(_b.get("effective_positions") is not None,
+       f"{_name}: effective positions is reported, not just the health score")
+    ok(_b.get("top_sector_pct") is not None,
+       f"{_name}: the heaviest sector is reported")
+
+    # 1/HHI can never exceed the number of holdings, and equals it only when
+    # every weight is identical.
+    ok(_b["effective_positions"] <= _b["holdings"] + 1e-6,
+       f"{_name}: effective positions {_b['effective_positions']} cannot exceed "
+       f"{_b['holdings']} holdings")
+
+    # The defect this display exposed: with two sectors, no allocation can put
+    # every sector under a 40% cap, because they must add to 100. The capping
+    # loop oscillated — cap Oil & Gas, push the excess into IT, cap IT, push it
+    # back — and returned whichever end of the swing it stopped on. On a 55/45
+    # book it handed back a 60% top sector as the FIX for a 55% one.
+    ok(_a["top_sector_pct"] <= _b["top_sector_pct"] + 1e-9,
+       f"{_name}: the fix does not increase sector concentration "
+       f"({_b['top_sector_pct']}% -> {_a['top_sector_pct']}%)")
+    ok(_a["effective_positions"] >= _b["effective_positions"] - 1e-9,
+       f"{_name}: the fix does not reduce effective positions "
+       f"({_b['effective_positions']} -> {_a['effective_positions']})")
+
+# Directly: an infeasible cap must not make things worse than doing nothing.
+_two = {"RELIANCE.NS": 55.0, "TCS.NS": 25.0, "INFY.NS": 20.0}
+_capped = _cs(_two, 40.0)          # 40% is unreachable with only two sectors
+def _topsec(d):
+    from portfolio_advisor import _sector_of
+    agg = {}
+    for _t, _v in d.items():
+        _s2 = _sector_of(_t)
+        if _s2:
+            agg[_s2] = agg.get(_s2, 0.0) + _v
+    return max(agg.values()) if agg else 0.0
+ok(_topsec(_capped) <= _topsec(_two) + 1e-9,
+   f"an unreachable sector cap never returns a worse book: "
+   f"{_topsec(_two):.1f}% -> {_topsec(_capped):.1f}%")
+ok(abs(sum(_capped.values()) - 100.0) < 0.5,
+   f"capped weights still sum to 100, got {sum(_capped.values()):.2f}")
+
+_fix_jsx = io.open("../frontend/src/components/PortfolioCoach.jsx",
+                   encoding="utf-8").read()
+ok("Effective positions" in _fix_jsx, "the before/after shows effective positions")
+ok("Heaviest sector" in _fix_jsx, "the before/after shows the sector change")
+
+
 # ================= BLACK-LITTERMAN DISPLAY (item 3) ===================
 # The optimiser always returned the whole chain; the page rendered only the
 # final weights. These checks are about the CONTRACT the panel depends on, so

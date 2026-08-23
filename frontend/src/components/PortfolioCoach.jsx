@@ -792,6 +792,63 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
                 ))}
               </div>
 
+              {/* What the fix actually DID, as opposed to what it scored.
+                  This module caps stock weights and caps sectors, so those two
+                  things change by construction — but the panel reported only
+                  health and downside, leaving the reader to take the number on
+                  trust. Effective positions is 1/HHI: how many holdings this
+                  behaves like, not how many it contains. Ten names with 55% in
+                  one behave like about three, and that gap is the point. */}
+              {(fix.data.before?.shape?.effective_positions != null ||
+                fix.data.before?.shape?.top_sector) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {fix.data.before?.shape?.effective_positions != null &&
+                   fix.data.after?.shape?.effective_positions != null && (
+                    <div className="card-sm">
+                      <p className="text-[11px] text-gray-500">
+                        Effective positions
+                        <span className="text-gray-600"> · behaves like</span>
+                      </p>
+                      <p className="text-sm font-mono">
+                        <span className="text-gray-400">
+                          {fix.data.before.shape.effective_positions}
+                        </span>
+                        <span className="text-gray-600 mx-1">&rarr;</span>
+                        <span className={
+                          fix.data.after.shape.effective_positions >
+                          fix.data.before.shape.effective_positions
+                            ? 'text-green-400' : 'text-gray-300'}>
+                          {fix.data.after.shape.effective_positions}
+                        </span>
+                        <span className="text-[11px] text-gray-600 ml-1">
+                          of {fix.data.after.shape.holdings}
+                        </span>
+                      </p>
+                    </div>
+                  )}
+
+                  {fix.data.before?.shape?.top_sector && fix.data.after?.shape?.top_sector && (
+                    <div className="card-sm">
+                      <p className="text-[11px] text-gray-500">Heaviest sector</p>
+                      <p className="text-sm font-mono">
+                        <span className="text-gray-400">
+                          {fix.data.before.shape.top_sector.replace(/_/g, ' ')}
+                          {' '}{fix.data.before.shape.top_sector_pct}%
+                        </span>
+                        <span className="text-gray-600 mx-1">&rarr;</span>
+                        <span className={
+                          fix.data.after.shape.top_sector_pct <
+                          fix.data.before.shape.top_sector_pct
+                            ? 'text-green-400' : 'text-gray-300'}>
+                          {fix.data.after.shape.top_sector.replace(/_/g, ' ')}
+                          {' '}{fix.data.after.shape.top_sector_pct}%
+                        </span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <ul className="space-y-1">
                 {fix.data.steps.map((st, i) => (
                   <li key={i} className="text-xs text-gray-400 pl-3 relative leading-relaxed">
