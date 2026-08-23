@@ -6,7 +6,7 @@ import PairsTrading from './PairsTrading'
 import Seasonality from './Seasonality'
 import Research from './Research'
 import Backtest from './Backtest'
-import WalkForward from '../components/WalkForward'
+import Validation from './Validation'
 import StrategyCompare from '../components/StrategyCompare'
 
 /**
@@ -22,7 +22,7 @@ const TABS = [
   // Validation first on purpose. Whether the model works is a more important
   // question than anything else these tools can compute, and burying it at the
   // end would say the opposite.
-  { label: 'Validation',  Component: WalkForward },
+  { label: 'Validation',  Component: Validation },
   // Next to Validation for the same reason it is first: 'which method
   // should build this?' is a validation question, not a tooling one.
   { label: 'Methods',     Component: StrategyCompare },

@@ -1163,6 +1163,76 @@ ok("Edge " not in _fc_jsx.replace("Edge score", ""),
    "the UI renders no edge score")
 
 
+# ================= FACTOR EVIDENCE TABLE ==============================
+# The app said momentum was unproven and said nothing about the other five. A
+# reader who sees one factor honestly marked unproven assumes the silent ones
+# passed. Saying nothing was the overclaim.
+from factor_evidence import evidence as _ev
+
+_e = _ev(run_walk_forward=False)
+_rows = _e["factors"]
+ok(len(_rows) == 6, f"every factor gets a row, got {len(_rows)}")
+
+_names = {r["factor"] for r in _rows}
+from alpha_v2 import WEIGHTS_V2 as _W
+ok(_names == set(_W), f"the table covers exactly the model's factors: {_names ^ set(_W)}")
+
+# Weight is the number that matters. Five of six sounds survivable until you
+# see they carry most of the score.
+for _r in _rows:
+    ok(_r["weight_pct"] is not None, f"{_r['factor']} states its weight")
+    ok(abs(_r["weight_pct"] - _W[_r["factor"]] * 100) < 0.05,
+       f"{_r['factor']} weight matches the model exactly")
+    ok(_r["status"] in ("tested", "cannot_test_yet", "untested"),
+       f"{_r['factor']} has a valid status")
+    ok(bool(_r.get("why")), f"{_r['factor']} says WHY it has that status")
+
+_total = sum(r["weight_pct"] for r in _rows)
+ok(abs(_total - 100.0) < 0.05, f"the weights on this page sum to 100, got {_total}")
+ok(abs(_e["weight_tested_pct"] + _e["weight_untested_pct"] - 100.0) < 0.05,
+   "tested plus untested weight accounts for the whole model")
+
+# Momentum is the only testable one, and the reason is about data not effort.
+_mom = [r for r in _rows if r["factor"] == "momentum"][0]
+ok(_mom["status"] == "tested", "momentum is the tested row")
+ok("purely from prices" in _mom["why"],
+   "momentum's row explains what makes it testable when others are not")
+for _r in _rows:
+    if _r["factor"] == "momentum":
+        continue
+    ok(_r["status"] == "cannot_test_yet",
+       f"{_r['factor']} is marked as blocked by data, not as passed")
+    ok("look-ahead" in _r["why"] or "not stored" in _r["why"],
+       f"{_r['factor']} names the data problem rather than blaming effort")
+
+# No factor may be quietly reported as validated.
+ok(_e["counts"]["passed"] == 0,
+   f"nothing claims to have passed, got {_e['counts']['passed']}")
+ok("never been tested" in _e["headline"],
+   "the headline states plainly that most of the model is untested")
+ok(str(int(_e["weight_untested_pct"])) in _e["headline"],
+   "the headline carries the untested weight as a number")
+
+ok("Saying nothing was the overclaim" in _e["why_this_table_exists"],
+   "the page explains why silence was itself a claim")
+
+# The unblocking date is computed from real recording, not promised vaguely.
+_u = _e.get("unblocking") or {}
+ok("recording_started" in _u, "the table reports when point-in-time recording began")
+if _u.get("recording_started"):
+    ok(bool(_u.get("earliest_meaningful_test")),
+       "a computed date is given for when these could first be tested")
+    ok("cannot be brought forward" in _u.get("note", ""),
+       "it says the date cannot be pulled in by backfilling")
+
+_fe_jsx = io.open("../frontend/src/components/FactorEvidence.jsx", encoding="utf-8").read()
+ok("headline" in _fe_jsx, "the UI leads with the headline")
+ok("weight_pct" in _fe_jsx, "the UI shows weight, not just a count")
+_val_jsx = io.open("../frontend/src/pages/Validation.jsx", encoding="utf-8").read()
+ok(_val_jsx.index("FactorEvidence") < _val_jsx.index("WalkForward />"),
+   "the evidence overview renders above the single-factor deep dive")
+
+
 # ================= SHOCK SCENARIOS ====================================
 # "What happens to me if X falls 20%" — one event, not a distribution. The
 # arithmetic here is exactly checkable, which is the point of pinning it.

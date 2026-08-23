@@ -128,6 +128,7 @@ export const getEvents         = t => api.get(`/events/${encodeURIComponent(t)}`
 export const getPortfolioFit   = body => api.post('/portfolio/fit', body, { timeout: 120000 })
 export const getWalkForward    = () => api.get('/validation/walk-forward', { timeout: 240000 })
 export const getRegimeWeights  = () => api.get('/regime/weights')
+export const getFactorEvidence   = (full=false) => api.get(`/factors/evidence?full=${full}`, { timeout: 240000 })
 export const getFactorChange     = (t, days=30) => api.get(`/factors/change?ticker=${encodeURIComponent(t)}&days=${days}`)
 export const getFactorDivergence = (t, days=30) => api.get(`/factors/divergence?ticker=${encodeURIComponent(t)}&days=${days}`)
 export const getFactorCoverage   = () => api.get('/factors/coverage')

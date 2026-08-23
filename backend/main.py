@@ -1396,6 +1396,18 @@ class ShockRequest(BaseModel):
     initial_value: float = 100000
 
 
+@app.get("/factors/evidence")
+def factor_evidence_table(full: bool = Query(False)):
+    """
+    What is actually known about each factor, one row each.
+
+    `full=true` runs the walk-forward test and is slow; the default returns the
+    table with momentum's row unpopulated, which is enough to render the page.
+    """
+    from factor_evidence import evidence
+    return evidence(run_walk_forward=full)
+
+
 @app.get("/factors/history")
 def factor_history_read(ticker: str = Query(...), model: str = Query(None),
                         limit: int = Query(90, ge=2, le=400)):
