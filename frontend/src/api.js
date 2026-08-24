@@ -130,6 +130,8 @@ export const getWalkForward    = () => api.get('/validation/walk-forward', { tim
 export const getRegimeWeights  = () => api.get('/regime/weights')
 export const getScenarios = (ticker, params = {}) =>
   api.get('/stock/scenarios', { params: { ticker, ...params }, timeout: 120000 })
+export const getMarketValidation = (days=21) =>
+  api.get(`/validation/market-wide?min_days=${days}`, { timeout: 300000 })
 export const getUniverseSensitivity = () =>
   api.get('/factors/universe-sensitivity', { timeout: 600000 })
 export const getFactorStrategies = (start='2019-01-01', fraction=0.2) =>

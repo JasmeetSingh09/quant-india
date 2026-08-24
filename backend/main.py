@@ -1480,6 +1480,19 @@ def stock_scenarios(ticker: str = Query(...),
                      bear_growth_pct=bear_growth_pct, bear_multiple=bear_multiple)
 
 
+@app.get("/validation/market-wide")
+def market_wide_validation(min_days: int = Query(21, ge=3, le=252)):
+    """
+    Stratified validation of the live forward track record.
+
+    Reports raw, independent and effective sample sizes separately, broken down
+    by market-cap bucket, sector and signal bucket. Refuses to call anything
+    validated on coverage it does not have.
+    """
+    from market_validation import validate
+    return validate(min_days=min_days)
+
+
 @app.get("/factors/universe-sensitivity")
 def factor_universe_sensitivity(start: str = Query("2019-01-01"),
                                 fraction: float = Query(0.2, ge=0.05, le=0.5)):

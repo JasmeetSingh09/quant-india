@@ -1,4 +1,5 @@
 import FactorEvidence from '../components/FactorEvidence'
+import MarketValidation from '../components/MarketValidation'
 import WalkForward from '../components/WalkForward'
 import FactorStrategies from '../components/FactorStrategies'
 import UniverseSensitivity from '../components/UniverseSensitivity'
@@ -18,6 +19,10 @@ export default function Validation() {
   return (
     <div className="p-4 sm:p-6 space-y-4 max-w-5xl mx-auto">
       <ErrorBoundary name="factor evidence"><FactorEvidence /></ErrorBoundary>
+      {/* Directly under the evidence table, because it is the same question
+          asked of the live record rather than of the backtests: does this work
+          across the market, or only where we happened to look. */}
+      <ErrorBoundary name="market-wide validation"><MarketValidation /></ErrorBoundary>
       <ErrorBoundary name="walk-forward test"><WalkForward /></ErrorBoundary>
       {/* Last because it is the heaviest and the most specific: two factors
           actually traded as strategies, after the table that says which six
