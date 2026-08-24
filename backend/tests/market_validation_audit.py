@@ -296,6 +296,42 @@ ok("UNIQUE(ticker, snapshot_date)" in _isrc,
    "one row per ticker per day is enforced by the schema")
 
 
+# ============================ scan -> snapshot wiring ====================
+# A skipped day of evidence cannot be recovered, and the snapshot now refuses a
+# stale or missing scan - correctly - which means a fixed 16:30 cron would lose
+# any day the scan finished late. The trigger belongs where completion is known.
+print("=== scan completion triggers the snapshot ===")
+import universe_scan as _us
+import inspect as _ui
+_scan_src = _ui.getsource(_us)
+
+ok("from prediction_tracker import snapshot" in _scan_src,
+   "the scan triggers a snapshot when it completes")
+_after_publish = _scan_src.split('last_complete_cycle=cycle')[-1]
+ok("snapshot" in _after_publish,
+   "the snapshot fires AFTER the cycle is published, not before")
+ok("daemon=True" in _after_publish or "Thread" in _after_publish,
+   "the snapshot runs off the scan thread so it cannot delay publishing")
+ok("except Exception" in _after_publish,
+   "a failed snapshot loses one day, never the whole scan pass")
+
+# Reads must serve the last COMPLETE cycle so a scan in progress never shows
+# a half-updated mixture of two passes.
+ok("last_complete_cycle" in _scan_src,
+   "reads are served from the last complete cycle")
+_serve = [l for l in _scan_src.split(chr(10)) if "serve_cycle =" in l]
+ok(_serve and "last_complete_cycle" in _serve[0],
+   "the serving cycle prefers the completed pass over the running one",
+   str(_serve[:1]))
+
+# The backstop cron must attempt more than once.
+_pt_src = _ui.getsource(_pt.start_prediction_scheduler)
+ok(_pt_src.count("add_job") >= 1 and "for _h in" in _pt_src,
+   "the timed backstop retries rather than getting one chance")
+ok("no-op" in _pt_src or "UNIQUE" in _pt_src,
+   "repeat runs are documented as harmless")
+
+
 print("\n" + "=" * 66)
 print(f"MARKET-VALIDATION CHECKS: {checks}")
 print(f"FAILURES:                 {len(failures)}")

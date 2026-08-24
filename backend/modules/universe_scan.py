@@ -395,6 +395,33 @@ def _scan_loop():
     _set_state(done=counter["n"], finished_at=datetime.now().isoformat(),
                status="complete", last_complete_cycle=cycle)
 
+    # Log the track-record snapshot the moment fresh scores exist, rather than
+    # hoping a 16:30 cron lands after the scan. It used to be timed, and the
+    # snapshot now REFUSES a stale or missing cycle — correctly — which means a
+    # scan that finishes late would have produced no observation for that day at
+    # all. Evidence accrues one day at a time and a skipped day cannot be
+    # recovered, so the trigger belongs here where completion is known.
+    #
+    # Never allowed to break the scan: a failed snapshot loses one day of
+    # record, a raised exception would lose the whole pass.
+    try:
+        import threading
+        from prediction_tracker import snapshot as _snap
+
+        def _log_snapshot():
+            try:
+                r = _snap()
+                print(f"  snapshot after scan: {r.get('logged')} logged "
+                      f"of {r.get('universe_size')}"
+                      + (f" (skipped: {r.get('reason', '')[:60]})"
+                         if r.get("skipped") else ""))
+            except Exception as e:
+                print(f"  snapshot after scan failed: {type(e).__name__}")
+
+        threading.Thread(target=_log_snapshot, daemon=True).start()
+    except Exception:
+        pass
+
 
 def start_scan(force: bool = False) -> dict:
     """Kick off the background scan if one is not already running."""

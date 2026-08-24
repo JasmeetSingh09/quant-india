@@ -724,7 +724,14 @@ def start_prediction_scheduler():
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
         sched = BackgroundScheduler(daemon=True)
-        sched.add_job(snapshot, "cron", hour=16, minute=30)  # ~after NSE close
+        # A backstop, not the primary trigger: the scan fires a snapshot the
+        # moment it completes. These runs are cheap no-ops once the day is
+        # logged, because UNIQUE(ticker, snapshot_date) makes a repeat insert
+        # do nothing. Several attempts, because a single fixed time cannot know
+        # when the scan will finish and a skipped day is unrecoverable.
+        for _h in (16, 18, 21):
+            sched.add_job(snapshot, "cron", hour=_h, minute=30,
+                          id=f"snapshot_{_h}", replace_existing=True)
         sched.start()
         return True
     except Exception:
