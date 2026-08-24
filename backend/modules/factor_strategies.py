@@ -67,6 +67,99 @@ def _stats_from(res: dict, name: str, plain: str, note: str = None) -> dict:
     }
 
 
+def universe_sensitivity(start: str = "2019-01-01",
+                         fraction: float = 0.2) -> dict:
+    """
+    How much of momentum's apparent edge is a choice rather than a finding.
+
+    This is the most important number the backtest can produce, and it is not
+    a return. Run the same 12-1 momentum strategy over the same period and the
+    excess return against the Nifty ranges from roughly nothing to more than
+    twenty points a year, depending entirely on two decisions that have nothing
+    to do with momentum:
+
+      which universe you trade
+      whether the universe is chosen with information from the future
+
+    Widening from 40 large caps to ~200 names multiplies the apparent edge.
+    Applying a point-in-time liquidity screen — so 2019 is traded using who was
+    liquid in 2019 rather than who is liquid now — roughly halves it, then
+    halves it again as the screen tightens. The drawdown gets WORSE at every
+    step, which is the tell: the flattering configurations were quietly picking
+    survivors.
+
+    None of the remaining excess can be called an edge. Every configuration
+    here still holds only companies that exist today; the ones that went to
+    zero are absent from the data source entirely, and that cannot be corrected
+    with the data this project has.
+    """
+    from momentum_backtest import (momentum_backtest, DEFAULT_UNIVERSE,
+                                   BROAD_UNIVERSE)
+    rows = []
+    configs = [
+        ("40 large caps, no screen", DEFAULT_UNIVERSE, None),
+        ("~200 names, no screen", BROAD_UNIVERSE, None),
+        ("~200 names, point-in-time top 100", BROAD_UNIVERSE, 100),
+        ("~200 names, point-in-time top 50", BROAD_UNIVERSE, 50),
+    ]
+    for label, uni, pit in configs:
+        try:
+            r = momentum_backtest(universe=uni, start=start,
+                                  top_fraction=fraction, pit_universe_size=pit)
+        except Exception as e:
+            rows.append({"config": label, "error": type(e).__name__})
+            continue
+        if "error" in r:
+            rows.append({"config": label, "error": r["error"]})
+            continue
+        st = r["strategy_stats"]
+        rows.append({
+            "config": label,
+            "universe_size": r.get("universe_size"),
+            "point_in_time": bool(r.get("point_in_time_universe")),
+            "cagr_pct": st["cagr_pct"],
+            "sharpe": st["sharpe"],
+            "max_drawdown_pct": st["max_drawdown_pct"],
+            "hit_rate_pct": st["hit_rate_pct"],
+            "excess_vs_nifty_pct": r.get("excess_cagr_pct"),
+        })
+
+    good = [x for x in rows if "excess_vs_nifty_pct" in x
+            and x["excess_vs_nifty_pct"] is not None]
+    lo = min((x["excess_vs_nifty_pct"] for x in good), default=None)
+    hi = max((x["excess_vs_nifty_pct"] for x in good), default=None)
+
+    return {
+        "configurations": rows,
+        "excess_range_pct": ([lo, hi] if lo is not None else None),
+        "headline": (
+            f"The same momentum strategy over the same years produces anywhere "
+            f"from {lo:+.1f} to {hi:+.1f} points of annual excess return, "
+            f"depending only on which universe is traded and whether that "
+            f"universe was chosen using information from the future. The spread "
+            f"between those numbers is larger than any edge being claimed, so "
+            f"the configuration is doing more work than the factor."
+            if lo is not None else
+            "Sensitivity could not be computed."),
+        "what_it_means": (
+            "A backtest result that moves this much with a methodology choice "
+            "is a measurement of the choice. The apparent edge is largest "
+            "exactly where survivorship bias is worst — a broad list of "
+            "mid-caps that all still exist in 2026 — and smallest among large "
+            "caps, which rarely delist. That pattern is what an artefact looks "
+            "like."),
+        "still_not_clean": (
+            "Even the most conservative row here is contaminated. A "
+            "point-in-time liquidity screen fixes look-ahead in universe "
+            "SELECTION, but every company in the data source is one that "
+            "survived to today. The ones that went to zero are missing, and "
+            "momentum strategies buy recent winners, which is precisely the "
+            "population that survivorship flatters. Fixing that needs "
+            "point-in-time constituent data this project does not have."),
+        "verdict": "NOT VALIDATED — the range is the result, not the best number in it.",
+    }
+
+
 def compare(start: str = "2019-01-01", fraction: float = 0.2,
             universe: list = None) -> dict:
     """

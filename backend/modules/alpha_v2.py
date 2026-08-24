@@ -156,7 +156,11 @@ def _low_risk_factor(ticker: str) -> dict:
 
         ann_vol = float(rets.std() * np.sqrt(252))
         # Worst peak-to-trough over the window.
+        # Prepend the starting value so a fall in the FIRST period counts.
+        # Without it the first point is its own running peak and an opening
+        # loss is invisible: -50% then +100% reports a drawdown of zero.
         curve = (1 + rets).cumprod()
+        curve = type(curve)([1.0] + list(curve.values))
         drawdown = float((curve / curve.cummax() - 1).min())
 
         # 20% annualised volatility is unremarkable for an Indian equity; 60% is

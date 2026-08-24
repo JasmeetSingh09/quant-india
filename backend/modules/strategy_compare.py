@@ -41,7 +41,9 @@ def _metrics(daily, initial_value: float, turnover: float, periods_per_year: int
     downside = r[r < 0]
     dvol = float(downside.std() * np.sqrt(periods_per_year)) if len(downside) > 1 else None
 
-    curve = np.cumprod(1 + r)
+    # Prepend the starting value so a fall in the FIRST period counts. Without
+    # it the opening point is its own peak and a first-period loss vanishes.
+    curve = np.concatenate([[1.0], np.cumprod(1 + r)])
     max_dd = float((curve / np.maximum.accumulate(curve) - 1).min())
 
     # 6.5% is the RBI repo proxy used elsewhere in the app.

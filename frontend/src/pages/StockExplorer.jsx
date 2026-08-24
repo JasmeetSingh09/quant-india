@@ -4,6 +4,7 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import ErrorBoundary from '../components/ErrorBoundary'
 import AlphaVsFit from '../components/AlphaVsFit'
 import FactorChange from '../components/FactorChange'
+import ScenarioValuation from '../components/ScenarioValuation'
 import {
   getPrice, getMetrics, getAlphaScore, getSentiment, getStockNews,
   searchStocks, explainAlpha, getIntraday, getVolForecast,
@@ -789,6 +790,7 @@ function StockDetail({ ticker, onBack }) {
               <ErrorBoundary name="what's happening"><StockContext ticker={ticker} /></ErrorBoundary>
               <ErrorBoundary name="alpha vs fit"><AlphaVsFit ticker={ticker} /></ErrorBoundary>
               <ErrorBoundary name="what's changing"><FactorChange ticker={ticker} /></ErrorBoundary>
+              <ErrorBoundary name="bull base bear"><ScenarioValuation ticker={ticker} /></ErrorBoundary>
               <ErrorBoundary name="six-factor view"><SixFactor ticker={ticker} /></ErrorBoundary>
               <ErrorBoundary name="why this signal"><WhySignal ticker={ticker} /></ErrorBoundary>
               {alphaLoading ? <Spinner size="sm" /> : alpha && (

@@ -32,6 +32,8 @@ selling, no liquidity effects.
 
 from datetime import datetime, timedelta
 
+import math
+
 import numpy as np
 
 
@@ -44,6 +46,16 @@ def _returns(tickers, lookback_days=LOOKBACK_DAYS):
     start = (datetime.now() - timedelta(days=int(lookback_days * 1.5))).strftime("%Y-%m-%d")
     from portfolio_optimizer import _get_returns
     return _get_returns(list(dict.fromkeys(tickers)), start, end)
+
+
+def _is_positive_number(v) -> bool:
+    """A weight has to be a finite positive number. NaN and infinity used to
+    pass the `> 0` test and reach the output as NaN impacts."""
+    try:
+        fv = float(v)
+    except Exception:
+        return False
+    return math.isfinite(fv) and fv > 0
 
 
 def _beta(series, driver):
@@ -82,10 +94,23 @@ def shock(holdings: dict, kind: str = "market", magnitude_pct: float = -20.0,
     target    sector name for "sector", ticker for "stock"
     cash_pct  share of the portfolio held in cash, which does not move
     """
-    holdings = {str(t).strip().upper(): float(v) for t, v in (holdings or {}).items()
-                if v and float(v) > 0}
+    # A NaN or infinite weight used to survive the `> 0` test and propagate all
+    # the way to the output as a NaN impact — worse than a refusal, because a
+    # NaN rendered in a table looks like a number that failed to load rather
+    # than an input that was never valid.
+    import math as _m
+    cleaned = {}
+    for t, v in (holdings or {}).items():
+        try:
+            fv = float(v)
+        except Exception:
+            continue
+        if not _m.isfinite(fv) or fv <= 0:
+            continue
+        cleaned[str(t).strip().upper()] = fv
+    holdings = cleaned
     if not holdings:
-        return {"error": "No holdings to shock."}
+        return {"error": "No holdings to shock (weights must be positive numbers)."}
     if kind not in ("market", "sector", "stock"):
         return {"error": f"Unknown scenario '{kind}'."}
     try:
@@ -228,6 +253,123 @@ def shock(holdings: dict, kind: str = "market", magnitude_pct: float = -20.0,
             "recovery path, no second round of selling, no liquidity effects, and "
             "no assumption about how likely any of this is. It answers 'where "
             "would the damage land', not 'will this happen'."),
+    }
+
+
+def multi_shock(holdings: dict, shocks: list, cash_pct: float = 0.0,
+                initial_value: float = 100000) -> dict:
+    """
+    Several things going wrong at once, which is what actually happens.
+
+    Each shock is applied to its own driver and the per-holding moves are
+    SUMMED, because a stock exposed to both a market fall and its own sector
+    falling takes both. Summing is a linear approximation and it is stated as
+    one: in reality a stock cannot fall more than 100%, and second-round
+    effects are not modelled.
+
+    shocks: [{"kind": "market"|"sector"|"stock", "magnitude_pct": -20,
+              "target": "IT"}, ...]
+    """
+    import math as _m2
+    holdings = {str(t).strip().upper(): float(v)
+                for t, v in (holdings or {}).items()
+                if _is_positive_number(v)}
+    if not holdings:
+        return {"error": "No holdings to shock (weights must be positive numbers)."}
+    if not shocks:
+        return {"error": "No scenarios supplied."}
+    if len(shocks) > 6:
+        return {"error": "At most 6 simultaneous scenarios."}
+
+    total = sum(holdings.values()) or 1.0
+    w = {t: v * 100.0 / total for t, v in holdings.items()}
+    invested = 1.0 - max(0.0, min(100.0, float(cash_pct or 0.0))) / 100.0
+
+    # Per-holding percentage moves, accumulated across every shock.
+    moves = {t: 0.0 for t in w}
+    applied, failed = [], []
+    for sh in shocks:
+        r = shock(holdings, kind=sh.get("kind", "market"),
+                  magnitude_pct=sh.get("magnitude_pct", -20.0),
+                  target=sh.get("target"), cash_pct=0.0,
+                  initial_value=initial_value)
+        if "error" in r:
+            failed.append({**sh, "error": r["error"]})
+            continue
+        applied.append({"scenario": r["scenario"], "driver": r["driver"]})
+        for row in r["holdings"]:
+            if row.get("move_pct") is not None:
+                moves[row["ticker"]] += row["move_pct"]
+
+    if not applied:
+        return {"error": "None of the scenarios could be applied. "
+                         + (failed[0]["error"] if failed else "")}
+
+    rows, total_move = [], 0.0
+    for t, mv in moves.items():
+        # A share cannot lose more than all of itself. Without this floor a
+        # stack of shocks produces a holding down 140%, which then shows up as
+        # a portfolio that owes money.
+        capped = max(mv, -100.0)
+        share = w[t] / 100.0 * invested
+        contrib = share * capped / 100.0
+        total_move += contrib
+        rows.append({"ticker": t, "weight_pct": round(w[t], 2),
+                     "move_pct": round(capped, 2),
+                     "capped": capped != mv,
+                     "impact_pts": round(contrib * 100, 2),
+                     "impact_inr": round(initial_value * contrib, 0)})
+    rows.sort(key=lambda r: r["impact_pts"])
+
+    by_sector = {}
+    for r in rows:
+        sec = _sector_of(r["ticker"]) or "Unclassified"
+        by_sector[sec] = round(by_sector.get(sec, 0.0) + r["impact_pts"], 2)
+
+    after = initial_value * (1 + total_move)
+
+    # What the portfolio looks like AFTER the fall, which is not what it looked
+    # like before: a crash concentrates whatever fell least.
+    post_w = {}
+    for r in rows:
+        post_w[r["ticker"]] = w[r["ticker"]] * (1 + r["move_pct"] / 100.0)
+    pw_total = sum(post_w.values()) or 1.0
+    post_w = {t: v * 100.0 / pw_total for t, v in post_w.items()}
+    shares = [v / 100.0 for v in post_w.values() if v > 0]
+    hhi = sum(x * x for x in shares)
+    eff_after = round(1 / hhi, 1) if hhi > 0 else None
+    shares_b = [v / 100.0 for v in w.values() if v > 0]
+    hhi_b = sum(x * x for x in shares_b)
+    eff_before = round(1 / hhi_b, 1) if hhi_b > 0 else None
+
+    return {
+        "scenarios_applied": applied,
+        "scenarios_failed": failed,
+        "cash_pct": round(float(cash_pct or 0.0), 1),
+        "initial_value": round(initial_value, 2),
+        "after_value": round(after, 2),
+        "change_pct": round(total_move * 100, 2),
+        "change_inr": round(after - initial_value, 0),
+        "holdings": rows,
+        "by_sector": dict(sorted(by_sector.items(), key=lambda kv: kv[1])),
+        "concentration": {
+            "effective_positions_before": eff_before,
+            "effective_positions_after": eff_after,
+            "largest_weight_before_pct": round(max(w.values()), 1) if w else None,
+            "largest_weight_after_pct": round(max(post_w.values()), 1) if post_w else None,
+            "note": ("A fall changes the shape of the portfolio as well as its "
+                     "size: whatever dropped least is a bigger share of what "
+                     "is left, so concentration usually rises in a crash."),
+        },
+        "how": ("Each scenario moves its own driver and every holding responds "
+                "by its measured beta to that driver. Where a holding is hit by "
+                "more than one scenario the moves are ADDED, which is a linear "
+                "approximation — real shocks interact."),
+        "limits": ("Betas come from ordinary days and rise in a crash, so this "
+                   "is optimistic for a genuine crisis. Moves are capped at "
+                   "-100% per holding because a share cannot lose more than "
+                   "itself. No recovery path, no second round of selling, and "
+                   "no claim about how likely any of this is."),
     }
 
 

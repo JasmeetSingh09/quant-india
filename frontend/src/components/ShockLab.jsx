@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { shockPortfolio, shockPresets } from '../api'
+import { shockPortfolio, shockPresets, multiShock } from '../api'
 import Spinner from './Spinner'
 
 /**
@@ -29,6 +29,11 @@ export default function ShockLab({ holdings, initialValue = 100000 }) {
     enabled: !!enough,
   })
   const run = useMutation({ mutationFn: shockPortfolio })
+  // Several things at once, which is what actually happens in a crisis:
+  // the market falls, the sector falls harder, and the biggest holding
+  // falls hardest. One at a time understates all three.
+  const combo = useMutation({ mutationFn: multiShock })
+  const [stacked, setStacked] = useState([])
 
   const fire = p => {
     setActive(p.key)
@@ -64,6 +69,78 @@ export default function ShockLab({ holdings, initialValue = 100000 }) {
           </button>
         ))}
       </div>
+
+      {/* Stack scenarios rather than replacing them. */}
+      {presets.data?.presets?.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-gray-800 pt-2">
+          <span className="text-[11px] uppercase tracking-wide text-gray-500 mr-1">
+            Or stack several
+          </span>
+          {(presets.data.presets || []).slice(0, 8).map(p => {
+            const on = stacked.some(x => x.key === p.key)
+            return (
+              <button key={`s-${p.key}`}
+                onClick={() => setStacked(cur => on
+                  ? cur.filter(x => x.key !== p.key)
+                  : [...cur, p].slice(0, 6))}
+                className={`text-[11px] px-2 py-0.5 rounded border transition-colors ${
+                  on ? 'border-blue-700 bg-blue-950/40 text-blue-200'
+                     : 'border-gray-700 text-gray-400 hover:bg-gray-800'}`}>
+                {on ? '✓ ' : '+ '}{p.label}
+              </button>
+            )
+          })}
+          {stacked.length >= 2 && (
+            <button disabled={combo.isPending}
+              onClick={() => { setActive(null); combo.mutate({
+                holdings, shocks: stacked.map(p => ({
+                  kind: p.kind, magnitude_pct: p.magnitude_pct, target: p.target ?? null })),
+                cash_pct: Number(cash) || 0, initial_value: initialValue }) }}
+              className="btn-ghost text-[11px] py-0.5">
+              {combo.isPending ? 'Running…' : `Run all ${stacked.length} together`}
+            </button>
+          )}
+        </div>
+      )}
+
+      {combo.isError && <p className="banner-error text-xs">{String(combo.error)}</p>}
+      {combo.data && (
+        <div className="p-3 rounded-lg border border-red-800/70 bg-red-950/25 space-y-2">
+          <p className="text-[11px] uppercase tracking-wide text-gray-500">
+            {combo.data.scenarios_applied.map(s => s.scenario).join(' + ')}
+          </p>
+          <p className="text-lg font-semibold font-mono">
+            <span className="text-gray-400">{rupee(combo.data.initial_value)}</span>
+            <span className="text-gray-600 mx-2">→</span>
+            <span className="text-red-400">{rupee(combo.data.after_value)}</span>
+            <span className="text-sm ml-2 text-gray-500">({combo.data.change_pct}%)</span>
+          </p>
+          {combo.data.concentration && (
+            <p className="text-xs text-gray-400">
+              Effective positions{' '}
+              <span className="font-mono">
+                {combo.data.concentration.effective_positions_before} →
+                {' '}{combo.data.concentration.effective_positions_after}
+              </span>
+              {' · '}largest holding{' '}
+              <span className="font-mono">
+                {combo.data.concentration.largest_weight_before_pct}% →
+                {' '}{combo.data.concentration.largest_weight_after_pct}%
+              </span>
+            </p>
+          )}
+          {combo.data.holdings.some(h => h.capped) && (
+            <p className="text-[11px] text-yellow-300/90">
+              Some holdings hit the -100% floor: stacked shocks implied a fall
+              larger than the whole position, which cannot happen.
+            </p>
+          )}
+          <p className="text-[10px] text-gray-500 leading-relaxed">{combo.data.how}</p>
+          <p className="text-[11px] text-amber-200/80 border-l-2 border-amber-700/70 pl-2.5 leading-relaxed">
+            {combo.data.limits}
+          </p>
+        </div>
+      )}
 
       <label className="flex items-center gap-2 text-xs text-gray-400">
         <span>Cash held</span>

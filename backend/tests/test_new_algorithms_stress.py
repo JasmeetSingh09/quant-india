@@ -163,11 +163,24 @@ def make_multi(tickers, n=1600, seed=1):
     return pd.DataFrame(cols, index=idx)
 
 import yfinance as _yf
-TICKS = [f"T{i}.NS" for i in range(30)]
+# Widened from 30 so the smallest fraction tested still clears MIN_HOLDINGS.
+# The backtests now refuse a universe that would hold fewer than 5 names,
+# because a "factor strategy" holding three stocks is a bet on those three.
+# That guard is correct and this suite is checking STRUCTURE on synthetic
+# prices, so the fix is to hand it a configuration the guard permits rather
+# than to weaken the guard.
+TICKS = [f"T{i}.NS" for i in range(60)]
 _orig_dl = _yf.download
 def fake_dl(tickers, *a, **k):
     return make_multi(list(tickers))
 _yf.download = fake_dl
+
+# The guard is a property worth testing in its own right.
+for fn, name, key in ((MB.low_vol_backtest, "lowvol", "bottom_fraction"),
+                      (MB.momentum_backtest, "momentum", "top_fraction")):
+    _tiny = fn(universe=TICKS[:8], start="2019-01-01", **{key: 0.1})
+    check("error" in _tiny and "too small" in _tiny.get("error", ""),
+          f"{name}_tiny_universe_refused", str(_tiny.get("error"))[:70])
 
 for frac in (0.1, 0.2, 0.3):
     for fn, name in ((MB.low_vol_backtest, "lowvol"), (MB.momentum_backtest, "momentum")):

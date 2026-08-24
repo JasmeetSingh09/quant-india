@@ -1423,6 +1423,76 @@ class ShockRequest(BaseModel):
     initial_value: float = 100000
 
 
+class MultiShockRequest(BaseModel):
+    holdings: dict
+    shocks: list
+    cash_pct: float = 0.0
+    initial_value: float = 100000
+
+
+@app.post("/portfolio/shock/multi")
+def portfolio_multi_shock(req: MultiShockRequest):
+    """Several things going wrong at once, which is what actually happens."""
+    from portfolio_shock import multi_shock
+    r = multi_shock(req.holdings, req.shocks, cash_pct=req.cash_pct,
+                    initial_value=req.initial_value)
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+
+class ModelCompareRequest(BaseModel):
+    tickers: list
+
+
+@app.post("/models/compare")
+def models_compare(req: ModelCompareRequest):
+    """
+    Four-factor against six-factor against portfolio-aware, on what can
+    actually be measured — which does not include performance.
+    """
+    from model_comparison import compare
+    r = compare(req.tickers)
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+
+@app.get("/stock/scenarios")
+def stock_scenarios(ticker: str = Query(...),
+                    years: int = Query(3, ge=1, le=10),
+                    base_growth_pct: float = Query(None),
+                    base_multiple: float = Query(None),
+                    bull_growth_pct: float = Query(None),
+                    bull_multiple: float = Query(None),
+                    bear_growth_pct: float = Query(None),
+                    bear_multiple: float = Query(None)):
+    """
+    Bull, base and bear from explicit assumptions — or an explicit refusal when
+    the inputs a valuation needs do not exist.
+
+    Never returns a scenario built on a substituted zero.
+    """
+    from scenario_valuation import scenarios
+    return scenarios(ticker, years=years,
+                     base_growth_pct=base_growth_pct, base_multiple=base_multiple,
+                     bull_growth_pct=bull_growth_pct, bull_multiple=bull_multiple,
+                     bear_growth_pct=bear_growth_pct, bear_multiple=bear_multiple)
+
+
+@app.get("/factors/universe-sensitivity")
+def factor_universe_sensitivity(start: str = Query("2019-01-01"),
+                                fraction: float = Query(0.2, ge=0.05, le=0.5)):
+    """
+    How much of momentum's apparent edge is a methodology choice.
+
+    The most important thing the backtest can report, and it is not a return.
+    Very heavy: four full backtests over ~200 names.
+    """
+    from factor_strategies import universe_sensitivity
+    return universe_sensitivity(start=start, fraction=fraction)
+
+
 @app.get("/factors/strategies")
 def factor_strategy_comparison(start: str = Query("2019-01-01"),
                                fraction: float = Query(0.2, ge=0.05, le=0.5)):

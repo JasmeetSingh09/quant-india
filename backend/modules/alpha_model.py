@@ -589,9 +589,32 @@ def _compute_value_factor(ticker: str, peers: list = None) -> dict:
         raw   = -0.6 * pe_z - 0.4 * pb_z
         score = float(np.tanh(raw / 2))
 
+        # A distressed leg that was nulled above must not vanish silently. The
+        # warning used to fire only when BOTH P/E and P/B were unusable, so a
+        # company with negative book value — liabilities exceeding assets — was
+        # scored on its P/E alone at full confidence and reported as
+        # "significantly undervalued", with the insolvency never mentioned.
+        #
+        # One surviving leg is half the evidence, so confidence is halved and
+        # the reason travels with the score.
+        # Confidence should reflect how much evidence actually contributed, not
+        # only whether distress was detected. A missing P/E and a NEGATIVE P/E
+        # are the same amount of evidence — one leg instead of two — even
+        # though only the second one raises a flag. RPOWER has no earnings at
+        # all, so its trailingPE is simply absent, and it was being scored
+        # "significantly undervalued" on book value alone at full confidence.
+        _legs = (1 if pe_self else 0) + (1 if pb_self else 0)
+        _conf = min(1.0, 0.5 + len(peer_pes) * 0.1)
+        if _legs < 2:
+            _conf = round(_conf * 0.5, 3)
+
         return {
             "score":        round(score, 4),
-            "confidence":   min(1.0, 0.5 + len(peer_pes) * 0.1),
+            "confidence":   _conf,
+            "distress_flags": distressed or None,
+            "legs_used": _legs,
+            "valued_on": ("P/E and P/B" if _legs == 2
+                          else "P/E only" if pe_self else "P/B only"),
             "pe_ratio":     pe_self,
             "pb_ratio":     pb_self,
             "sector_pe":    round(pe_mean, 1),
@@ -599,6 +622,8 @@ def _compute_value_factor(ticker: str, peers: list = None) -> dict:
             "pe_z_score":   round(pe_z, 3),
             "pb_z_score":   round(pb_z, 3),
             "interpretation": (
+                (f"{' and '.join(distressed).capitalize()} — " if distressed else "") +
+                ("Valued on one measure only. " if _legs < 2 else "") +
                 "Significantly undervalued vs peers" if score > 0.4 else
                 "Slightly cheap vs peers"            if score > 0.1 else
                 "Significantly overvalued vs peers"  if score < -0.4 else

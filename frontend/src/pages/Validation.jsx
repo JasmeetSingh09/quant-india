@@ -1,6 +1,8 @@
 import FactorEvidence from '../components/FactorEvidence'
 import WalkForward from '../components/WalkForward'
 import FactorStrategies from '../components/FactorStrategies'
+import UniverseSensitivity from '../components/UniverseSensitivity'
+import ModelComparison from '../components/ModelComparison'
 import ErrorBoundary from '../components/ErrorBoundary'
 
 /**
@@ -21,6 +23,10 @@ export default function Validation() {
           actually traded as strategies, after the table that says which six
           exist and the test that says what happened to the one. */}
       <ErrorBoundary name="factor strategies"><FactorStrategies /></ErrorBoundary>
+      {/* After the strategies, because it is the question their numbers raise:
+          how much of that came from the configuration rather than the factor. */}
+      <ErrorBoundary name="universe sensitivity"><UniverseSensitivity /></ErrorBoundary>
+      <ErrorBoundary name="model comparison"><ModelComparison /></ErrorBoundary>
     </div>
   )
 }

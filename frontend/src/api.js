@@ -128,12 +128,18 @@ export const getEvents         = t => api.get(`/events/${encodeURIComponent(t)}`
 export const getPortfolioFit   = body => api.post('/portfolio/fit', body, { timeout: 120000 })
 export const getWalkForward    = () => api.get('/validation/walk-forward', { timeout: 240000 })
 export const getRegimeWeights  = () => api.get('/regime/weights')
+export const getScenarios = (ticker, params = {}) =>
+  api.get('/stock/scenarios', { params: { ticker, ...params }, timeout: 120000 })
+export const getUniverseSensitivity = () =>
+  api.get('/factors/universe-sensitivity', { timeout: 600000 })
 export const getFactorStrategies = (start='2019-01-01', fraction=0.2) =>
   api.get(`/factors/strategies?start=${start}&fraction=${fraction}`, { timeout: 300000 })
 export const getFactorEvidence   = (full=false) => api.get(`/factors/evidence?full=${full}`, { timeout: 240000 })
 export const getFactorChange     = (t, days=30) => api.get(`/factors/change?ticker=${encodeURIComponent(t)}&days=${days}`)
 export const getFactorDivergence = (t, days=30) => api.get(`/factors/divergence?ticker=${encodeURIComponent(t)}&days=${days}`)
 export const getFactorCoverage   = () => api.get('/factors/coverage')
+export const multiShock      = body => api.post('/portfolio/shock/multi', body, { timeout: 300000 })
+export const compareModels   = body => api.post('/models/compare', body, { timeout: 300000 })
 export const compareShock    = body => api.post('/portfolio/shock/compare', body, { timeout: 240000 })
 export const shockPortfolio  = body => api.post('/portfolio/shock', body, { timeout: 180000 })
 export const shockPresets    = body => api.post('/portfolio/shock/presets', body, { timeout: 60000 })

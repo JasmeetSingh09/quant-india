@@ -1217,6 +1217,12 @@ def _compute_cvar(returns: pd.Series, confidence: float = 0.95) -> float:
 
 
 def _compute_max_drawdown(cum: pd.Series) -> float:
+    # Prepend the starting value so a fall in the FIRST period counts. Without
+    # it the opening point is its own running peak, and a portfolio that fell
+    # on day one reports no drawdown for it.
+    if len(cum) and float(cum.iloc[0]) != 1.0:
+        cum = pd.concat([pd.Series([1.0]), cum / float(cum.iloc[0])],
+                        ignore_index=True)
     roll_max = cum.cummax()
     dd       = (cum - roll_max) / roll_max
     return round(float(dd.min() * 100), 2)

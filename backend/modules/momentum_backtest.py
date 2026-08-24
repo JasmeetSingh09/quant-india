@@ -75,7 +75,10 @@ def _annualised(monthly: pd.Series) -> dict:
     downside = monthly[monthly < 0]
     dstd = float(downside.std(ddof=1)) if len(downside) > 1 else 0.0
     sortino = ((mean_m - rf_m) / dstd * np.sqrt(12)) if dstd > 0 else 0.0
+    # Prepend the starting value so a fall in the FIRST month counts. Without
+    # it month one becomes its own peak and an opening loss is not a drawdown.
     cum = (1 + monthly).cumprod()
+    cum = pd.concat([pd.Series([1.0]), cum], ignore_index=True)
     peak = cum.cummax()
     max_dd = float(((cum - peak) / peak).min())
     return {
@@ -87,6 +90,11 @@ def _annualised(monthly: pd.Series) -> dict:
         "hit_rate_pct":  round(float((monthly > 0).mean()) * 100, 1),
         "n_months":      int(len(monthly)),
     }
+
+
+# Below this many holdings a factor backtest is a bet on a handful of names
+# rather than a test of the factor.
+MIN_HOLDINGS = 5
 
 
 def momentum_backtest(
@@ -147,6 +155,19 @@ def momentum_backtest(
             pass
     if "^NSEI" not in monthly or len(monthly) < 6:
         return {"error": "insufficient price data for a backtest"}
+
+    # A "factor strategy" that holds one or two names is not testing the
+    # factor, it is testing those names. With top_fraction=0.2 a five-stock
+    # universe holds exactly one, and the result came back as a confident CAGR
+    # with a caveat nobody would weight correctly. Refuse instead.
+    _n_stocks = len([t for t in monthly if t != "^NSEI"])
+    _n_held = int(_n_stocks * top_fraction)
+    if _n_held < MIN_HOLDINGS:
+        return {"error": (
+            f"Universe too small: {_n_stocks} stocks at {top_fraction:.0%} would "
+            f"hold {_n_held}. A factor strategy holding fewer than {MIN_HOLDINGS} "
+            f"names measures those names rather than the factor. Widen the "
+            f"universe or raise the fraction.")}
 
     prices = pd.DataFrame(monthly).dropna(how="all")
     nifty  = prices["^NSEI"]
@@ -292,6 +313,16 @@ def low_vol_backtest(
             pass
     if "^NSEI" not in monthly or len(monthly) < 6:
         return {"error": "insufficient price data for a backtest"}
+
+    # Same guard as the momentum path: a handful of holdings tests those names,
+    # not the factor.
+    _n_stocks = len([t for t in monthly if t != "^NSEI"])
+    _n_held = int(_n_stocks * bottom_fraction)
+    if _n_held < MIN_HOLDINGS:
+        return {"error": (
+            f"Universe too small: {_n_stocks} stocks at {bottom_fraction:.0%} "
+            f"would hold {_n_held}. A factor strategy holding fewer than "
+            f"{MIN_HOLDINGS} names measures those names rather than the factor.")}
 
     prices = pd.DataFrame(monthly).dropna(how="all")
     nifty  = prices["^NSEI"]
