@@ -235,6 +235,35 @@ ok((hi2 - lo2) < (hi - lo), "a larger sample gives a tighter interval",
 lo3, hi3 = mv._wilson(10, 10)
 ok(hi3 <= 100.0 and lo3 >= 0.0, "intervals stay inside [0,100]", f"[{lo3},{hi3}]")
 
+# ============================ tracker wiring =============================
+# The validator reads the tracker's output. Reading a key the tracker never
+# returns produced an empty list and reported "no graded predictions yet",
+# which is indistinguishable from a genuinely empty record - the same silent
+# mismatch that once dropped Black-Litterman from the strategy comparison.
+print("=== tracker key contract ===")
+import inspect as _insp
+_src = _insp.getsource(mv.validate)
+ok("predictions" in _src,
+   "the validator reads the key the tracker actually returns")
+
+import prediction_tracker as _pt
+_tsrc = _insp.getsource(_pt.evaluate)
+ok("predictions" in _tsrc,
+   "the tracker really does return predictions under that name")
+
+# An unrecognised shape must announce itself rather than look empty.
+_orig = _pt.evaluate
+try:
+    _pt.evaluate = lambda min_days=21: {"something_else": []}
+    _r = mv.validate(min_days=21)
+    ok(_r.get("available") is False, "an unknown shape is not treated as success")
+    ok("does not recognise" in _r.get("reason", ""),
+       "an unknown shape says so instead of reporting an empty sample",
+       str(_r.get("reason"))[:60])
+finally:
+    _pt.evaluate = _orig
+
+
 print("\n" + "=" * 66)
 print(f"MARKET-VALIDATION CHECKS: {checks}")
 print(f"FAILURES:                 {len(failures)}")

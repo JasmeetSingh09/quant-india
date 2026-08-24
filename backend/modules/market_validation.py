@@ -242,8 +242,24 @@ def validate(min_days: int = 21, records: list = None) -> dict:
     if records is None:
         try:
             from prediction_tracker import evaluate
-            ev = evaluate(min_days=min_days)
-            records = ev.get("records") or []
+            ev = evaluate(min_days=min_days) or {}
+            # The tracker returns these under "predictions". Reading "records"
+            # returned an empty list and reported "no graded predictions yet",
+            # which is indistinguishable from a genuine empty record — the same
+            # silent key mismatch that dropped Black-Litterman from the strategy
+            # comparison. Both names are accepted so neither side can break it
+            # again, and an unrecognised shape says so instead of reporting
+            # emptiness.
+            records = ev.get("predictions")
+            if records is None:
+                records = ev.get("records")
+            if records is None:
+                return {"available": False,
+                        "reason": ("The track record returned a shape this "
+                                   "validator does not recognise "
+                                   f"(keys: {sorted(ev.keys())}). Reporting that "
+                                   "rather than an empty sample, because the two "
+                                   "look identical and mean opposite things.")}
         except Exception as e:
             return {"available": False,
                     "reason": f"Could not load the track record ({type(e).__name__})."}
