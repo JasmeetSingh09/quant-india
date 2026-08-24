@@ -80,13 +80,37 @@ def init_table():
     c.close()
 
 
-def snapshot(universe: list = None) -> dict:
+# A scan older than this is not today's opinion. One day of slack covers a
+# scan that finished after midnight.
+MAX_CYCLE_AGE_DAYS = 1
+
+
+def _add_cycle_column():
+    """The scan cycle a prediction came from, so a snapshot can be traced back
+    to the run that produced its scores. Own connection: on Postgres a failed
+    statement aborts the whole transaction, so batching migrations means one
+    already-exists error takes the rest down with it."""
+    for ddl in ("ALTER TABLE predictions ADD COLUMN scan_cycle TEXT",
+                "ALTER TABLE predictions ADD COLUMN universe_size INTEGER",
+                "ALTER TABLE predictions ADD COLUMN source TEXT"):
+        c = _conn()
+        try:
+            c.execute(ddl)
+            c.commit()
+        except Exception:
+            pass
+        finally:
+            c.close()
+
+
+def snapshot(universe: list = None, allow_fallback: bool = False) -> dict:
     """
     Log today's alpha picks. Call this daily (or on demand). Records each ticker's
     alpha score, signal, and current price, so we can grade it later.
     """
     init_table()
     _add_horizon_column()
+    _add_cycle_column()
     from alpha_model import compute_alpha_score, TOP_PICKS_UNIVERSE
     today = datetime.now().strftime("%Y-%m-%d")
 
@@ -99,14 +123,65 @@ def snapshot(universe: list = None) -> dict:
     # Re-scoring is not needed: the scan stored a score for every stock today.
     # Reading those rows makes this a database pass instead of thousands of
     # model runs, which is the only way covering the full universe is feasible.
-    scored = {}
+    scored, cycle, source = {}, None, "explicit"
     if universe is None:
         try:
             from universe_scan import stored_scores_for_today
             scored = stored_scores_for_today()
         except Exception:
             scored = {}
-    universe = universe or list(scored) or TOP_PICKS_UNIVERSE
+        try:
+            from db import get_conn as _gc
+            _c = _gc()
+            row = _c.execute("SELECT last_complete_cycle FROM alpha_scan_state "
+                             "WHERE id = 1").fetchone()
+            cycle = row[0] if row else None
+            _c.close()
+        except Exception:
+            cycle = None
+
+    # The silent fallback is why the entire track record is 30 large caps. When
+    # no completed scan exists this quietly logged TOP_PICKS_UNIVERSE instead,
+    # and nothing downstream could tell a 30-stock day from a 2,573-stock day —
+    # so months of narrow, unrepresentative observations accumulated looking
+    # exactly like broad ones.
+    #
+    # It now refuses by default. A caller that genuinely wants the small list
+    # has to ask for it, and the row records that it did.
+    # A completed cycle is not the same as a CURRENT one. Locally this happily
+    # paired scores from a scan eleven days old with today's closing price and
+    # logged it as today's prediction — an observation where the signal and the
+    # price come from different weeks measures neither.
+    cycle_age = None
+    if cycle:
+        try:
+            cycle_age = (datetime.strptime(today, "%Y-%m-%d")
+                         - datetime.strptime(str(cycle)[:10], "%Y-%m-%d")).days
+        except Exception:
+            cycle_age = None
+
+    if universe is not None:
+        source = "explicit"
+    elif scored and (cycle_age is None or cycle_age <= MAX_CYCLE_AGE_DAYS):
+        universe, source = list(scored), "scan"
+    elif scored and not allow_fallback:
+        return {"snapshot_date": today, "logged": 0, "universe_size": 0,
+                "skipped": True, "scan_cycle": cycle, "cycle_age_days": cycle_age,
+                "reason": (f"The most recent completed scan is from {cycle}, "
+                           f"{cycle_age} days old. Logging those scores against "
+                           f"today's price would pair a signal and a price from "
+                           f"different weeks, which measures neither. Run the "
+                           f"scan first.")}
+    elif allow_fallback:
+        universe, source = TOP_PICKS_UNIVERSE, "fallback_30"
+    else:
+        return {"snapshot_date": today, "logged": 0, "universe_size": 0,
+                "skipped": True,
+                "reason": ("No completed scan cycle, so there are no scores to "
+                           "log. Refusing to fall back to the 30-stock list: "
+                           "that fallback is what made the existing track "
+                           "record large-cap only, and a narrow day is "
+                           "indistinguishable from a broad one once logged.")}
 
     # Prices from the exchange's own file. One query for every symbol, instead
     # of one throttled Yahoo round-trip per stock — at 2,400 stocks that
@@ -119,31 +194,51 @@ def snapshot(universe: list = None) -> dict:
         bhav = {}
 
     logged = 0
+    # Exclusions are counted with a reason. "2,573 logged" says nothing about
+    # what was dropped or why, and a coverage figure that cannot be decomposed
+    # is not a coverage figure.
+    excluded = {"no_score": 0, "no_price": 0, "error": 0}
     c = _conn()
     for t in universe:
         try:
             stored = scored.get(t)
             r = stored if stored else compute_alpha_score(t)
             if not r or r.get("alpha_score") is None:
+                excluded["no_score"] += 1
                 continue
             px = bhav.get(t)
             if px is None:
                 px = yf.Ticker(t).fast_info.last_price
             if px is None or not (px == px):
+                excluded["no_price"] += 1
                 continue
             c.execute(
                 "INSERT OR IGNORE INTO predictions "
                 "(ticker, snapshot_date, alpha_score, signal, price_at_snapshot, "
-                "signal_horizon_days) VALUES (?,?,?,?,?,?)",
+                "signal_horizon_days, scan_cycle, universe_size, source) "
+                "VALUES (?,?,?,?,?,?,?,?,?)",
                 (t, today, r.get("alpha_score"), r.get("signal"), round(float(px), 2),
-                 int(r.get("horizon_days") or 21)),
+                 int(r.get("horizon_days") or 21), cycle, len(universe), source),
             )
             logged += 1
         except Exception:
+            excluded["error"] += 1
             continue
     c.commit()
     c.close()
-    return {"snapshot_date": today, "logged": logged, "universe_size": len(universe)}
+    return {"snapshot_date": today, "logged": logged,
+            "universe_size": len(universe),
+            "scan_cycle": cycle, "cycle_age_days": cycle_age, "source": source,
+            "excluded": excluded,
+            "excluded_total": sum(excluded.values()),
+            "coverage_pct": (round(logged / len(universe) * 100, 1)
+                             if universe else 0.0),
+            "note": (f"{logged} of {len(universe)} stocks logged from the "
+                     f"{source} source"
+                     + (f" (scan cycle {cycle})" if cycle else "")
+                     + f". Excluded: {excluded['no_score']} without a score, "
+                     f"{excluded['no_price']} without a price, "
+                     f"{excluded['error']} on error.")}
 
 
 _CLOSE_CACHE: dict = {}          # ticker -> (timestamp, Series of closes)

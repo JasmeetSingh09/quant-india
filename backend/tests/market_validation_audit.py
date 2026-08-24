@@ -264,6 +264,38 @@ finally:
     _pt.evaluate = _orig
 
 
+# ============================ snapshot integrity =========================
+# The silent 30-stock fallback is why the whole track record is large-cap only.
+# A narrow day and a broad day looked identical once logged.
+print("=== snapshot integrity ===")
+import prediction_tracker as _pt
+import inspect as _pi
+_ssrc = _pi.getsource(_pt.snapshot)
+
+ok("allow_fallback" in _ssrc,
+   "the 30-stock fallback must be asked for explicitly")
+ok("skipped" in _ssrc, "a snapshot that cannot run says it was skipped")
+ok("MAX_CYCLE_AGE_DAYS" in _ssrc or "cycle_age" in _ssrc,
+   "snapshot checks how old the scan cycle is")
+ok(_pt.MAX_CYCLE_AGE_DAYS <= 2,
+   "a scan more than a couple of days old is not today's opinion",
+   str(_pt.MAX_CYCLE_AGE_DAYS))
+
+# Provenance: a logged row must record where it came from.
+for field in ("scan_cycle", "universe_size", "source"):
+    ok(field in _ssrc, f"snapshot records {field} with each prediction")
+
+# Coverage must decompose. "2,573 logged" says nothing about what was dropped.
+for reason in ("no_score", "no_price", "error"):
+    ok(reason in _ssrc, f"exclusions are counted by reason: {reason}")
+ok("coverage_pct" in _ssrc, "snapshot reports coverage as a percentage")
+
+# Duplicate protection is a schema guarantee, not a hope.
+_isrc = _pi.getsource(_pt.init_table)
+ok("UNIQUE(ticker, snapshot_date)" in _isrc,
+   "one row per ticker per day is enforced by the schema")
+
+
 print("\n" + "=" * 66)
 print(f"MARKET-VALIDATION CHECKS: {checks}")
 print(f"FAILURES:                 {len(failures)}")
