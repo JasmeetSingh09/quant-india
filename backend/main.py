@@ -153,15 +153,47 @@ def _start_picks_scheduler():
         # independent fallback fresh without anyone remembering to.
         from bhavcopy import fetch_day
         sched.add_job(fetch_day, "cron", hour=20, id="bhavcopy_daily")
-        # Continue any unfinished history build. A deep backfill runs for hours
-        # and a deploy restarts the process, so without this the build stalls
-        # wherever the last push interrupted it and nothing resumes it.
-        try:
-            from bhavcopy import resume_if_incomplete
-            loop_exec = asyncio.get_event_loop()
-            loop_exec.run_in_executor(None, resume_if_incomplete)
-        except Exception:
-            pass
+        # Keep the history build alive. Two lessons are baked in here.
+        #
+        # The first attempt called asyncio.get_event_loop() from inside this
+        # sync function. There is no current loop in a scheduler context, so it
+        # raised, the bare except swallowed it, and the resume never ran once —
+        # a silent no-op that looked exactly like a working feature.
+        #
+        # The second lesson is that a startup-only resume would not have helped
+        # anyway. The backfill died three times TODAY without any restart:
+        # under load, when a rebuild competed for the database, and once for no
+        # visible reason. A job that only recovers at boot cannot recover from
+        # that. So this polls.
+        #
+        # resume_if_incomplete already returns early when a run is in progress
+        # or when history reaches the archive floor, so a poll costs one query
+        # and the interval can be short without being wasteful.
+        # Imported locally: main.py has no module-level datetime, and relying
+        # on one that is not there would raise NameError into the outer bare
+        # except — reintroducing the exact silent failure this block exists to
+        # remove.
+        from datetime import datetime as _dt, timedelta as _td
+        from bhavcopy import resume_if_incomplete
+        sched.add_job(resume_if_incomplete, "interval", minutes=15,
+                      id="bhavcopy_resume", replace_existing=True,
+                      next_run_time=_dt.now() + _td(seconds=45))
+
+        # The screener cache has the identical failure mode: built once at
+        # startup, and if that build loses a race the stocks page renders empty
+        # until a human notices and triggers a refresh. It did exactly that
+        # today. Same treatment — check periodically, rebuild only if empty.
+        def _ensure_screener():
+            try:
+                st = get_screener_status() or {}
+                if not st.get("cached_stocks"):
+                    build_screener_cache()
+            except Exception:
+                pass
+
+        sched.add_job(_ensure_screener, "interval", minutes=20,
+                      id="screener_guard", replace_existing=True,
+                      next_run_time=_dt.now() + _td(seconds=90))
         sched.start()
     except Exception:
         pass
