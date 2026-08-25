@@ -1534,6 +1534,20 @@ def market_wide_validation(min_days: int = Query(21, ge=3, le=252)):
     return validate(min_days=min_days)
 
 
+@app.get("/backtest/full-pit")
+def backtest_full_pit(top_fraction: float = Query(0.2, ge=0.05, le=0.5)):
+    """
+    Frozen v1.0 momentum on the FULL point-in-time universe, priced from the
+    exchange's own files so companies that delisted are present while they
+    existed. Compared against the same code restricted to survivors.
+    """
+    from pit_backtest import compare
+    r = compare(top_fraction=top_fraction)
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+
 @app.get("/backtest/pit-comparison")
 def backtest_pit_comparison(start: str = Query("2024-01-01"),
                             fraction: float = Query(0.2, ge=0.05, le=0.5)):
