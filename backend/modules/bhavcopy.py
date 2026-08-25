@@ -51,6 +51,36 @@ def _init_db():
     """)
     conn.commit()
     conn.close()
+    _add_isin_column()
+
+
+def _add_isin_column():
+    """
+    ISIN is the security's permanent identity; the ticker is only its current
+    label. Without it a rename is indistinguishable from a delisting — the
+    symbol simply stops appearing — and the point-in-time backtest booked
+    ZOMATO as a -100% loss when it had merely become ETERNAL.
+
+    The raw NSE file has carried this column all along and the parser discarded
+    it.
+    """
+    conn = get_conn()
+    try:
+        conn.execute("ALTER TABLE bhavcopy_eod ADD COLUMN isin TEXT")
+        conn.commit()
+    except Exception:
+        pass
+    finally:
+        conn.close()
+    conn = get_conn()
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_bhav_isin "
+                     "ON bhavcopy_eod (isin, day)")
+        conn.commit()
+    except Exception:
+        pass
+    finally:
+        conn.close()
 
 
 def fetch_day(day: datetime = None) -> dict:
@@ -98,6 +128,9 @@ def fetch_day(day: datetime = None) -> dict:
 
     c_o, c_h, c_l = col("OPNPRIC", "OPEN_PRICE"), col("HGHPRIC", "HIGH_PRICE"), col("LWPRIC", "LOW_PRICE")
     c_v = col("TTLTRADGVOL", "TTL_TRD_QNTY", "VOLUME")
+    # The permanent identity. Present in the file since the start and discarded
+    # until a backtest booked a ticker rename as a total loss.
+    c_isin = col("ISIN")
 
     rows = []
     iso = day.strftime("%Y-%m-%d")
@@ -106,19 +139,29 @@ def fetch_day(day: datetime = None) -> dict:
             sym = str(r[c_sym]).strip().upper()
             if not sym:
                 continue
+            isin = None
+            if c_isin is not None:
+                iv = str(r[c_isin]).strip().upper()
+                # A blank or literal 'NAN' is absent, not an identifier.
+                if iv and iv not in ("NAN", "NONE", "-"):
+                    isin = iv
             rows.append((f"{sym}.NS", iso,
                          float(r[c_o]) if c_o else None,
                          float(r[c_h]) if c_h else None,
                          float(r[c_l]) if c_l else None,
                          float(r[c_close]),
-                         float(r[c_v]) if c_v else None))
+                         float(r[c_v]) if c_v else None,
+                         isin))
         except Exception:
             continue
 
     conn = get_conn()
-    stmt = ("INSERT INTO bhavcopy_eod (symbol, day, open, high, low, close, volume) "
-            "VALUES (?,?,?,?,?,?,?)")
-    stmt += (" ON CONFLICT (symbol, day) DO UPDATE SET close = EXCLUDED.close"
+    stmt = ("INSERT INTO bhavcopy_eod (symbol, day, open, high, low, close, "
+            "volume, isin) VALUES (?,?,?,?,?,?,?,?)")
+    # A re-fetch of a day already stored exists to fill in the ISIN, so the
+    # conflict path has to actually write it.
+    stmt += (" ON CONFLICT (symbol, day) DO UPDATE SET close = EXCLUDED.close, "
+             "isin = COALESCE(EXCLUDED.isin, bhavcopy_eod.isin)"
              if IS_POSTGRES else "")
     if not IS_POSTGRES:
         stmt = stmt.replace("INSERT INTO", "INSERT OR REPLACE INTO")
@@ -146,7 +189,13 @@ def _already_stored() -> set:
         from db import get_conn
         conn = get_conn()
         try:
-            rows = conn.execute("SELECT DISTINCT day FROM bhavcopy_eod").fetchall()
+            # Only days whose rows carry an ISIN count as done. Otherwise the
+            # resume guard would see 652 stored days, conclude there is nothing
+            # left, and leave every historical row without the identity the
+            # rename fix depends on.
+            rows = conn.execute(
+                "SELECT day FROM bhavcopy_eod GROUP BY day "
+                "HAVING COUNT(isin) > 0").fetchall()
         finally:
             conn.close()
         return {str(r[0])[:8].replace("-", "") for r in rows} | {str(r[0]) for r in rows}
@@ -252,8 +301,11 @@ def resume_if_incomplete(chunk_days: int = 1200) -> dict:
         from db import get_conn
         conn = get_conn()
         try:
+            # Same rule here: a day without ISIN is not finished.
             row = conn.execute(
-                "SELECT MIN(day), COUNT(DISTINCT day) FROM bhavcopy_eod"
+                "SELECT MIN(day), COUNT(*) FROM ("
+                "  SELECT day FROM bhavcopy_eod GROUP BY day "
+                "  HAVING COUNT(isin) > 0) t"
             ).fetchone()
         finally:
             conn.close()

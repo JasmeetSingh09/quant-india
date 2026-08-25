@@ -1534,6 +1534,31 @@ def market_wide_validation(min_days: int = Query(21, ge=3, le=252)):
     return validate(min_days=min_days)
 
 
+@app.get("/identity/transitions")
+def identity_transitions():
+    """Ticker changes derived from ISIN — which renames are the same company."""
+    from security_identity import transitions
+    return transitions()
+
+
+@app.get("/identity/delistings")
+def identity_delistings():
+    """
+    Securities that genuinely stopped trading, as opposed to changing label.
+
+    Counting symbols inflates this by every rename.
+    """
+    from security_identity import true_delistings
+    return true_delistings()
+
+
+@app.get("/identity/coverage")
+def identity_coverage():
+    """How much stored history carries an ISIN yet."""
+    from security_identity import coverage
+    return coverage()
+
+
 @app.get("/backtest/full-pit")
 def backtest_full_pit(top_fraction: float = Query(0.2, ge=0.05, le=0.5)):
     """

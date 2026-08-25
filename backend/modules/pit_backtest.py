@@ -63,13 +63,20 @@ def _panel(conn, month_days: list):
     """
     closes, values = {}, {}
     for ym, day in month_days:
+        # Keyed on ISIN, not symbol. A rename changes the symbol and keeps the
+        # ISIN, so keying on the label made ZOMATO look like a company that
+        # ceased to exist when it was trading normally as ETERNAL the same day.
+        # Rows without an ISIN fall back to the symbol so a partially
+        # backfilled table still runs — degraded, and the caller is told.
         rows = conn.execute(
-            "SELECT symbol, close, volume FROM bhavcopy_eod WHERE day = ?",
+            "SELECT symbol, close, volume, isin FROM bhavcopy_eod WHERE day = ?",
             (day,)).fetchall()
         c, v = {}, {}
-        for sym, close, vol in rows:
-            if not sym or close is None:
+        for sym, close, vol, isin in rows:
+            key = isin or sym
+            if not key or close is None:
                 continue
+            sym = key
             try:
                 px = float(close)
             except (TypeError, ValueError):
@@ -132,6 +139,14 @@ def run(top_fraction: float = 0.2, min_turnover: float = MIN_MONTHLY_TURNOVER,
         except Exception:
             pass
 
+    # How much of this run is genuinely identity-keyed. A run over rows without
+    # ISIN is the old symbol-keyed behaviour wearing the new name.
+    try:
+        from security_identity import coverage as _idcov
+        identity = _idcov()
+    except Exception:
+        identity = {"available": False}
+
     months = [ym for ym, _ in month_days]
     final_universe = set(closes[months[-1]]) if months else set()
 
@@ -189,7 +204,7 @@ def run(top_fraction: float = 0.2, min_turnover: float = MIN_MONTHLY_TURNOVER,
                 continue
             if p_next is None:
                 rets.append(-1.0)
-                delisted_held.append({"month": hold_m, "symbol": sym})
+                delisted_held.append({"month": hold_m, "security": sym})
                 continue
             rets.append(p_next / p_now - 1.0)
         if not rets:
@@ -225,6 +240,13 @@ def run(top_fraction: float = 0.2, min_turnover: float = MIN_MONTHLY_TURNOVER,
             "months_available": len(months),
             "first_month": months[0],
             "last_month": months[-1],
+        },
+        "identity": {
+            "keyed_on": "ISIN where available, symbol otherwise",
+            "coverage": identity,
+            "why": ("A ticker is a label; the ISIN is the security. Keyed on "
+                    "symbols, a rename is indistinguishable from a delisting "
+                    "and gets booked as a total loss."),
         },
         "delistings_held": {
             "count": len(delisted_held),
