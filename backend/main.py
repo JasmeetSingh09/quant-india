@@ -153,6 +153,15 @@ def _start_picks_scheduler():
         # independent fallback fresh without anyone remembering to.
         from bhavcopy import fetch_day
         sched.add_job(fetch_day, "cron", hour=20, id="bhavcopy_daily")
+        # Continue any unfinished history build. A deep backfill runs for hours
+        # and a deploy restarts the process, so without this the build stalls
+        # wherever the last push interrupted it and nothing resumes it.
+        try:
+            from bhavcopy import resume_if_incomplete
+            loop_exec = asyncio.get_event_loop()
+            loop_exec.run_in_executor(None, resume_if_incomplete)
+        except Exception:
+            pass
         sched.start()
     except Exception:
         pass
@@ -1563,6 +1572,42 @@ def factor_divergence_read(ticker: str = Query(...),
     """
     from factor_history import divergences
     return divergences(ticker.strip().upper(), days=days, model=model)
+
+
+class FreezeRequest(BaseModel):
+    version: str
+    notes: str = None
+
+
+@app.post("/strategy/freeze")
+def strategy_freeze(req: FreezeRequest):
+    """
+    Record the complete strategy specification under a version name.
+
+    Refuses to overwrite. Changing anything means minting a new version, which
+    leaves the old one to be compared against.
+    """
+    from strategy_version import freeze
+    return freeze(req.version, req.notes)
+
+
+@app.get("/strategy/versions")
+def strategy_versions():
+    from strategy_version import listing
+    return listing()
+
+
+@app.get("/strategy/version/{version}")
+def strategy_version_get(version: str):
+    from strategy_version import get
+    return get(version)
+
+
+@app.get("/strategy/drift/{version}")
+def strategy_drift(version: str):
+    """Has the live configuration moved away from a frozen version?"""
+    from strategy_version import drift
+    return drift(version)
 
 
 @app.get("/factors/correlations")

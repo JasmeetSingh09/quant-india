@@ -232,6 +232,54 @@ def backfill_async(days: int = 30) -> dict:
             "note": "Running in the background. Poll /bhavcopy/coverage for progress."}
 
 
+def resume_if_incomplete(chunk_days: int = 1200) -> dict:
+    """
+    Continue building history after a restart, without being asked.
+
+    A deep backfill takes hours and a deploy takes seconds. Every push restarts
+    the process, kills the daemon thread and loses the job — the days already
+    written survive in the table, but nothing resumes them, so the build stalls
+    wherever it happened to be and only a human noticing restarts it. That is
+    how a 640-day target quietly stops at 69.
+
+    Called at startup. It compares stored coverage against the archive floor
+    and continues if there is anything left, which makes progress monotonic
+    across any number of restarts. backfill() already skips days it has, so a
+    resume costs one query rather than re-fetching everything.
+    """
+    try:
+        _init_db()
+        from db import get_conn
+        conn = get_conn()
+        try:
+            row = conn.execute(
+                "SELECT MIN(day), COUNT(DISTINCT day) FROM bhavcopy_eod"
+            ).fetchone()
+        finally:
+            conn.close()
+    except Exception as e:
+        return {"resumed": False, "reason": f"{type(e).__name__}"}
+
+    earliest = str(row[0])[:10] if row and row[0] else None
+    have_days = int(row[1] or 0) if row else 0
+
+    floor = datetime.strptime(ARCHIVE_STARTS, "%Y-%m-%d")
+    if earliest:
+        try:
+            if datetime.strptime(earliest, "%Y-%m-%d") <= floor:
+                return {"resumed": False, "complete": True,
+                        "earliest": earliest, "days": have_days,
+                        "note": "History already reaches the archive floor."}
+        except Exception:
+            pass
+
+    if _BACKFILL_STATE.get("running"):
+        return {"resumed": False, "note": "A backfill is already running."}
+
+    return {**backfill_async(chunk_days), "resumed": True,
+            "earliest_before": earliest, "days_before": have_days}
+
+
 def backfill_status() -> dict:
     return dict(_BACKFILL_STATE)
 
