@@ -123,7 +123,15 @@ def scenarios(ticker: str, years: int = 3,
                 "which is worse than showing nothing at all."),
         }
 
-    eps_now = price / pe
+    # Derive EPS from the ROUNDED price and P/E, because those are the two
+    # numbers the page displays. Computing it from the unrounded pair left a
+    # reader who divides the two figures in front of them with a different
+    # answer from the third figure in front of them — small (0.03 on TCS) but
+    # it is the first arithmetic anyone checks, and every downstream scenario
+    # value is built on this number.
+    price = round(float(price), 2)
+    pe = round(float(pe), 2)
+    eps_now = round(price / pe, 2)
 
     # Defaults come from the stock's own numbers, and every one of them is
     # returned so the user can see what they are about to override.
@@ -161,7 +169,7 @@ def scenarios(ticker: str, years: int = 3,
             "scenario": name,
             "growth_pct": round(g, 2),
             "exit_multiple": round(mult, 2),
-            "eps_now": round(eps_now, 2),
+            "eps_now": eps_now,
             "eps_end": eps_end,
             "implied_value": round(value, 2),
             "change_pct": round((value / price - 1) * 100, 2),
@@ -189,9 +197,9 @@ def scenarios(ticker: str, years: int = 3,
     return {
         "available": True,
         "ticker": ticker,
-        "current_price": round(float(price), 2),
-        "current_pe": round(float(pe), 2),
-        "eps_now": round(eps_now, 2),
+        "current_price": price,
+        "current_pe": pe,
+        "eps_now": eps_now,
         "years": years,
         "scenarios": cases,
         "assumptions_used": {

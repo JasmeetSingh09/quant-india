@@ -475,6 +475,49 @@ else:
 
 
 # ============================ REPORT =====================================
+# ============================ J. BACKTEST INTEGRITY LABEL ================
+section("J. backtests declare whether their universe was real")
+
+from backtest_integrity import classify as _bt_classify
+
+_far = _bt_classify("2016-01-01")
+_near = _bt_classify("2026-08-01")
+
+ok(_far["mode"] in ("RESEARCH ONLY", "UNKNOWN"),
+   "a 10-year run is labelled research-only, not validated", _far["mode"])
+ok("longer_is_worse" in _far or _far["mode"] == "UNKNOWN",
+   "the label states that survivorship compounds with length")
+ok("edge" in _far.get("safe_to_claim", "").lower(),
+   "the research label says plainly what may not be claimed")
+
+# The counter-intuitive property this exists to protect: a LONGER contaminated
+# run must never be graded better than a shorter one.
+_a = _bt_classify("2016-01-01")
+_b = _bt_classify("2024-01-01")
+if _a["mode"] == _b["mode"] == "RESEARCH ONLY":
+    ok(_a.get("uncovered_years", 0) >= _b.get("uncovered_years", 0),
+       "a longer run has at least as much uncovered history",
+       f"{_a.get('uncovered_years')} vs {_b.get('uncovered_years')}")
+
+# A run inside the stored window may be validated, but only if files exist.
+ok(_near["mode"] in ("POINT-IN-TIME VALIDATED", "RESEARCH ONLY"),
+   "a recent run is classified, not left blank", _near["mode"])
+if _near["mode"] == "POINT-IN-TIME VALIDATED":
+    ok("delisted" in _near.get("why", "").lower(),
+       "the validated label explains that failures are included too")
+
+# Every backtest result must carry its label, or the number can be quoted
+# without it — which is precisely how a contaminated figure escapes.
+import inspect as _bi
+import momentum_backtest as _mbt
+_msrc = _bi.getsource(_mbt)
+ok(_msrc.count('"integrity"') >= 2,
+   "both backtests attach an integrity label to their result",
+   str(_msrc.count('"integrity"')))
+ok("_integrity" in _msrc and "except Exception" in _msrc,
+   "a failed label costs disclosure, never the backtest itself")
+
+
 print("\n" + "=" * 66)
 print(f"AUDIT CHECKS: {checks}")
 print(f"FAILURES:     {len(failures)}")

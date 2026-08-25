@@ -94,6 +94,17 @@ def _annualised(monthly: pd.Series) -> dict:
 
 # Below this many holdings a factor backtest is a bet on a handful of names
 # rather than a test of the factor.
+def _integrity(start, end=None):
+    """Classify this run's universe integrity. Never allowed to break a
+    backtest: a missing label is a gap in disclosure, an exception is a
+    broken feature."""
+    try:
+        from backtest_integrity import classify
+        return classify(start, end)
+    except Exception as e:
+        return {"mode": "UNKNOWN", "reason": type(e).__name__}
+
+
 MIN_HOLDINGS = 5
 
 
@@ -255,6 +266,10 @@ def momentum_backtest(
         "period":    f"{eq_dates[0]} to {eq_dates[-1]}",
         "costs_included": True,
         "cost_roundtrip_pct": cost_roundtrip_pct,
+        # The label travels with the number. A return figure that
+        # arrives without knowing whether its universe was real is
+        # exactly the figure people quote.
+        "integrity": _integrity(start, end),
         "strategy_stats":  s_stats,
         "benchmark_stats": b_stats,
         "excess_cagr_pct": round(s_stats["cagr_pct"] - b_stats["cagr_pct"], 2),
@@ -362,6 +377,7 @@ def low_vol_backtest(
         "universe_size": len(stocks.columns),
         "period": f"{eq_dates[0]} to {eq_dates[-1]}",
         "costs_included": True, "cost_roundtrip_pct": cost_roundtrip_pct,
+        "integrity": _integrity(start, end),
         "strategy_stats": s_stats, "benchmark_stats": b_stats,
         "excess_cagr_pct": round(s_stats["cagr_pct"] - b_stats["cagr_pct"], 2),
         "t_stat_excess": round(t_stat, 2), "significant_5pct": bool(abs(t_stat) > 1.96),
