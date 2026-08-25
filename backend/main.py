@@ -1565,6 +1565,20 @@ def factor_divergence_read(ticker: str = Query(...),
     return divergences(ticker.strip().upper(), days=days, model=model)
 
 
+@app.get("/factors/correlations")
+def factor_correlations():
+    """
+    Pairwise correlation of the factor scores across the scored universe.
+
+    Audit infrastructure: six factors with distinct names may still be fewer
+    distinct signals. If two correlate highly, their stated weights do not mean
+    what they appear to mean, because the pair is carrying one signal at their
+    combined weight.
+    """
+    from factor_correlation import matrix
+    return matrix()
+
+
 @app.get("/factors/coverage")
 def factor_history_coverage():
     """How much history exists — the honest answer to 'why is this empty'."""
