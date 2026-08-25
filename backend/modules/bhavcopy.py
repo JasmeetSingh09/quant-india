@@ -165,14 +165,39 @@ def fetch_day(day: datetime = None) -> dict:
              if IS_POSTGRES else "")
     if not IS_POSTGRES:
         stmt = stmt.replace("INSERT INTO", "INSERT OR REPLACE INTO")
-    for row in rows:
+    # One statement per row meant ~2,400 round-trips per day and 1.5 million
+    # across the archive, which turned the ISIN re-fetch into a 16-to-40 hour
+    # job. The data and the conflict rules are identical; only the number of
+    # round-trips changes.
+    #
+    # The per-row loop survives as a fallback because executemany is
+    # all-or-nothing: one malformed row would lose the whole day, and losing a
+    # day silently is exactly the failure this project keeps finding. On
+    # Postgres a failed statement poisons the transaction, so the rollback
+    # before retrying is required rather than tidy.
+    stored = len(rows)
+    try:
+        conn.executemany(stmt, rows)
+        conn.commit()
+    except Exception:
         try:
-            conn.execute(stmt, row)
+            conn.rollback()
         except Exception:
             pass
-    conn.commit()
+        stored = 0
+        for row in rows:
+            try:
+                conn.execute(stmt, row)
+                stored += 1
+            except Exception:
+                pass
+        conn.commit()
     conn.close()
-    return {"day": iso, "stored": len(rows), "source": "NSE bhavcopy"}
+    # Report what was actually written, not what was parsed. If the batch fell
+    # back and some rows failed, a caller counting len(rows) would be told the
+    # day is complete when it is not.
+    return {"day": iso, "stored": stored, "parsed": len(rows),
+            "source": "NSE bhavcopy"}
 
 
 # NSE's archive at these URLs starts in early 2024 — measured, not assumed:
