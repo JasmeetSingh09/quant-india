@@ -132,7 +132,29 @@ def fetch_day(day: datetime = None) -> dict:
     return {"day": iso, "stored": len(rows), "source": "NSE bhavcopy"}
 
 
-def backfill(days: int = 10, workers: int = 4) -> dict:
+# NSE's archive at these URLs starts in early 2024 — measured, not assumed:
+# 2024-02-21 returns a file, 2023-11-15 does not, and neither is a holiday.
+# Asking for dates before this only produces 404s, so the depth of any
+# point-in-time universe built from this source is bounded here.
+ARCHIVE_STARTS = "2024-01-01"
+
+
+def _already_stored() -> set:
+    """Days already in the table, so a resumed backfill does not refetch them."""
+    try:
+        _init_db()
+        from db import get_conn
+        conn = get_conn()
+        try:
+            rows = conn.execute("SELECT DISTINCT day FROM bhavcopy_eod").fetchall()
+        finally:
+            conn.close()
+        return {str(r[0])[:8].replace("-", "") for r in rows} | {str(r[0]) for r in rows}
+    except Exception:
+        return set()
+
+
+def backfill(days: int = 10, workers: int = 4, skip_existing: bool = True) -> dict:
     """
     Pull the last N calendar days. Missing days are skipped, not retried.
 
@@ -141,17 +163,42 @@ def backfill(days: int = 10, workers: int = 4) -> dict:
     at 280 seconds. Concurrency is deliberately modest: NSE is a public archive
     being used politely, and hammering it to save a minute would be a good way
     to lose the source entirely.
+
+    skip_existing matters once this is used to build real depth. A 900-day pull
+    that refetches everything it already has on each restart never finishes, and
+    it puts nine hundred pointless requests through a public archive to learn
+    what one query of its own table would have said.
     """
     from concurrent.futures import ThreadPoolExecutor
 
-    targets = [datetime.now() - timedelta(days=i) for i in range(1, days + 1)]
+    have = _already_stored() if skip_existing else set()
+    floor = datetime.strptime(ARCHIVE_STARTS, "%Y-%m-%d")
+
+    targets = []
+    for i in range(1, days + 1):
+        d = datetime.now() - timedelta(days=i)
+        if d < floor:
+            continue                      # nothing published before the archive starts
+        if d.weekday() >= 5:
+            continue                      # no file on a weekend; do not ask for one
+        if d.strftime("%Y%m%d") in have or d.strftime("%Y-%m-%d") in have:
+            continue
+        targets.append(d)
+
     out = []
-    with ThreadPoolExecutor(max_workers=max(1, min(workers, 6))) as ex:
-        for r in ex.map(fetch_day, targets):
-            out.append(r)
-    return {"days_attempted": days,
+    if targets:
+        with ThreadPoolExecutor(max_workers=max(1, min(workers, 6))) as ex:
+            for r in ex.map(fetch_day, targets):
+                out.append(r)
+    return {"days_requested": days,
+            "days_attempted": len(targets),
+            "days_skipped_already_had": max(0, days - len(targets)),
             "days_stored": len([o for o in out if o.get("stored")]),
-            "rows": sum(o.get("stored", 0) for o in out)}
+            "rows": sum(o.get("stored", 0) for o in out),
+            "archive_starts": ARCHIVE_STARTS,
+            "note": (f"Weekends and days already stored are not requested. "
+                     f"Nothing before {ARCHIVE_STARTS} is requested either: the "
+                     f"archive does not serve it.")}
 
 
 _BACKFILL_STATE = {"running": False, "started": None, "result": None}

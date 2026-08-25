@@ -1747,7 +1747,7 @@ def bhavcopy_fetch(days: int = Query(1, ge=1, le=30)):
 
 
 @app.post("/bhavcopy/backfill")
-def bhavcopy_backfill(days: int = Query(30, ge=1, le=60)):
+def bhavcopy_backfill(days: int = Query(30, ge=1, le=1200)):
     """
     Build real history in the background. Thirty days of files outlives any HTTP
     request, so this starts the work and returns; progress shows in /coverage.

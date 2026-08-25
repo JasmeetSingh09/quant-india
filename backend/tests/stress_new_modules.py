@@ -1036,13 +1036,36 @@ from simulator import _market_note as _mn
 _flat = [{"ticker": "SBIN.NS", "pnl_pct": 0.0}, {"ticker": "INFY.NS", "pnl_pct": 0.0}]
 _moved = [{"ticker": "SBIN.NS", "pnl_pct": 0.0}, {"ticker": "INFY.NS", "pnl_pct": 1.4}]
 
-_n = _mn(_flat)
-ok(_n is not None, "a completely flat portfolio gets an explanation")
-if _n:
-    ok("not a stalled feed" in _n or "nothing has traded" in _n.lower(),
-       "the note says the feed is fine, which is the actual question being asked")
-    ok("cost of opening" in _n.lower(),
-       "the note attributes the difference from starting capital to dealing costs")
+# The note has two branches and which one fires depends on whether the market
+# is open. Asserting on the wall clock made this pass at weekends and fail on a
+# Tuesday afternoon — a test that depends on when it runs is not a test. Both
+# branches are now exercised explicitly.
+import data_fetcher as _df_mod
+import simulator as _sim_mod
+_orig_open = _df_mod.is_market_open
+
+try:
+    _df_mod.is_market_open = lambda: False
+    _n = _mn(_flat)
+    ok(_n is not None, "a flat portfolio gets an explanation when the market is shut")
+    if _n:
+        ok("not a stalled feed" in _n or "nothing has traded" in _n.lower(),
+           "closed-market note says the feed is fine, which is the question asked")
+        ok("cost of opening" in _n.lower(),
+           "closed-market note attributes the difference to dealing costs")
+
+    # Flat while the market is OPEN is a different situation and must not be
+    # explained away with the reassuring weekend wording.
+    _df_mod.is_market_open = lambda: True
+    _n_open = _mn(_flat)
+    ok(_n_open is not None, "a flat portfolio during open hours also gets a note")
+    if _n_open:
+        ok("unusual" in _n_open.lower(),
+           "open-market note flags the flatness as unusual rather than normal")
+        ok("not a stalled feed" not in _n_open,
+           "open-market note does NOT reassure that the feed is fine")
+finally:
+    _df_mod.is_market_open = _orig_open
 
 # A note that appears every time is a note nobody reads.
 ok(_mn(_moved) is None, "no note once anything has actually moved")
