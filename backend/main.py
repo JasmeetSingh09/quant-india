@@ -1534,6 +1534,66 @@ def market_wide_validation(min_days: int = Query(21, ge=3, le=252)):
     return validate(min_days=min_days)
 
 
+@app.get("/backtest/pit-comparison")
+def backtest_pit_comparison(start: str = Query("2024-01-01"),
+                            fraction: float = Query(0.2, ge=0.05, le=0.5)):
+    """
+    The experiment: the same frozen strategy run on today's survivors and on
+    the point-in-time universe, over the same window.
+
+    Only the eligible SET differs. Momentum definition, weights, rebalance
+    dates and cost model are identical, so the difference is survivorship and
+    nothing else.
+    """
+    from momentum_backtest import momentum_backtest, BROAD_UNIVERSE
+
+    def _run(pit):
+        r = momentum_backtest(universe=BROAD_UNIVERSE, start=start,
+                              top_fraction=fraction, pit_membership=pit)
+        if "error" in r:
+            return {"error": r["error"]}
+        st, b = r["strategy_stats"], r["benchmark_stats"]
+        return {"cagr_pct": st["cagr_pct"], "vol_pct": st["vol_pct"],
+                "sharpe": st["sharpe"], "sortino": st.get("sortino"),
+                "max_drawdown_pct": st["max_drawdown_pct"],
+                "hit_rate_pct": st["hit_rate_pct"], "months": st["n_months"],
+                "benchmark_cagr_pct": b["cagr_pct"],
+                "excess_vs_nifty_pct": r.get("excess_cagr_pct"),
+                "avg_listed_at_rebalance": r.get("avg_listed_at_rebalance"),
+                "integrity": (r.get("integrity") or {}).get("mode")}
+
+    contaminated = _run(False)
+    clean = _run(True)
+
+    diff = None
+    if "error" not in contaminated and "error" not in clean:
+        a = contaminated.get("excess_vs_nifty_pct")
+        b2 = clean.get("excess_vs_nifty_pct")
+        if a is not None and b2 is not None:
+            diff = round(b2 - a, 2)
+
+    return {
+        "period_start": start,
+        "contaminated": {**contaminated,
+                         "label": "RESEARCH ONLY - SURVIVORSHIP BIAS",
+                         "universe": "today's listed set projected backwards"},
+        "clean": {**clean,
+                  "label": "POINT-IN-TIME universe membership",
+                  "universe": "the exchange's own symbol list for each date"},
+        "survivorship_cost_pct": diff,
+        "what_it_means": (
+            "The difference is how much of the apparent performance came from "
+            "only ever holding companies that survived to today. It is not a "
+            "measure of skill in either direction."
+            if diff is not None else
+            "Could not be computed for this window."),
+        "still_limited": (
+            "Point-in-time membership fixes WHICH companies were investable. It "
+            "does not give point-in-time fundamentals, so quality, value, growth "
+            "and sentiment remain untestable regardless of this window."),
+    }
+
+
 @app.get("/factors/universe-sensitivity")
 def factor_universe_sensitivity(start: str = Query("2019-01-01"),
                                 fraction: float = Query(0.2, ge=0.05, le=0.5)):

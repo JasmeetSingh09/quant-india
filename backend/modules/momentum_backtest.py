@@ -117,6 +117,7 @@ def momentum_backtest(
     skip_months: int = 1,
     cost_roundtrip_pct: float = 0.4,
     pit_universe_size: int = None,
+    pit_membership: bool = False,
     liquidity_lookback_months: int = 6,
 ) -> dict:
     """
@@ -197,6 +198,7 @@ def momentum_backtest(
     prev_basket = set()
     holdings_log = []
     pit_sizes = []
+    pit_membership_sizes = []
 
     # Need L months of history to form the first signal; hold the following month.
     for i in range(L, len(dates) - 1):
@@ -205,6 +207,26 @@ def momentum_backtest(
         past = stocks.iloc[i - L]
         recent = stocks.iloc[i - K]
         mom = (recent / past - 1).dropna()
+
+        # TRUE point-in-time MEMBERSHIP: was this company listed at all on this
+        # date? The liquidity screen below removes look-ahead in universe
+        # SELECTION, but a screen applied to a list of today's survivors can
+        # still only ever pick survivors. This filters to the exchange's own
+        # symbol list for the date, which includes the companies that have
+        # since delisted and excludes the ones not yet listed.
+        #
+        # Injected at exactly the point the liquidity screen acts, so the two
+        # runs differ in the eligible SET and in nothing else — same momentum
+        # definition, same weights, same costs, same rebalance dates.
+        if pit_membership:
+            try:
+                from survivorship import universe_as_of
+                listed = universe_as_of(t.strftime("%Y-%m-%d"))
+                if listed:
+                    mom = mom[mom.index.isin(listed)]
+                    pit_membership_sizes.append(len(listed))
+            except Exception:
+                pass
 
         # POINT-IN-TIME universe screen: rank by trailing turnover using ONLY
         # data before this rebalance, so a name is eligible only once it was
@@ -270,6 +292,10 @@ def momentum_backtest(
         # arrives without knowing whether its universe was real is
         # exactly the figure people quote.
         "integrity": _integrity(start, end),
+        "pit_membership": bool(pit_membership),
+        "avg_listed_at_rebalance": (round(sum(pit_membership_sizes)
+                                          / len(pit_membership_sizes), 1)
+                                    if pit_membership_sizes else None),
         "strategy_stats":  s_stats,
         "benchmark_stats": b_stats,
         "excess_cagr_pct": round(s_stats["cagr_pct"] - b_stats["cagr_pct"], 2),
