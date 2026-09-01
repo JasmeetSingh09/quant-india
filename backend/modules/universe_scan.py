@@ -417,8 +417,13 @@ def _scan_loop_inner():
     done = _already_done(cycle)
     todo = [t for t in universe if t not in done]
 
+    # last_error is cleared here, not left to age. A pass that is running now
+    # while the state still displays the crash that killed the previous one
+    # reports a failure that is no longer true, which is worse than reporting
+    # nothing — the whole point of recording it was to say what is happening.
     _set_state(cycle=cycle, started_at=datetime.now().isoformat(), finished_at=None,
-               done=len(done), total=len(universe), status="running")
+               done=len(done), total=len(universe), status="running",
+               last_error=None)
 
     from concurrent.futures import ThreadPoolExecutor
 
