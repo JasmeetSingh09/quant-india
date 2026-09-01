@@ -1588,6 +1588,23 @@ def backtest_full_pit(top_fraction: float = Query(0.2, ge=0.05, le=0.5)):
     return r
 
 
+@app.get("/validation/pit")
+def validation_pit(min_turnover: float = Query(1e7, ge=0),
+                   buckets: int = Query(5, ge=3, le=10)):
+    """
+    Track A: validation of the factors the point-in-time archive can actually
+    reconstruct — momentum and low_risk — across horizons, regimes and
+    liquidity, with Track B listing what cannot be tested and why.
+
+    This is price-observable validation, NOT full V1/V2 validation.
+    """
+    from pit_validation import validate
+    r = validate(min_turnover=min_turnover, n_buckets=buckets)
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+
 @app.get("/backtest/identity-ab")
 def backtest_identity_ab(top_fraction: float = Query(0.2, ge=0.05, le=0.5)):
     """
