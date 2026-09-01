@@ -356,10 +356,65 @@ def current_spec() -> dict:
     return spec
 
 
+# Where a deployment publishes the commit it built from, when git itself is not
+# in the image. Render sets the first; the others cost nothing to check and
+# cover the platforms this could plausibly move to.
+COMMIT_ENV_VARS = ("RENDER_GIT_COMMIT", "GIT_COMMIT", "SOURCE_VERSION",
+                   "VERCEL_GIT_COMMIT_SHA", "HEROKU_SLUG_COMMIT")
+
+NO_COMMIT_WARNING = (
+    "PROVENANCE GAP: the commit that produced this run could not be "
+    "determined. Git is not available and no deployment commit variable is "
+    "set, so this record cannot identify the code it describes. Results "
+    "produced here are reproducible only as far as the parameter values above "
+    "— which is not the same as reproducible."
+)
+
+
+def _git_head(cwd=None):
+    import subprocess
+    return subprocess.check_output(
+        ["git", "rev-parse", "--short", "HEAD"],
+        cwd=cwd or os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        stderr=subprocess.DEVNULL, timeout=5).decode().strip()
+
+
+def _code_commit(run=None, environ=None) -> dict:
+    """
+    Which commit produced this run, and how we know.
+
+    Locally git answers. In the deployed container it does not — the image has
+    no .git directory — so the audit passed on a laptop and the production
+    record carried a null commit, which is the one place provenance actually
+    matters. The platform publishes the commit it built from as an environment
+    variable, so that is the fallback.
+
+    When neither is available the field stays null and a warning goes with it.
+    A null that explains itself is a known gap; a bare null reads like nobody
+    looked.
+    """
+    run = _git_head if run is None else run
+    environ = os.environ if environ is None else environ
+    try:
+        c = (run() or "").strip()
+        if c:
+            return {"code_commit": c, "code_commit_source": "git",
+                    "provenance_warning": None}
+    except Exception:
+        pass
+    for var in COMMIT_ENV_VARS:
+        v = (environ.get(var) or "").strip()
+        if v:
+            # Short form, so a git answer and a deployment answer look alike.
+            return {"code_commit": v[:7], "code_commit_source": var,
+                    "provenance_warning": None}
+    return {"code_commit": None, "code_commit_source": None,
+            "provenance_warning": NO_COMMIT_WARNING}
+
+
 def _environment() -> dict:
     """What ran this, and on what data."""
     import platform
-    import subprocess
 
     env = {
         "python_version": platform.python_version(),
@@ -371,13 +426,7 @@ def _environment() -> dict:
         except Exception:
             env[f"{lib}_version"] = None
 
-    try:
-        env["code_commit"] = subprocess.check_output(
-            ["git", "rev-parse", "--short", "HEAD"],
-            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            stderr=subprocess.DEVNULL, timeout=5).decode().strip()
-    except Exception:
-        env["code_commit"] = None
+    env.update(_code_commit())
 
     # The archive is data, and a result depends on which rows existed when it
     # ran. Recorded as a boundary and a row count rather than a hash of 1.5

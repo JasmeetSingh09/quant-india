@@ -112,6 +112,54 @@ ok("min_holdings" in str(res.get("capture_failures")),
 ok("allow_incomplete" in res.get("reason", ""),
    "the refusal explains how to override it deliberately")
 
+print("\n4b. Commit provenance, in all three environments")
+# The gap this closes: git answers on a laptop and not in the container, so the
+# audit passed locally while the production record carried a null commit —
+# exactly where provenance matters.
+g = sv._code_commit(run=lambda: "abc1234", environ={})
+ok(g["code_commit"] == "abc1234" and g["code_commit_source"] == "git",
+   "git available -> commit captured from git")
+ok(g["provenance_warning"] is None, "and no warning is raised")
+
+
+def _no_git():
+    raise FileNotFoundError("git not installed")
+
+
+d = sv._code_commit(run=_no_git,
+                    environ={"RENDER_GIT_COMMIT": "deadbeefcafe1234"})
+ok(d["code_commit"] == "deadbee",
+   f"git unavailable + RENDER_GIT_COMMIT -> deployment commit ({d['code_commit']})")
+ok(d["code_commit_source"] == "RENDER_GIT_COMMIT",
+   "and the record says where it came from")
+ok(d["provenance_warning"] is None, "and no warning is raised")
+
+n = sv._code_commit(run=_no_git, environ={})
+ok(n["code_commit"] is None, "neither available -> commit is explicitly null")
+ok("PROVENANCE GAP" in (n["provenance_warning"] or ""),
+   "and a documented warning travels with the null")
+
+# An empty variable is not an answer.
+e = sv._code_commit(run=_no_git, environ={"RENDER_GIT_COMMIT": "   "})
+ok(e["code_commit"] is None, "a blank deployment variable is not treated as a commit")
+
+# Order matters: git wins when both are present, because it describes the
+# working tree that actually ran rather than what was built.
+b = sv._code_commit(run=lambda: "local99", environ={"RENDER_GIT_COMMIT": "remote11"})
+ok(b["code_commit"] == "local99", "git takes precedence over the deployment variable")
+
+# And none of it may touch the hash.
+h_env = sv._hash(spec)
+for variant in ({"code_commit": "aaaaaaa", "code_commit_source": "git",
+                 "provenance_warning": None},
+                {"code_commit": None, "code_commit_source": None,
+                 "provenance_warning": sv.NO_COMMIT_WARNING}):
+    s2 = copy.deepcopy(spec)
+    s2.setdefault("environment", {}).update(variant)
+    ok(sv._hash(s2) == h_env,
+       f"commit provenance ({variant['code_commit_source'] or 'absent'}) "
+       f"does not move the hash")
+
 print("\n5. Field classification")
 ok("factors_not_historically_testable" in sv.METADATA_FIELDS,
    "the testability list is metadata")
