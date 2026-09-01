@@ -53,6 +53,8 @@ after seeing a result, and the two factor definitions are read from the frozen
 model rather than restated.
 """
 
+from model_config import RISK_FREE_RATE as _RF
+
 import math
 from datetime import datetime
 
@@ -85,7 +87,7 @@ LR_VOL_W, LR_DD_W = 0.6, 0.4
 # Shared with the frozen backtest so the two cannot drift apart silently.
 MIN_MONTHLY_TURNOVER = 1e7
 COST_ROUNDTRIP_PCT = 0.4
-RISK_FREE = 0.065
+RISK_FREE = _RF
 
 N_BUCKETS = 5
 HORIZONS = (1, 3, 6, 12)

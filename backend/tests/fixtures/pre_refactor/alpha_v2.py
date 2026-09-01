@@ -89,29 +89,6 @@ WEIGHT_NOTES = {
 
 MODEL_VERSION_V2 = "alpha-v2-six-factor"
 
-# ---------------------------------------------------------------------------
-# Behavioural parameters, named so they can be frozen. Previously inline
-# literals, which no specification could capture and no drift check could see.
-# Every value is exactly what the literal was.
-# ---------------------------------------------------------------------------
-
-# Growth. The divisors set what counts as a normal range: revenue growth of
-# +/-30% spans most of the real distribution, earnings growth is wider.
-GROWTH_REVENUE_DIVISOR = 0.30
-GROWTH_EARNINGS_DIVISOR = 0.50
-GROWTH_PART_WEIGHT = 0.5          # each leg contributes equally when present
-GROWTH_CONFIDENCE_SCALE = 0.85    # full confidence with both legs reported
-
-# Low risk: the low-volatility anomaly, scored so calmer is higher.
-LOW_RISK_WINDOW_DAYS = 400        # calendar days of history fetched
-LOW_RISK_MIN_RETURNS = 60         # below this the window is not usable
-LOW_RISK_VOL_REF = 0.20           # 20% annualised is unremarkable for India
-LOW_RISK_DD_REF = 0.25            # reference drawdown for the tanh
-LOW_RISK_VOL_WEIGHT = 0.6
-LOW_RISK_DD_WEIGHT = 0.4
-LOW_RISK_CONFIDENCE_BASE = 0.5
-LOW_RISK_CONFIDENCE_DIVISOR = 500
-
 
 def _growth_factor(ticker: str) -> dict:
     """
@@ -130,20 +107,18 @@ def _growth_factor(ticker: str) -> dict:
         parts, wsum = [], 0.0
         if rev_g is not None:
             # +/-30% revenue growth spans most of the real distribution.
-            parts.append((GROWTH_PART_WEIGHT,
-                           float(np.tanh(float(rev_g) / GROWTH_REVENUE_DIVISOR))))
-            wsum += GROWTH_PART_WEIGHT
+            parts.append((0.5, float(np.tanh(float(rev_g) / 0.30))))
+            wsum += 0.5
         if earn_g is not None:
-            parts.append((GROWTH_PART_WEIGHT,
-                           float(np.tanh(float(earn_g) / GROWTH_EARNINGS_DIVISOR))))
-            wsum += GROWTH_PART_WEIGHT
+            parts.append((0.5, float(np.tanh(float(earn_g) / 0.50))))
+            wsum += 0.5
         if not parts:
             return {"score": 0.0, "confidence": 0.0, "reason": "no growth data"}
 
         raw = sum(w * v for w, v in parts) / wsum
         return {
             "score": round(max(-1.0, min(1.0, raw)), 4),
-            "confidence": round(GROWTH_CONFIDENCE_SCALE * wsum, 3),
+            "confidence": round(0.85 * wsum, 3),
             "revenue_growth": rev_g,
             "earnings_growth": earn_g,
             "reason": ("Revenue and earnings growth against a normal range. Fast "
@@ -166,17 +141,17 @@ def _low_risk_factor(ticker: str) -> dict:
         from datetime import datetime, timedelta
         import yfinance as yf
         end = datetime.now()
-        start = end - timedelta(days=LOW_RISK_WINDOW_DAYS)
+        start = end - timedelta(days=400)
         df = yf.download(ticker, start=start.strftime("%Y-%m-%d"),
                          end=end.strftime("%Y-%m-%d"), progress=False,
                          auto_adjust=True)
-        if df is None or len(df) < LOW_RISK_MIN_RETURNS:
+        if df is None or len(df) < 60:
             return {"score": 0.0, "confidence": 0.0, "reason": "insufficient history"}
         close = df["Close"]
         if hasattr(close, "columns"):
             close = close.iloc[:, 0]
         rets = close.pct_change().dropna()
-        if len(rets) < LOW_RISK_MIN_RETURNS:
+        if len(rets) < 60:
             return {"score": 0.0, "confidence": 0.0, "reason": "insufficient returns"}
 
         ann_vol = float(rets.std() * np.sqrt(252))
@@ -190,14 +165,13 @@ def _low_risk_factor(ticker: str) -> dict:
 
         # 20% annualised volatility is unremarkable for an Indian equity; 60% is
         # extreme. Below 20 scores positive, above scores negative.
-        vol_score = float(np.tanh((LOW_RISK_VOL_REF - ann_vol) / LOW_RISK_VOL_REF))
-        dd_score = float(np.tanh((LOW_RISK_DD_REF + drawdown) / LOW_RISK_DD_REF))   # drawdown is negative
+        vol_score = float(np.tanh((0.20 - ann_vol) / 0.20))
+        dd_score = float(np.tanh((0.25 + drawdown) / 0.25))   # drawdown is negative
 
-        raw = LOW_RISK_VOL_WEIGHT * vol_score + LOW_RISK_DD_WEIGHT * dd_score
+        raw = 0.6 * vol_score + 0.4 * dd_score
         return {
             "score": round(max(-1.0, min(1.0, raw)), 4),
-            "confidence": round(min(1.0, LOW_RISK_CONFIDENCE_BASE
-                                    + len(rets) / LOW_RISK_CONFIDENCE_DIVISOR), 3),
+            "confidence": round(min(1.0, 0.5 + len(rets) / 500), 3),
             "annual_volatility_pct": round(ann_vol * 100, 1),
             "max_drawdown_pct": round(drawdown * 100, 1),
             "reason": (f"Annualised volatility {ann_vol*100:.0f}%, worst drawdown "
@@ -268,11 +242,11 @@ def compute_v2(ticker: str, v1_result: dict = None) -> dict:
     except Exception:
         liq = None
 
-    # One definition of what a Strong Buy is, shared with V1. This block
-    # used to carry its own copy of 40 / 15 / -40 / -15, so changing the
-    # V1 thresholds would have left V2 silently on the old ones.
-    from alpha_model import signal_for_score
-    signal = signal_for_score(alpha)
+    if alpha > 40:      signal = "STRONG BUY"
+    elif alpha > 15:    signal = "BUY"
+    elif alpha < -40:   signal = "STRONG SELL"
+    elif alpha < -15:   signal = "SELL"
+    else:               signal = "NEUTRAL"
 
     coverage = round(used_w / sum(WEIGHTS_V2.values()), 3)
 

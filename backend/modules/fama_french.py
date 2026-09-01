@@ -43,6 +43,9 @@ not provide clean historical fundamentals). This is the standard
 student/practitioner simplification and is stated as a limitation.
 """
 
+from model_config import (RISK_FREE_RATE as _RF,
+                          BENCHMARK_INDEX as _BM)
+
 import numpy as np
 import pandas as pd
 import yfinance as yf
@@ -53,8 +56,8 @@ from scipy import stats
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-NIFTY_TICKER   = "^NSEI"
-RISK_FREE_RATE = 0.065   # RBI repo rate proxy
+NIFTY_TICKER   = _BM
+RISK_FREE_RATE = _RF   # RBI repo rate proxy
 
 # Default universe used to build the factors (Nifty large/mid mix)
 DEFAULT_UNIVERSE = [

@@ -95,9 +95,20 @@ ok("factors_not_historically_testable" in sv.METADATA_FIELDS,
 for f in ("factor_weights", "costs", "backtest", "pit_backtest",
           "validation_thresholds"):
     ok(f not in sv.METADATA_FIELDS, f"{f} is behavioural")
-b, m = sv._classify({"anything_new"})
+b, m, e = sv._classify({"anything_new"})
 ok(b == ["anything_new"],
    "an unrecognised field defaults to behavioural, which is the safe direction")
+ok(m == [] and e == [], "and is claimed by neither metadata nor environment")
+
+# Environment is its own category: a numpy upgrade is not a model change, and
+# reporting it as one would retire every prior result on a dependency bump.
+b2, m2, e2 = sv._classify({"environment"})
+ok(e2 == ["environment"] and b2 == [],
+   "environment is classified as environment, not as behaviour")
+ok(sv._kind_of("environment") == "environment", "_kind_of agrees")
+ok(sv._kind_of("factor_weights") == "behavioural", "_kind_of on a weight")
+ok(sv._kind_of("factors_not_historically_testable") == "metadata",
+   "_kind_of on metadata")
 
 print("\n" + "=" * 64)
 print(f"passed {len(PASS)}, failed {len(FAIL)}")

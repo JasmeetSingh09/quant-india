@@ -15,10 +15,13 @@ Nifty 50 (^NSEI) is the reference because it is the benchmark Indian investors
 are implicitly choosing against when they pick stocks themselves.
 """
 
+from model_config import (BENCHMARK_INDEX as _BM,
+                          BENCHMARK_NAME as _BMN)
+
 from datetime import datetime, timedelta
 
-BENCHMARK = "^NSEI"
-BENCHMARK_NAME = "Nifty 50"
+BENCHMARK = _BM
+BENCHMARK_NAME = _BMN
 
 # One index, refetched at most every few hours. The comparison appears on
 # several screens, and none of them justify a fresh download each time.

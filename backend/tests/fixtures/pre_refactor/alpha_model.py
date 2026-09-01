@@ -68,70 +68,6 @@ FACTOR_WEIGHTS = {
     "value":     0.15,
 }
 
-# ---------------------------------------------------------------------------
-# Behavioural parameters, named so they can be frozen.
-#
-# These were inline literals inside the functions below. A number with no name
-# cannot be imported, so no specification could capture it and no drift check
-# could see it change — the signal thresholds in particular decide every Strong
-# Buy and Strong Sell this platform shows, and moving 40 to 25 would have
-# produced a different product with an identical spec hash.
-#
-# Every value here is exactly what the literal was. This is a provenance
-# change, not a model change, and tests/behavioural_fixtures.py holds 357
-# recorded outputs proving it.
-# ---------------------------------------------------------------------------
-
-# Momentum: 12-1, volatility-adjusted (Jegadeesh & Titman 1993).
-MOMENTUM_LOOKBACK_DAYS = 252      # ~12 months of trading days
-MOMENTUM_SKIP_DAYS = 21           # skip the most recent ~1 month
-MOMENTUM_HISTORY_BUFFER_DAYS = 430   # calendar days fetched, ~14mo of buffer
-MOMENTUM_MIN_OBSERVATIONS = 60    # below this there is no usable window
-MOMENTUM_MIN_RETURNS = 5          # below this, volatility is not estimable
-MOMENTUM_VOL_EPSILON = 1e-6       # guards the division, not a tuned parameter
-# tanh squashes to [-1, +1]; the divisor keeps typical values off the rails so
-# the score stays continuous rather than pinning at the extremes.
-MOMENTUM_TANH_DIVISOR = 1.5
-MOMENTUM_CONFIDENCE_BASE = 0.4    # confidence with no history at all
-MOMENTUM_CONFIDENCE_SPAN = 0.6    # added in proportion to history available
-# Cut-points for the plain-English label on the momentum score. They change
-# what a user is told, so they are behavioural even though no arithmetic
-# downstream depends on them.
-MOMENTUM_INTERP_STRONG = 0.5
-MOMENTUM_INTERP_MILD = 0.1
-
-# Signal thresholds on the composite alpha score, which runs -100 to +100.
-SIGNAL_STRONG_BUY = 40
-SIGNAL_BUY = 15
-SIGNAL_SELL = -15
-SIGNAL_STRONG_SELL = -40
-
-
-def signal_for_score(alpha_score: float) -> str:
-    """
-    The label for a composite score.
-
-    Extracted from compute_alpha_score so the thresholds are testable on their
-    own, across a grid, at the boundaries — rather than only reachable by
-    computing a whole alpha score and hoping it lands where you need it.
-    Comparisons are strictly greater/less than, exactly as they were inline.
-    """
-    if alpha_score > SIGNAL_STRONG_BUY:
-        return "STRONG BUY"
-    if alpha_score > SIGNAL_BUY:
-        return "BUY"
-    if alpha_score < SIGNAL_STRONG_SELL:
-        return "STRONG SELL"
-    if alpha_score < SIGNAL_SELL:
-        return "SELL"
-    return "NEUTRAL"
-
-
-SIGNAL_COLOURS = {
-    "STRONG BUY": "green", "BUY": "lightgreen", "NEUTRAL": "grey",
-    "SELL": "orange", "STRONG SELL": "red",
-}
-
 
 # yfinance's .info is slow and can HANG for 20-30s on a throttled cloud IP, with
 # no timeout param. The Top Picks scan makes dozens of these calls, so one hung
@@ -332,12 +268,11 @@ def _compute_momentum_factor(ticker: str, peers: list = None) -> dict:
     `peers` is accepted for signature compatibility but intentionally unused.
     """
     try:
-        LOOKBACK = MOMENTUM_LOOKBACK_DAYS   # start of the window
-        SKIP     = MOMENTUM_SKIP_DAYS       # short-term reversal, skipped
+        LOOKBACK = 252    # ~12 months of trading days (start of the window)
+        SKIP     = 21     # skip the most recent ~1 month (short-term reversal)
 
         end   = datetime.now().strftime("%Y-%m-%d")
-        start = (datetime.now()
-                 - timedelta(days=MOMENTUM_HISTORY_BUFFER_DAYS)).strftime("%Y-%m-%d")
+        start = (datetime.now() - timedelta(days=430)).strftime("%Y-%m-%d")  # ~14mo buffer
 
         # Single-ticker, timeout-bounded download — no peer fan-out, so this can't
         # collapse under throttling the way the old peer-percentile version did.
@@ -348,7 +283,7 @@ def _compute_momentum_factor(ticker: str, peers: list = None) -> dict:
         except Exception:
             s = None
 
-        if s is None or len(s) < MOMENTUM_MIN_OBSERVATIONS:
+        if s is None or len(s) < 60:
             return {"score": 0.0, "confidence": 0.0, "reason": "price data unavailable"}
 
         n = len(s)
@@ -362,16 +297,16 @@ def _compute_momentum_factor(ticker: str, peers: list = None) -> dict:
 
         # Annualised volatility of daily returns over the same window
         rets = s.iloc[start_idx:end_idx + 1].pct_change().dropna()
-        ann_vol = (float(rets.std() * np.sqrt(252))
-                   if len(rets) > MOMENTUM_MIN_RETURNS else 0.0)
-        risk_adj = (mom / ann_vol) if ann_vol > MOMENTUM_VOL_EPSILON else 0.0
+        ann_vol = float(rets.std() * np.sqrt(252)) if len(rets) > 5 else 0.0
+        risk_adj = (mom / ann_vol) if ann_vol > 1e-6 else 0.0
 
-        score = float(np.tanh(risk_adj / MOMENTUM_TANH_DIVISOR))
+        # tanh squashes to [-1, +1]; /1.5 keeps typical values off the rails so
+        # the score stays continuous rather than pinning at ±1.
+        score = float(np.tanh(risk_adj / 1.5))
 
         # Confidence reflects how much of the intended 12-month window we had.
         history_frac = min(1.0, (end_idx - start_idx) / LOOKBACK)
-        confidence = round(MOMENTUM_CONFIDENCE_BASE
-                           + MOMENTUM_CONFIDENCE_SPAN * history_frac, 3)
+        confidence = round(0.4 + 0.6 * history_frac, 3)
 
         return {
             "score":        round(score, 4),
@@ -381,10 +316,10 @@ def _compute_momentum_factor(ticker: str, peers: list = None) -> dict:
             "risk_adj":     round(risk_adj, 3),
             "window":       f"{n - 1 - start_idx}→{SKIP} trading days ago",
             "interpretation": (
-                "Strong upward momentum"     if score > MOMENTUM_INTERP_STRONG else
-                "Positive momentum"          if score > MOMENTUM_INTERP_MILD else
-                "Strong downward momentum"   if score < -MOMENTUM_INTERP_STRONG else
-                "Negative momentum"          if score < -MOMENTUM_INTERP_MILD else
+                "Strong upward momentum"     if score > 0.5 else
+                "Positive momentum"          if score > 0.1 else
+                "Strong downward momentum"   if score < -0.5 else
+                "Negative momentum"          if score < -0.1 else
                 "Flat — no clear momentum"
             ),
         }
@@ -783,11 +718,22 @@ def compute_alpha_score(
         3
     )
 
-    # Signal strength. The thresholds live in named constants so a change to
-    # them shows up as specification drift instead of silently redefining what
-    # a Strong Buy means.
-    signal = signal_for_score(alpha_score)
-    colour = SIGNAL_COLOURS[signal]
+    # Signal strength
+    if alpha_score > 40:
+        signal = "STRONG BUY"
+        colour = "green"
+    elif alpha_score > 15:
+        signal = "BUY"
+        colour = "lightgreen"
+    elif alpha_score < -40:
+        signal = "STRONG SELL"
+        colour = "red"
+    elif alpha_score < -15:
+        signal = "SELL"
+        colour = "orange"
+    else:
+        signal = "NEUTRAL"
+        colour = "grey"
 
     # Factor contribution breakdown
     contributions = {

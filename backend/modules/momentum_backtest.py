@@ -18,6 +18,8 @@ Why this is defensible (the point of the whole exercise):
     edge is zero or negative.
 """
 
+from model_config import RISK_FREE_RATE as _RF
+
 import numpy as np
 import pandas as pd
 from datetime import datetime
@@ -70,7 +72,7 @@ def _annualised(monthly: pd.Series) -> dict:
     std_m  = float(monthly.std(ddof=1))
     ann_ret = (1 + mean_m) ** 12 - 1
     ann_vol = std_m * np.sqrt(12)
-    rf_m = 0.065 / 12
+    rf_m = _RF / 12
     sharpe = ((mean_m - rf_m) / std_m * np.sqrt(12)) if std_m > 0 else 0.0
     downside = monthly[monthly < 0]
     dstd = float(downside.std(ddof=1)) if len(downside) > 1 else 0.0

@@ -12,7 +12,9 @@ for survival. Bet too big and one bad streak ruins you even with a real edge.
 All inputs are annualised (return %, vol %). Risk-free defaults to RBI repo.
 """
 
-RISK_FREE = 0.065   # RBI repo rate proxy
+from model_config import RISK_FREE_RATE as _RF
+
+RISK_FREE = _RF   # RBI repo rate proxy
 
 
 def kelly_fraction(annual_return_pct: float, annual_vol_pct: float,

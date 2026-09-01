@@ -20,6 +20,7 @@ Nothing here evaluates a strategy. It only records what one was.
 
 import hashlib
 import json
+import os
 from datetime import datetime
 
 try:
@@ -49,12 +50,29 @@ METADATA_FIELDS = {
     "captured_at",
 }
 
+# The stack and the data a run happened on. It affects whether a number can be
+# REPRODUCED, but it is not the strategy: upgrading numpy is not a model
+# change, and reporting it as one would retire every prior result on a routine
+# dependency bump. Kept separate so both facts stay sayable.
+ENVIRONMENT_FIELDS = {"environment"}
+
 
 def _classify(fields):
-    """Split a set of changed field names into behavioural and metadata."""
-    behavioural = sorted(f for f in fields if f not in METADATA_FIELDS)
+    """Split changed field names into behavioural, metadata and environment."""
+    behavioural = sorted(f for f in fields
+                         if f not in METADATA_FIELDS
+                         and f not in ENVIRONMENT_FIELDS)
     metadata = sorted(f for f in fields if f in METADATA_FIELDS)
-    return behavioural, metadata
+    environment = sorted(f for f in fields if f in ENVIRONMENT_FIELDS)
+    return behavioural, metadata, environment
+
+
+def _kind_of(field):
+    if field in METADATA_FIELDS:
+        return "metadata"
+    if field in ENVIRONMENT_FIELDS:
+        return "environment"
+    return "behavioural"
 
 
 def _init():
@@ -175,6 +193,100 @@ def current_spec() -> dict:
          lambda: __import__("pit_backtest").MIN_MONTHLY_TURNOVER)
     spec["pit_backtest"] = pit
 
+    # Factor internals. These were inline literals until the provenance audit
+    # found them: a number with no name cannot be imported, so no specification
+    # could capture it and no drift check could see it move. The signal
+    # thresholds are the sharpest case — they decide every Strong Buy and
+    # Strong Sell the platform displays, and 40 could have become 25 without
+    # changing a single hash.
+    def _block(target, mod, names):
+        for n in names:
+            _cap(target, n.lower(), lambda m=mod, k=n: getattr(__import__(m), k))
+
+    sig = {}
+    _block(sig, "alpha_model", ["SIGNAL_STRONG_BUY", "SIGNAL_BUY",
+                                "SIGNAL_SELL", "SIGNAL_STRONG_SELL"])
+    spec["signal_thresholds"] = sig
+
+    mom = {}
+    _block(mom, "alpha_model",
+           ["MOMENTUM_LOOKBACK_DAYS", "MOMENTUM_SKIP_DAYS",
+            "MOMENTUM_TANH_DIVISOR", "MOMENTUM_HISTORY_BUFFER_DAYS",
+            "MOMENTUM_MIN_OBSERVATIONS", "MOMENTUM_MIN_RETURNS",
+            "MOMENTUM_VOL_EPSILON", "MOMENTUM_CONFIDENCE_BASE",
+            "MOMENTUM_CONFIDENCE_SPAN", "SENTIMENT_HALF_LIFE_DAYS",
+            "MOMENTUM_INTERP_STRONG", "MOMENTUM_INTERP_MILD"])
+    _cap(mom, "top_picks_universe_size",
+         lambda: len(__import__("alpha_model").TOP_PICKS_UNIVERSE))
+    spec["momentum_factor"] = mom
+
+    v2f = {}
+    _block(v2f, "alpha_v2",
+           ["GROWTH_REVENUE_DIVISOR", "GROWTH_EARNINGS_DIVISOR",
+            "GROWTH_PART_WEIGHT", "GROWTH_CONFIDENCE_SCALE",
+            "LOW_RISK_WINDOW_DAYS", "LOW_RISK_MIN_RETURNS",
+            "LOW_RISK_VOL_REF", "LOW_RISK_DD_REF", "LOW_RISK_VOL_WEIGHT",
+            "LOW_RISK_DD_WEIGHT", "LOW_RISK_CONFIDENCE_BASE",
+            "LOW_RISK_CONFIDENCE_DIVISOR"])
+    spec["v2_factors"] = v2f
+
+    shared = {}
+    _block(shared, "model_config",
+           ["RISK_FREE_RATE", "TRADING_DAYS_PER_YEAR", "MONTHS_PER_YEAR",
+            "COST_BROKERAGE_PCT", "COST_STT_PCT", "COST_STAMP_DUTY_PCT",
+            "COST_EXCHANGE_PCT", "COST_GST_PCT", "BENCHMARK_INDEX"])
+    spec["shared_config"] = shared
+
+    # Research tooling. Its parameters change reported research numbers, so
+    # they are frozen alongside the model's own.
+    res = {}
+    _cap(res, "stability_trials",
+         lambda: __import__("optimizer_stability").DEFAULT_TRIALS)
+    _cap(res, "euler_gamma", lambda: __import__("overfitting").EULER_GAMMA)
+    _cap(res, "fama_french_universe_size",
+         lambda: len(__import__("fama_french").DEFAULT_UNIVERSE))
+    spec["research_tools"] = res
+
+    val = {}
+    _block(val, "pit_validation",
+           ["MOM_LOOKBACK", "MOM_SKIP", "MOM_TANH_DIV", "LR_WINDOW",
+            "LR_VOL_REF", "LR_DD_REF", "LR_VOL_W", "LR_DD_W",
+            "MIN_MONTHLY_TURNOVER", "COST_ROUNDTRIP_PCT", "RISK_FREE",
+            "N_BUCKETS", "MIN_NONOVERLAPPING", "REGIME_TREND_PCT",
+            "REGIME_VOL_ANN"])
+    _cap(val, "horizons", lambda: list(__import__("pit_validation").HORIZONS))
+    _cap(val, "factors", lambda: list(__import__("pit_validation").FACTORS))
+    _cap(val, "bucket_order",
+         lambda: list(__import__("market_validation").BUCKET_ORDER))
+    spec["pit_validation"] = val
+
+    ident = {}
+    _block(ident, "security_identity",
+           ["LINK_MAX_GAP_DAYS", "LINK_MAX_OVERLAP_DAYS"])
+    spec["identity_resolution"] = ident
+
+    port = {}
+    _block(port, "portfolio_fix", ["MAX_SINGLE", "MAX_SECTOR", "MIN_HOLDINGS"])
+    _cap(port, "risk_free_rate",
+         lambda: __import__("portfolio_optimizer").RISK_FREE_RATE)
+    spec["portfolio_construction"] = port
+
+    uni = {}
+    _block(uni, "universe_scan",
+           ["LARGE_CAP_RANK_MAX", "MID_CAP_RANK_MAX", "LARGE_CAP_MIN",
+            "MID_CAP_MIN"])
+    spec["universe_rules"] = uni
+
+    bm = {}
+    _cap(bm, "index", lambda: __import__("benchmark").BENCHMARK)
+    _cap(bm, "tracker_index",
+         lambda: __import__("prediction_tracker").BENCHMARK)
+    _cap(bm, "max_cycle_age_days",
+         lambda: __import__("prediction_tracker").MAX_CYCLE_AGE_DAYS)
+    _cap(bm, "min_effective_n",
+         lambda: __import__("prediction_tracker").MIN_EFFECTIVE_N)
+    spec["benchmark_and_tracking"] = bm
+
     try:
         from strategy_compare import COST_PER_UNIT_TURNOVER
         spec["costs"] = {
@@ -215,7 +327,79 @@ def current_spec() -> dict:
     except Exception:
         pass
 
+    # Environment. A version-controlled model is not a reproducible one: the
+    # same code on a different numpy can return a different last decimal, and a
+    # result attributed to a strategy is really attributed to a strategy AND
+    # the stack that ran it. Recorded under its own key so a library upgrade
+    # shows as environment drift rather than as the model changing.
+    spec["environment"] = _environment()
+
     return spec
+
+
+def _environment() -> dict:
+    """What ran this, and on what data."""
+    import platform
+    import subprocess
+
+    env = {
+        "python_version": platform.python_version(),
+        "platform": platform.system(),
+    }
+    for lib in ("numpy", "pandas", "scipy", "statsmodels", "yfinance"):
+        try:
+            env[f"{lib}_version"] = __import__(lib).__version__
+        except Exception:
+            env[f"{lib}_version"] = None
+
+    try:
+        env["code_commit"] = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            stderr=subprocess.DEVNULL, timeout=5).decode().strip()
+    except Exception:
+        env["code_commit"] = None
+
+    # The archive is data, and a result depends on which rows existed when it
+    # ran. Recorded as a boundary and a row count rather than a hash of 1.5
+    # million rows, which would change on every daily append.
+    try:
+        from db import get_conn
+        c = get_conn()
+        try:
+            row = c.execute("SELECT MIN(day), MAX(day), COUNT(*) "
+                            "FROM bhavcopy_eod").fetchone()
+            env["archive"] = {"first_day": str(row[0])[:10],
+                              "last_day": str(row[1])[:10],
+                              "rows": int(row[2] or 0)}
+        finally:
+            c.close()
+    except Exception:
+        env["archive"] = None
+
+    env["random_seeds"] = _random_seeds()
+    return env
+
+
+def _random_seeds() -> dict:
+    """
+    Seeds for every module whose randomness reaches a reported number.
+
+    Recorded rather than removed. Monte Carlo, the optimiser stability check and
+    the overfitting test are sampling methods — randomness is the method, not an
+    accident — so the reproducible version of them is a fixed seed that travels
+    with the result, not a deterministic rewrite that would change what they
+    measure.
+    """
+    out = {}
+    for mod, attr in (("monte_carlo", "RANDOM_SEED"),
+                      ("optimizer_stability", "RANDOM_SEED"),
+                      ("overfitting", "RANDOM_SEED")):
+        try:
+            out[mod] = getattr(__import__(mod), attr)
+        except Exception:
+            out[mod] = None
+    return out
 
 
 def freeze(version: str, notes: str = None, spec: dict = None,
@@ -414,12 +598,13 @@ def drift(version: str) -> dict:
             changed.append(k)
         entries.append({
             "field": k,
-            "kind": "metadata" if k in METADATA_FIELDS else "behavioural",
+            "kind": _kind_of(k),
             "difference": why,
             "frozen": a.get(k), "live": b.get(k)})
 
-    behavioural, metadata = _classify(set(changed))
-    unc_behavioural = [k for k in uncovered if k not in METADATA_FIELDS]
+    behavioural, metadata, environment = _classify(set(changed))
+    unc_behavioural = [k for k in uncovered
+                       if k not in METADATA_FIELDS and k not in ENVIRONMENT_FIELDS]
 
     if not entries:
         verdict = "The live configuration still matches this version."
@@ -439,6 +624,12 @@ def drift(version: str) -> dict:
                    f"was frozen."
                    + (f" Metadata also differs: {', '.join(metadata)}."
                       if metadata else ""))
+    elif environment and not metadata:
+        verdict = (f"Environment only: the stack or the archive this ran on "
+                   f"differs from when {version} was frozen. No strategy "
+                   f"parameter moved, so the model behaves identically — but a "
+                   f"number reproduced now may differ in its last decimal, and "
+                   f"that is a reproducibility fact rather than a model one.")
     else:
         verdict = (f"Metadata only: {', '.join(metadata)}. No factor weight, "
                    f"threshold, cost or rule differs, so the strategy behaves "
@@ -452,6 +643,7 @@ def drift(version: str) -> dict:
         "drifted": bool(entries),
         "behavioural_drift": bool(behavioural),
         "metadata_drift": bool(metadata),
+        "environment_drift": bool(environment),
         "coverage_gap": sorted(uncovered),
         "changes": entries,
         "verdict": verdict,
@@ -492,11 +684,11 @@ def compare_versions(a: str, b: str) -> dict:
             changed.append(k)
         entries.append({
             "field": k,
-            "kind": "metadata" if k in METADATA_FIELDS else "behavioural",
+            "kind": _kind_of(k),
             "difference": why,
             a: sa.get(k), b: sb.get(k)})
 
-    behavioural, metadata = _classify(set(changed))
+    behavioural, metadata, environment = _classify(set(changed))
 
     if behavioural:
         verdict = (f"{len(behavioural)} behavioural field(s) hold DIFFERENT "
@@ -526,6 +718,7 @@ def compare_versions(a: str, b: str) -> dict:
         "behaviourally_identical": not behavioural,
         "behavioural_changes": behavioural,
         "metadata_changes": metadata,
+        "environment_changes": environment,
         "coverage_differences": coverage,
         "changes": entries,
         "verdict": verdict,

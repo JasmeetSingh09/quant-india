@@ -58,6 +58,11 @@ _STOP    = threading.Event()
 # Schema
 # ---------------------------------------------------------------------------
 
+# Scan order is shuffled so a throttled run does not always starve the same
+# tail of the universe. Fixed seed: the order must be identical across
+# restarts or a partial scan is not reproducible.
+SHUFFLE_SEED = 20260813
+
 def _init_db():
     conn = get_conn()
     # Keyed on (ticker, cycle), not ticker alone. With ticker as the sole key a
@@ -333,7 +338,7 @@ def _universe() -> list:
     head = [t for t in priority if t in set(out)]
     tail = [t for t in out if t not in pri_set]
     import random as _r
-    _r.Random(20260813).shuffle(tail)     # fixed seed: same order across restarts
+    _r.Random(SHUFFLE_SEED).shuffle(tail)     # fixed seed: same order across restarts
     return head + tail
 
 

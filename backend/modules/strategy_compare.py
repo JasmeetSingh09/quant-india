@@ -16,6 +16,8 @@ Every method is measured over the SAME window with the SAME cost model, because
 a comparison where the methods differ in more than one respect measures nothing.
 """
 
+from model_config import RISK_FREE_RATE as _RF
+
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -47,7 +49,7 @@ def _metrics(daily, initial_value: float, turnover: float, periods_per_year: int
     max_dd = float((curve / np.maximum.accumulate(curve) - 1).min())
 
     # 6.5% is the RBI repo proxy used elsewhere in the app.
-    rf = 0.065
+    rf = _RF
     sharpe = round((cagr - rf) / vol, 3) if (cagr is not None and vol > 0) else None
     sortino = round((cagr - rf) / dvol, 3) if (cagr is not None and dvol) else None
     calmar = round(cagr / abs(max_dd), 3) if (cagr is not None and max_dd < 0) else None

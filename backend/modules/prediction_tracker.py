@@ -1,3 +1,5 @@
+
+from model_config import BENCHMARK_INDEX as _BM
 import os
 """
 prediction_tracker.py — HONEST track record of the alpha model's picks.
@@ -25,7 +27,7 @@ import pandas as pd
 import yfinance as yf
 
 _DB_PATH = Path(os.environ.get("QUANT_DATA_DIR", str(Path(__file__).parent.parent))) / "quant_platform.db"
-BENCHMARK = "^NSEI"
+BENCHMARK = _BM
 
 
 def _conn():

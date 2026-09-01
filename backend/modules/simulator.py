@@ -1,3 +1,5 @@
+
+from model_config import RISK_FREE_RATE as _RF
 import os
 """
 simulator.py — Real-time paper trading + historic backtesting for NSE stocks.
@@ -1179,14 +1181,14 @@ def delete_simulation(name: str, user_id: str = "public") -> dict:
 # ── MODE 2: HISTORIC SIMULATION (BACKTEST) ────────────────────────────────
 # ---------------------------------------------------------------------------
 
-def _compute_sharpe(returns: pd.Series, risk_free: float = 0.065) -> float:
+def _compute_sharpe(returns: pd.Series, risk_free: float = _RF) -> float:
     if len(returns) < 2 or returns.std() == 0:
         return 0.0
     daily_rf = risk_free / 252
     return round(float((returns - daily_rf).mean() / returns.std() * (252 ** 0.5)), 4)
 
 
-def _compute_sortino(returns: pd.Series, risk_free: float = 0.065) -> float:
+def _compute_sortino(returns: pd.Series, risk_free: float = _RF) -> float:
     """Sortino ratio — penalises only downside volatility, not upside."""
     if len(returns) < 2:
         return 0.0

@@ -27,6 +27,10 @@ import numpy as np
 DEFAULT_TRIALS = 60
 
 
+# Fixed so a stability report is itself stable. The seed is part of the
+# method, not an accident, and is recorded in the frozen specification.
+RANDOM_SEED = 7
+
 def _weights_vector(res: dict, tickers: list):
     """Pull weights out of an optimiser result in whatever shape it used."""
     for key in ("optimal_pct", "weights_pct", "weights", "optimal_weights"):
@@ -42,7 +46,7 @@ def _weights_vector(res: dict, tickers: list):
 def stability(tickers: list, target: str = "max_sharpe",
               max_weight: float = 1.0, period_months: int = 24,
               trials: int = DEFAULT_TRIALS, noise_scale: float = 1.0,
-              seed: int = 7) -> dict:
+              seed: int = RANDOM_SEED) -> dict:
     """
     Re-optimise with jittered expected returns and measure how far weights move.
 

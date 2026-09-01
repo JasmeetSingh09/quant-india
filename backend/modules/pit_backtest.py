@@ -29,6 +29,8 @@ eighteen monthly observations cannot establish a durable edge, and this module
 says so in its own output rather than leaving it to a footnote.
 """
 
+from model_config import RISK_FREE_RATE as _RF
+
 from datetime import datetime
 
 # Same cost assumption as the rest of the project: Indian delivery rates for a
@@ -574,7 +576,7 @@ def _stats(monthly: list) -> dict:
         peak = max(peak, curve)
         max_dd = min(max_dd, curve / peak - 1)
 
-    rf = 0.065
+    rf = _RF
     return {
         "cagr_pct": round(cagr * 100, 2),
         "total_return_pct": round((total - 1) * 100, 2),

@@ -37,6 +37,9 @@ All studies return:
   - plain-English conclusion
 """
 
+from model_config import (RISK_FREE_RATE as _RF,
+                          BENCHMARK_INDEX as _BM)
+
 import numpy as np
 import pandas as pd
 import yfinance as yf
@@ -46,8 +49,8 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-NIFTY_TICKER  = "^NSEI"
-RISK_FREE_RATE = 0.065   # RBI repo rate as proxy
+NIFTY_TICKER  = _BM
+RISK_FREE_RATE = _RF   # RBI repo rate as proxy
 
 
 # ---------------------------------------------------------------------------

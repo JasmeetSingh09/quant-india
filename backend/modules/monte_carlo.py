@@ -57,6 +57,11 @@ _HIST_TTL = 30 * 60             # 30 min — intraday drift is irrelevant to a 1
 _HIST_LOCK = threading.Lock()
 
 
+# Seeded by default so a projection is reproducible: a Monte Carlo that
+# returns a different answer on every refresh cannot be checked, cited, or
+# compared against itself a month later. Callers may still pass their own.
+RANDOM_SEED = 42
+
 def _portfolio_daily_returns(holdings: dict, lookback_days: int = 504) -> pd.Series:
     """
     Build the historical daily return series for a weighted portfolio.
@@ -297,7 +302,7 @@ def simulate(
     n_simulations: int = 10_000,
     method: str = "bootstrap",
     t_dof: int = 5,
-    seed: int = None,
+    seed: int = RANDOM_SEED,
     with_charts: bool = True,
     # A value the user is aiming at. Reported as a SHARE of simulations, never
     # as a chance of reaching it — the simulation knows only the past it

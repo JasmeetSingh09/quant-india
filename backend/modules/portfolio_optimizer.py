@@ -52,6 +52,8 @@ solving the MVO at 50 target return levels. Useful for
 showing where your current portfolio sits vs the optimal.
 """
 
+from model_config import RISK_FREE_RATE as _RF
+
 import numpy as np
 import pandas as pd
 import yfinance as yf
@@ -64,7 +66,7 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-RISK_FREE_RATE = 0.065   # default: RBI repo rate proxy
+RISK_FREE_RATE = _RF   # default: RBI repo rate proxy
 
 
 def _rf(risk_free_pct: float = None) -> float:

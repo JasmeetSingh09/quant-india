@@ -18,6 +18,10 @@ from scipy.stats import norm, skew as _skew, kurtosis as _kurtosis
 EULER_GAMMA = 0.5772156649
 
 
+# The permutation draw. Named so it can be frozen and reproduced rather
+# than sitting as a bare 42 inside a function.
+RANDOM_SEED = 42
+
 def _sharpe_per_period(returns: np.ndarray) -> float:
     """Non-annualised Sharpe (per observation) — what the PSR/DSR formula needs."""
     sd = returns.std(ddof=1)
@@ -129,7 +133,7 @@ if __name__ == "__main__":
     print("=" * 60)
     print("Testing overfitting.py (Deflated Sharpe Ratio)")
     print("=" * 60)
-    rng = np.random.default_rng(42)
+    rng = np.random.default_rng(RANDOM_SEED)
 
     # A genuinely good strategy (positive drift), long sample
     good = rng.normal(0.0008, 0.01, 2000)
