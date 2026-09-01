@@ -501,7 +501,13 @@ def _scan_loop_inner():
     # Never allowed to break the scan: a failed snapshot loses one day of
     # record, a raised exception would lose the whole pass.
     try:
-        import threading
+        # No `import threading` here. The module already imports it at the top,
+        # and re-importing it inside this function made `threading` a LOCAL
+        # name for the whole function — so `clock = threading.Lock()`, nearly
+        # two hundred lines earlier, raised UnboundLocalError before a single
+        # stock was scored. Every scan died on its first statement, the state
+        # sat at "running" with done=0, and the last completed cycle receded
+        # further into the past for nine days.
         from prediction_tracker import snapshot as _snap
 
         def _log_snapshot():
