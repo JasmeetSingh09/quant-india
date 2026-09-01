@@ -519,9 +519,40 @@ def _side_stats(rows, wants_down):
     r = [x["forward_return_pct"] for x in rows]
     ex = [x["excess_pct"] for x in rows if x.get("excess_pct") is not None]
     hits = sum(1 for v in r if (v < 0 if wants_down else v > 0))
+
+    # Signals issued on the same day share that day's market move, so counting
+    # them as independent draws overstates the evidence — the whole reason
+    # market_validation exists. The scorecard used to apply the binomial test to
+    # the raw count, which meant this page and the validation page could report
+    # different p-values for the same underlying question, and this one was
+    # always the more flattering. The design effect is estimated from these
+    # observations rather than assumed.
+    n_eff, deff = len(r), None
+    try:
+        from market_validation import _design_effect
+        deff = _design_effect([{"date": x["date"],
+                                "_hit": (x["forward_return_pct"] < 0 if wants_down
+                                         else x["forward_return_pct"] > 0)}
+                               for x in rows if x.get("date") is not None])
+        if deff and deff.get("deff"):
+            n_eff = max(2, int(round(len(r) / deff["deff"])))
+    except Exception:
+        pass
+    eff_hits = int(round(hits / len(r) * n_eff)) if len(r) else 0
+
     return {
         "signals": len(r),
-        "significance": _significance(hits, len(r)),
+        "significance": _significance(eff_hits, n_eff),
+        "effective_sample_size": n_eff,
+        "clustering": deff,
+        "significance_note": (
+            f"Tested on {n_eff} effective observations, not {len(r)} raw "
+            f"signals. Signals issued the same day are not independent draws; "
+            f"the design effect is estimated from the data by ANOVA."
+            if n_eff != len(r) else
+            "Clustering could not be estimated, so no correction was applied "
+            "and this test still assumes independent signals."),
+        "significance_unadjusted": _significance(hits, len(r)),
         "avg_return_pct": round(float(np.mean(r)), 2),
         "median_return_pct": round(float(np.median(r)), 2),
         # "Right" means the direction the signal called, not "went up".
