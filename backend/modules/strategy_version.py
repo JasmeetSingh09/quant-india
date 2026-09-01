@@ -253,7 +253,8 @@ def current_spec() -> dict:
     _block(shared, "model_config",
            ["RISK_FREE_RATE", "TRADING_DAYS_PER_YEAR", "MONTHS_PER_YEAR",
             "COST_BROKERAGE_PCT", "COST_STT_PCT", "COST_STAMP_DUTY_PCT",
-            "COST_EXCHANGE_PCT", "COST_GST_PCT", "BENCHMARK_INDEX"])
+            "COST_EXCHANGE_PCT", "COST_GST_PCT", "BENCHMARK_INDEX",
+            "SCAN_COMPLETE_FRACTION"])
     spec["shared_config"] = shared
 
     # Research tooling. Its parameters change reported research numbers, so

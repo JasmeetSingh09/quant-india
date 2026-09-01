@@ -191,6 +191,27 @@ def _start_picks_scheduler():
             except Exception:
                 pass
 
+        # The universe scan had no recurring guard — start_scan ran once at
+        # startup and that was the entire cadence. Production went nine days
+        # without a completed cycle because a pass takes hours and the instance
+        # does not stay up that long. Factor history cannot be backfilled, so
+        # every one of those days is gone. Same guard as the two below it,
+        # added after the same failure.
+        from universe_scan import resume_if_incomplete as _resume_scan
+
+        def _ensure_scan():
+            try:
+                r = _resume_scan()
+                if r.get("action") == "started":
+                    print(f"[scan] resumed cycle {r.get('cycle')} "
+                          f"({r.get('already_scored')} already scored)")
+            except Exception as _e:
+                print(f"[scan] resume guard failed: {type(_e).__name__}")
+
+        sched.add_job(_ensure_scan, "interval", minutes=10,
+                      id="scan_resume", replace_existing=True,
+                      next_run_time=_dt.now() + _td(seconds=120))
+
         sched.add_job(_ensure_screener, "interval", minutes=20,
                       id="screener_guard", replace_existing=True,
                       next_run_time=_dt.now() + _td(seconds=90))

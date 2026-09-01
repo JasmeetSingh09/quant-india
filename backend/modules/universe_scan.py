@@ -260,6 +260,30 @@ def _save_result(ticker: str, cycle: str, r: dict):
         pass
 
 
+# A pass has to cover this much of the universe to count as an observation of
+# the market. Below it, the sample is "whichever stocks answered today", which
+# is not the same thing and cannot be told apart from the real thing once it is
+# in the record.
+from model_config import SCAN_COMPLETE_FRACTION as MIN_COMPLETE_FRACTION
+
+
+def _scored_count(cycle: str) -> int:
+    """Stocks that actually produced a score this cycle. Errors do not count —
+    they are rows, and rows were what completion used to be measured by."""
+    try:
+        conn = get_conn()
+        try:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM alpha_scan2 WHERE cycle = ? "
+                "AND model_version = ? AND alpha_score IS NOT NULL",
+                (cycle, MODEL_VERSION)).fetchone()
+            return int(row[0] or 0)
+        finally:
+            conn.close()
+    except Exception:
+        return 0
+
+
 def _already_done(cycle: str) -> set:
     """Tickers finished in THIS cycle — the basis for resuming after a restart."""
     conn = get_conn()
@@ -395,10 +419,34 @@ def _scan_loop():
     if _STOP.is_set():
         _set_state(done=counter["n"], status="stopped")
         return
-    # Publishing happens HERE and only here: the display swaps to this pass
-    # atomically once it is finished, never partway through.
-    _set_state(done=counter["n"], finished_at=datetime.now().isoformat(),
-               status="complete", last_complete_cycle=cycle)
+
+    # Completion is now a measurement, not the fact that the loop ended.
+    #
+    # This used to mark the cycle complete the moment the pool drained, whether
+    # the stocks had scored or errored, and publish it as the serving cycle. A
+    # pass where most of the universe failed was recorded exactly like a clean
+    # one, and — because factor history cannot be backfilled — an incomplete
+    # pass logged as a research observation is a permanently wrong row.
+    #
+    # So a pass has to have actually covered the market to count. If it did
+    # not, the cycle stays incomplete, the display keeps serving the last good
+    # pass, and the next run resumes this one instead of starting over.
+    scored = _scored_count(cycle)
+    universe_n = len(universe)
+    frac = (scored / universe_n) if universe_n else 0.0
+    if frac >= MIN_COMPLETE_FRACTION:
+        # Publishing happens HERE and only here: the display swaps to this pass
+        # atomically once it is finished, never partway through.
+        _set_state(done=counter["n"], finished_at=datetime.now().isoformat(),
+                   status="complete", last_complete_cycle=cycle)
+    else:
+        _set_state(done=counter["n"], finished_at=datetime.now().isoformat(),
+                   status="incomplete")
+        print(f"[scan] cycle {cycle} INCOMPLETE: {scored} of {universe_n} "
+              f"scored ({frac:.1%}, need {MIN_COMPLETE_FRACTION:.0%}). Not "
+              f"published, no snapshot logged. A partial pass is not an "
+              f"observation of the market.")
+        return
 
     # Log the track-record snapshot the moment fresh scores exist, rather than
     # hoping a 16:30 cron lands after the scan. It used to be timed, and the
@@ -442,6 +490,42 @@ def start_scan(force: bool = False) -> dict:
         _THREAD = threading.Thread(target=_scan_loop, name="alpha-universe-scan", daemon=True)
         _THREAD.start()
     return {"status": "started", **get_state()}
+
+
+def resume_if_incomplete() -> dict:
+    """
+    Restart the scan whenever today's pass is not finished.
+
+    start_scan runs once, at application startup. That was the whole cadence,
+    and it is why production went nine days without a completed cycle: the
+    instance sleeps or redeploys, the daemon thread dies mid-pass, and nothing
+    starts another one until something happens to restart the process. A pass
+    takes two to five hours of wall clock, so it rarely survives to the end.
+
+    This is the same recurring guard the archive fetch and the screener cache
+    already have, for the same reason and after the same failure. Progress is
+    written per stock, so a resumed pass continues from where it stopped rather
+    than starting over.
+
+    Cheap to call: it does nothing when a scan is alive or today's pass is
+    already complete.
+    """
+    try:
+        if _THREAD is not None and _THREAD.is_alive():
+            return {"action": "none", "reason": "a scan is already running"}
+        st = get_state()
+        today = _current_cycle()
+        if st.get("status") == "complete" and st.get("cycle") == today:
+            return {"action": "none", "reason": "today's pass is complete"}
+        scored = _scored_count(today)
+        r = start_scan()
+        return {"action": "started", "cycle": today,
+                "already_scored": scored, "result": r.get("status"),
+                "note": ("Resuming an unfinished pass. Factor history cannot be "
+                         "backfilled, so a day without a completed scan is "
+                         "research data that no later run recovers.")}
+    except Exception as e:
+        return {"action": "failed", "error": f"{type(e).__name__}: {e}"}
 
 
 def stop_scan() -> dict:

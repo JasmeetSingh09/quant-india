@@ -34,7 +34,7 @@ from datetime import datetime, timedelta
 # is a partial observation, whatever the status column says. Not a tuning
 # parameter — it is the line between "the market that day" and "whichever
 # stocks happened to answer".
-COMPLETE_FRACTION = 0.90
+from model_config import SCAN_COMPLETE_FRACTION as COMPLETE_FRACTION
 # Consecutive writes further apart than this mean the process was not running.
 STALL_MINUTES = 20
 
@@ -64,6 +64,26 @@ def cycles(limit: int = 30) -> dict:
                 "FROM alpha_scan_state WHERE id = 1").fetchone()
         except Exception:
             state = None
+
+        # The denominator is the universe as it stood THAT DAY, from the
+        # exchange's own file. The first version measured every cycle against
+        # the largest universe any cycle ever attempted, scoring August passes
+        # at 83% when they had covered 2,389 of the 2,401 names that existed —
+        # penalising them for a market that had not grown yet. Comparing a day
+        # to a universe from a later date is the same error this project spent
+        # a week removing from the backtest.
+        #
+        # Read here, inside the connection's life. Written after the finally
+        # block first time round, where it silently failed and fell back to the
+        # denominator it was meant to replace.
+        pit = {}
+        try:
+            for day, n in conn.execute(
+                    "SELECT day, COUNT(DISTINCT symbol) FROM bhavcopy_eod "
+                    "GROUP BY day").fetchall():
+                pit[str(day)[:10]] = int(n)
+        except Exception:
+            pit = {}
     except Exception as e:
         conn.close()
         return {"available": False, "reason": f"{type(e).__name__}: {e}"}
@@ -73,14 +93,17 @@ def cycles(limit: int = 30) -> dict:
         except Exception:
             pass
 
-    # The universe size to measure against: the largest any cycle attempted.
-    # Using today's universe would flatter older cycles, which faced a smaller
-    # market, and using each cycle's own count would make every cycle complete
-    # by definition.
     peak = max((r[1] for r in rows), default=0)
 
     out = []
     for cyc, total, scored, errored, first, last in rows[:limit]:
+        # Nearest stored trading day at or before the cycle, so a Sunday cycle
+        # is measured against Friday's universe rather than against nothing.
+        denom = pit.get(cyc)
+        if denom is None and pit:
+            earlier = [d for d in pit if d <= str(cyc)]
+            denom = pit[max(earlier)] if earlier else None
+        denom = denom or peak
         span = None
         if first and last:
             try:
@@ -89,12 +112,13 @@ def cycles(limit: int = 30) -> dict:
                               ).total_seconds() / 60.0, 1)
             except Exception:
                 span = None
-        frac = (scored or 0) / peak if peak else 0.0
+        frac = (scored or 0) / denom if denom else 0.0
         out.append({
             "cycle": cyc,
             "attempted": total,
             "scored": scored or 0,
             "errored": errored or 0,
+            "universe_that_day": denom,
             "coverage_pct": round(frac * 100, 1),
             "complete_by_coverage": frac >= COMPLETE_FRACTION,
             "first_write": str(first)[:19] if first else None,
@@ -108,6 +132,11 @@ def cycles(limit: int = 30) -> dict:
     return {
         "available": True,
         "peak_universe": peak,
+        "denominator": ("the exchange universe on each cycle's own day, "
+                        "from bhavcopy" if pit else
+                        "the largest universe any cycle attempted "
+                        "(bhavcopy unavailable, so older cycles are "
+                        "understated)"),
         "cycles_recorded": len(rows),
         "cycles_shown": len(out),
         "cycles_complete": len(good),
@@ -118,11 +147,11 @@ def cycles(limit: int = 30) -> dict:
         "days_since_last_complete": days["since_last_complete"],
         "missing_days": days["missing"],
         "cycles": out,
-        "threshold": (f"A cycle counts as complete here when it scored at least "
-                      f"{COMPLETE_FRACTION:.0%} of the largest universe any "
-                      f"cycle attempted ({peak}). The status column is not used "
-                      f"for this: it is set when the worker pool drains, which "
-                      f"happens whether the stocks scored or errored."),
+        "threshold": (f"A cycle counts as complete when it scored at least "
+                      f"{COMPLETE_FRACTION:.0%} of the securities the exchange "
+                      f"listed that day. The status column is not used: it is "
+                      f"set when the worker pool drains, whether the stocks "
+                      f"scored or errored."),
     }
 
 

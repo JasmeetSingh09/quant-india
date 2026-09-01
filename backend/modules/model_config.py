@@ -54,8 +54,16 @@ COST_STAMP_DUTY_PCT = 0.015
 COST_EXCHANGE_PCT = 0.00345
 COST_GST_PCT = 18.0
 
+# How much of the day's universe a scan must cover before it counts as an
+# observation of the market rather than of whichever stocks answered.
+# Shared: the scanner enforces it and the health report measures against
+# it, and the two disagreeing would mean a pass the collector called
+# complete showing as incomplete in its own audit.
+SCAN_COMPLETE_FRACTION = 0.90
+
 MUST_AGREE = (
-    "RISK_FREE_RATE, TRADING_DAYS_PER_YEAR and MONTHS_PER_YEAR are shared "
+    "RISK_FREE_RATE, TRADING_DAYS_PER_YEAR, MONTHS_PER_YEAR, BENCHMARK_INDEX "
+    "and SCAN_COMPLETE_FRACTION are shared "
     "definitions: two modules disagreeing about them would report different "
     "risk-adjusted numbers for the same data. Liquidity floors and minimum "
     "holdings are NOT shared — they match today by coincidence of judgement, "

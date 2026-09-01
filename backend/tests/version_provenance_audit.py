@@ -55,8 +55,13 @@ def ok(cond, label, gap=None):
 
 
 # ---------------------------------------------------------------- inventory
-BEHAVIOURAL, METADATA, ENVIRONMENT, OPERATIONAL = \
-    "BEHAVIOURAL", "METADATA", "ENVIRONMENT", "OPERATIONAL"
+# ALIAS is a fifth category, not a fourth-and-a-half. A constant imported from
+# a shared module is a REFERENCE to a decision made elsewhere, not a decision
+# of its own: it needs no separate spec field, because freezing it twice would
+# record the same value under two names and invite them to diverge on paper.
+# What it does need is proof that it still equals what it points at.
+BEHAVIOURAL, METADATA, ENVIRONMENT, OPERATIONAL, ALIAS = (
+    "BEHAVIOURAL", "METADATA", "ENVIRONMENT", "OPERATIONAL", "ALIAS")
 
 INVENTORY = {
     "alpha_model": {
@@ -98,7 +103,7 @@ INVENTORY = {
         "COST_STT_PCT": BEHAVIOURAL, "COST_STAMP_DUTY_PCT": BEHAVIOURAL,
         "COST_EXCHANGE_PCT": BEHAVIOURAL, "COST_GST_PCT": BEHAVIOURAL,
         "BENCHMARK_INDEX": BEHAVIOURAL, "BENCHMARK_NAME": METADATA,
-        "MUST_AGREE": METADATA,
+        "SCAN_COMPLETE_FRACTION": BEHAVIOURAL, "MUST_AGREE": METADATA,
     },
     "momentum_backtest": {
         "DEFAULT_UNIVERSE": BEHAVIOURAL, "BROAD_UNIVERSE": BEHAVIOURAL,
@@ -129,12 +134,13 @@ INVENTORY = {
     },
     "prediction_tracker": {
         "BENCHMARK": BEHAVIOURAL, "MAX_CYCLE_AGE_DAYS": BEHAVIOURAL,
-        "MIN_EFFECTIVE_N": BEHAVIOURAL,
+        "MIN_EFFECTIVE_N": BEHAVIOURAL, "IS_POSTGRES": ALIAS,
     },
     "security_identity": {
         "LINK_MAX_GAP_DAYS": BEHAVIOURAL, "LINK_MAX_OVERLAP_DAYS": BEHAVIOURAL,
     },
-    "bhavcopy": {"ARCHIVE_STARTS": BEHAVIOURAL},
+    "bhavcopy": {"ARCHIVE_STARTS": BEHAVIOURAL,
+                 "IS_POSTGRES": ALIAS},
     "portfolio_fix": {
         "MAX_SINGLE": BEHAVIOURAL, "MAX_SECTOR": BEHAVIOURAL,
         "MIN_HOLDINGS": BEHAVIOURAL,
@@ -148,6 +154,7 @@ INVENTORY = {
         "MODEL_VERSION": METADATA, "SHUFFLE_SEED": ENVIRONMENT,
         "LARGE_CAP_RANK_MAX": BEHAVIOURAL, "MID_CAP_RANK_MAX": BEHAVIOURAL,
         "LARGE_CAP_MIN": BEHAVIOURAL, "MID_CAP_MIN": BEHAVIOURAL,
+        "MIN_COMPLETE_FRACTION": ALIAS, "IS_POSTGRES": ALIAS,
     },
     "monte_carlo": {"RANDOM_SEED": ENVIRONMENT},
     "optimizer_stability": {"RANDOM_SEED": ENVIRONMENT,
@@ -161,6 +168,8 @@ INVENTORY = {
     "factor_strategies": {"CANNOT_BACKTEST": METADATA, "PLAIN": METADATA},
     "backtest_integrity": {"SAFE_VALIDATED": METADATA, "SAFE_RESEARCH": METADATA},
     "screener": {"DB_PATH": ENVIRONMENT},
+    "scan_health": {"COMPLETE_FRACTION": ALIAS,
+                    "STALL_MINUTES": OPERATIONAL},
     "fama_french": {"RISK_FREE_RATE": BEHAVIOURAL,
                     "NIFTY_TICKER": BEHAVIOURAL,
                     "DEFAULT_UNIVERSE": BEHAVIOURAL},
@@ -223,6 +232,7 @@ for name in ("MOM_LOOKBACK", "MOM_SKIP", "MOM_TANH_DIV", "LR_WINDOW",
              "N_BUCKETS", "MIN_NONOVERLAPPING", "REGIME_TREND_PCT",
              "REGIME_VOL_ANN"):
     SPEC_MAPPING[("pit_validation", name)] = (f"pit_validation.{name.lower()}", None)
+SPEC_MAPPING[("model_config", "SCAN_COMPLETE_FRACTION")] = ("shared_config.scan_complete_fraction", None)
 SPEC_MAPPING[("optimizer_stability", "DEFAULT_TRIALS")] = ("research_tools.stability_trials", None)
 SPEC_MAPPING[("overfitting", "EULER_GAMMA")] = ("research_tools.euler_gamma", None)
 SPEC_MAPPING[("fama_french", "DEFAULT_UNIVERSE")] = ("research_tools.fama_french_universe_size", len)
@@ -259,9 +269,9 @@ def constants_in_source(src):
     tree = ast.parse(src)
     found = {}
 
-    def take(n):
+    def take(n, kind="assign", source=None):
         if n.isupper() and not n.startswith("_"):
-            found[n] = True
+            found[n] = {"kind": kind, "source": source}
 
     for n in tree.body:
         if isinstance(n, ast.Assign):
@@ -274,6 +284,16 @@ def constants_in_source(src):
                             take(e.id)
         elif isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name):
             take(n.target.id)
+        # An imported constant, with or without renaming. These were invisible
+        # to the first version, which walked only assignments — so the moment a
+        # duplicated constant was correctly consolidated into a shared module
+        # and imported back under an alias, the auditor stopped seeing it. A
+        # checker that goes blind precisely when the code improves is worse
+        # than one that never looked.
+        elif isinstance(n, ast.ImportFrom):
+            for a in n.names:
+                name = a.asname or a.name
+                take(name, kind="alias", source=f"{n.module}.{a.name}")
     return found
 
 
@@ -367,6 +387,10 @@ for name in ("SIMPLE", "TUPLE_A", "TUPLE_B", "LIST_A", "LIST_B", "ANNOTATED",
 ok("_PRIVATE" not in found, "ignores private names")
 ok("lowercase" not in found, "ignores lowercase names")
 
+ok("IMPORTED_PI" in found and found["IMPORTED_PI"]["kind"] == "alias",
+   "detects an imported constant and marks it an alias",
+   gap="auditor blind to imported constants")
+
 lits = scoring_literals_in_source(FIXTURE, ["scorer"])
 vals = {v for _, _, v in lits}
 ok({1.5, 0.85, 40, 0.30} <= vals,
@@ -383,15 +407,30 @@ ok(at_path({"a": {}}, "a.missing") == ("__ABSENT__",), "reports an absent path")
 print("\n" + "=" * 72)
 print("SECTION 1 — is every constant classified?")
 print("=" * 72)
-unclassified = []
+unclassified, broken_alias = [], []
 for mod, declared in INVENTORY.items():
     actual = module_constants(mod)
-    for name in actual:
+    for name, meta in actual.items():
         if name not in declared:
             unclassified.append(f"{mod}.{name} (NEW, unregistered)")
     for name in declared:
         if name not in actual:
             unclassified.append(f"{mod}.{name} (declared, no longer exists)")
+    # An alias must actually equal what it aliases, or the consolidation that
+    # created it is decorative.
+    for name, kind in declared.items():
+        if kind != ALIAS or name not in actual:
+            continue
+        src = (actual[name] or {}).get("source")
+        try:
+            here = getattr(__import__(mod), name)
+            smod, sname = src.rsplit(".", 1)
+            there = getattr(__import__(smod), sname)
+            if here != there:
+                broken_alias.append(f"{mod}.{name} != {src}")
+        except Exception as _e:
+            broken_alias.append(f"{mod}.{name} -> {src} unresolvable "
+                                f"({type(_e).__name__})")
 ok(not unclassified,
    f"every module-level constant is classified ({len(unclassified)} loose)",
    gap=("Unclassified/stale constants: " + ", ".join(unclassified))
@@ -399,10 +438,17 @@ ok(not unclassified,
 for u in unclassified:
     print(f"         ! {u}")
 
+ok(not broken_alias,
+   f"every alias resolves to the constant it aliases ({len(broken_alias)} broken)",
+   gap=("Aliases disagreeing with their source: " + ", ".join(broken_alias))
+       if broken_alias else None)
+for b in broken_alias:
+    print(f"         ! {b}")
+
 behavioural = {(m, n) for m, d in INVENTORY.items()
                for n, k in d.items() if k == BEHAVIOURAL}
 counts = {k: sum(1 for d in INVENTORY.values() for v in d.values() if v == k)
-          for k in (BEHAVIOURAL, METADATA, ENVIRONMENT, OPERATIONAL)}
+          for k in (BEHAVIOURAL, METADATA, ENVIRONMENT, OPERATIONAL, ALIAS)}
 print(f"\n  {sum(counts.values())} constants across {len(INVENTORY)} modules")
 for k, v in counts.items():
     print(f"    {k:<12} {v}")
