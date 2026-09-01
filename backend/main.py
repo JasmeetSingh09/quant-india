@@ -1588,6 +1588,26 @@ def backtest_full_pit(top_fraction: float = Query(0.2, ge=0.05, le=0.5)):
     return r
 
 
+class RetractRequest(BaseModel):
+    version: str
+    reason: str
+
+
+@app.post("/strategy/retract")
+def strategy_retract(req: RetractRequest):
+    """
+    Withdraw a frozen version without deleting it.
+
+    For a record that is wrong in a way overwriting cannot fix — notes that
+    claim something the stored spec does not contain, for instance.
+    """
+    from strategy_version import retract
+    r = retract(req.version, req.reason)
+    if not r.get("retracted"):
+        raise HTTPException(status_code=400, detail=r.get("reason"))
+    return r
+
+
 @app.get("/strategy/compare-versions")
 def strategy_compare_versions(a: str = Query(...), b: str = Query(...)):
     """

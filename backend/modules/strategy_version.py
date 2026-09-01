@@ -77,6 +77,22 @@ def _init():
         pass
     finally:
         conn.close()
+
+    # Retraction columns, each on its own connection: on Postgres a failed
+    # statement aborts the whole transaction, so a second ALTER in the same
+    # one would fail for the wrong reason.
+    for col in ("retracted_at TEXT", "retracted_reason TEXT"):
+        c = get_conn()
+        try:
+            c.execute(f"ALTER TABLE strategy_versions ADD COLUMN {col}")
+            c.commit()
+        except Exception:
+            try:
+                c.rollback()
+            except Exception:
+                pass
+        finally:
+            c.close()
     _READY = True
 
 
@@ -278,19 +294,66 @@ def freeze(version: str, notes: str = None, spec: dict = None,
                      "asserting it.")}
 
 
+def retract(version: str, reason: str) -> dict:
+    """
+    Mark a version as withdrawn, without deleting it.
+
+    A version record can be wrong in a way that overwriting will not fix and
+    deleting would hide. v1.2 was frozen against a stale deployment: its notes
+    claimed to be the first complete specification while the spec it stored was
+    byte-identical to v1.1, missing the same four parameters. Removing it would
+    leave a gap in the numbering and no explanation; leaving it alone would
+    leave a false claim standing.
+
+    So the record stays, the reason stays with it, and anything that reads a
+    version has to see both.
+    """
+    _init()
+    if not (reason or "").strip():
+        return {"retracted": False,
+                "reason": "A retraction must say why, or it is just a deletion."}
+    conn = get_conn()
+    try:
+        row = conn.execute("SELECT version FROM strategy_versions "
+                           "WHERE version = ?", (version,)).fetchone()
+        if not row:
+            return {"retracted": False, "version": version,
+                    "reason": f"No frozen version named {version}."}
+        conn.execute("UPDATE strategy_versions SET retracted_at = ?, "
+                     "retracted_reason = ? WHERE version = ?",
+                     (datetime.now().isoformat(), reason.strip(), version))
+        conn.commit()
+    finally:
+        conn.close()
+    return {"retracted": True, "version": version, "reason": reason.strip(),
+            "note": ("The record and its hash are kept. A retracted version is "
+                     "part of the research trail, not an embarrassment to be "
+                     "deleted from it.")}
+
+
 def get(version: str) -> dict:
     _init()
     conn = get_conn()
     try:
         row = conn.execute(
-            "SELECT version, frozen_at, spec_json, spec_hash, notes "
+            "SELECT version, frozen_at, spec_json, spec_hash, notes, "
+            "retracted_at, retracted_reason "
             "FROM strategy_versions WHERE version = ?", (version,)).fetchone()
     finally:
         conn.close()
     if not row:
         return {"found": False, "version": version}
-    return {"found": True, "version": row[0], "frozen_at": row[1],
-            "spec": json.loads(row[2]), "spec_hash": row[3], "notes": row[4]}
+    out = {"found": True, "version": row[0], "frozen_at": row[1],
+           "spec": json.loads(row[2]), "spec_hash": row[3], "notes": row[4]}
+    if len(row) > 5 and row[5]:
+        out["retracted"] = True
+        out["retracted_at"] = row[5]
+        out["retracted_reason"] = row[6]
+        out["warning"] = (f"This version was RETRACTED on {str(row[5])[:10]}. "
+                          f"Do not attribute results to it.")
+    else:
+        out["retracted"] = False
+    return out
 
 
 def listing() -> dict:
@@ -298,13 +361,22 @@ def listing() -> dict:
     conn = get_conn()
     try:
         rows = conn.execute(
-            "SELECT version, frozen_at, spec_hash, notes FROM strategy_versions "
+            "SELECT version, frozen_at, spec_hash, notes, retracted_at, "
+            "retracted_reason FROM strategy_versions "
             "ORDER BY frozen_at").fetchall()
     finally:
         conn.close()
-    return {"versions": [{"version": r[0], "frozen_at": r[1],
-                          "spec_hash": r[2], "notes": r[3]} for r in rows],
-            "count": len(rows)}
+    versions = []
+    for r in rows:
+        v = {"version": r[0], "frozen_at": r[1], "spec_hash": r[2],
+             "notes": r[3], "retracted": bool(len(r) > 4 and r[4])}
+        if v["retracted"]:
+            v["retracted_at"] = r[4]
+            v["retracted_reason"] = r[5]
+        versions.append(v)
+    return {"versions": versions, "count": len(versions),
+            "active": sum(1 for v in versions if not v["retracted"]),
+            "retracted": sum(1 for v in versions if v["retracted"])}
 
 
 def drift(version: str) -> dict:
