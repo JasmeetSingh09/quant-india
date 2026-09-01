@@ -173,38 +173,48 @@ UNTESTABLE = {
 
 # ------------------------------------------------------------------ loading
 
-def _load(conn, canonical):
+def _load(conn, canonical, pair_rows=None):
     """
     The archive as two dense matrices, securities by trading day.
 
     Dense is the right shape here: about 3,000 securities over 656 days is a
     few megabytes as float32, and every factor below is then a slice rather
     than a query.
+
+    The identity index is built from the pair listing — a few thousand rows —
+    rather than from the fact table. Reading a day, filling its column and
+    letting it go keeps one day of rows in memory instead of 1.5 million, which
+    is the difference between this running and the process being killed.
     """
     days = [r[0] for r in conn.execute(
         "SELECT DISTINCT day FROM bhavcopy_eod ORDER BY day").fetchall()]
-    day_ix = {d: i for i, d in enumerate(days)}
 
-    rows_by_day = {}
+    # Every identity the archive contains, from the (isin, symbol) listing.
     keys = {}
-    for d in days:
-        rows = conn.execute(
-            "SELECT symbol, close, volume, isin FROM bhavcopy_eod WHERE day = ?",
-            (d,)).fetchall()
-        rows_by_day[d] = rows
-        for sym, close, vol, isin in rows:
-            k = canonical.get(isin, isin) if isin else sym
-            if k and k not in keys:
-                keys[k] = len(keys)
+    for isin, sym, *_ in (pair_rows or []):
+        k = canonical.get(isin, isin)
+        if k and k not in keys:
+            keys[k] = len(keys)
+    # Rows with no ISIN fall back to their symbol. Coverage is complete today,
+    # so this is normally empty, but a future gap must not silently drop names.
+    try:
+        for (sym,) in conn.execute(
+                "SELECT DISTINCT symbol FROM bhavcopy_eod "
+                "WHERE isin IS NULL").fetchall():
+            if sym and sym not in keys:
+                keys[sym] = len(keys)
+    except Exception:
+        pass
 
-    n_k, n_d = len(keys), len(days)
-    C = np.full((n_k, n_d), np.nan, dtype=np.float32)
-    V = np.zeros((n_k, n_d), dtype=np.float32)
-    for d, rows in rows_by_day.items():
-        j = day_ix[d]
-        for sym, close, vol, isin in rows:
+    C = np.full((len(keys), len(days)), np.nan, dtype=np.float32)
+    V = np.zeros((len(keys), len(days)), dtype=np.float32)
+    for j, d in enumerate(days):
+        for sym, close, vol, isin in conn.execute(
+                "SELECT symbol, close, volume, isin FROM bhavcopy_eod "
+                "WHERE day = ?", (d,)).fetchall():
             k = canonical.get(isin, isin) if isin else sym
-            if not k or close is None:
+            i = keys.get(k)
+            if i is None or close is None:
                 continue
             try:
                 px = float(close)
@@ -212,7 +222,6 @@ def _load(conn, canonical):
                 continue
             if px <= 0:
                 continue
-            i = keys[k]
             C[i, j] = px
             try:
                 V[i, j] = px * float(vol or 0)
@@ -468,13 +477,17 @@ def validate(min_turnover: float = MIN_MONTHLY_TURNOVER,
         return {"error": f"No database ({type(e).__name__})."}
 
     try:
+        pair_rows = []
         try:
             from security_identity import _pairs, _resolve_pairs
-            canonical, _c, links, amb = _resolve_pairs(_pairs(conn))
+            pair_rows = _pairs(conn)
+            canonical, _c, links, amb = _resolve_pairs(pair_rows)
             ident = {"linked_isins": len(links), "ambiguous_not_merged": len(amb)}
+            del _c, links, amb
         except Exception as e:
             canonical, ident = {}, {"error": type(e).__name__}
-        keys, days, C, V = _load(conn, canonical)
+        keys, days, C, V = _load(conn, canonical, pair_rows)
+        del pair_rows
     finally:
         try:
             conn.close()
@@ -496,7 +509,11 @@ def validate(min_turnover: float = MIN_MONTHLY_TURNOVER,
     # Equal-weight market return per month, from the eligible universe itself.
     # Used for excess and for regimes, so the whole of Track A stays inside the
     # point-in-time archive with no external series.
-    records = []          # (month, key_ix, mom, lr, liq, {h: (raw, excess)})
+    # Held as compact arrays per horizon and month rather than a record per
+    # stock-month. The dict-per-observation version was about a hundred
+    # thousand small objects and it got the process killed on the host; this is
+    # the same information in a few megabytes.
+    panel = {h: {} for h in HORIZONS}
     market_monthly = {}
 
     for i in form_ix:
@@ -530,21 +547,23 @@ def validate(min_turnover: float = MIN_MONTHLY_TURNOVER,
         if 1 in fwd:
             market_monthly[months[i]] = float(np.mean(fwd[1]))
 
+        lr_col = (lr[idx].astype(np.float64) if lr is not None
+                  else np.full(len(idx), np.nan))
         for h, r in fwd.items():
             mkt = float(np.mean(r))
-            for pos, k in enumerate(idx):
-                records.append({
-                    "month": months[i], "key": k, "h": h,
-                    "mom": float(mom[k]),
-                    "lr": float(lr[k]) if lr is not None and np.isfinite(lr[k]) else None,
-                    "liq": float(liq[k]),
-                    "raw": float(r[pos]), "excess": float(r[pos] - mkt),
-                })
+            panel[h][months[i]] = {
+                "key": idx.astype(np.int32),
+                "momentum": mom[idx].astype(np.float64),
+                "low_risk": lr_col,
+                "liq": liq[idx].astype(np.float64),
+                "raw": r.astype(np.float64),
+                "excess": (r - mkt).astype(np.float64),
+            }
 
-    if not records:
+    if not any(panel[h] for h in HORIZONS):
         return {"error": "No formation month produced a usable cross-section."}
 
-    n_form = len({r["month"] for r in records})
+    n_form = len(panel[HORIZONS[0]])
 
     # -------------------------------------------------- regimes, from the PIT
     # market itself and known only from months BEFORE the formation date.
@@ -569,7 +588,7 @@ def validate(min_turnover: float = MIN_MONTHLY_TURNOVER,
     # -------------------------------------------------- per factor / horizon
     results, primary = {}, []
     for factor in FACTORS:
-        fkey = "mom" if factor == "momentum" else "lr"
+
         results[factor] = {
             "definition": (
                 "Absolute 12-1 momentum, volatility-adjusted: return from 252 "
@@ -585,38 +604,44 @@ def validate(min_turnover: float = MIN_MONTHLY_TURNOVER,
             "horizons": {},
         }
         for h in HORIZONS:
-            rows = [r for r in records if r["h"] == h and r[fkey] is not None]
-            if len(rows) < 100:
-                results[factor]["horizons"][f"{h}m"] = {
-                    "insufficient": True,
-                    "reason": f"{len(rows)} observations."}
-                continue
-
             # Buckets are formed WITHIN each month, so a bucket is a
             # cross-sectional rank and not a comparison across time.
-            by_month = {}
-            for r in rows:
-                by_month.setdefault(r["month"], []).append(r)
-            for m, group in by_month.items():
-                group.sort(key=lambda r: r[fkey])
-                nb = len(group)
-                for pos, r in enumerate(group):
-                    r["_bucket"] = min(n_buckets - 1, pos * n_buckets // nb)
+            by_month, total = {}, 0
+            for m, blk in sorted(panel[h].items()):
+                good = np.isfinite(blk[factor])
+                if good.sum() < n_buckets * 2:
+                    continue
+                order = np.argsort(blk[factor][good], kind="stable")
+                gi = np.where(good)[0][order]
+                nb = len(gi)
+                lab = np.minimum(n_buckets - 1,
+                                 np.arange(nb) * n_buckets // nb)
+                by_month[m] = {"idx": gi, "bucket": lab, "blk": blk}
+                total += nb
+            if total < 100 or not by_month:
+                results[factor]["horizons"][f"{h}m"] = {
+                    "insufficient": True, "reason": f"{total} observations."}
+                continue
 
             buckets = []
             for b in range(n_buckets):
-                obs = [(r["month"], r["excess"], r["raw"])
-                       for r in rows if r["_bucket"] == b]
+                obs = []
+                for m, g in by_month.items():
+                    sel = g["idx"][g["bucket"] == b]
+                    blk = g["blk"]
+                    obs.extend(zip([m] * len(sel), blk["excess"][sel],
+                                   blk["raw"][sel]))
                 buckets.append(_grade(obs, f"Q{b + 1}", n_form, h))
 
             # Monthly long-only series for the top bucket, net of costs.
             top_monthly, prev = [], set()
             for m in sorted(by_month):
-                g = [r for r in by_month[m] if r["_bucket"] == n_buckets - 1]
-                if not g:
+                g = by_month[m]
+                sel = g["idx"][g["bucket"] == n_buckets - 1]
+                if not len(sel):
                     continue
-                gross = float(np.mean([r["raw"] for r in g]))
-                cur = {r["key"] for r in g}
+                gross = float(np.mean(g["blk"]["raw"][sel]))
+                cur = set(g["blk"]["key"][sel].tolist())
                 turn = len(cur ^ prev) / max(2 * len(cur), 1) if prev else 1.0
                 top_monthly.append(gross - turn * COST_ROUNDTRIP_PCT / 100.0)
                 prev = cur
@@ -624,10 +649,11 @@ def validate(min_turnover: float = MIN_MONTHLY_TURNOVER,
             # The declared primary test: top quintile minus bottom, paired by
             # month so the market's move cancels.
             spread = []
-            for m, group in by_month.items():
-                hi = [r["excess"] for r in group if r["_bucket"] == n_buckets - 1]
-                lo = [r["excess"] for r in group if r["_bucket"] == 0]
-                if hi and lo:
+            for m, g in by_month.items():
+                exc = g["blk"]["excess"]
+                hi = exc[g["idx"][g["bucket"] == n_buckets - 1]]
+                lo = exc[g["idx"][g["bucket"] == 0]]
+                if len(hi) and len(lo):
                     spread.append(float(np.mean(hi)) - float(np.mean(lo)))
             spread_test = _mean_test(spread)
             non_overlap = len(spread) // max(h, 1)
@@ -652,34 +678,33 @@ def validate(min_turnover: float = MIN_MONTHLY_TURNOVER,
             }
 
     # -------------------------------------------------- exploratory cuts
-    tested = [r for r in records if r["h"] == 1]
     explore = {"n_comparisons": 0, "by_regime": {}, "by_liquidity": {}}
+    LIQ_LABELS = ["Least liquid", "Mid liquidity", "Most liquid"]
     for factor in FACTORS:
-        fkey = "mom" if factor == "momentum" else "lr"
-        rows = [r for r in tested if r[fkey] is not None]
-        if not rows:
-            continue
-        by_month = {}
-        for r in rows:
-            by_month.setdefault(r["month"], []).append(r)
-        for m, group in by_month.items():
-            group.sort(key=lambda r: r[fkey])
-            nb = len(group)
-            for pos, r in enumerate(group):
-                r["_b"] = min(n_buckets - 1, pos * n_buckets // nb)
-            # Liquidity terciles, ranked within the month for the same reason.
-            group2 = sorted(group, key=lambda r: r["liq"])
-            for pos, r in enumerate(group2):
-                r["_liq"] = ["Least liquid", "Mid liquidity",
-                             "Most liquid"][min(2, pos * 3 // len(group2))]
-
-        top = [r for r in rows if r.get("_b") == n_buckets - 1]
         reg, liqd = {}, {}
-        for r in top:
-            t, v = regime_of.get(r["month"], ("Unknown", "Unknown"))
-            for label in (t, v):
-                reg.setdefault(label, []).append((r["month"], r["excess"], r["raw"]))
-            liqd.setdefault(r["_liq"], []).append((r["month"], r["excess"], r["raw"]))
+        for m, blk in sorted(panel[1].items()):
+            good = np.isfinite(blk[factor])
+            if good.sum() < n_buckets * 2:
+                continue
+            good_idx = np.where(good)[0]
+            gi = good_idx[np.argsort(blk[factor][good], kind="stable")]
+            nb = len(gi)
+            top = gi[np.arange(nb) * n_buckets // nb == n_buckets - 1]
+            if not len(top):
+                continue
+            # Liquidity terciles, ranked within the month for the same reason
+            # the factor buckets are: a cross-sectional rank, never a
+            # comparison across time.
+            liq_order = good_idx[np.argsort(blk["liq"][good], kind="stable")]
+            liq_pos = {int(k): p for p, k in enumerate(liq_order)}
+            t, v = regime_of.get(m, ("Unknown", "Unknown"))
+            for k in top:
+                row = (m, float(blk["excess"][k]), float(blk["raw"][k]))
+                for label in (t, v):
+                    reg.setdefault(label, []).append(row)
+                pos = liq_pos[int(k)]
+                liqd.setdefault(LIQ_LABELS[min(2, pos * 3 // nb)],
+                                []).append(row)
         explore["by_regime"][factor] = {
             k: _grade(v, k, n_form, 1, exploratory=True)
             for k, v in sorted(reg.items())}
