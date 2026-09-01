@@ -1588,6 +1588,22 @@ def backtest_full_pit(top_fraction: float = Query(0.2, ge=0.05, le=0.5)):
     return r
 
 
+@app.get("/backtest/identity-ab")
+def backtest_identity_ab(top_fraction: float = Query(0.2, ge=0.05, le=0.5)):
+    """
+    Frozen v1.0 run three ways — keyed on ticker, on ISIN, and on resolved
+    identity — with everything else held constant.
+
+    The difference between the columns is the cost of the identity bug, not a
+    finding about the strategy.
+    """
+    from pit_backtest import identity_ab
+    r = identity_ab(top_fraction=top_fraction)
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+
 @app.get("/backtest/pit-comparison")
 def backtest_pit_comparison(start: str = Query("2024-01-01"),
                             fraction: float = Query(0.2, ge=0.05, le=0.5)):

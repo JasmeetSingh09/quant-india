@@ -53,7 +53,8 @@ def _month_end_days(conn) -> list:
     return [(r[0], r[1]) for r in rows if r and r[1]]
 
 
-def _panel(conn, month_days: list, canonical: dict = None):
+def _panel(conn, month_days: list, canonical: dict = None,
+           key_mode: str = "resolved"):
     """
     Month-end close and traded value for every security, per month.
 
@@ -62,7 +63,7 @@ def _panel(conn, month_days: list, canonical: dict = None):
     never filled in.
     """
     canonical = canonical or {}
-    closes, values = {}, {}
+    closes, values, to_resolved = {}, {}, {}
     for ym, day in month_days:
         # Keyed on resolved identity, not on either raw identifier. Keying on
         # the symbol made ZOMATO look like a company that ceased to exist when
@@ -77,26 +78,83 @@ def _panel(conn, month_days: list, canonical: dict = None):
         rows = conn.execute(
             "SELECT symbol, close, volume, isin FROM bhavcopy_eod WHERE day = ?",
             (day,)).fetchall()
-        c, v = {}, {}
+        c, v, r = {}, {}, {}
         for sym, close, vol, isin in rows:
-            key = canonical.get(isin, isin) if isin else sym
+            # The resolved identity is computed for every row whatever the key
+            # mode, because it is what tells a naive run that a security it
+            # just wrote off to -100% was in fact still trading.
+            rid = canonical.get(isin, isin) if isin else sym
+            if key_mode == "symbol":
+                key = sym
+            elif key_mode == "isin":
+                key = isin or sym
+            else:
+                key = rid
             if not key or close is None:
                 continue
-            sym = key
             try:
                 px = float(close)
             except (TypeError, ValueError):
                 continue
             if px <= 0:
                 continue
-            c[sym] = px
+            c[key] = px
+            r[key] = rid
             try:
-                v[sym] = px * float(vol or 0)
+                v[key] = px * float(vol or 0)
             except (TypeError, ValueError):
-                v[sym] = 0.0
+                v[key] = 0.0
         closes[ym] = c
         values[ym] = v
-    return closes, values
+        to_resolved[ym] = r
+    return closes, values, to_resolved
+
+
+def _panels_all(conn, month_days: list, canonical: dict = None):
+    """
+    All three keyings built from a single pass over the files.
+
+    Reading the archive once and keying it three ways is faster than three
+    passes, and it also removes a question the comparison would otherwise
+    invite: the runs cannot differ because of what they read, because they read
+    the same rows.
+    """
+    canonical = canonical or {}
+    modes = ("symbol", "isin", "resolved")
+    out = {m: ({}, {}, {}) for m in modes}
+    for ym, day in month_days:
+        rows = conn.execute(
+            "SELECT symbol, close, volume, isin FROM bhavcopy_eod WHERE day = ?",
+            (day,)).fetchall()
+        buckets = {m: ({}, {}, {}) for m in modes}
+        for sym, close, vol, isin in rows:
+            if close is None:
+                continue
+            try:
+                px = float(close)
+            except (TypeError, ValueError):
+                continue
+            if px <= 0:
+                continue
+            try:
+                val = px * float(vol or 0)
+            except (TypeError, ValueError):
+                val = 0.0
+            rid = canonical.get(isin, isin) if isin else sym
+            for m, key in (("symbol", sym), ("isin", isin or sym),
+                           ("resolved", rid)):
+                if not key:
+                    continue
+                c, v, r = buckets[m]
+                c[key] = px
+                v[key] = val
+                r[key] = rid
+        for m in modes:
+            c, v, r = buckets[m]
+            out[m][0][ym] = c
+            out[m][1][ym] = v
+            out[m][2][ym] = r
+    return out
 
 
 def _benchmark(months: list) -> dict:
@@ -118,41 +176,56 @@ def _benchmark(months: list) -> dict:
 
 
 def run(top_fraction: float = 0.2, min_turnover: float = MIN_MONTHLY_TURNOVER,
-        survivor_only: bool = False) -> dict:
+        survivor_only: bool = False, key_mode: str = "resolved",
+        _prebuilt: tuple = None) -> dict:
     """
     Run frozen v1.0 momentum on the point-in-time universe.
 
-    survivor_only=True restricts every month to the symbols trading in the
+    survivor_only=True restricts every month to the securities trading in the
     FINAL month, which reproduces the survivorship bias deliberately so the
     two runs can be compared on identical code.
-    """
-    try:
-        from db import get_conn
-        conn = get_conn()
-    except Exception as e:
-        return {"error": f"No database ({type(e).__name__})."}
 
-    try:
-        month_days = _month_end_days(conn)
-        if len(month_days) < LOOKBACK_MONTHS + SKIP_MONTHS + 2:
-            return {"error": (f"Only {len(month_days)} months of exchange files. "
-                              f"A 12-1 momentum test needs at least "
-                              f"{LOOKBACK_MONTHS + SKIP_MONTHS + 2}.")}
-        # Resolve identity BEFORE building the panel, so a company that changed
-        # ISIN mid-window is one column rather than two.
+    key_mode selects how a security is identified across months, and changes
+    NOTHING else — not a weight, not a threshold, not the cost model:
+
+        symbol    the ticker, which is what the first version used
+        isin      the ISIN, which fixed renames and broke restructurings
+        resolved  ISINs chained through shared tickers (the correction)
+
+    Running the same strategy under each is the only way to attribute a
+    difference in result to identity rather than to anything else.
+    """
+    if _prebuilt is not None:
+        month_days, closes, values, to_resolved, resolved = _prebuilt
+    else:
         try:
-            from security_identity import _pairs, _resolve_pairs
-            canonical, _components, _links, _amb = _resolve_pairs(_pairs(conn))
-            resolved = {"linked_isins": len(_links),
-                        "ambiguous_not_merged": len(_amb)}
+            from db import get_conn
+            conn = get_conn()
         except Exception as e:
-            canonical, resolved = {}, {"error": type(e).__name__}
-        closes, values = _panel(conn, month_days, canonical)
-    finally:
+            return {"error": f"No database ({type(e).__name__})."}
+
         try:
-            conn.close()
-        except Exception:
-            pass
+            month_days = _month_end_days(conn)
+            if len(month_days) < LOOKBACK_MONTHS + SKIP_MONTHS + 2:
+                return {"error": (f"Only {len(month_days)} months of exchange "
+                                  f"files. A 12-1 momentum test needs at least "
+                                  f"{LOOKBACK_MONTHS + SKIP_MONTHS + 2}.")}
+            # Resolve identity BEFORE building the panel, so a company that
+            # changed ISIN mid-window is one column rather than two.
+            try:
+                from security_identity import _pairs, _resolve_pairs
+                canonical, _components, _links, _amb = _resolve_pairs(_pairs(conn))
+                resolved = {"linked_isins": len(_links),
+                            "ambiguous_not_merged": len(_amb)}
+            except Exception as e:
+                canonical, resolved = {}, {"error": type(e).__name__}
+            closes, values, to_resolved = _panel(conn, month_days, canonical,
+                                                 key_mode)
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     # How much of this run is genuinely identity-keyed. A run over rows without
     # ISIN is the old symbol-keyed behaviour wearing the new name.
@@ -171,6 +244,12 @@ def run(top_fraction: float = 0.2, min_turnover: float = MIN_MONTHLY_TURNOVER,
     strat_rets, bench_rets, eq_months = [], [], []
     prev_basket, eligible_log, holdings_log = set(), [], []
     delisted_held = []
+    # Every -100% booking is checked against resolved identity. If the security
+    # was still trading that month under another label, the write-off was an
+    # artefact of the key, not a delisting — this is the count that says how
+    # much of the old result was manufactured by the identity bug.
+    invalid_writeoffs = []
+    all_holding_rets, unique_held, turnover_log = [], set(), []
     cost = COST_ROUNDTRIP_PCT / 100.0
 
     for i in range(L, len(months) - 1):
@@ -211,6 +290,7 @@ def run(top_fraction: float = 0.2, min_turnover: float = MIN_MONTHLY_TURNOVER,
         # pretending otherwise is precisely the bias being removed. It is
         # marked to -100% of that position, which is the harshest defensible
         # assumption and is disclosed as such.
+        alive_next = set(to_resolved.get(hold_m, {}).values())
         rets = []
         for sym in basket:
             p_now = now_px.get(sym)
@@ -219,14 +299,26 @@ def run(top_fraction: float = 0.2, min_turnover: float = MIN_MONTHLY_TURNOVER,
                 continue
             if p_next is None:
                 rets.append(-1.0)
-                delisted_held.append({"month": hold_m, "security": sym})
+                rid = to_resolved.get(form_m, {}).get(sym)
+                still_trading = rid in alive_next if rid else False
+                delisted_held.append({"month": hold_m, "security": sym,
+                                      "still_trading_as": rid if still_trading
+                                                          else None})
+                if still_trading:
+                    invalid_writeoffs.append({"month": hold_m, "booked": sym,
+                                              "actually_trading_as": rid})
                 continue
             rets.append(p_next / p_now - 1.0)
         if not rets:
             continue
 
+        # Kept with their month, because holdings in the same month share that
+        # month's market move and are not independent observations.
+        all_holding_rets.extend((hold_m, r) for r in rets)
+        unique_held.update(basket)
         gross = sum(rets) / len(rets)
         turn = len(set(basket) ^ prev_basket) / max(2 * len(basket), 1)
+        turnover_log.append(turn)
         strat_rets.append(gross - turn * cost)
         prev_basket = set(basket)
         eq_months.append(hold_m)
@@ -238,9 +330,21 @@ def run(top_fraction: float = 0.2, min_turnover: float = MIN_MONTHLY_TURNOVER,
         return {"error": f"Only {len(strat_rets)} rebalances survived the "
                          f"eligibility rules."}
 
+    excess = [s - b for s, b in zip(strat_rets, bench_rets)]
+
     return {
         "stats": _stats(strat_rets),
         "benchmark_stats": _stats(bench_rets) if any(bench_rets) else None,
+        "excess_stats": _evidence(excess),
+        "monthly_evidence": _evidence(strat_rets),
+        "holdings_stats": _holding_stats(all_holding_rets),
+        "unique_securities_held": len(unique_held),
+        "turnover": {
+            "avg_monthly_pct": round(sum(turnover_log) / len(turnover_log) * 100, 1)
+                               if turnover_log else None,
+            "note": ("Fraction of the book replaced each month, from the "
+                     "symmetric difference between consecutive baskets."),
+        },
         "months_tested": len(strat_rets),
         "period": f"{eq_months[0]} to {eq_months[-1]}",
         "universe": {
@@ -257,10 +361,25 @@ def run(top_fraction: float = 0.2, min_turnover: float = MIN_MONTHLY_TURNOVER,
             "last_month": months[-1],
         },
         "identity": {
-            "keyed_on": ("resolved identity — ISINs chained through shared "
-                         "tickers; symbol only where no ISIN exists"),
+            "key_mode": key_mode,
+            "keyed_on": {
+                "symbol": "the ticker alone — a rename reads as a delisting",
+                "isin": "the ISIN alone — a new ISIN under a kept ticker reads "
+                        "as a delisting",
+                "resolved": "ISINs chained through shared tickers; symbol only "
+                            "where no ISIN exists",
+            }.get(key_mode, key_mode),
             "coverage": identity,
             "resolution": resolved,
+            "invalid_writeoffs": {
+                "count": len(invalid_writeoffs),
+                "examples": invalid_writeoffs[:8],
+                "meaning": ("Positions booked at -100% that resolved identity "
+                            "shows were still trading that month. Under "
+                            "key_mode='resolved' this is zero by construction; "
+                            "under the other two it is the damage the identity "
+                            "bug did to the result."),
+            },
             "why": ("Neither identifier survives every corporate event. Keyed "
                     "on symbols, a rename looks like a delisting and gets "
                     "booked as a total loss. Keyed on ISINs, a company that "
@@ -291,6 +410,112 @@ def run(top_fraction: float = 0.2, min_turnover: float = MIN_MONTHLY_TURNOVER,
             f"and dividends, so a corporate action inside the hold month "
             f"distorts that month's return for that name."),
     }
+
+
+def _evidence(series: list) -> dict:
+    """
+    Whether a mean is distinguishable from zero, on this many observations.
+
+    Reported alongside every return figure because a mean without an interval
+    invites a reader to treat noise as a finding, and at eighteen monthly
+    observations noise is the default explanation.
+    """
+    import math
+    n = len(series)
+    if n < 3:
+        return {"n": n, "insufficient": True,
+                "note": "Too few observations to say anything about the mean."}
+    mean = sum(series) / n
+    var = sum((x - mean) ** 2 for x in series) / (n - 1)
+    sd = var ** 0.5
+    se = sd / math.sqrt(n) if sd > 0 else 0.0
+    t = (mean / se) if se > 0 else None
+
+    p, method = None, None
+    if t is not None:
+        try:
+            from scipy import stats as _st
+            p = float(2 * _st.t.sf(abs(t), df=n - 1))
+            method = "two-sided t-test"
+        except Exception:
+            from math import erfc
+            p = float(erfc(abs(t) / math.sqrt(2)))
+            method = "normal approximation (scipy unavailable)"
+
+    crit = 1.96
+    try:
+        from scipy import stats as _st
+        crit = float(_st.t.ppf(0.975, df=n - 1))
+    except Exception:
+        pass
+
+    srt = sorted(series)
+    mid = n // 2
+    median = srt[mid] if n % 2 else (srt[mid - 1] + srt[mid]) / 2
+
+    return {
+        "n": n,
+        "mean_pct": round(mean * 100, 3),
+        "median_pct": round(median * 100, 3),
+        "sd_pct": round(sd * 100, 3),
+        "t_stat": round(t, 3) if t is not None else None,
+        "p_value": round(p, 4) if p is not None else None,
+        "p_method": method,
+        "ci95_mean_pct": [round((mean - crit * se) * 100, 3),
+                          round((mean + crit * se) * 100, 3)]
+                         if se > 0 else None,
+        # Cohen's d for a one-sample mean against zero.
+        "effect_size_d": round(mean / sd, 3) if sd > 0 else None,
+        "significant_at_5pct": bool(p is not None and p < 0.05),
+    }
+
+
+def _holding_stats(month_rets: list) -> dict:
+    """
+    Statistics across individual positions, with the clustering priced in.
+
+    Every holding in a month shares that month's market move, so counting them
+    as independent draws overstates the evidence by whatever the intra-month
+    correlation happens to be. That correlation is estimated from these
+    observations rather than assumed, and the effective sample size is reported
+    next to the raw one so the gap is visible.
+    """
+    if not month_rets:
+        return {"n": 0, "insufficient": True}
+    rets = [r for _, r in month_rets]
+    base = _evidence(rets)
+    hits = sum(1 for r in rets if r > 0)
+    n = len(rets)
+
+    wilson, binom_p, binom_method, deff = None, None, None, None
+    try:
+        from market_validation import _wilson, _binom_p, _design_effect
+        wilson = _wilson(hits, n)
+        binom_p, binom_method = _binom_p(hits, n)
+        deff = _design_effect([{"date": m + "-01", "_hit": r > 0}
+                               for m, r in month_rets])
+    except Exception:
+        pass
+
+    n_eff = None
+    if deff and deff.get("deff"):
+        n_eff = round(n / deff["deff"], 1)
+
+    out = dict(base)
+    out.update({
+        "positions": n,
+        "hit_rate_pct": round(hits / n * 100, 1),
+        "hit_rate_ci95": wilson,
+        "hit_rate_p_value": round(binom_p, 4) if binom_p is not None else None,
+        "hit_rate_p_method": binom_method,
+        "clustering": deff,
+        "effective_sample_size": n_eff,
+        "note": ("Position-level figures. The raw count is every holding-month; "
+                 "the effective count divides it by the design effect, because "
+                 "positions held in the same month are not independent "
+                 "observations of anything."),
+    })
+    return out
 
 
 def _stats(monthly: list) -> dict:
@@ -327,6 +552,136 @@ def _stats(monthly: list) -> dict:
         "max_drawdown_pct": round(max_dd * 100, 2),
         "hit_rate_pct": round(sum(1 for r in monthly if r > 0) / n * 100, 1),
         "n_months": n,
+    }
+
+
+def identity_ab(top_fraction: float = 0.2) -> dict:
+    """
+    The same strategy run three ways, differing only in what counts as one
+    security.
+
+    This is the experiment that says how much of the earlier result was the
+    strategy and how much was the identity bug. Nothing else varies between the
+    runs — same weights, same lookback, same costs, same eligibility rules,
+    same frozen v1.0 — so any difference is attributable to identity and to
+    nothing else.
+    """
+    try:
+        from db import get_conn
+        conn = get_conn()
+    except Exception as e:
+        return {"error": f"No database ({type(e).__name__})."}
+    try:
+        month_days = _month_end_days(conn)
+        if len(month_days) < LOOKBACK_MONTHS + SKIP_MONTHS + 2:
+            return {"error": (f"Only {len(month_days)} months of exchange files. "
+                              f"A 12-1 momentum test needs at least "
+                              f"{LOOKBACK_MONTHS + SKIP_MONTHS + 2}.")}
+        try:
+            from security_identity import _pairs, _resolve_pairs
+            canonical, _components, _links, _amb = _resolve_pairs(_pairs(conn))
+            resolved = {"linked_isins": len(_links),
+                        "ambiguous_not_merged": len(_amb)}
+        except Exception as e:
+            canonical, resolved = {}, {"error": type(e).__name__}
+        panels = _panels_all(conn, month_days, canonical)
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    runs = {}
+    for mode in ("symbol", "isin", "resolved"):
+        c, v, r2 = panels[mode]
+        runs[mode] = run(top_fraction=top_fraction, survivor_only=False,
+                         key_mode=mode,
+                         _prebuilt=(month_days, c, v, r2, resolved))
+        if "error" in runs[mode]:
+            return {"error": f"{mode} run: {runs[mode]['error']}"}
+
+    def _row(label, fn):
+        return {"metric": label,
+                "old_symbol": fn(runs["symbol"]),
+                "old_isin": fn(runs["isin"]),
+                "corrected": fn(runs["resolved"])}
+
+    def _g(d, *path, default=None):
+        for k in path:
+            if not isinstance(d, dict):
+                return default
+            d = d.get(k)
+        return d if d is not None else default
+
+    table = [
+        _row("Months tested", lambda r: r.get("months_tested")),
+        _row("Avg eligible per rebalance",
+             lambda r: _g(r, "universe", "avg_eligible_per_rebalance")),
+        _row("Avg holdings", lambda r: _g(r, "universe", "avg_holdings")),
+        _row("Unique securities held",
+             lambda r: r.get("unique_securities_held")),
+        _row("Position-months", lambda r: _g(r, "holdings_stats", "positions")),
+        _row("Delistings booked",
+             lambda r: _g(r, "delistings_held", "count")),
+        _row("Invalid -100% bookings",
+             lambda r: _g(r, "identity", "invalid_writeoffs", "count")),
+        _row("Hit rate, monthly (%)",
+             lambda r: _g(r, "stats", "hit_rate_pct")),
+        _row("Hit rate, positions (%)",
+             lambda r: _g(r, "holdings_stats", "hit_rate_pct")),
+        _row("Mean monthly return (%)",
+             lambda r: _g(r, "monthly_evidence", "mean_pct")),
+        _row("Median monthly return (%)",
+             lambda r: _g(r, "monthly_evidence", "median_pct")),
+        _row("Mean position return (%)",
+             lambda r: _g(r, "holdings_stats", "mean_pct")),
+        _row("Median position return (%)",
+             lambda r: _g(r, "holdings_stats", "median_pct")),
+        _row("Mean monthly excess vs Nifty (%)",
+             lambda r: _g(r, "excess_stats", "mean_pct")),
+        _row("CAGR (%)", lambda r: _g(r, "stats", "cagr_pct")),
+        _row("Volatility (%)", lambda r: _g(r, "stats", "vol_pct")),
+        _row("Sharpe", lambda r: _g(r, "stats", "sharpe")),
+        _row("Max drawdown (%)", lambda r: _g(r, "stats", "max_drawdown_pct")),
+        _row("Avg monthly turnover (%)",
+             lambda r: _g(r, "turnover", "avg_monthly_pct")),
+        _row("t-stat, monthly mean",
+             lambda r: _g(r, "monthly_evidence", "t_stat")),
+        _row("p-value, monthly mean",
+             lambda r: _g(r, "monthly_evidence", "p_value")),
+        _row("Effect size (d), monthly",
+             lambda r: _g(r, "monthly_evidence", "effect_size_d")),
+        _row("Effective sample size, positions",
+             lambda r: _g(r, "holdings_stats", "effective_sample_size")),
+    ]
+
+    inv_sym = _g(runs["symbol"], "identity", "invalid_writeoffs", "count", default=0)
+    inv_isin = _g(runs["isin"], "identity", "invalid_writeoffs", "count", default=0)
+    inv_res = _g(runs["resolved"], "identity", "invalid_writeoffs", "count", default=0)
+
+    return {
+        "table": table,
+        "runs": runs,
+        "held_constant": (
+            "Factor definition, weights, lookback, skip month, top fraction, "
+            "minimum holdings, liquidity floor, cost model, rebalance frequency "
+            "and benchmark are identical across the three runs. The only "
+            "difference is what counts as one security across months."),
+        "invalid_writeoffs": {
+            "symbol_keyed": inv_sym,
+            "isin_keyed": inv_isin,
+            "resolved": inv_res,
+            "reading": (
+                f"Keyed on tickers, {inv_sym} position(s) were written off to "
+                f"-100% while the company was still trading. Keyed on ISINs, "
+                f"{inv_isin}. Resolved, {inv_res} — zero by construction, which "
+                f"is what makes the corrected run's losses real losses."),
+        },
+        "caution": (
+            "A difference between these columns is a measure of the bug, not "
+            "evidence about the strategy. The corrected column is the only one "
+            "worth interpreting as a result, and it is still eighteen-odd "
+            "monthly observations over a single market regime."),
     }
 
 
