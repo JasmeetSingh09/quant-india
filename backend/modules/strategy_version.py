@@ -394,22 +394,51 @@ def drift(version: str) -> dict:
     # captured_at always differs; it is metadata, not configuration.
     a = {k: v for k, v in rec["spec"].items() if k != "captured_at"}
     b = {k: v for k, v in live.items() if k != "captured_at"}
-    changed = []
+    # Same three-way split compare_versions uses. A field the frozen spec never
+    # recorded has not "changed" — the record simply never covered it, and the
+    # hash cannot speak to a value it never saw. Reporting that as behavioural
+    # drift would retire a sound result; reporting it as no drift at all would
+    # hide a gap in what the hash protects.
+    entries, changed, uncovered = [], [], []
     for k in sorted(set(a) | set(b)):
-        if a.get(k) != b.get(k):
-            changed.append({"field": k, "frozen": a.get(k), "live": b.get(k)})
+        if a.get(k) == b.get(k):
+            continue
+        if k not in a:
+            why = "never captured by this version"
+            uncovered.append(k)
+        elif k not in b:
+            why = "no longer present in the live configuration"
+            uncovered.append(k)
+        else:
+            why = "value differs"
+            changed.append(k)
+        entries.append({
+            "field": k,
+            "kind": "metadata" if k in METADATA_FIELDS else "behavioural",
+            "difference": why,
+            "frozen": a.get(k), "live": b.get(k)})
 
-    behavioural, metadata = _classify({c["field"] for c in changed})
-    for c in changed:
-        c["kind"] = "metadata" if c["field"] in METADATA_FIELDS else "behavioural"
+    behavioural, metadata = _classify(set(changed))
+    unc_behavioural = [k for k in uncovered if k not in METADATA_FIELDS]
 
-    if not changed:
+    if not entries:
         verdict = "The live configuration still matches this version."
     elif behavioural:
-        verdict = (f"{len(behavioural)} behavioural field(s) differ from the "
-                   f"frozen spec ({', '.join(behavioural)}). A result produced "
-                   f"now cannot be attributed to {version} — mint a new version "
-                   f"instead.")
+        verdict = (f"{len(behavioural)} behavioural field(s) hold different "
+                   f"values from the frozen spec ({', '.join(behavioural)}). A "
+                   f"result produced now cannot be attributed to {version} — "
+                   f"mint a new version instead.")
+    elif unc_behavioural:
+        verdict = (f"No field recorded by {version} differs in value. "
+                   f"{len(unc_behavioural)} behavioural field(s) appear in the "
+                   f"live specification that {version} never captured "
+                   f"({', '.join(unc_behavioural)}). The strategy behaves as it "
+                   f"did; what changed is that the record now covers more of "
+                   f"it. Note the corollary: {version}'s hash never protected "
+                   f"those fields, so it cannot prove what they held when it "
+                   f"was frozen."
+                   + (f" Metadata also differs: {', '.join(metadata)}."
+                      if metadata else ""))
     else:
         verdict = (f"Metadata only: {', '.join(metadata)}. No factor weight, "
                    f"threshold, cost or rule differs, so the strategy behaves "
@@ -420,10 +449,11 @@ def drift(version: str) -> dict:
 
     return {
         "found": True, "version": version, "frozen_at": rec["frozen_at"],
-        "drifted": bool(changed),
+        "drifted": bool(entries),
         "behavioural_drift": bool(behavioural),
         "metadata_drift": bool(metadata),
-        "changes": changed,
+        "coverage_gap": sorted(uncovered),
+        "changes": entries,
         "verdict": verdict,
     }
 
