@@ -132,6 +132,22 @@ def _init_db():
     finally:
         conn.close()
 
+    # Somewhere for a crash to be recorded. Without it the failure handler
+    # writes to a column that does not exist, fails, gets swallowed by its own
+    # guard, and the diagnostic disappears exactly when it is needed.
+    conn = get_conn()
+    try:
+        if IS_POSTGRES:
+            conn.execute("ALTER TABLE alpha_scan_state "
+                         "ADD COLUMN IF NOT EXISTS last_error TEXT")
+        else:
+            conn.execute("ALTER TABLE alpha_scan_state ADD COLUMN last_error TEXT")
+        conn.commit()
+    except Exception:
+        pass
+    finally:
+        conn.close()
+
 
 # ---------------------------------------------------------------------------
 # State
@@ -146,8 +162,8 @@ def get_state() -> dict:
     _init_db()
     conn = get_conn()
     row = conn.execute(
-        "SELECT cycle, started_at, finished_at, done, total, status, last_complete_cycle "
-        "FROM alpha_scan_state WHERE id = 1"
+        "SELECT cycle, started_at, finished_at, done, total, status, "
+        "last_complete_cycle, last_error FROM alpha_scan_state WHERE id = 1"
     ).fetchone()
     scanned = conn.execute("SELECT COUNT(*) FROM alpha_scan2 WHERE alpha_score IS NOT NULL").fetchone()[0]
     # Attempted is not the same as succeeded. Errors are stored so a bad ticker
@@ -173,11 +189,13 @@ def get_state() -> dict:
     conn.close()
     if not row:
         return {"status": "never_run", "done": 0, "total": 0, "scored_total": scanned}
-    cycle, started, finished, done, total, status, last_complete = row
+    cycle, started, finished, done, total, status, last_complete = row[:7]
+    last_error = row[7] if len(row) > 7 else None
     return {
         "status": status, "cycle": cycle, "started_at": started,
         "finished_at": finished, "done": done, "total": total,
         "last_complete_cycle": last_complete,
+        "last_error": last_error,
         "scored_total": scanned,
         "succeeded": ok_n,
         "failed": err_n,
@@ -367,6 +385,31 @@ def _universe() -> list:
 
 
 def _scan_loop():
+    """
+    Wrapper that makes a crash visible.
+
+    The body used to run unguarded, so an exception anywhere in it killed the
+    thread silently: the state kept saying "running" with done=0 and
+    finished_at=None forever, the traceback went to stderr where nobody reads
+    it, and from the outside a scan that died on its first stock was
+    indistinguishable from one still working. Production sat in exactly that
+    state — started, zero rows, thread gone — and the API had no way to say so.
+    """
+    try:
+        _scan_loop_inner()
+    except BaseException as e:
+        import traceback
+        detail = f"{type(e).__name__}: {e}"
+        print(f"[scan] CRASHED: {detail}\n{traceback.format_exc()}")
+        try:
+            _set_state(status="failed", finished_at=datetime.now().isoformat(),
+                       last_error=detail[:500])
+        except Exception:
+            pass
+        raise
+
+
+def _scan_loop_inner():
     from alpha_model import compute_alpha_score, _ticker_info
 
     cycle = _current_cycle()
@@ -482,14 +525,18 @@ def start_scan(force: bool = False) -> dict:
     _init_db()
     with _LOCK:
         if _THREAD is not None and _THREAD.is_alive():
-            return {"status": "already_running", **get_state()}
+            return {"action": "already_running", **get_state()}
         st = get_state()
         if not force and st.get("status") == "complete" and st.get("cycle") == _current_cycle():
-            return {"status": "already_complete_today", **st}
+            return {"action": "already_complete_today", **st}
         _STOP.clear()
         _THREAD = threading.Thread(target=_scan_loop, name="alpha-universe-scan", daemon=True)
         _THREAD.start()
-    return {"status": "started", **get_state()}
+    # `action` is what THIS call did; `status` comes from get_state and is
+    # what the scan is. They used to share the key, so the spread silently
+    # overwrote the literal and start_scan reported "complete" immediately
+    # after starting a thread — the same collision class as bl_pct.
+    return {"action": "started", **get_state()}
 
 
 def resume_if_incomplete() -> dict:
@@ -520,7 +567,7 @@ def resume_if_incomplete() -> dict:
         scored = _scored_count(today)
         r = start_scan()
         return {"action": "started", "cycle": today,
-                "already_scored": scored, "result": r.get("status"),
+                "already_scored": scored, "result": r.get("action"),
                 "note": ("Resuming an unfinished pass. Factor history cannot be "
                          "backfilled, so a day without a completed scan is "
                          "research data that no later run recovers.")}

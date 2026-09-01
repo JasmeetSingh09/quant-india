@@ -255,7 +255,7 @@ async def startup():
 
     try:
         from universe_scan import start_scan
-        print(f"[scan] {start_scan().get('status')}")
+        print(f"[scan] {start_scan().get('action')}")
     except Exception as _e:
         print(f"[scan] WARNING: could not start universe scan: {_e}")
     import asyncio
