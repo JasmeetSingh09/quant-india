@@ -11,12 +11,18 @@ import Spinner from './Spinner'
  * marked unproven reasonably assumes the silent ones were checked and passed.
  * They were not. Saying nothing was the overclaim, and this table is the fix.
  *
- * The number that matters is the weight, not the count: five of six factors
- * being untested sounds survivable until you notice they carry 82% of the
- * score. So weight leads, and the headline states it in words as well.
+ * The number that matters is the weight, not the count: four of six factors
+ * being untestable sounds survivable until you notice how much of the score
+ * they carry. So weight leads, and the headline states it in words as well.
+ *
+ * Three states, not two. 'Testable now' exists because low_risk turned out to
+ * be reconstructible from stored prices after all, and collapsing it into
+ * either neighbour would misreport it — 'Tested' claims a result that has not
+ * been read, 'Cannot test yet' repeats the error that put it there.
  */
 const STATUS = {
   tested: { label: 'Tested', cls: 'text-yellow-300 border-yellow-800/60 bg-yellow-950/20' },
+  testable_now: { label: 'Testable from prices', cls: 'text-sky-300 border-sky-800/60 bg-sky-950/20' },
   cannot_test_yet: { label: 'Cannot test yet', cls: 'text-gray-400 border-gray-700 bg-gray-900/40' },
   untested: { label: 'Untested', cls: 'text-gray-400 border-gray-700 bg-gray-900/40' },
 }

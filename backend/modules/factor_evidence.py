@@ -56,11 +56,26 @@ CANNOT_TEST = {
     "quality":  LOOKAHEAD_REASON,
     "growth":   LOOKAHEAD_REASON,
     "value":    LOOKAHEAD_REASON,
-    "low_risk": ("Built from realised volatility and drawdown, which ARE "
-                 "reconstructible from prices — but the version scored here is "
-                 "blended with current fundamentals, so the same look-ahead "
-                 "problem applies to the score as shipped."),
     "sentiment": SENTIMENT_REASON,
+}
+
+# low_risk was listed above as untestable, on the stated grounds that the
+# shipped version is "blended with current fundamentals". That was wrong about
+# our own code: alpha_v2._low_risk_factor takes a price series, computes
+# annualised volatility and worst drawdown, and combines them 60/40. No
+# fundamental touches it. With daily closes now stored for the whole archive it
+# is reconstructible at any past date, and it is tested in pit_validation.
+#
+# Correcting this moves a fifth of the model's weight out of the untested
+# column, which is a large enough change to the headline that it is written
+# down here rather than quietly edited.
+RECONSTRUCTIBLE_FROM_PRICES = {
+    "momentum": ("12-1 return over the stock's own price history, "
+                 "volatility-adjusted. Every input is a past price."),
+    "low_risk": ("Annualised volatility and worst drawdown over a trailing "
+                 "window. Every input is a past price — the earlier claim that "
+                 "this factor was blended with current fundamentals was "
+                 "incorrect about the shipped code."),
 }
 
 PLAIN = {
@@ -150,7 +165,18 @@ def evidence(run_walk_forward: bool = True) -> dict:
     w = _weights()
     rows = [_momentum_row(run_walk_forward)]
 
-    for f in ("quality", "growth", "value", "sentiment", "low_risk"):
+    rows.append({
+        "factor": "low_risk",
+        "plain": PLAIN.get("low_risk", "low_risk"),
+        "status": "testable_now",
+        "why": RECONSTRUCTIBLE_FROM_PRICES["low_risk"],
+        "where": ("Tested in the point-in-time validation at /validation/pit, "
+                  "on the same archive and the same identity resolution as the "
+                  "corrected backtest."),
+        "result": None,
+    })
+
+    for f in ("quality", "growth", "value", "sentiment"):
         rows.append({
             "factor": f,
             "plain": PLAIN.get(f, f),
@@ -163,8 +189,10 @@ def evidence(run_walk_forward: bool = True) -> dict:
         r["weight_pct"] = round(w.get(r["factor"], 0) * 100, 1) if w else None
 
     tested = [r for r in rows if r["status"] == "tested"]
+    testable = [r for r in rows if r["status"] == "testable_now"]
     blocked = [r for r in rows if r["status"] == "cannot_test_yet"]
     weight_tested = sum(r["weight_pct"] or 0 for r in tested)
+    weight_testable = sum(r["weight_pct"] or 0 for r in testable)
     weight_blocked = sum(r["weight_pct"] or 0 for r in blocked)
 
     passed = [r for r in tested
@@ -172,22 +200,27 @@ def evidence(run_walk_forward: bool = True) -> dict:
 
     return {
         "factors": rows,
-        "counts": {"tested": len(tested), "cannot_test_yet": len(blocked),
-                   "passed": len(passed)},
+        "counts": {"tested": len(tested), "testable_now": len(testable),
+                   "cannot_test_yet": len(blocked), "passed": len(passed)},
         "weight_tested_pct": round(weight_tested, 1),
+        "weight_testable_pct": round(weight_testable, 1),
         "weight_untested_pct": round(weight_blocked, 1),
         # The single most important number on this page, and the one a reader
         # would never guess: most of the score is carried by factors that have
         # never been tested at all.
         "headline": (
             f"{weight_blocked:.0f}% of the model's weight sits in factors that "
-            f"have never been tested, because the data needed to test them "
-            f"honestly does not exist yet. The {weight_tested:.0f}% that HAS "
-            f"been tested — momentum — did not demonstrate a statistically "
-            f"significant edge in our tested configurations."
+            f"cannot be tested on the data that exists, because scoring a past "
+            f"date would need fundamentals as filed and news as published, and "
+            f"neither is stored. A further {weight_testable:.0f}% is "
+            f"reconstructible from prices and is tested in the point-in-time "
+            f"validation. The {weight_tested:.0f}% tested here — momentum — did "
+            f"not demonstrate a statistically significant edge in our tested "
+            f"configurations."
             if not passed else
-            f"{weight_tested:.0f}% of the model's weight has been tested; "
-            f"{weight_blocked:.0f}% has not."),
+            f"{weight_tested:.0f}% of the model's weight has been tested, "
+            f"{weight_testable:.0f}% is testable from prices, and "
+            f"{weight_blocked:.0f}% cannot be tested on the data that exists."),
         "why_this_table_exists": (
             "The app said momentum was unproven and said nothing about the "
             "other five. A reader who sees one factor honestly marked unproven "

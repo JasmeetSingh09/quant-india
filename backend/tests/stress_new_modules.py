@@ -1333,22 +1333,33 @@ for _r in _rows:
     ok(_r["weight_pct"] is not None, f"{_r['factor']} states its weight")
     ok(abs(_r["weight_pct"] - _W[_r["factor"]] * 100) < 0.05,
        f"{_r['factor']} weight matches the model exactly")
-    ok(_r["status"] in ("tested", "cannot_test_yet", "untested"),
+    ok(_r["status"] in ("tested", "testable_now", "cannot_test_yet", "untested"),
        f"{_r['factor']} has a valid status")
     ok(bool(_r.get("why")), f"{_r['factor']} says WHY it has that status")
 
 _total = sum(r["weight_pct"] for r in _rows)
 ok(abs(_total - 100.0) < 0.05, f"the weights on this page sum to 100, got {_total}")
-ok(abs(_e["weight_tested_pct"] + _e["weight_untested_pct"] - 100.0) < 0.05,
-   "tested plus untested weight accounts for the whole model")
+# Three buckets now, not two: tested, testable from prices, and blocked by data.
+# low_risk moved out of "blocked" when the daily archive made it reconstructible
+# — the earlier claim that it was blended with current fundamentals was wrong
+# about our own code.
+ok(abs(_e["weight_tested_pct"] + _e["weight_testable_pct"]
+       + _e["weight_untested_pct"] - 100.0) < 0.05,
+   "tested plus testable plus untested weight accounts for the whole model")
 
-# Momentum is the only testable one, and the reason is about data not effort.
+# Momentum is the tested one, and the reason is about data not effort.
 _mom = [r for r in _rows if r["factor"] == "momentum"][0]
 ok(_mom["status"] == "tested", "momentum is the tested row")
 ok("purely from prices" in _mom["why"],
    "momentum's row explains what makes it testable when others are not")
+
+_lr = [r for r in _rows if r["factor"] == "low_risk"][0]
+ok(_lr["status"] == "testable_now",
+   "low_risk is reconstructible from prices and is marked so")
+ok(bool(_lr.get("where")), "low_risk says where it is tested")
+
 for _r in _rows:
-    if _r["factor"] == "momentum":
+    if _r["factor"] in ("momentum", "low_risk"):
         continue
     ok(_r["status"] == "cannot_test_yet",
        f"{_r['factor']} is marked as blocked by data, not as passed")
@@ -1358,8 +1369,8 @@ for _r in _rows:
 # No factor may be quietly reported as validated.
 ok(_e["counts"]["passed"] == 0,
    f"nothing claims to have passed, got {_e['counts']['passed']}")
-ok("never been tested" in _e["headline"],
-   "the headline states plainly that most of the model is untested")
+ok("cannot be tested" in _e["headline"],
+   "the headline states plainly that much of the model cannot be tested")
 ok(str(int(_e["weight_untested_pct"])) in _e["headline"],
    "the headline carries the untested weight as a number")
 

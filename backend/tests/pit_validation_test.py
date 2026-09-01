@@ -136,6 +136,34 @@ g = pv._grade([("2025-01", 0.01, 0.02)] * 40 + [("2025-02", -0.01, 0.0)] * 40,
 ok("insufficient_independent_windows" in g,
    "a 12-month horizon over 2 months is flagged as too few windows")
 
+print("\n4b. The mean is tested across MONTHS, not across positions")
+# 400 positions spread over 4 months. Within each month every position has the
+# same excess, so there are really four observations, not four hundred. A test
+# that pools them reports overwhelming significance for what is a sample of
+# four. This is the bug that made regime cells read p=0.0000.
+monthly_truth = [0.02, -0.01, 0.03, -0.015]
+clustered = []
+for mi, mu in enumerate(monthly_truth):
+    for _ in range(100):
+        clustered.append((f"2025-{mi + 1:02d}", mu, mu))
+g = pv._grade(clustered, "clustered", 4, 1)
+pooled_n = g["pooled_description_only"]["n_positions"]
+print(f"    positions={pooled_n}  months tested={g['excess']['n']}  "
+      f"p={g['excess']['p_value']}")
+ok(g["excess"]["n"] == 4,
+   "the mean test uses 4 months, not 400 positions")
+ok(g["excess"]["p_value"] > 0.05,
+   f"four noisy months are not significant (p={g['excess']['p_value']})")
+ok(pooled_n == 400 and "NOT tested" in g["pooled_description_only"]["warning"],
+   "the pooled figure is kept as description and labelled as untested")
+# And the pooled test, had it been run, would have been absurd — this is the
+# size of the error being avoided.
+pooled_if_wrong = pv._mean_test([e for _, e, _ in clustered])
+print(f"    if pooled (wrong): n={pooled_if_wrong['n']}  "
+      f"p={pooled_if_wrong['p_value']}")
+ok(pooled_if_wrong["p_value"] < g["excess"]["p_value"],
+   "pooling would have overstated significance, as expected")
+
 print("\n5. Low-risk scores calmer stocks higher")
 calm = np.full((1, 400), 100.0, dtype=np.float32)
 calm[0] = 100.0 * np.cumprod(1 + rng.normal(0.0002, 0.004, 400))

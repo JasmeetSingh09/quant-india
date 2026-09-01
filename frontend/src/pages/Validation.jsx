@@ -10,10 +10,15 @@ import ErrorBoundary from '../components/ErrorBoundary'
  * Validation — the evidence overview first, then the one deep test.
  *
  * The order is the argument. The table says what is known about all six
- * factors, including that most of the model's weight has never been tested;
- * the walk-forward panel below it is the detail on the single factor that
- * could be. Opening with the deep test alone was what let five silent factors
- * read as though they had passed something.
+ * factors, including that most of the model's weight cannot be tested on the
+ * data that exists; the walk-forward panel below it is the detail on momentum.
+ * Opening with the deep test alone was what let five silent factors read as
+ * though they had passed something.
+ *
+ * Two of the six — momentum and low_risk — are reconstructible from stored
+ * prices and are tested point-in-time. The other four need fundamentals as
+ * filed and news as published, and are marked untestable rather than
+ * approximated from today's values.
  */
 export default function Validation() {
   return (

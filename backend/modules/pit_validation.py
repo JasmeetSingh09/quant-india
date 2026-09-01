@@ -389,6 +389,23 @@ def _grade(obs, label, n_form, horizon, exploratory=False):
     hits = sum(1 for e in exc if e > 0)
     n = len(exc)
 
+    # The mean is TESTED on monthly averages, not on individual positions.
+    # Running a t-test across every stock-month treats a few hundred names
+    # picked in the same month as a few hundred independent draws, and it is
+    # not: they share that month's market. Doing it the wrong way here produced
+    # p-values of 0.0000 on regime cells built from four months, which is how a
+    # cut of nineteen months starts looking like a discovery.
+    #
+    # Averaging within the cluster first is the standard remedy and costs
+    # nothing but the illusion. The pooled figures are still reported, as
+    # description, with no test attached to them.
+    by_month_e, by_month_r = {}, {}
+    for m, e, r in obs:
+        by_month_e.setdefault(m, []).append(e)
+        by_month_r.setdefault(m, []).append(r)
+    monthly_e = [float(np.mean(v)) for _, v in sorted(by_month_e.items())]
+    monthly_r = [float(np.mean(v)) for _, v in sorted(by_month_r.items())]
+
     d = _deff([(m, e > 0) for m, e, _ in obs])
     n_eff = round(n / d["deff"], 1) if d and d.get("deff") else None
     n_i = int(round(n_eff)) if n_eff and n_eff >= 5 else None
@@ -402,8 +419,21 @@ def _grade(obs, label, n_form, horizon, exploratory=False):
         "n_months": len(months),
         "effective_sample_size": n_eff,
         "design_effect": d.get("deff") if d else None,
-        "excess": _mean_test(exc),
-        "raw_return": _mean_test(raw),
+        # Tested across months. n here is the number of months, not the number
+        # of positions, and that is the honest denominator.
+        "excess": _mean_test(monthly_e),
+        "raw_return": _mean_test(monthly_r),
+        "pooled_description_only": {
+            "excess_mean_pct": round(float(np.mean(exc)) * 100, 3),
+            "excess_median_pct": round(float(np.median(exc)) * 100, 3),
+            "raw_mean_pct": round(float(np.mean(raw)) * 100, 3),
+            "n_positions": n,
+            "warning": ("Pooled across every position in every month. Shown to "
+                        "describe the spread of outcomes, NOT tested — a t-test "
+                        "here would treat positions picked in the same month as "
+                        "independent observations and report a significance "
+                        "that does not exist."),
+        },
         "hit_rate_pct": round(hits / n * 100, 1),
         "hit_rate_ci95": _wilson_ci(eff_hits, n_i) if n_i else None,
         "hit_rate_p_value": round(p_eff, 4) if p_eff is not None else None,
