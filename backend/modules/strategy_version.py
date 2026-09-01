@@ -110,19 +110,54 @@ def current_spec() -> dict:
     except Exception:
         pass
 
-    try:
-        from momentum_backtest import (MIN_HOLDINGS, ARCHIVE_STARTS,
-                                       DEFAULT_UNIVERSE, BROAD_UNIVERSE)
-        spec["backtest"] = {
-            "min_holdings": MIN_HOLDINGS,
-            "archive_starts": ARCHIVE_STARTS,
-            "default_universe_size": len(DEFAULT_UNIVERSE),
-            "broad_universe_size": len(BROAD_UNIVERSE),
-            "rebalance": "monthly",
-            "momentum_definition": "12-1 (12-month lookback, most recent month skipped)",
-        }
-    except Exception as e:
-        spec["backtest_error"] = type(e).__name__
+    # Captured field by field. This block used to be one tuple import, and it
+    # named ARCHIVE_STARTS — which lives in bhavcopy, not momentum_backtest. The
+    # ImportError took the other three constants down with it and the whole
+    # block was replaced by the string "ImportError", so v1.0 was frozen on
+    # 2026-08-25 without min_holdings, without the universe sizes, without the
+    # rebalance frequency and without the momentum definition. The hash covered
+    # none of them. MIN_HOLDINGS could have gone from 5 to 3 and the drift check
+    # would have reported no change.
+    #
+    # One failure must not be able to empty a block again, so each field is
+    # captured on its own and anything that fails is recorded by name.
+    def _cap(target, key, fn):
+        try:
+            target[key] = fn()
+        except Exception as e:
+            spec.setdefault("_capture_failures", {})[key] = \
+                f"{type(e).__name__}: {e}"
+
+    bt = {}
+    _cap(bt, "min_holdings",
+         lambda: __import__("momentum_backtest").MIN_HOLDINGS)
+    _cap(bt, "default_universe_size",
+         lambda: len(__import__("momentum_backtest").DEFAULT_UNIVERSE))
+    _cap(bt, "broad_universe_size",
+         lambda: len(__import__("momentum_backtest").BROAD_UNIVERSE))
+    _cap(bt, "archive_starts",
+         lambda: __import__("bhavcopy").ARCHIVE_STARTS)
+    bt["rebalance"] = "monthly"
+    bt["momentum_definition"] = ("12-1 (12-month lookback, most recent month "
+                                 "skipped)")
+    spec["backtest"] = bt
+
+    # The point-in-time backtest is the one that produced the headline result,
+    # so its parameters belong in the frozen record too. Freezing a strategy
+    # while leaving out the cost assumption and the liquidity floor of the test
+    # that evaluates it is most of the way to not freezing it at all.
+    pit = {}
+    _cap(pit, "cost_roundtrip_pct",
+         lambda: __import__("pit_backtest").COST_ROUNDTRIP_PCT)
+    _cap(pit, "lookback_months",
+         lambda: __import__("pit_backtest").LOOKBACK_MONTHS)
+    _cap(pit, "skip_months",
+         lambda: __import__("pit_backtest").SKIP_MONTHS)
+    _cap(pit, "min_holdings",
+         lambda: __import__("pit_backtest").MIN_HOLDINGS)
+    _cap(pit, "min_monthly_turnover",
+         lambda: __import__("pit_backtest").MIN_MONTHLY_TURNOVER)
+    spec["pit_backtest"] = pit
 
     try:
         from strategy_compare import COST_PER_UNIT_TURNOVER
@@ -167,7 +202,8 @@ def current_spec() -> dict:
     return spec
 
 
-def freeze(version: str, notes: str = None, spec: dict = None) -> dict:
+def freeze(version: str, notes: str = None, spec: dict = None,
+           allow_incomplete: bool = False) -> dict:
     """
     Record a version. Refuses to overwrite an existing one.
 
@@ -180,6 +216,28 @@ def freeze(version: str, notes: str = None, spec: dict = None) -> dict:
         return {"frozen": False, "reason": "A version name is required."}
 
     spec = spec or current_spec()
+
+    # A freeze with holes in it is worse than no freeze, because it looks like
+    # a complete record and is treated as one. v1.0 was frozen missing four
+    # behavioural parameters and nobody noticed for a week, so this now refuses
+    # rather than recording a specification it could not fully read.
+    failures = spec.get("_capture_failures") or {}
+    if failures and not allow_incomplete:
+        return {
+            "frozen": False, "version": version,
+            "capture_failures": failures,
+            "reason": (
+                f"Refusing to freeze: {len(failures)} field(s) could not be "
+                f"read from the live configuration "
+                f"({', '.join(sorted(failures))}). A hash over a partial "
+                f"specification silently fails to protect the fields it is "
+                f"missing — exactly what happened to v1.0, which was frozen "
+                f"without min_holdings or the momentum definition and reported "
+                f"no drift when they were absent. Fix the capture, or pass "
+                f"allow_incomplete if a permanently unavailable field is "
+                f"genuinely acceptable."),
+        }
+
     h = _hash(spec)
     now = datetime.now().isoformat()
 
@@ -313,15 +371,52 @@ def compare_versions(a: str, b: str) -> dict:
 
     sa = {k: v for k, v in ra["spec"].items() if k != "captured_at"}
     sb = {k: v for k, v in rb["spec"].items() if k != "captured_at"}
-    changed = []
+    # A field ABSENT from one side is not evidence its value changed — it is
+    # evidence that side never recorded it. Conflating the two would let a
+    # capture defect masquerade as a strategy change, or worse, let a real
+    # change hide behind the excuse of one.
+    entries, changed, coverage = [], [], []
     for k in sorted(set(sa) | set(sb)):
-        if sa.get(k) != sb.get(k):
-            changed.append({
-                "field": k,
-                "kind": "metadata" if k in METADATA_FIELDS else "behavioural",
-                a: sa.get(k), b: sb.get(k)})
+        if sa.get(k) == sb.get(k):
+            continue
+        if k not in sa:
+            why = f"not captured by {a}"
+            coverage.append(k)
+        elif k not in sb:
+            why = f"not captured by {b}"
+            coverage.append(k)
+        else:
+            why = "value differs"
+            changed.append(k)
+        entries.append({
+            "field": k,
+            "kind": "metadata" if k in METADATA_FIELDS else "behavioural",
+            "difference": why,
+            a: sa.get(k), b: sb.get(k)})
 
-    behavioural, metadata = _classify({c["field"] for c in changed})
+    behavioural, metadata = _classify(set(changed))
+
+    if behavioural:
+        verdict = (f"{len(behavioural)} behavioural field(s) hold DIFFERENT "
+                   f"values: {', '.join(behavioural)}. These are different "
+                   f"strategies and their results are not interchangeable.")
+    elif metadata and not coverage:
+        verdict = (f"{a} and {b} are behaviourally identical. The only "
+                   f"difference is {', '.join(metadata)}, which records what "
+                   f"was understood about the strategy rather than what it "
+                   f"does. A backtest of one is a backtest of the other.")
+    elif coverage:
+        verdict = (f"No field recorded by both versions differs. "
+                   f"{len(coverage)} field(s) are present in one record and "
+                   f"absent from the other ({', '.join(coverage)}), which is a "
+                   f"difference in what was CAPTURED, not in what the strategy "
+                   f"does. Behaviour is unchanged; the coverage of the hash is "
+                   f"not."
+                   + (f" Metadata also differs: {', '.join(metadata)}."
+                      if metadata else ""))
+    else:
+        verdict = f"{a} and {b} are identical in every recorded field."
+
     return {
         "found": True,
         "a": {"version": a, "frozen_at": ra["frozen_at"], "spec_hash": ra["spec_hash"]},
@@ -329,16 +424,7 @@ def compare_versions(a: str, b: str) -> dict:
         "behaviourally_identical": not behavioural,
         "behavioural_changes": behavioural,
         "metadata_changes": metadata,
-        "changes": changed,
-        "verdict": (
-            f"{a} and {b} are behaviourally identical. The only difference is "
-            f"{', '.join(metadata)}, which records what was understood about "
-            f"the strategy rather than what it does. A backtest of one is a "
-            f"backtest of the other."
-            if not behavioural and metadata else
-            f"{a} and {b} are identical in every recorded field."
-            if not changed else
-            f"{len(behavioural)} behavioural field(s) differ: "
-            f"{', '.join(behavioural)}. These are different strategies and "
-            f"their results are not interchangeable."),
+        "coverage_differences": coverage,
+        "changes": entries,
+        "verdict": verdict,
     }
