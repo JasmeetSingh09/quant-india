@@ -6,26 +6,166 @@ symbol ZOMATO stopped appearing in the exchange files and ETERNAL started, and
 a backtest keyed on symbols read that as a company ceasing to exist — it booked
 a -100% loss on a firm that was trading normally under a new name the same day.
 
-ISIN survives the rename, so the two cases separate cleanly:
+The obvious fix is to key on ISIN instead. That fixes renames and introduces
+the mirror-image bug, which the live data then produced: between 2024-01-01 and
+2026-08-28, 237 ISINs stopped appearing while only 183 symbols did. More
+identifiers died than names. An ISIN is never reissued to a different company,
+so those extra ones are not delistings — they are securities whose ISIN was
+replaced under a stable ticker, which is what a face-value change, an
+amalgamation or a scheme of arrangement does. Keying on ISIN books every one of
+them as a total loss, exactly as keying on symbols did to Zomato.
 
-  rename     the ISIN keeps trading, under a different symbol
-  delisting  the ISIN stops appearing anywhere
+Neither identifier is the company. So this resolves identity from both:
 
-Both look identical if you only track tickers, and they mean opposite things to
-a portfolio. This module derives the mapping from the exchange's own files
-rather than from a hand-maintained table, which is the difference between
-fixing today's five known cases and fixing the class.
+    ISINs are linked when they trade under the same symbol in sequence.
+    A resolved identity is a chain of such links, and it is delisted only
+    when the whole chain stops trading.
 
-Nothing here is hard-coded. If NSE renames something next month it appears in
-the output without anyone editing this file.
+Sequence is what makes the link safe. Two ISINs under one symbol back to back
+are one company continuing through a corporate action; the same symbol reused
+years later is a recycled ticker, and merging those would erase a real
+delisting. So a link requires the ranges to be adjacent, and anything that
+overlaps substantially is left unmerged and reported as ambiguous — the
+direction that keeps a delisting visible rather than the one that hides it.
+
+Nothing here is hard-coded. If NSE renames or restructures something next month
+it appears in the output without anyone editing this file.
 """
 
-from datetime import datetime
+from datetime import datetime, date
+
+
+# How far apart two ISINs under one symbol may sit and still be one company.
+# A replacement ISIN from a corporate action starts within days of the old one
+# ending. A ticker recycled for an unrelated company is separated by months.
+LINK_MAX_GAP_DAYS = 45
+# A little overlap is ragged data at the boundary, not two live securities.
+# Beyond this the two were genuinely trading at once and are not merged.
+LINK_MAX_OVERLAP_DAYS = 5
 
 
 def _conn():
     from db import get_conn
     return get_conn()
+
+
+def _d(v) -> date:
+    return datetime.strptime(str(v)[:10], "%Y-%m-%d").date()
+
+
+def _pairs(conn):
+    """Every (ISIN, symbol) the exchange has recorded, with its date range."""
+    return conn.execute(
+        "SELECT isin, symbol, MIN(day) AS first_day, MAX(day) AS last_day, "
+        "       COUNT(DISTINCT day) AS days "
+        "FROM bhavcopy_eod WHERE isin IS NOT NULL "
+        "GROUP BY isin, symbol").fetchall()
+
+
+def _resolve_pairs(rows):
+    """
+    Union-find over ISINs, linked by shared symbols that run in sequence.
+
+    Returns (canonical, components, links, ambiguous) where canonical maps
+    every ISIN to the identifier of its chain.
+    """
+    parent = {}
+
+    def find(x):
+        parent.setdefault(x, x)
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            # Lowest ISIN wins, so the canonical id is stable across runs
+            # rather than depending on row order.
+            lo, hi = (ra, rb) if ra <= rb else (rb, ra)
+            parent[hi] = lo
+
+    by_symbol = {}
+    for isin, sym, first, last, days in rows:
+        find(isin)
+        by_symbol.setdefault(sym, []).append(
+            {"isin": isin, "first": _d(first), "last": _d(last),
+             "days": int(days or 0)})
+
+    links, ambiguous = [], []
+    for sym, entries in by_symbol.items():
+        if len(entries) < 2:
+            continue
+        entries.sort(key=lambda e: e["first"])
+        for prev, nxt in zip(entries, entries[1:]):
+            gap = (nxt["first"] - prev["last"]).days
+            if -LINK_MAX_OVERLAP_DAYS <= gap <= LINK_MAX_GAP_DAYS:
+                union(prev["isin"], nxt["isin"])
+                links.append({"symbol": sym, "old_isin": prev["isin"],
+                              "new_isin": nxt["isin"],
+                              "old_last_seen": prev["last"].isoformat(),
+                              "new_first_seen": nxt["first"].isoformat(),
+                              "gap_days": gap})
+            else:
+                ambiguous.append({
+                    "symbol": sym, "isin_a": prev["isin"], "isin_b": nxt["isin"],
+                    "gap_days": gap,
+                    "reason": ("the same ticker reused after a long gap — merging "
+                               "these would hide a real delisting"
+                               if gap > LINK_MAX_GAP_DAYS else
+                               "both ISINs traded under this ticker at the same "
+                               "time, so they are not one security continuing")})
+
+    components = {}
+    for isin in list(parent):
+        components.setdefault(find(isin), set()).add(isin)
+    canonical = {isin: find(isin) for isin in parent}
+    return canonical, components, links, ambiguous
+
+
+def resolve() -> dict:
+    """
+    The symbol/ISIN graph collapsed into continuing securities.
+
+    This is what the backtest keys on. Neither a symbol nor an ISIN survives
+    every corporate event; a chain of them does.
+    """
+    try:
+        conn = _conn()
+    except Exception as e:
+        return {"available": False, "reason": f"{type(e).__name__}"}
+    try:
+        rows = _pairs(conn)
+    except Exception as e:
+        return {"available": False,
+                "reason": (f"Could not read identities ({type(e).__name__}). "
+                           f"The ISIN column may not be populated yet.")}
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    canonical, components, links, ambiguous = _resolve_pairs(rows)
+    multi = {k: v for k, v in components.items() if len(v) > 1}
+    return {
+        "available": True,
+        "isins": len(canonical),
+        "resolved_identities": len(components),
+        "identities_spanning_multiple_isins": len(multi),
+        "isin_changes": len(links),
+        "ambiguous_not_merged": len(ambiguous),
+        "examples": links[:10],
+        "ambiguous_examples": ambiguous[:10],
+        "canonical": canonical,
+        "rule": (f"Two ISINs are the same security when they trade under one "
+                 f"ticker in sequence — the new one starting within "
+                 f"{LINK_MAX_GAP_DAYS} days of the old one ending. Ranges that "
+                 f"overlap by more than {LINK_MAX_OVERLAP_DAYS} days, or sit "
+                 f"further apart than that, are left separate and counted as "
+                 f"ambiguous, because merging them would erase a delisting."),
+    }
 
 
 def transitions(min_gap_days: int = 0) -> dict:
@@ -42,11 +182,7 @@ def transitions(min_gap_days: int = 0) -> dict:
         return {"available": False, "reason": f"{type(e).__name__}"}
 
     try:
-        rows = conn.execute(
-            "SELECT isin, symbol, MIN(day) AS first_day, MAX(day) AS last_day, "
-            "       COUNT(DISTINCT day) AS days "
-            "FROM bhavcopy_eod WHERE isin IS NOT NULL "
-            "GROUP BY isin, symbol").fetchall()
+        rows = _pairs(conn)
     except Exception as e:
         conn.close()
         return {"available": False,
@@ -81,23 +217,37 @@ def transitions(min_gap_days: int = 0) -> dict:
             })
 
     renames.sort(key=lambda r: r["new_first_seen"])
+
+    # The mirror case, reported alongside so neither is mistaken for the whole
+    # problem: one ISIN under many symbols is a rename, one symbol under many
+    # ISINs is a restructuring, and both break naive tracking.
+    try:
+        _, _, links, _ = _resolve_pairs(rows)
+    except Exception:
+        links = []
+
     return {
         "available": True,
         "isins_seen": len(by_isin),
         "renames": renames,
         "rename_count": len(renames),
+        "isin_changes": links[:50],
+        "isin_change_count": len(links),
         "how": ("Derived from the exchange's own files: an ISIN that has traded "
-                "under more than one symbol was renamed. Nothing is hard-coded, "
-                "so a rename next month appears here without an edit."),
+                "under more than one symbol was renamed, and a symbol whose "
+                "ISIN was replaced in sequence was restructured. Nothing is "
+                "hard-coded, so either kind of change next month appears here "
+                "without an edit."),
     }
 
 
 def true_delistings(as_of_last: str = None) -> dict:
     """
-    ISINs that stopped trading entirely, as opposed to changing label.
+    Securities that stopped trading entirely, as opposed to changing label.
 
-    This is the number a survivorship correction actually needs. Counting
-    symbols instead inflates it by every rename.
+    Counted on resolved identities. Counting symbols inflates the number by
+    every rename; counting ISINs inflates it by every restructuring. All three
+    counts are reported so the difference is visible rather than asserted.
     """
     try:
         conn = _conn()
@@ -112,7 +262,6 @@ def true_delistings(as_of_last: str = None) -> dict:
             conn.close()
             return {"available": False, "reason": "No exchange files stored."}
 
-        # ISINs present at the start, absent at the end.
         start_isins = {r[0] for r in conn.execute(
             "SELECT DISTINCT isin FROM bhavcopy_eod WHERE day = ? "
             "AND isin IS NOT NULL", (first,)).fetchall()}
@@ -120,26 +269,6 @@ def true_delistings(as_of_last: str = None) -> dict:
             "SELECT DISTINCT isin FROM bhavcopy_eod WHERE day = ? "
             "AND isin IS NOT NULL", (last,)).fetchall()}
 
-        gone = start_isins - end_isins
-        # Name them by the last symbol each traded under.
-        named = []
-        for isin in list(gone)[:50]:
-            row = conn.execute(
-                "SELECT symbol, MAX(day) FROM bhavcopy_eod WHERE isin = ? "
-                "GROUP BY symbol ORDER BY MAX(day) DESC", (isin,)).fetchone()
-            if row:
-                named.append({"isin": isin, "last_symbol": row[0],
-                              "last_seen": str(row[1])[:10]})
-    finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
-
-    # Symbol-level count, for the comparison that shows why this matters.
-    sym_gone = None
-    try:
-        conn = _conn()
         s_start = {r[0] for r in conn.execute(
             "SELECT DISTINCT symbol FROM bhavcopy_eod WHERE day = ?",
             (first,)).fetchall()}
@@ -147,33 +276,71 @@ def true_delistings(as_of_last: str = None) -> dict:
             "SELECT DISTINCT symbol FROM bhavcopy_eod WHERE day = ?",
             (last,)).fetchall()}
         sym_gone = len(s_start - s_end)
-        conn.close()
-    except Exception:
-        pass
+
+        pairs = _pairs(conn)
+        canonical, components, links, ambiguous = _resolve_pairs(pairs)
+
+        start_ids = {canonical.get(i, i) for i in start_isins}
+        end_ids = {canonical.get(i, i) for i in end_isins}
+        gone_ids = start_ids - end_ids
+        gone_isins = start_isins - end_isins
+
+        named = []
+        for cid in list(gone_ids)[:50]:
+            member = sorted(components.get(cid, {cid}))
+            marks = ",".join("?" for _ in member)
+            row = conn.execute(
+                "SELECT symbol, MAX(day) FROM bhavcopy_eod WHERE isin IN "
+                "(" + marks + ") GROUP BY symbol ORDER BY MAX(day) DESC",
+                tuple(member)).fetchone()
+            if row:
+                named.append({"identity": cid, "isins": member,
+                              "last_symbol": row[0],
+                              "last_seen": str(row[1])[:10]})
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    rename_inflation = sym_gone - len(gone_ids)
+    restructure_inflation = len(gone_isins) - len(gone_ids)
 
     return {
         "available": True,
         "window": {"first": str(first)[:10], "last": str(last)[:10]},
+        "identities_at_start": len(start_ids),
+        "identities_at_end": len(end_ids),
+        "true_delistings": len(gone_ids),
+        "true_delisting_pct": (round(len(gone_ids) / len(start_ids) * 100, 2)
+                               if start_ids else None),
+        "counted_by_symbol": sym_gone,
+        "counted_by_isin": len(gone_isins),
+        "inflation_from_renames": rename_inflation,
+        "inflation_from_isin_changes": restructure_inflation,
         "isins_at_start": len(start_isins),
         "isins_at_end": len(end_isins),
-        "true_delistings": len(gone),
-        "true_delisting_pct": (round(len(gone) / len(start_isins) * 100, 2)
-                               if start_isins else None),
-        "symbols_disappeared": sym_gone,
-        "inflation_from_renames": ((sym_gone - len(gone))
-                                   if sym_gone is not None else None),
+        "ambiguous_not_merged": len(ambiguous),
         "examples": named[:10],
         "why_it_matters": (
-            f"Counting SYMBOLS that disappeared gives {sym_gone}. Counting "
-            f"ISINs gives {len(gone)}. The difference is renames — companies "
-            f"that never stopped trading. A backtest keyed on symbols books "
-            f"every one of them as a total loss."
-            if sym_gone is not None else ""),
+            "Three ways of counting the same window give three answers. "
+            "Symbols that disappeared: " + str(sym_gone) + ". ISINs that "
+            "disappeared: " + str(len(gone_isins)) + ". Securities that "
+            "actually stopped trading: " + str(len(gone_ids)) + ". Keying a "
+            "backtest on symbols books " + str(rename_inflation) + " renamed "
+            "companies as total losses; keying it on ISINs books " +
+            str(restructure_inflation) + " restructured ones the same way. "
+            "Only the third number is a delisting rate."),
+        "caveat": (
+            str(len(ambiguous)) + " symbol reuse(s) were left unmerged rather "
+            "than assumed to be one company. That keeps the delisting count "
+            "higher, which is the safe direction — the alternative silently "
+            "removes losses from the record." if ambiguous else None),
     }
 
 
 def symbol_to_isin(day: str = None) -> dict:
-    """Current symbol -> ISIN on the nearest stored day at or before `day`."""
+    """Current symbol -> ISIN on the nearest stored day at or before day."""
     try:
         conn = _conn()
     except Exception:

@@ -53,19 +53,25 @@ def _month_end_days(conn) -> list:
     return [(r[0], r[1]) for r in rows if r and r[1]]
 
 
-def _panel(conn, month_days: list):
+def _panel(conn, month_days: list, canonical: dict = None):
     """
-    Month-end close and traded value for every symbol, per month.
+    Month-end close and traded value for every security, per month.
 
-    A symbol missing from a month-end file is missing on purpose: it was not
+    A security missing from a month-end file is missing on purpose: it was not
     trading. That absence is what makes the universe point-in-time, so it is
     never filled in.
     """
+    canonical = canonical or {}
     closes, values = {}, {}
     for ym, day in month_days:
-        # Keyed on ISIN, not symbol. A rename changes the symbol and keeps the
-        # ISIN, so keying on the label made ZOMATO look like a company that
-        # ceased to exist when it was trading normally as ETERNAL the same day.
+        # Keyed on resolved identity, not on either raw identifier. Keying on
+        # the symbol made ZOMATO look like a company that ceased to exist when
+        # it was trading normally as ETERNAL the same day. Keying on the ISIN
+        # fixes that and breaks the mirror case: a company that keeps its
+        # ticker through a corporate action gets a new ISIN, and the old one
+        # vanishing reads as a delisting. In this window that mirror case is
+        # the LARGER of the two. security_identity chains both together.
+        #
         # Rows without an ISIN fall back to the symbol so a partially
         # backfilled table still runs — degraded, and the caller is told.
         rows = conn.execute(
@@ -73,7 +79,7 @@ def _panel(conn, month_days: list):
             (day,)).fetchall()
         c, v = {}, {}
         for sym, close, vol, isin in rows:
-            key = isin or sym
+            key = canonical.get(isin, isin) if isin else sym
             if not key or close is None:
                 continue
             sym = key
@@ -132,7 +138,16 @@ def run(top_fraction: float = 0.2, min_turnover: float = MIN_MONTHLY_TURNOVER,
             return {"error": (f"Only {len(month_days)} months of exchange files. "
                               f"A 12-1 momentum test needs at least "
                               f"{LOOKBACK_MONTHS + SKIP_MONTHS + 2}.")}
-        closes, values = _panel(conn, month_days)
+        # Resolve identity BEFORE building the panel, so a company that changed
+        # ISIN mid-window is one column rather than two.
+        try:
+            from security_identity import _pairs, _resolve_pairs
+            canonical, _components, _links, _amb = _resolve_pairs(_pairs(conn))
+            resolved = {"linked_isins": len(_links),
+                        "ambiguous_not_merged": len(_amb)}
+        except Exception as e:
+            canonical, resolved = {}, {"error": type(e).__name__}
+        closes, values = _panel(conn, month_days, canonical)
     finally:
         try:
             conn.close()
@@ -242,11 +257,17 @@ def run(top_fraction: float = 0.2, min_turnover: float = MIN_MONTHLY_TURNOVER,
             "last_month": months[-1],
         },
         "identity": {
-            "keyed_on": "ISIN where available, symbol otherwise",
+            "keyed_on": ("resolved identity — ISINs chained through shared "
+                         "tickers; symbol only where no ISIN exists"),
             "coverage": identity,
-            "why": ("A ticker is a label; the ISIN is the security. Keyed on "
-                    "symbols, a rename is indistinguishable from a delisting "
-                    "and gets booked as a total loss."),
+            "resolution": resolved,
+            "why": ("Neither identifier survives every corporate event. Keyed "
+                    "on symbols, a rename looks like a delisting and gets "
+                    "booked as a total loss. Keyed on ISINs, a company that "
+                    "keeps its ticker through a restructuring looks like one "
+                    "too — and in this window that second case is the larger "
+                    "of the two. Chaining both is what makes a delisting here "
+                    "mean the security actually stopped trading."),
         },
         "delistings_held": {
             "count": len(delisted_held),

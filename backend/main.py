@@ -1559,6 +1559,21 @@ def identity_coverage():
     return coverage()
 
 
+@app.get("/identity/resolved")
+def identity_resolved():
+    """
+    Symbols and ISINs collapsed into continuing securities.
+
+    An ISIN that changes under a stable ticker is the mirror of a rename, and
+    counting either one naively books a live company as a total loss.
+    """
+    from security_identity import resolve
+    out = resolve()
+    # The full map is thousands of entries and nothing reads it over HTTP.
+    out.pop("canonical", None)
+    return out
+
+
 @app.get("/backtest/full-pit")
 def backtest_full_pit(top_fraction: float = Query(0.2, ge=0.05, le=0.5)):
     """
