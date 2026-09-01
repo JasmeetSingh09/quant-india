@@ -29,6 +29,33 @@ except Exception:                                   # pragma: no cover
 
 _READY = False
 
+# Which parts of a specification decide what the strategy DOES, and which only
+# record what we understood about it.
+#
+# The distinction earns its keep the first time a version increments for a
+# reason that is not a model change. A corrected note about which factors can
+# be tested historically moves no weight and changes no threshold, but it does
+# change the hash — and without this split, the drift report says "any result
+# produced now cannot be attributed to this version", which for a metadata
+# correction is false and would retire a perfectly good backtest.
+#
+# Everything not listed as metadata is treated as behavioural. That default is
+# deliberate: a new field added later is assumed to matter until someone says
+# otherwise, which is the safe direction for a check whose whole job is to
+# refuse to let a change pass unnoticed.
+METADATA_FIELDS = {
+    "factors_not_historically_testable",
+    "factors_not_backtestable_as_strategies",
+    "captured_at",
+}
+
+
+def _classify(fields):
+    """Split a set of changed field names into behavioural and metadata."""
+    behavioural = sorted(f for f in fields if f not in METADATA_FIELDS)
+    metadata = sorted(f for f in fields if f in METADATA_FIELDS)
+    return behavioural, metadata
+
 
 def _init():
     global _READY
@@ -241,12 +268,77 @@ def drift(version: str) -> dict:
     for k in sorted(set(a) | set(b)):
         if a.get(k) != b.get(k):
             changed.append({"field": k, "frozen": a.get(k), "live": b.get(k)})
+
+    behavioural, metadata = _classify({c["field"] for c in changed})
+    for c in changed:
+        c["kind"] = "metadata" if c["field"] in METADATA_FIELDS else "behavioural"
+
+    if not changed:
+        verdict = "The live configuration still matches this version."
+    elif behavioural:
+        verdict = (f"{len(behavioural)} behavioural field(s) differ from the "
+                   f"frozen spec ({', '.join(behavioural)}). A result produced "
+                   f"now cannot be attributed to {version} — mint a new version "
+                   f"instead.")
+    else:
+        verdict = (f"Metadata only: {', '.join(metadata)}. No factor weight, "
+                   f"threshold, cost or rule differs, so the strategy behaves "
+                   f"exactly as it did when {version} was frozen and results "
+                   f"remain attributable to it. The hash differs because the "
+                   f"hash covers the whole record, which is the point of "
+                   f"hashing it.")
+
     return {
         "found": True, "version": version, "frozen_at": rec["frozen_at"],
-        "drifted": bool(changed), "changes": changed,
-        "verdict": ("The live configuration still matches this version."
-                    if not changed else
-                    f"{len(changed)} field(s) differ from the frozen spec. Any "
-                    f"result produced now cannot be attributed to {version} — "
-                    f"mint a new version instead."),
+        "drifted": bool(changed),
+        "behavioural_drift": bool(behavioural),
+        "metadata_drift": bool(metadata),
+        "changes": changed,
+        "verdict": verdict,
+    }
+
+
+def compare_versions(a: str, b: str) -> dict:
+    """
+    What actually differs between two frozen versions.
+
+    Exists so that "V1.1 is behaviourally identical to V1.0" is something a
+    reader can check rather than something the notes field claims.
+    """
+    ra, rb = get(a), get(b)
+    if not ra.get("found"):
+        return {"found": False, "missing": a}
+    if not rb.get("found"):
+        return {"found": False, "missing": b}
+
+    sa = {k: v for k, v in ra["spec"].items() if k != "captured_at"}
+    sb = {k: v for k, v in rb["spec"].items() if k != "captured_at"}
+    changed = []
+    for k in sorted(set(sa) | set(sb)):
+        if sa.get(k) != sb.get(k):
+            changed.append({
+                "field": k,
+                "kind": "metadata" if k in METADATA_FIELDS else "behavioural",
+                a: sa.get(k), b: sb.get(k)})
+
+    behavioural, metadata = _classify({c["field"] for c in changed})
+    return {
+        "found": True,
+        "a": {"version": a, "frozen_at": ra["frozen_at"], "spec_hash": ra["spec_hash"]},
+        "b": {"version": b, "frozen_at": rb["frozen_at"], "spec_hash": rb["spec_hash"]},
+        "behaviourally_identical": not behavioural,
+        "behavioural_changes": behavioural,
+        "metadata_changes": metadata,
+        "changes": changed,
+        "verdict": (
+            f"{a} and {b} are behaviourally identical. The only difference is "
+            f"{', '.join(metadata)}, which records what was understood about "
+            f"the strategy rather than what it does. A backtest of one is a "
+            f"backtest of the other."
+            if not behavioural and metadata else
+            f"{a} and {b} are identical in every recorded field."
+            if not changed else
+            f"{len(behavioural)} behavioural field(s) differ: "
+            f"{', '.join(behavioural)}. These are different strategies and "
+            f"their results are not interchangeable."),
     }

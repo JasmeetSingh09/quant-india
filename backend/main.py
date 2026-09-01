@@ -1588,6 +1588,23 @@ def backtest_full_pit(top_fraction: float = Query(0.2, ge=0.05, le=0.5)):
     return r
 
 
+@app.get("/strategy/compare-versions")
+def strategy_compare_versions(a: str = Query(...), b: str = Query(...)):
+    """
+    What differs between two frozen versions, split into behavioural changes
+    and metadata changes.
+
+    Lets "V1.1 is behaviourally identical to V1.0" be checked rather than
+    taken on the word of a notes field.
+    """
+    from strategy_version import compare_versions
+    r = compare_versions(a, b)
+    if not r.get("found"):
+        raise HTTPException(status_code=404,
+                            detail=f"No frozen version named {r.get('missing')}.")
+    return r
+
+
 @app.get("/validation/pit")
 def validation_pit(min_turnover: float = Query(1e7, ge=0),
                    buckets: int = Query(5, ge=3, le=10)):
