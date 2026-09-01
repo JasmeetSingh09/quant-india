@@ -114,10 +114,29 @@ def _init():
     _READY = True
 
 
+def _strategy_only(spec: dict) -> dict:
+    """
+    The spec minus the environment it happened to run in.
+
+    The hash answers "is this the same strategy". The environment block answers
+    "could this run be reproduced", and it includes the archive's row count,
+    which grows every trading day. Hashing it would mean the hash of a frozen
+    version changed every evening — and a specification whose hash changes
+    daily is not frozen, it is a timestamp with extra steps.
+
+    So the environment is RECORDED with the version and compared by drift, but
+    it is not part of the identity of the strategy. Versions frozen before this
+    block existed are unaffected: removing a key they never had cannot change
+    their hash, so v1.0 through v1.3 keep the hashes they were minted with.
+    """
+    return {k: v for k, v in (spec or {}).items()
+            if k not in ENVIRONMENT_FIELDS}
+
+
 def _hash(spec: dict) -> str:
-    """Stable hash of the specification. sort_keys so a reordered dict is the
-    same strategy, which it is."""
-    blob = json.dumps(spec, sort_keys=True, separators=(",", ":"))
+    """Stable hash of the STRATEGY. sort_keys so a reordered dict is the same
+    strategy, which it is."""
+    blob = json.dumps(_strategy_only(spec), sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(blob.encode()).hexdigest()[:16]
 
 

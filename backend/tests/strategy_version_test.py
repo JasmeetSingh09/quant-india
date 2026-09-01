@@ -79,6 +79,29 @@ tampered2["pit_backtest"]["cost_roundtrip_pct"] = 0.1
 ok(sv._hash(tampered2) != h_before,
    "changing the cost assumption changes the hash")
 
+print("\n3b. The hash is stable against environment churn")
+# The environment block records the archive's row count, which grows every
+# trading day. If that were hashed, the hash of a frozen version would change
+# every evening — and a specification whose hash changes daily is not frozen.
+import copy  # noqa: E402
+env_churn = copy.deepcopy(spec)
+if env_churn.get("environment", {}).get("archive"):
+    env_churn["environment"]["archive"]["rows"] += 2400
+    env_churn["environment"]["archive"]["last_day"] = "2099-01-01"
+env_churn.setdefault("environment", {})["numpy_version"] = "99.0.0"
+ok(sv._hash(env_churn) == h_before,
+   "a grown archive and a numpy upgrade do not move the hash")
+
+no_env = {k: v for k, v in spec.items() if k != "environment"}
+ok(sv._hash(no_env) == h_before,
+   "a spec with no environment key hashes the same, so v1.0-v1.3 are unaffected")
+
+both = copy.deepcopy(env_churn)
+both["signal_thresholds"] = dict(both["signal_thresholds"])
+both["signal_thresholds"]["signal_strong_buy"] = 25
+ok(sv._hash(both) != h_before,
+   "but a Strong Buy threshold change still moves it, environment churn or not")
+
 print("\n4. An incomplete specification is refused, not stored")
 holed = {k: v for k, v in spec.items()}
 holed["_capture_failures"] = {"min_holdings": "ImportError: nope"}
