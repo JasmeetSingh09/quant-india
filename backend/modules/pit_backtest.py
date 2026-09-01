@@ -501,19 +501,51 @@ def _holding_stats(month_rets: list) -> dict:
     if deff and deff.get("deff"):
         n_eff = round(n / deff["deff"], 1)
 
+    # The unadjusted interval and p-value are computed as if every position
+    # were an independent draw. They are not — positions held in the same month
+    # share that month's market move — so on this data the unadjusted p-value
+    # is roughly fifty times too confident. Both are reported, but the adjusted
+    # pair is the one that means anything, and the unadjusted pair is labelled
+    # rather than quietly shown next to it.
+    eff_wilson, eff_p, eff_method, eff_hits = None, None, None, None
+    if n_eff and n_eff >= 5:
+        try:
+            from market_validation import _wilson, _binom_p
+            n_i = int(round(n_eff))
+            eff_hits = int(round(hits / n * n_i))
+            eff_wilson = _wilson(eff_hits, n_i)
+            eff_p, eff_method = _binom_p(eff_hits, n_i)
+        except Exception:
+            pass
+
     out = dict(base)
     out.update({
         "positions": n,
         "hit_rate_pct": round(hits / n * 100, 1),
-        "hit_rate_ci95": wilson,
-        "hit_rate_p_value": round(binom_p, 4) if binom_p is not None else None,
-        "hit_rate_p_method": binom_method,
-        "clustering": deff,
         "effective_sample_size": n_eff,
-        "note": ("Position-level figures. The raw count is every holding-month; "
-                 "the effective count divides it by the design effect, because "
-                 "positions held in the same month are not independent "
-                 "observations of anything."),
+        "hit_rate_ci95": eff_wilson,
+        "hit_rate_p_value": round(eff_p, 4) if eff_p is not None else None,
+        "hit_rate_p_method": (f"{eff_method}, on the effective sample "
+                              f"({eff_hits} of {int(round(n_eff))})"
+                              if eff_method else None),
+        "hit_rate_significant_at_5pct": bool(eff_p is not None and eff_p < 0.05),
+        "unadjusted_if_positions_were_independent": {
+            "ci95": wilson,
+            "p_value": round(binom_p, 4) if binom_p is not None else None,
+            "method": binom_method,
+            "warning": ("These treat all "
+                        + str(n) +
+                        " position-months as independent draws. They are not. "
+                        "This pair is shown only so the size of the correction "
+                        "is visible; it is not evidence of anything."),
+        },
+        "clustering": deff,
+        "note": ("Position-level figures. The headline interval and p-value are "
+                 "computed on the EFFECTIVE sample size — the raw count divided "
+                 "by a design effect estimated from these observations by "
+                 "ANOVA. Positions held in the same month are not independent "
+                 "observations, and at a design effect above 50 the difference "
+                 "decides whether a result looks significant."),
     })
     return out
 
