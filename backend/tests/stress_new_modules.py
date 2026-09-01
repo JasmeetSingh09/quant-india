@@ -615,8 +615,23 @@ if _cov.get("usable") or _u:
 _b = measure_bias(_cov.get("earliest") or "2026-08-13")
 ok("measured" in _b, "bias measurement always reports whether it ran")
 if _b.get("measured"):
-    ok(_b["delisted_since"] >= 0, "delisted count is never negative")
+    ok(_b["symbols_gone"] >= 0, "ticker-disappearance count is never negative")
     ok(_b["listed_then"] > 0, "a measured day has a non-empty universe")
+    # The delisting count is only populated when identity was resolved.
+    if _b.get("identity_resolved"):
+        ok(_b["delisted_since"] >= 0, "delisted count is never negative")
+        # Provable, not merely observed: every resolved identity that vanished
+        # has at least one ISIN of its own that vanished, so the resolved count
+        # cannot exceed the ISIN count. No such bound holds against the TICKER
+        # count — a ticker reassigned to another company is still present at the
+        # end while the original security is gone — so that is left uncompared
+        # rather than asserted and quietly true until the day it is not.
+        ok(_b["delisted_since"] <= _b["counted_by_isin"],
+           "resolved delistings never exceed the ISIN count")
+    else:
+        ok(_b["delisted_since"] is None,
+           "an unresolved window reports no delisting count rather than a "
+           "ticker count wearing its name")
 
 
 # Portfolio health score and the suggested-allocation fix.

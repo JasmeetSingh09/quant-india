@@ -241,7 +241,7 @@ def transitions(min_gap_days: int = 0) -> dict:
     }
 
 
-def true_delistings(as_of_last: str = None) -> dict:
+def true_delistings(as_of_last: str = None, as_of_first: str = None) -> dict:
     """
     Securities that stopped trading entirely, as opposed to changing label.
 
@@ -255,10 +255,19 @@ def true_delistings(as_of_last: str = None) -> dict:
         return {"available": False, "reason": f"{type(e).__name__}"}
 
     try:
-        last = as_of_last or conn.execute(
+        # Snap a requested date to a day the exchange actually traded, rather
+        # than returning nothing because the caller named a Sunday.
+        last = as_of_last and conn.execute(
+            "SELECT MAX(day) FROM bhavcopy_eod WHERE day <= ?",
+            (str(as_of_last)[:10],)).fetchone()[0]
+        last = last or conn.execute(
             "SELECT MAX(day) FROM bhavcopy_eod").fetchone()[0]
-        first = conn.execute("SELECT MIN(day) FROM bhavcopy_eod").fetchone()[0]
-        if not last:
+        first = as_of_first and conn.execute(
+            "SELECT MIN(day) FROM bhavcopy_eod WHERE day >= ?",
+            (str(as_of_first)[:10],)).fetchone()[0]
+        first = first or conn.execute(
+            "SELECT MIN(day) FROM bhavcopy_eod").fetchone()[0]
+        if not last or not first:
             conn.close()
             return {"available": False, "reason": "No exchange files stored."}
 

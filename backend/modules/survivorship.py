@@ -130,19 +130,64 @@ def measure_bias(start_date: str) -> dict:
     gone = sorted(then - now)
     new = sorted(now - then)
     pct = round(len(gone) / max(1, len(then)) * 100, 2)
-    return {
+
+    # A symbol that stopped appearing has not necessarily stopped trading: it
+    # may have been renamed, or had its ISIN replaced under the same ticker.
+    # Both look identical here and both inflate this count, so the resolved
+    # figure is computed alongside and leads the note.
+    resolved = None
+    try:
+        from security_identity import true_delistings
+        resolved = true_delistings(as_of_first=str(start_date)[:10])
+        if not resolved.get("available"):
+            resolved = None
+    except Exception:
+        resolved = None
+
+    out = {
         "measured": True,
         "as_of": str(start_date)[:10],
         "listed_then": len(then),
         "listed_now": len(now),
-        "delisted_since": len(gone),
-        "delisted_pct": pct,
+        "symbols_gone": len(gone),
+        "symbols_gone_pct": pct,
         "newly_listed_since": len(new),
         "examples": [t.replace(".NS", "") for t in gone[:10]],
-        "note": (f"{len(gone)} of {len(then)} symbols trading on {str(start_date)[:10]} "
-                 f"({pct}%) are no longer in the current universe. Every backtest run "
-                 f"on today's stock list silently excludes them, and companies "
-                 f"disappear disproportionately after doing badly — which is why "
-                 f"survivorship bias makes historical results look better than they "
-                 f"were."),
     }
+
+    if resolved:
+        true_n = resolved["true_delistings"]
+        true_pct = resolved["true_delisting_pct"]
+        out.update({
+            "delisted_since": true_n,
+            "delisted_pct": true_pct,
+            "counted_by_symbol": len(gone),
+            "counted_by_isin": resolved["counted_by_isin"],
+            "identity_resolved": True,
+            "note": (f"{true_n} of {resolved['identities_at_start']} securities "
+                     f"trading on {resolved['window']['first']} "
+                     f"({true_pct}%) have actually stopped trading. Counting "
+                     f"tickers instead gives {len(gone)} and counting ISINs "
+                     f"gives {resolved['counted_by_isin']}; the surplus in each "
+                     f"is companies that changed name or changed ISIN and are "
+                     f"trading today. Every backtest run on today's stock list "
+                     f"still silently excludes the {true_n} that are genuinely "
+                     f"gone, and companies disappear disproportionately after "
+                     f"doing badly — which is why survivorship bias makes "
+                     f"historical results look better than they were."),
+        })
+    else:
+        # Say which number this is rather than letting a ticker count pass as
+        # a delisting count.
+        out.update({
+            "delisted_since": None,
+            "delisted_pct": None,
+            "identity_resolved": False,
+            "note": (f"{len(gone)} of {len(then)} symbols trading on "
+                     f"{str(start_date)[:10]} ({pct}%) are no longer in the "
+                     f"current universe. This is a count of TICKERS, not of "
+                     f"delistings — a renamed company appears in it too, so "
+                     f"treat it as an upper bound. Identity could not be "
+                     f"resolved for this window."),
+        })
+    return out
