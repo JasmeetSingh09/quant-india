@@ -1608,6 +1608,27 @@ def strategy_retract(req: RetractRequest):
     return r
 
 
+@app.get("/scan/health")
+def scan_health_report():
+    """
+    Did the collector actually collect?
+
+    Factor history cannot be backfilled, so a day the scan failed to complete
+    is research data that no later effort recovers. This measures completion
+    from the stored rows rather than from the status column, which is set when
+    the worker pool drains whether or not anything scored.
+    """
+    from scan_health import report
+    return report()
+
+
+@app.get("/scan/stalls")
+def scan_health_stalls(cycle: str = Query(None)):
+    """Gaps in the write stream — where the scanner was not running."""
+    from scan_health import stalls
+    return stalls(cycle=cycle)
+
+
 @app.get("/strategy/compare-versions")
 def strategy_compare_versions(a: str = Query(...), b: str = Query(...)):
     """
