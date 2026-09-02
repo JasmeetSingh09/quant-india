@@ -116,6 +116,31 @@ def _momentum(C, col, lookback, skip):
     return score
 
 
+def _py(o):
+    """
+    Numpy scalars out, Python scalars in.
+
+    A module this full of numpy will leak a np.bool_ or np.float64 into the
+    response eventually, and the failure mode is a 500 after the work is
+    already done — the most expensive way to discover a type error. Converted
+    once at the boundary rather than remembered at each of thirty sites.
+    """
+    if isinstance(o, dict):
+        return {k: _py(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [_py(v) for v in o]
+    if isinstance(o, np.bool_):
+        return bool(o)
+    if isinstance(o, np.integer):
+        return int(o)
+    if isinstance(o, np.floating):
+        f = float(o)
+        return f if math.isfinite(f) else None
+    if isinstance(o, float) and not math.isfinite(o):
+        return None
+    return o
+
+
 def run(min_turnover: float = 1e7, n_buckets: int = 5) -> dict:
     """
     All four variants on one panel. Read-only.
@@ -246,8 +271,12 @@ def run(min_turnover: float = 1e7, n_buckets: int = 5) -> dict:
               .get("top_minus_bottom", {}).get("mean_pct"))
         results[label]["sign_stability"] = {
             "regime_signs_agree": bool(signs) and len(set(signs)) == 1,
-            "horizons_agree": (h1 is not None and h3 is not None
-                               and np.sign(h1) == np.sign(h3)),
+            # bool(), not the numpy comparison. np.sign returns np.float64 and
+            # comparing two of them yields np.bool_, which FastAPI cannot
+            # serialise — the whole experiment 500'd on this one field after
+            # running for 220 seconds.
+            "horizons_agree": bool(h1 is not None and h3 is not None
+                                   and np.sign(h1) == np.sign(h3)),
             "primary_mean_pct": h1, "secondary_mean_pct": h3,
         }
 
@@ -277,7 +306,7 @@ def run(min_turnover: float = 1e7, n_buckets: int = 5) -> dict:
 
     promotable = [k for k, v in verdicts.items() if v["meets_decision_rule"]]
 
-    return {
+    return _py({
         "available": True,
         "pre_registration": {
             "family": [{"label": l, "lookback": lb, "skip": sk, "description": d}
@@ -318,4 +347,4 @@ def run(min_turnover: float = 1e7, n_buckets: int = 5) -> dict:
             "than reported weakly. Nothing here establishes a durable edge for "
             "any variant, including the baseline."),
         "as_of": datetime.now().strftime("%Y-%m-%d %H:%M"),
-    }
+    })
