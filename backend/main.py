@@ -1688,6 +1688,21 @@ def scan_health_report():
     return report()
 
 
+@app.get("/research/momentum-variants")
+def research_momentum_variants(min_turnover: float = Query(1e7, ge=0)):
+    """
+    The pre-registered 12-1 vs 12-0 comparison, plus two robustness variants.
+
+    Read-only research. Changes no model parameter; the hypotheses and the
+    decision rule were committed before this could be run.
+    """
+    from momentum_variants import run
+    r = run(min_turnover=min_turnover)
+    if not r.get("available"):
+        raise HTTPException(status_code=400, detail=r.get("reason"))
+    return r
+
+
 @app.get("/scan/cycle-audit")
 def scan_cycle_audit(cycle: str = Query(None)):
     """
