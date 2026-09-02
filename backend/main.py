@@ -1643,6 +1643,22 @@ def scan_health_report():
     return report()
 
 
+@app.get("/scan/cycle-audit")
+def scan_cycle_audit(cycle: str = Query(None)):
+    """
+    Data-integrity report for one completed scan cycle.
+
+    Read-only. Defaults to the most recent completed pass, because auditing a
+    scan still in flight measures a moving target and reports its
+    incompleteness as a fault.
+    """
+    from cycle_audit import audit
+    r = audit(cycle=cycle)
+    if not r.get("available"):
+        raise HTTPException(status_code=400, detail=r.get("reason"))
+    return r
+
+
 @app.get("/scan/stalls")
 def scan_health_stalls(cycle: str = Query(None)):
     """Gaps in the write stream — where the scanner was not running."""
