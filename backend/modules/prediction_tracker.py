@@ -323,6 +323,8 @@ def _closes_for(tickers: list) -> dict:
 # answer.
 _TIERS: dict = {}               # ticker -> cap tier, per evaluation
 _EVAL_CACHE: dict = {}          # min_days -> (computed_at, result)
+# Enough to read, not enough to hurt. The scorecard uses every row.
+MAX_LISTED_PREDICTIONS = 500
 EVAL_CACHE_TTL = 1800           # 30 minutes
 
 
@@ -520,7 +522,35 @@ def evaluate(min_days: int = 7, use_cache: bool = True) -> dict:
         buys, sells, corr, excess,
         (scorecard["independent_sample"] or {}).get("by_signal") or scorecard["by_signal"],
         scorecard["independence"])
-    return {"scorecard": scorecard, "predictions": sorted(records, key=lambda r: r["date"])}
+    # The row list is capped. At a 3-day horizon nearly every logged pick has
+    # matured, so the full set was 13,856 rows and 2.6 MB shipped to a dashboard
+    # panel — the transfer and parse cost more than the computation did. The
+    # SCORECARD is still computed over every row; only the listing is bounded,
+    # and it says how many it left out so a trimmed table cannot be mistaken for
+    # the whole record.
+    ordered = sorted(records, key=lambda r: r["date"], reverse=True)
+    listed = ordered[:MAX_LISTED_PREDICTIONS]
+    result = {
+        "scorecard": scorecard,
+        "predictions": listed,
+        "predictions_total": len(ordered),
+        "predictions_listed": len(listed),
+        "predictions_truncated": len(ordered) > len(listed),
+        "listing_note": (
+            f"Showing the {len(listed)} most recent of {len(ordered)} graded "
+            f"picks. Every one of the {len(ordered)} is counted in the "
+            f"scorecard above — only this list is trimmed, because sending them "
+            f"all was several megabytes for a panel nobody scrolls to the "
+            f"bottom of."
+            if len(ordered) > len(listed) else None),
+    }
+
+    # Store it. The lookup above was added without this, so the cache could
+    # never hit and every request paid full price while reporting nothing amiss
+    # — a cache that only reads is just latency with extra steps.
+    import time as _t2
+    _EVAL_CACHE[min_days] = (_t2.time(), result)
+    return result
 
 
 def _significance(hits: int, n: int) -> dict | None:
