@@ -1713,10 +1713,10 @@ def scan_cycle_audit(cycle: str = Query(None)):
     incompleteness as a fault.
     """
     from cycle_audit import audit
-    r = audit(cycle=cycle)
-    if not r.get("available"):
-        raise HTTPException(status_code=400, detail=r.get("reason"))
-    return r
+    # Returned, not raised. A failing audit should say why in its own body —
+    # an HTTP error tells the reader neither what broke nor whether the cycle
+    # was sound.
+    return audit(cycle=cycle)
 
 
 @app.get("/scan/stalls")

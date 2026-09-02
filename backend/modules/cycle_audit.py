@@ -45,6 +45,20 @@ def _q(conn, sql, args=(), one=True):
 
 
 def audit(cycle: str = None) -> dict:
+    """Public entry point. Never raises: an audit that dies with a 500 tells the
+    reader nothing about the cycle AND nothing about itself."""
+    try:
+        return _audit(cycle)
+    except Exception as e:
+        import traceback
+        return {"available": False,
+                "reason": f"{type(e).__name__}: {e}",
+                "traceback": traceback.format_exc()[-1200:],
+                "note": ("The audit failed, which is a fault in the audit and "
+                         "not a verdict on the cycle. The cycle is unjudged.")}
+
+
+def _audit(cycle: str = None) -> dict:
     """
     Everything measurable about one cycle, with a verdict per check.
 
