@@ -67,6 +67,29 @@ def _classify(fields):
     return behavioural, metadata, environment
 
 
+def _nested_difference(old, new):
+    """
+    Why two spec blocks differ: because a value moved, or because one of them
+    never recorded the field at all.
+
+    Comparison used to stop at the top level, so a block that merely GAINED a
+    key read as "value differs" — and v1.4 was told a result could no longer be
+    attributed to it when nothing about the strategy had changed and one extra
+    parameter had started being captured. That is the same added-versus-changed
+    distinction already made between whole fields; it just has to reach one
+    level further in, because the spec groups parameters into blocks.
+
+    Returns (kind, detail) where kind is "value_differs" or "coverage".
+    """
+    if not (isinstance(old, dict) and isinstance(new, dict)):
+        return "value_differs", {}
+    changed = sorted(k for k in set(old) & set(new) if old[k] != new[k])
+    added = sorted(set(new) - set(old))
+    removed = sorted(set(old) - set(new))
+    detail = {"changed_values": changed, "added": added, "removed": removed}
+    return ("value_differs" if changed else "coverage"), detail
+
+
 def _kind_of(field):
     if field in METADATA_FIELDS:
         return "metadata"
@@ -656,6 +679,7 @@ def drift(version: str) -> dict:
     for k in sorted(set(a) | set(b)):
         if a.get(k) == b.get(k):
             continue
+        detail = None
         if k not in a:
             why = "never captured by this version"
             uncovered.append(k)
@@ -663,13 +687,20 @@ def drift(version: str) -> dict:
             why = "no longer present in the live configuration"
             uncovered.append(k)
         else:
-            why = "value differs"
-            changed.append(k)
-        entries.append({
-            "field": k,
-            "kind": _kind_of(k),
-            "difference": why,
-            "frozen": a.get(k), "live": b.get(k)})
+            # Both sides have the block; look inside before calling it a change.
+            nested, detail = _nested_difference(a.get(k), b.get(k))
+            if nested == "coverage":
+                why = ("fields added that this version never captured: "
+                       + ", ".join(detail["added"] + detail["removed"]))
+                uncovered.append(k)
+            else:
+                why = "value differs"
+                changed.append(k)
+        e = {"field": k, "kind": _kind_of(k), "difference": why,
+             "frozen": a.get(k), "live": b.get(k)}
+        if detail:
+            e["detail"] = detail
+        entries.append(e)
 
     behavioural, metadata, environment = _classify(set(changed))
     unc_behavioural = [k for k in uncovered

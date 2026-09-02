@@ -59,12 +59,36 @@ def _init():
                 sentiment   REAL,
                 low_risk    REAL,
                 price       REAL,
+                raw_inputs_available INTEGER DEFAULT 0,
                 PRIMARY KEY (ticker, captured_at, model)
             )
         """)
         conn.commit()
     except Exception:
         pass
+    finally:
+        conn.close()
+
+    # The flag on its own connection, because CREATE TABLE IF NOT EXISTS will
+    # not add a column to a table that already exists — the 7,918 observations
+    # already recorded live in the old shape. They default to 0, which is the
+    # truthful value: their inputs were never persisted and cannot be
+    # recovered. Backfilling them from today's Yahoo figures would invent a
+    # provenance that never existed, which is worse than admitting the gap.
+    conn = get_conn()
+    try:
+        if IS_POSTGRES:
+            conn.execute("ALTER TABLE factor_history ADD COLUMN IF NOT EXISTS "
+                         "raw_inputs_available INTEGER DEFAULT 0")
+        else:
+            conn.execute("ALTER TABLE factor_history ADD COLUMN "
+                         "raw_inputs_available INTEGER DEFAULT 0")
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
     finally:
         conn.close()
 
@@ -84,7 +108,8 @@ def _init():
 
 
 def record(ticker: str, model: str, alpha_score=None, factors: dict = None,
-           price=None, captured_at: str = None) -> bool:
+           price=None, captured_at: str = None,
+           raw_inputs_available: bool = False) -> bool:
     """
     Store one observation. Never raises: a failed write must not take down the
     scan or the page that triggered it, and a missing row is a gap in history
@@ -127,7 +152,12 @@ def record(ticker: str, model: str, alpha_score=None, factors: dict = None,
                 None if alpha_score is None else float(alpha_score),
                 _score("momentum"), _score("quality"), _score("growth"),
                 _score("value"), _score("sentiment"), _score("low_risk"),
-                None if price is None else float(price))
+                None if price is None else float(price),
+                # False unless the inputs behind these scores were actually
+                # persisted. Observations recorded before provenance existed
+                # keep false forever: reconstructing them from today's Yahoo
+                # values would invent a provenance that never existed.
+                1 if raw_inputs_available else 0)
 
         conn = get_conn()
         try:
@@ -135,7 +165,8 @@ def record(ticker: str, model: str, alpha_score=None, factors: dict = None,
                 conn.execute(
                     "INSERT INTO factor_history (ticker, captured_at, model,"
                     " alpha_score, momentum, quality, growth, value, sentiment,"
-                    " low_risk, price) VALUES (?,?,?,?,?,?,?,?,?,?,?)"
+                    " low_risk, price, raw_inputs_available)"
+                    " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
                     # COALESCE, not plain assignment. A caller supplying only
                     # some factors used to blank the rest for that day, so a
                     # partial refresh silently destroyed the fuller record
@@ -149,26 +180,34 @@ def record(ticker: str, model: str, alpha_score=None, factors: dict = None,
                     " value=COALESCE(EXCLUDED.value, factor_history.value),"
                     " sentiment=COALESCE(EXCLUDED.sentiment, factor_history.sentiment),"
                     " low_risk=COALESCE(EXCLUDED.low_risk, factor_history.low_risk),"
-                    " price=COALESCE(EXCLUDED.price, factor_history.price)", vals)
+                    " price=COALESCE(EXCLUDED.price, factor_history.price),"
+                    # A day whose inputs WERE captured must not be downgraded
+                    # by a later partial write that had none.
+                    " raw_inputs_available=GREATEST(EXCLUDED.raw_inputs_available,"
+                    " factor_history.raw_inputs_available)", vals)
             else:
                 # INSERT OR REPLACE deletes the old row and writes a new one, so
                 # unsupplied columns come back NULL. Merge with what is already
                 # stored before writing, or a partial update destroys the rest.
                 prev = conn.execute(
                     "SELECT alpha_score, momentum, quality, growth, value,"
-                    " sentiment, low_risk, price FROM factor_history"
+                    " sentiment, low_risk, price, raw_inputs_available FROM factor_history"
                     " WHERE ticker = ? AND captured_at = ? AND model = ?",
                     (ticker, stamp, model)).fetchone()
                 if prev:
                     merged = list(vals)
-                    for i, old_v in enumerate(prev):
+                    for i, old_v in enumerate(prev[:8]):
                         if merged[3 + i] is None and old_v is not None:
                             merged[3 + i] = old_v
+                    # Sticky: once a day's inputs are captured, a later write
+                    # without them cannot claim they are gone.
+                    merged[11] = max(int(merged[11] or 0), int(prev[8] or 0))
                     vals = tuple(merged)
                 conn.execute(
                     "INSERT OR REPLACE INTO factor_history (ticker, captured_at,"
                     " model, alpha_score, momentum, quality, growth, value,"
-                    " sentiment, low_risk, price) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                    " sentiment, low_risk, price, raw_inputs_available)"
+                    " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                     vals)
             conn.commit()
             return True

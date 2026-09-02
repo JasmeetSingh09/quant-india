@@ -272,8 +272,19 @@ def _save_result(ticker: str, cycle: str, r: dict):
     try:
         from factor_history import record as _fh_record
         if not r.get("error"):
+            # The inputs behind the scores, stored before the scores are, so
+            # raw_inputs_available records what actually happened rather than
+            # what was intended. Reads only what the factor functions already
+            # returned — nothing is re-fetched, so this cannot change a score.
+            have_inputs = False
+            try:
+                from factor_provenance import capture as _prov
+                have_inputs = bool(_prov(ticker, cycle, f).get("complete"))
+            except Exception:
+                have_inputs = False
             _fh_record(ticker, "v1", alpha_score=r.get("alpha_score"),
-                       factors=f, price=(r.get("price") or r.get("current_price")))
+                       factors=f, price=(r.get("price") or r.get("current_price")),
+                       raw_inputs_available=have_inputs)
     except Exception:
         pass
 

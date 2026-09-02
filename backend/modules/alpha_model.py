@@ -240,6 +240,11 @@ def _compute_sentiment_factor(ticker: str, days_back: int = 14) -> dict:
         weighted_scores = []
         weights         = []
         undated         = 0
+        # The exact article set this score was built from. Appended to, never
+        # read by the calculation — a sentiment score whose headlines are gone
+        # cannot be checked or explained afterwards, and the headlines cannot
+        # be recovered later because the news feed is a moving window.
+        used_articles   = []
 
         for art in articles:
             pub = _parse_pub_date(art.get("published_at") or art.get("publishedAt"))
@@ -265,6 +270,11 @@ def _compute_sentiment_factor(ticker: str, days_back: int = 14) -> dict:
             else:
                 numeric = 0.0
 
+            used_articles.append({
+                "title": art.get("title"),
+                "published_at": (pub.isoformat() if pub is not None else None),
+                "label": label, "confidence": conf, "weight": float(w),
+            })
             weighted_scores.append(numeric * w)
             weights.append(w)
 
@@ -288,7 +298,16 @@ def _compute_sentiment_factor(ticker: str, days_back: int = 14) -> dict:
             "score":      round(float(weighted_avg), 4),
             "confidence": round(float(confidence), 4),
             "n_articles": len(weights),
+            # The window the decay and the confidence shrink were
+            # computed against. Without it the stored articles cannot
+            # reproduce the score, because confidence divides by it.
+            "days_back": days_back,
             "undated_articles": undated,
+            # Provenance, not an input: the calculation above is already
+            # finished. Stored so a sentiment score can be explained by
+            # the headlines that produced it, which the news feed will
+            # not still be serving next week.
+            "articles_used": used_articles,
             "interpretation": (
                 "Strongly positive news flow" if weighted_avg > 0.4 else
                 "Mildly positive news flow"   if weighted_avg > 0.1 else
@@ -628,11 +647,17 @@ def _compute_value_factor(ticker: str, peers: list = None) -> dict:
 
         peer_pes = []
         peer_pbs = []
+        used_peers = []
         for p in peers[:3]:            # cap peer fetches so one stock can't fan out to many slow .info calls
             try:
                 pi = _ticker_info(p)
                 if pi.get("trailingPE"):  peer_pes.append(pi["trailingPE"])
                 if pi.get("priceToBook"): peer_pbs.append(pi["priceToBook"])
+                # Which peer supplied what. The sector aggregate below is
+                # enough to REPRODUCE the z-score; this is what makes it
+                # explainable — without it the comparison set is unknowable.
+                used_peers.append({"ticker": p, "pe": pi.get("trailingPE"),
+                                   "pb": pi.get("priceToBook")})
             except Exception:
                 pass
 
@@ -682,6 +707,8 @@ def _compute_value_factor(ticker: str, peers: list = None) -> dict:
                           else "P/E only" if pe_self else "P/B only"),
             "pe_ratio":     pe_self,
             "pb_ratio":     pb_self,
+            "peers_used":   used_peers,
+            "peer_count":   len(used_peers),
             "sector_pe":    round(pe_mean, 1),
             "sector_pb":    round(pb_mean, 2),
             "pe_z_score":   round(pe_z, 3),
