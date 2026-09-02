@@ -193,6 +193,47 @@ ok(r["verdict"] == "FAIL", "a stock that never scored must not be in history")
 ok(any("failed stock" in a for a in r["anomalies"]),
    f"and named ({[a for a in r['anomalies'] if 'failed' in a][:1]})")
 
+print("\n7b. A poisoned transaction does not cascade")
+# On Postgres one failed statement aborts the whole transaction, so every later
+# query on that connection fails too. SQLite does not behave this way, which is
+# exactly why the fixtures passed 25/25 while production returned 500. This
+# simulates the Postgres behaviour: the first failure must not take the rest of
+# the audit down with it.
+build()
+
+
+class _PoisonConn:
+    """Fails one query, then refuses everything until rolled back."""
+
+    def __init__(self, real):
+        self._real, self._poisoned = real, False
+
+    def execute(self, sql, args=()):
+        if "factor_inputs" in sql and not self._poisoned:
+            self._poisoned = True
+            raise RuntimeError('relation "factor_inputs" does not exist')
+        if self._poisoned:
+            raise RuntimeError("current transaction is aborted")
+        return self._real.execute(sql, args)
+
+    def rollback(self):
+        self._poisoned = False
+
+    def close(self):
+        self._real.close()
+
+
+import cycle_audit as _ca  # noqa: E402
+_real_get = _ca.get_conn
+_ca.get_conn = lambda: _PoisonConn(sqlite3.connect(DB))
+r = _ca.audit(CYCLE)
+_ca.get_conn = _real_get
+ok(r.get("available") is True,
+   f"the audit still completes ({str(r.get('reason'))[:60]})")
+ok((r.get("scan") or {}).get("scored", 0) > 0,
+   f"and checks AFTER the failure still ran "
+   f"(scored={(r.get('scan') or {}).get('scored')})")
+
 print("\n8. A pre-provenance cycle is reported, not failed")
 build(with_provenance=False)
 r = run()

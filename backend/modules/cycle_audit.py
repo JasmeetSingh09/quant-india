@@ -34,13 +34,34 @@ except Exception:                                   # pragma: no cover
     from .db import get_conn
 
 
-def _q(conn, sql, args=(), one=True):
-    """Run a query and time it, so latency is measured rather than guessed."""
+def _q(conn, sql, args=(), one=True, default=0):
+    """
+    Run a query, time it, and leave the connection usable if it fails.
+
+    The rollback is the whole point. On Postgres a failed statement aborts the
+    ENTIRE transaction, so every subsequent query on the same connection fails
+    with InFailedSqlTransaction — and this audit runs fifteen of them on one
+    connection. Catching the exception at the call site was not enough: it kept
+    the audit running while the connection was already dead, so a missing
+    factor_inputs table made every later check report a database error about a
+    table that was perfectly fine.
+
+    This codebase has learned that lesson three times already, in the migrations
+    that each take their own connection. On SQLite, where the fixtures run, none
+    of it shows: the transaction is not poisoned and the audit passes 25/25.
+    """
     t0 = time.time()
-    cur = conn.execute(sql, args)
-    rows = cur.fetchall()
+    try:
+        cur = conn.execute(sql, args)
+        rows = cur.fetchall()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return (default if one else []), round((time.time() - t0) * 1000, 1)
     ms = round((time.time() - t0) * 1000, 1)
-    val = (rows[0][0] if rows and one else (rows if not one else 0))
+    val = (rows[0][0] if rows and one else (rows if not one else default))
     return val, ms
 
 
