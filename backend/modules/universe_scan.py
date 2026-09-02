@@ -284,7 +284,7 @@ def _save_result(ticker: str, cycle: str, r: dict):
                 have_inputs = False
             _fh_record(ticker, "v1", alpha_score=r.get("alpha_score"),
                        factors=f, price=(r.get("price") or r.get("current_price")),
-                       raw_inputs_available=have_inputs)
+                       raw_inputs_available=have_inputs, cycle_id=cycle)
     except Exception:
         pass
 
@@ -498,6 +498,16 @@ def _scan_loop_inner():
         # atomically once it is finished, never partway through.
         _set_state(done=counter["n"], finished_at=datetime.now().isoformat(),
                    status="complete", last_complete_cycle=cycle)
+        # The research dataset learns the pass covered the market. Until this
+        # line runs, every row it wrote is flagged provisional.
+        try:
+            from factor_history import mark_cycle_complete
+            n_marked = mark_cycle_complete(cycle)
+            print(f"[scan] cycle {cycle} complete: {scored} of {universe_n} "
+                  f"scored ({frac:.1%}); {n_marked} factor-history rows "
+                  f"promoted to research-grade")
+        except Exception as _e:
+            print(f"[scan] could not mark cycle complete: {type(_e).__name__}")
     else:
         _set_state(done=counter["n"], finished_at=datetime.now().isoformat(),
                    status="incomplete")

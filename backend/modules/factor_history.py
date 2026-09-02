@@ -60,6 +60,8 @@ def _init():
                 low_risk    REAL,
                 price       REAL,
                 raw_inputs_available INTEGER DEFAULT 0,
+                cycle_id    TEXT,
+                cycle_complete INTEGER DEFAULT 0,
                 PRIMARY KEY (ticker, captured_at, model)
             )
         """)
@@ -75,22 +77,38 @@ def _init():
     # truthful value: their inputs were never persisted and cannot be
     # recovered. Backfilling them from today's Yahoo figures would invent a
     # provenance that never existed, which is worse than admitting the gap.
-    conn = get_conn()
-    try:
-        if IS_POSTGRES:
-            conn.execute("ALTER TABLE factor_history ADD COLUMN IF NOT EXISTS "
-                         "raw_inputs_available INTEGER DEFAULT 0")
-        else:
-            conn.execute("ALTER TABLE factor_history ADD COLUMN "
-                         "raw_inputs_available INTEGER DEFAULT 0")
-        conn.commit()
-    except Exception:
+    # Each on its own connection: a failed ALTER poisons the transaction on
+    # Postgres, so batching them means one already-exists error takes the rest
+    # down with it.
+    #
+    # cycle_complete exists because rows are written per stock, DURING a pass,
+    # before anyone knows whether that pass will cover the market. A scan that
+    # dies at 1,200 of 2,879 used to leave 1,200 rows in the research dataset
+    # indistinguishable from a full day. The rule was already enforced for
+    # publishing and for the prediction snapshot; factor history is the research
+    # dataset itself and was the one place it was not.
+    #
+    # Marked, not deleted. Writing per stock is what makes a long pass
+    # crash-safe, and destroying a partial pass would trade one silent error
+    # for another.
+    for col in ("raw_inputs_available INTEGER DEFAULT 0",
+                "cycle_id TEXT",
+                "cycle_complete INTEGER DEFAULT 0"):
+        conn = get_conn()
         try:
-            conn.rollback()
+            if IS_POSTGRES:
+                conn.execute(f"ALTER TABLE factor_history ADD COLUMN IF NOT "
+                             f"EXISTS {col}")
+            else:
+                conn.execute(f"ALTER TABLE factor_history ADD COLUMN {col}")
+            conn.commit()
         except Exception:
-            pass
-    finally:
-        conn.close()
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        finally:
+            conn.close()
 
     # Index on its own connection. A failed statement aborts the whole
     # transaction on Postgres, so batching migrations means one harmless
@@ -107,9 +125,35 @@ def _init():
     _READY = True
 
 
+def mark_cycle_complete(cycle_id: str) -> int:
+    """
+    Promote a pass's observations from provisional to research-grade.
+
+    Called once, when the scan has covered enough of the market to count. Until
+    then its rows exist — a long pass has to be written incrementally to survive
+    a restart — but they are flagged provisional, so a partial pass cannot be
+    mistaken for a day the market was actually observed.
+    """
+    if not cycle_id:
+        return 0
+    try:
+        _init()
+        conn = get_conn()
+        try:
+            cur = conn.execute("UPDATE factor_history SET cycle_complete = 1 "
+                               "WHERE cycle_id = ?", (cycle_id,))
+            conn.commit()
+            return int(getattr(cur, "rowcount", 0) or 0)
+        finally:
+            conn.close()
+    except Exception:
+        return 0
+
+
 def record(ticker: str, model: str, alpha_score=None, factors: dict = None,
            price=None, captured_at: str = None,
-           raw_inputs_available: bool = False) -> bool:
+           raw_inputs_available: bool = False,
+           cycle_id: str = None) -> bool:
     """
     Store one observation. Never raises: a failed write must not take down the
     scan or the page that triggered it, and a missing row is a gap in history
@@ -157,7 +201,9 @@ def record(ticker: str, model: str, alpha_score=None, factors: dict = None,
                 # persisted. Observations recorded before provenance existed
                 # keep false forever: reconstructing them from today's Yahoo
                 # values would invent a provenance that never existed.
-                1 if raw_inputs_available else 0)
+                1 if raw_inputs_available else 0,
+                # Provisional until the pass that produced it completes.
+                cycle_id, 0)
 
         conn = get_conn()
         try:
@@ -165,8 +211,8 @@ def record(ticker: str, model: str, alpha_score=None, factors: dict = None,
                 conn.execute(
                     "INSERT INTO factor_history (ticker, captured_at, model,"
                     " alpha_score, momentum, quality, growth, value, sentiment,"
-                    " low_risk, price, raw_inputs_available)"
-                    " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
+                    " low_risk, price, raw_inputs_available, cycle_id,"
+                    " cycle_complete) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
                     # COALESCE, not plain assignment. A caller supplying only
                     # some factors used to blank the rest for that day, so a
                     # partial refresh silently destroyed the fuller record
@@ -184,14 +230,18 @@ def record(ticker: str, model: str, alpha_score=None, factors: dict = None,
                     # A day whose inputs WERE captured must not be downgraded
                     # by a later partial write that had none.
                     " raw_inputs_available=GREATEST(EXCLUDED.raw_inputs_available,"
-                    " factor_history.raw_inputs_available)", vals)
+                    " factor_history.raw_inputs_available),"
+                    " cycle_id=COALESCE(EXCLUDED.cycle_id, factor_history.cycle_id),"
+                    " cycle_complete=GREATEST(EXCLUDED.cycle_complete,"
+                    " factor_history.cycle_complete)", vals)
             else:
                 # INSERT OR REPLACE deletes the old row and writes a new one, so
                 # unsupplied columns come back NULL. Merge with what is already
                 # stored before writing, or a partial update destroys the rest.
                 prev = conn.execute(
                     "SELECT alpha_score, momentum, quality, growth, value,"
-                    " sentiment, low_risk, price, raw_inputs_available FROM factor_history"
+                    " sentiment, low_risk, price, raw_inputs_available, cycle_complete"
+                    " FROM factor_history"
                     " WHERE ticker = ? AND captured_at = ? AND model = ?",
                     (ticker, stamp, model)).fetchone()
                 if prev:
@@ -202,12 +252,15 @@ def record(ticker: str, model: str, alpha_score=None, factors: dict = None,
                     # Sticky: once a day's inputs are captured, a later write
                     # without them cannot claim they are gone.
                     merged[11] = max(int(merged[11] or 0), int(prev[8] or 0))
+                    # Completion is sticky too: a re-write during a later,
+                    # unfinished pass must not un-complete a finished day.
+                    merged[13] = max(int(merged[13] or 0), int(prev[9] or 0))
                     vals = tuple(merged)
                 conn.execute(
                     "INSERT OR REPLACE INTO factor_history (ticker, captured_at,"
                     " model, alpha_score, momentum, quality, growth, value,"
-                    " sentiment, low_risk, price, raw_inputs_available)"
-                    " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                    " sentiment, low_risk, price, raw_inputs_available, cycle_id,"
+                    " cycle_complete) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     vals)
             conn.commit()
             return True
@@ -463,13 +516,39 @@ def coverage() -> dict:
             t = conn.execute("SELECT COUNT(DISTINCT ticker) FROM factor_history").fetchone()[0]
             d = conn.execute("SELECT MIN(captured_at), MAX(captured_at) "
                              "FROM factor_history").fetchone()
+            # A total that mixes finished passes with a scan still running
+            # overstates the dataset, and the overstatement grows every time a
+            # pass dies half way. Counted apart.
+            try:
+                done = conn.execute("SELECT COUNT(*) FROM factor_history "
+                                    "WHERE cycle_complete = 1").fetchone()[0]
+                with_inputs = conn.execute(
+                    "SELECT COUNT(*) FROM factor_history "
+                    "WHERE raw_inputs_available = 1").fetchone()[0]
+            except Exception:
+                done, with_inputs = None, None
         finally:
             conn.close()
-        return {"observations": n, "tickers": t,
-                "first": d[0] if d else None, "last": d[1] if d else None,
-                "note": ("History accumulates from the first scan after this "
-                         "shipped. It cannot be backfilled: the per-factor "
-                         "scores were never stored before, so there is nothing "
-                         "to recover.")}
+        out = {"observations": n, "tickers": t,
+               "first": d[0] if d else None, "last": d[1] if d else None,
+               "note": ("History accumulates from the first scan after this "
+                        "shipped. It cannot be backfilled: the per-factor "
+                        "scores were never stored before, so there is nothing "
+                        "to recover.")}
+        if done is not None:
+            out.update({
+                "research_grade": done,
+                "provisional": max(0, n - done),
+                "with_raw_inputs": with_inputs,
+                "grading_note": (
+                    "research_grade counts rows from passes that covered the "
+                    "market. provisional counts rows from a pass still running "
+                    "or one that never finished — real observations of some "
+                    "stocks, but not an observation OF THE MARKET, and they "
+                    "should not be pooled with the rest. with_raw_inputs counts "
+                    "rows whose factor inputs were also stored; earlier rows "
+                    "have none and cannot be given any."),
+            })
+        return out
     except Exception:
         return {"observations": 0, "tickers": 0}
