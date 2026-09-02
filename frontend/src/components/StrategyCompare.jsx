@@ -43,17 +43,33 @@ export default function StrategyCompare({ tickers: propTickers, currentWeights: 
       {!run.data && (
         <>
           <p className="text-xs text-gray-400 leading-relaxed">
-            Equal weight, mean-variance and Black-Litterman on your holdings,
+            Equal weight, mean-variance and Black-Litterman on the same holdings,
             measured identically. Equal weight is the baseline the others have to
             beat to justify their estimates.
           </p>
+          {/* Which holdings, named. "Your holdings" is ambiguous the moment a
+              paper simulation is running with a different set — and the
+              Simulator is a separate store, so the two genuinely differ. A
+              comparison that does not say what it compared invites the reader
+              to assume the wrong basket. */}
+          <div className="text-[11px] text-gray-500 leading-relaxed">
+            {propTickers
+              ? <>Comparing the <span className="text-gray-300">basket passed in</span> by this page.</>
+              : <>Comparing your <span className="text-gray-300">saved Portfolio</span> — not
+                 the Simulator, which keeps its own separate positions.</>}
+            {tickers?.length > 0 && (
+              <div className="mt-1 font-mono text-gray-400 break-words">
+                {tickers.map(t => String(t).replace('.NS', '')).join(' · ')}
+              </div>
+            )}
+          </div>
           <button onClick={() => run.mutate({ tickers, current_weights: currentWeights })}
                   disabled={run.isPending || pfLoading || !enough}
                   className="btn-ghost text-xs">
             {run.isPending ? 'Measuring…'
-              : pfLoading ? 'Loading your holdings…'
-              : enough ? 'Compare methods'
-              : 'Needs at least 3 holdings in your portfolio'}
+              : pfLoading ? 'Loading your saved Portfolio…'
+              : enough ? `Compare methods on these ${tickers.length}`
+              : `Needs at least 3 holdings in your saved Portfolio (has ${tickers?.length || 0})`}
           </button>
         </>
       )}

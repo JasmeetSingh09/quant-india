@@ -149,7 +149,16 @@ def _start_picks_scheduler():
         from datetime import datetime as _dt0, timedelta as _td0
         from apscheduler.schedulers.background import BackgroundScheduler
         sched = BackgroundScheduler(daemon=True)
-        sched.add_job(warm_top_picks, "interval", hours=6, id="warm_top_picks")
+        # next_run_time matters more than the interval here. An APScheduler
+        # interval job first fires AFTER one interval, so with no start time
+        # Top Picks stayed cold for six hours after every deploy or restart —
+        # and a cold call rescores thirty stocks live through Yahoo and FinBERT,
+        # which is the 30-60 seconds the page's own loading message apologises
+        # for. Warming a minute after boot means the first visitor finds it
+        # ready instead of paying for it.
+        sched.add_job(warm_top_picks, "interval", hours=6, id="warm_top_picks",
+                      replace_existing=True,
+                      next_run_time=_dt0.now() + _td0(seconds=60))
 
         # The dashboard's track-record panel took eighteen seconds: ~14,000
         # logged predictions re-graded against a price history for 2,600
