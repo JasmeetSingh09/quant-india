@@ -6,6 +6,22 @@ data so we can hammer thousands of cases deterministically.
 """
 import sys, math, warnings, random
 warnings.filterwarnings("ignore")
+
+# The Windows console defaults to cp1252, which cannot encode the tick this
+# script prints on success — so every check would pass, the final print would
+# raise UnicodeEncodeError, and the suite would exit non-zero having found
+# nothing wrong. A test that reports failure when it succeeded is worse than
+# one that reports nothing.
+#
+# Reconfiguring the stream fixes the class rather than the character: the
+# modules under test print rupee signs and arrows too, and any of them would
+# have done the same thing.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "modules"))
 import numpy as np, pandas as pd

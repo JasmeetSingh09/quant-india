@@ -230,7 +230,43 @@ REGIME_WEIGHT_MULTIPLIERS = {
 }
 
 
-def detect_regime(
+# Fitting a 3-state HMM on a year of daily returns takes ~2 seconds and the
+# answer changes once a day at most. The dashboard called it on mount, so every
+# visitor waited for a model fit whose inputs had not moved since the previous
+# close.
+_REGIME_CACHE: dict = {}        # (ticker, lookback, states) -> (at, result)
+REGIME_CACHE_TTL = 1800         # 30 minutes
+
+
+def invalidate_regime_cache():
+    _REGIME_CACHE.clear()
+
+
+def detect_regime(ticker: str = NIFTY_TICKER, lookback_days: int = 252,
+                  n_states: int = 3) -> dict:
+    """
+    Cached front door to the HMM fit.
+
+    A wrapper rather than a lookup injected into the body, because the body has
+    two return statements and a cache that populates on one path but not the
+    other is worse than none — it would serve a stale answer for some inputs and
+    a fresh one for others, with nothing to indicate which.
+    """
+    import time as _t
+    key = (ticker, lookback_days, n_states)
+    hit = _REGIME_CACHE.get(key)
+    if hit and (_t.time() - hit[0]) < REGIME_CACHE_TTL:
+        out = dict(hit[1])
+        out["cached"] = True
+        out["cached_age_seconds"] = int(_t.time() - hit[0])
+        return out
+    result = _detect_regime_uncached(ticker, lookback_days, n_states)
+    if isinstance(result, dict) and not result.get("error"):
+        _REGIME_CACHE[key] = (_t.time(), result)
+    return result
+
+
+def _detect_regime_uncached(
     ticker: str = NIFTY_TICKER,
     lookback_days: int = 252,
     n_states: int = 3,

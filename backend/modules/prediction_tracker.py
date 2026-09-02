@@ -113,6 +113,11 @@ def snapshot(universe: list = None, allow_fallback: bool = False) -> dict:
     init_table()
     _add_horizon_column()
     _add_cycle_column()
+    # New rows change the scorecard, so the cached one is wrong the moment this
+    # writes. Dropped here rather than waiting out the TTL: a fresh snapshot
+    # showing up half an hour late is the kind of staleness nobody notices and
+    # everybody misreads.
+    invalidate_evaluation_cache()
     from alpha_model import compute_alpha_score, TOP_PICKS_UNIVERSE
     today = datetime.now().strftime("%Y-%m-%d")
 
@@ -310,12 +315,41 @@ def _closes_for(tickers: list) -> dict:
     return out
 
 
-def evaluate(min_days: int = 7) -> dict:
+# The scorecard changes when a scan logs a new snapshot or a day passes, which
+# is at most a couple of times a day. It was being recomputed from scratch on
+# every request: ~14,000 predictions re-graded against a price history for
+# 2,600 tickers, eighteen seconds, on a dashboard that calls it during mount.
+# Users were paying for a recomputation that could not have produced a different
+# answer.
+_EVAL_CACHE: dict = {}          # min_days -> (computed_at, result)
+EVAL_CACHE_TTL = 1800           # 30 minutes
+
+
+def invalidate_evaluation_cache():
+    """Drop the cached scorecards. Called when new predictions are logged, so a
+    fresh snapshot shows up immediately rather than up to a TTL late."""
+    _EVAL_CACHE.clear()
+
+
+def evaluate(min_days: int = 7, use_cache: bool = True) -> dict:
     """
     Grade every logged pick that is at least `min_days` old: fetch the current
     price, compute the realised forward return, compare to the Nifty benchmark,
     and aggregate an honest scorecard.
+
+    Cached for EVAL_CACHE_TTL. The cache is keyed on min_days because a
+    different horizon is a different question, and it is dropped outright when
+    a new snapshot lands.
     """
+    import time as _t
+    if use_cache:
+        hit = _EVAL_CACHE.get(min_days)
+        if hit and (_t.time() - hit[0]) < EVAL_CACHE_TTL:
+            out = dict(hit[1])
+            out["cached"] = True
+            out["cached_age_seconds"] = int(_t.time() - hit[0])
+            return out
+
     init_table()
     c = _conn()
     rows = c.execute(

@@ -146,9 +146,39 @@ def _start_picks_scheduler():
     data, so 6h loses nothing.
     """
     try:
+        from datetime import datetime as _dt0, timedelta as _td0
         from apscheduler.schedulers.background import BackgroundScheduler
         sched = BackgroundScheduler(daemon=True)
         sched.add_job(warm_top_picks, "interval", hours=6, id="warm_top_picks")
+
+        # The dashboard's track-record panel took eighteen seconds: ~14,000
+        # logged predictions re-graded against a price history for 2,600
+        # tickers, recomputed on every page load even though the answer only
+        # changes when a scan logs a new snapshot. It is cached now, and warmed
+        # here just inside the cache TTL so the cache is never cold when a
+        # visitor arrives — the server pays the cost on a timer instead of a
+        # user paying it on arrival.
+        def _warm_track():
+            try:
+                for horizon in (21, 7):
+                    evaluate_predictions(min_days=horizon)
+            except Exception as _e:
+                print(f"[warm] track record: {type(_e).__name__}")
+
+        sched.add_job(_warm_track, "interval", minutes=25, id="warm_track",
+                      replace_existing=True,
+                      next_run_time=_dt0.now() + _td0(seconds=25))
+
+        def _warm_regime():
+            try:
+                from regime_detector import detect_regime
+                detect_regime()
+            except Exception as _e:
+                print(f"[warm] regime: {type(_e).__name__}")
+
+        sched.add_job(_warm_regime, "interval", minutes=25, id="warm_regime",
+                      replace_existing=True,
+                      next_run_time=_dt0.now() + _td0(seconds=40))
         # NSE publishes bhavcopy after the close; a daily pull keeps the
         # independent fallback fresh without anyone remembering to.
         from bhavcopy import fetch_day
