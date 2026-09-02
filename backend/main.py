@@ -168,8 +168,14 @@ def _start_picks_scheduler():
         # visitor arrives — the server pays the cost on a timer instead of a
         # user paying it on arrival.
         def _warm_track():
+            # Every horizon the UI offers, not just the default. The cache is
+            # keyed on min_days because a different horizon is a different
+            # question, so warming only 21 left the other three buttons cold —
+            # switching horizon then paid the full recomputation and the panel
+            # sat on a spinner for six seconds. These are the four the dashboard
+            # actually renders.
             try:
-                for horizon in (21, 7):
+                for horizon in (21, 14, 7, 3):
                     evaluate_predictions(min_days=horizon)
             except Exception as _e:
                 print(f"[warm] track record: {type(_e).__name__}")

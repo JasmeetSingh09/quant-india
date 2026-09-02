@@ -321,6 +321,7 @@ def _closes_for(tickers: list) -> dict:
 # 2,600 tickers, eighteen seconds, on a dashboard that calls it during mount.
 # Users were paying for a recomputation that could not have produced a different
 # answer.
+_TIERS: dict = {}               # ticker -> cap tier, per evaluation
 _EVAL_CACHE: dict = {}          # min_days -> (computed_at, result)
 EVAL_CACHE_TTL = 1800           # 30 minutes
 
@@ -351,6 +352,14 @@ def evaluate(min_days: int = 7, use_cache: bool = True) -> dict:
             return out
 
     init_table()
+    # One lookup for the whole pass. Fetching a tier per row would be ~14,000
+    # queries for a mapping that does not change inside a single evaluation.
+    global _TIERS
+    try:
+        from universe_scan import cap_tiers
+        _TIERS = cap_tiers() or {}
+    except Exception:
+        _TIERS = {}
     c = _conn()
     rows = c.execute(
         "SELECT ticker, snapshot_date, alpha_score, signal, price_at_snapshot FROM predictions"
@@ -407,6 +416,9 @@ def evaluate(min_days: int = 7, use_cache: bool = True) -> dict:
             if len(past) and len(fut):
                 bench = (float(fut.iloc[0]) / float(past.iloc[-1]) - 1) * 100
         rec = {"ticker": ticker, "date": sdate, "alpha_score": alpha, "signal": signal,
+               # Cap tier from the shared ranking, so the track record and the
+               # tier cards cannot disagree about what a mid cap is.
+               "cap_tier": _TIERS.get(ticker, "unknown"),
                "forward_return_pct": round(fwd, 2),
                "benchmark_return_pct": round(bench, 2) if bench is not None else None,
                "excess_pct": round(fwd - bench, 2) if bench is not None else None,
@@ -462,6 +474,31 @@ def evaluate(min_days: int = 7, use_cache: bool = True) -> dict:
         "avg_excess_vs_nifty_pct": round(float(np.mean(excess)), 2) if excess else None,
     }
     scorecard["by_signal"] = _by_signal(records)
+    # Split by cap tier. A model that works only on the largest hundred names is
+    # a different product from one that works across the market, and pooling the
+    # two hides which you have. Each tier is graded by the same clustered
+    # statistics as the whole, so the effective sample shrinks honestly rather
+    # than a thin tier borrowing confidence from a fat one.
+    by_tier = {}
+    for tier in ("large", "mid", "small", "unknown"):
+        rows_t = [r for r in records if r.get("cap_tier") == tier]
+        if not rows_t:
+            continue
+        by_tier[tier] = {
+            "observations": len(rows_t),
+            "unique_stocks": len({r["ticker"] for r in rows_t}),
+            "avg_return_pct": round(float(np.mean(
+                [r["forward_return_pct"] for r in rows_t])), 2),
+            "by_signal": _by_signal(rows_t),
+        }
+    scorecard["by_cap_tier"] = by_tier
+    scorecard["cap_tier_note"] = (
+        "Tiers rank the last complete scan by market cap — top 100 large, "
+        "101-250 mid, the rest small, the SEBI convention. 'unknown' means the "
+        "stock was not in that scan, usually because it was logged before the "
+        "universe covered it. Each tier carries its own effective sample size; "
+        "a tier with few independent observations proves less than its raw "
+        "count suggests, exactly as the whole does.")
     scorecard["independence"] = _independence(records, min_days)
 
     # The same metrics on windows that share no days. Reported ALONGSIDE the

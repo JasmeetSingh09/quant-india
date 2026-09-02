@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getMCX, getRegime, getMarketNews, getPrice, getPredictionTrack, getBenchmark } from '../api'
 import Spinner from '../components/Spinner'
@@ -144,11 +144,21 @@ function TrackRecord() {
   // measuring a completely different question — the shortest window flatters
   // the sample count, which is exactly the wrong thing to optimise for here.
   const [days, setDays] = useState(21)
+  // Cap tier filter and a row budget. The 3-day horizon matures nearly every
+  // logged pick, so the table rendered thousands of rows into a dashboard
+  // panel — slow to paint and impossible to read. Neither is a data problem;
+  // both are the page showing everything it has because nobody told it not to.
+  const [tier, setTier] = useState('all')
+  const [visible, setVisible] = useState(25)
   const { data, isLoading } = useQuery({
     queryKey: ['predTrack', days],
     queryFn: () => getPredictionTrack(days),
     staleTime: 10 * 60 * 1000,
   })
+  // A new horizon or tier is a new list; keeping a scrolled-open budget would
+  // dump hundreds of rows the moment someone switched.
+  useEffect(() => { setVisible(25) }, [days, tier])
+
   const sc = data?.scorecard
   const rawPreds = data?.predictions || []
   // The model re-logs a snapshot daily, so each stock appears once per snapshot
@@ -159,6 +169,18 @@ function TrackRecord() {
     if (!cur || (r.date ?? '') > (cur.date ?? '')) acc[r.ticker] = r
     return acc
   }, {}))
+  // Filter, then sort, then budget — in that order, so "top 25" means the top
+  // 25 of what you asked for rather than whatever survived a filter applied to
+  // an already-truncated list.
+  const tierCounts = preds.reduce((acc, r) => {
+    const t = r.cap_tier || 'unknown'
+    acc[t] = (acc[t] || 0) + 1
+    return acc
+  }, {})
+  const filtered = tier === 'all' ? preds : preds.filter(r => (r.cap_tier || 'unknown') === tier)
+  const sorted = filtered.slice().sort((a, b) => (b.forward_return_pct ?? 0) - (a.forward_return_pct ?? 0))
+  const shown = sorted.slice(0, visible)
+
   const pct = v => v == null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(2)}%`
   const col = v => v == null ? 'text-gray-400' : v >= 0 ? 'text-green-400' : 'text-red-400'
   // Direction-aware. A negative excess return is BAD for a BUY and GOOD for a
@@ -349,6 +371,25 @@ function TrackRecord() {
 
           <div className="overflow-x-auto">
             <div className="table-wrap">
+              {/* Cap tier. A model that works only on the largest hundred
+                  names is a different product from one that works across the
+                  market, and a pooled table cannot show you which you have. */}
+              <div className="flex items-center gap-1 text-xs mb-2 flex-wrap">
+                <span className="text-gray-500 mr-1">Size:</span>
+                {[['all', 'All'], ['large', 'Large cap'], ['mid', 'Mid cap'],
+                  ['small', 'Small cap'], ['unknown', 'Unclassified']].map(([k, label]) => {
+                  const n = k === 'all' ? preds.length : (tierCounts[k] || 0)
+                  if (k !== 'all' && n === 0) return null
+                  return (
+                    <button key={k} onClick={() => setTier(k)}
+                      className={`px-2 py-1 rounded ${tier === k
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-800 hover:bg-gray-700 text-gray-300'}`}>
+                      {label} <span className="opacity-60">{n}</span>
+                    </button>
+                  )
+                })}
+              </div>
               <table className="w-full min-w-[34rem] text-sm">
               <thead>
                 <tr className="text-gray-500 text-xs border-b border-gray-800">
@@ -361,7 +402,7 @@ function TrackRecord() {
                 </tr>
               </thead>
               <tbody>
-                {preds.slice().sort((a,b) => (b.forward_return_pct ?? 0) - (a.forward_return_pct ?? 0)).map((r, i) => {
+                {shown.map((r, i) => {
                   const isBuy = r.signal && r.signal.includes('BUY')
                   const isSell = r.signal && r.signal.includes('SELL')
                   return (
@@ -381,6 +422,37 @@ function TrackRecord() {
               </table>
             </div>
           </div>
+
+          {/* Row budget. Says how many of how many, so a truncated list never
+              reads as the whole record — the count is the honest part. */}
+          {sorted.length > 0 && (
+            <div className="flex items-center justify-between gap-3 flex-wrap text-xs">
+              <span className="text-gray-500">
+                Showing {shown.length} of {sorted.length}
+                {tier !== 'all' && ` ${tier} cap`} pick{sorted.length === 1 ? '' : 's'}
+                {tier !== 'all' && preds.length !== sorted.length
+                  && ` (${preds.length} across all sizes)`}
+              </span>
+              <div className="flex items-center gap-2">
+                {visible < sorted.length && (
+                  <button onClick={() => setVisible(v => v + 50)} className="btn-ghost text-xs">
+                    See more
+                  </button>
+                )}
+                {visible < sorted.length && (
+                  <button onClick={() => setVisible(sorted.length)} className="btn-ghost text-xs">
+                    Show all {sorted.length}
+                  </button>
+                )}
+                {visible > 25 && (
+                  <button onClick={() => setVisible(25)} className="btn-ghost text-xs">
+                    Show less
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           <p className="text-xs text-gray-600">
             "Actual return" = how the stock moved from the day it was logged until now. A BUY that went up
             (green) or a SELL that went down was "right." One row per stock (its longest-held snapshot); the

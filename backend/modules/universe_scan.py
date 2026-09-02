@@ -636,6 +636,43 @@ LARGE_CAP_MIN = 1.00e12   # ₹1,00,000 Cr
 MID_CAP_MIN   = 3.30e11   # ₹33,000 Cr
 
 
+def cap_tiers(cycle: str = None) -> dict:
+    """
+    ticker -> "large" | "mid" | "small", from the last complete pass.
+
+    Ranked, not thresholded, for the same reason top_by_tier ranks: SEBI defines
+    the tiers by position (1-100 large, 101-250 mid, the rest small), so a fixed
+    rupee cut-off drifts out of date as the market moves while a rank does not.
+
+    Shared so the track record and the tier cards cannot disagree about what a
+    mid cap is — two places classifying the same stock differently is the kind
+    of contradiction a reader notices and cannot resolve.
+    """
+    try:
+        _init_db()
+        if not cycle:
+            st = get_state()
+            cycle = st.get("last_complete_cycle") or st.get("cycle")
+        if not cycle:
+            return {}
+        conn = get_conn()
+        try:
+            rows = conn.execute(
+                "SELECT ticker, market_cap FROM alpha_scan2 "
+                "WHERE cycle = ? AND market_cap IS NOT NULL AND market_cap > 0",
+                (cycle,)).fetchall()
+        finally:
+            conn.close()
+        ranked = sorted(rows, key=lambda r: -float(r[1]))
+        out = {}
+        for i, (tk, _mc) in enumerate(ranked):
+            out[tk] = ("large" if i < LARGE_CAP_RANK_MAX else
+                       "mid" if i < MID_CAP_RANK_MAX else "small")
+        return out
+    except Exception:
+        return {}
+
+
 def top_by_tier(n: int = 10, min_confidence: float = 0.3) -> dict:
     """
     Top `n` BUY-side names in each cap tier, plus the weakest names overall.
