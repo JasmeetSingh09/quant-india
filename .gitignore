@@ -36,3 +36,7 @@ models/
 .DS_Store
 Thumbs.db
 *.log
+
+# Test run outputs — regenerated on every run, never source.
+backend/distress_study_rows.json
+backend/tests/alpha_audit_result.json
