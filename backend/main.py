@@ -1719,6 +1719,21 @@ def scan_cycle_audit(cycle: str = Query(None)):
     return audit(cycle=cycle)
 
 
+@app.get("/scan/provenance-gap")
+def scan_provenance_gap(cycle: str = Query(...)):
+    """
+    Why an observation has no complete provenance, by factor and input.
+
+    Read-only diagnostic. `raw_inputs_available` is a strict flag — every
+    factor that scored must also have stored all of its inputs — so a rate
+    below 100% may be honest (a stock with no news, no peers) or may be a
+    capture defect. This separates the two by querying the rows rather than
+    inferring from a coverage percentage.
+    """
+    from provenance_gap import report
+    return report(cycle)
+
+
 @app.get("/scan/stalls")
 def scan_health_stalls(cycle: str = Query(None)):
     """Gaps in the write stream — where the scanner was not running."""
