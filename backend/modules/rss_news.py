@@ -187,6 +187,22 @@ _MIN_TOKEN_LEN = 4
 _PHRASE_STEM = 6
 
 
+def _clean_tokens(company_name: str) -> list:
+    """The company name reduced to its words, legal form removed.
+
+    Only legal-form words go. " india" stays: it is part of the name in Coal
+    India and Nestle India, and stripping it turned the first into the commodity
+    "coal" and left State Bank of India as the fragment "state bank of" — which
+    was then used verbatim as a news search query.
+    """
+    base = " ".join(re.sub(r"[^a-z0-9& ]+", " ", (company_name or "").lower()).split())
+    for suffix in _LEGAL_SUFFIXES:
+        if base.endswith(suffix):
+            base = base[: -len(suffix)]
+        base = base.replace(suffix + " ", " ")
+    return [t for t in base.split() if t]
+
+
 def _identity_terms(company_name: str, ticker: str):
     """
     How to recognise this company in a headline.
@@ -197,13 +213,7 @@ def _identity_terms(company_name: str, ticker: str):
     sector word is never a word on its own: a company whose name is entirely
     generic is identified by its full name or its ticker, never by "bank".
     """
-    base = re.sub(r"[^a-z0-9& ]+", " ", (company_name or "").lower())
-    base = " ".join(base.split())
-    for suffix in _LEGAL_SUFFIXES:
-        if base.endswith(suffix):
-            base = base[: -len(suffix)]
-        base = base.replace(suffix + " ", " ")
-    tokens = [t for t in base.split() if t]
+    tokens = _clean_tokens(company_name)
     while tokens and tokens[-1] in _STOPWORDS:
         tokens.pop()
 
@@ -275,11 +285,11 @@ def get_rss_stock_news(company_name: str, ticker: str = "", limit: int = 20) -> 
     most certain exactly where it knew least.
     """
     words, phrases = _identity_terms(company_name, ticker)
-    base = re.sub(r"[^a-z0-9& ]+", " ", (company_name or "").lower())
-    for suffix in (" limited", " ltd", " industries", " india", " corporation",
-                   " company"):
-        base = base.replace(suffix, "")
-    base = " ".join(base.split())
+    # The query used to be built from a name with " india" cut out of it, which
+    # asked Google News for "state bank of stock NSE" and got back nothing
+    # usable. With step 2 correctly rejecting other companies' news, that left
+    # SBIN with no articles at all rather than the wrong ones.
+    base = " ".join(_clean_tokens(company_name))
     bare = ticker.replace(".NS", "").lower()
 
     combined = []
