@@ -126,7 +126,7 @@ def analyze(cycle: str) -> dict:
                           (cycle, factor, *keys))
 
             per_input = _q(conn,
-                           "SELECT fi.input_name, COUNT(*) FROM factor_inputs fi "
+                           "SELECT fi.input_name, COUNT(DISTINCT fi.ticker) FROM factor_inputs fi "
                            "JOIN factor_history fh ON fh.ticker=fi.ticker "
                            "AND fh.cycle_id=fi.cycle_id "
                            "WHERE fi.cycle_id=? AND fi.factor=? AND fi.missing=1 "
