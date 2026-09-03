@@ -162,8 +162,12 @@ con = sqlite3.connect(DB)
 n = con.execute("SELECT COUNT(*) FROM alpha_scan2 WHERE ticker='OK.NS' "
                 "AND cycle=?", (CYCLE,)).fetchone()[0]
 ok(n == 1, f"alpha_scan2 holds one row per (ticker, cycle) — got {n}")
+# Queried by model, not by date. record() stamps captured_at with TODAY,
+# never with the cycle id, so asking for captured_at=CYCLE matched nothing
+# from the moment the date rolled past the hard-coded one — the check passed
+# on the day it was written and has been asserting 0 == 1 ever since.
 n = con.execute("SELECT COUNT(*) FROM factor_history WHERE ticker='OK.NS' "
-                "AND captured_at=?", (CYCLE,)).fetchone()[0]
+                "AND model='v1'").fetchone()[0]
 ok(n == 1, f"factor_history holds one row per (ticker, day, model) — got {n}")
 dupes = con.execute(
     "SELECT COUNT(*) FROM (SELECT ticker, cycle_id, factor, input_name, "

@@ -9,6 +9,15 @@ Finally it throws deliberately hostile inputs at it.
 Run:  python alpha_audit.py [n_stocks]
 """
 import sys, os, math, time, json, warnings, random
+
+# The edge-case table prints a Devanagari ticker, and a Windows console
+# is cp1252. Every check passed and then the report crashed writing them
+# out, turning a clean run into a non-zero exit — the third suite in this
+# project to die that way after doing its job.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 warnings.filterwarnings("ignore")
 sys.path.insert(0, r"C:\Users\seeraj\OneDrive\Documents\Desktop\code\ai_stock\backend\modules")
 

@@ -44,6 +44,8 @@ raised exception would cost the whole stock, and then the score too.
 import hashlib
 from datetime import datetime
 
+from model_config import is_refusal
+
 try:
     from db import get_conn, IS_POSTGRES
 except Exception:                                   # pragma: no cover
@@ -335,7 +337,14 @@ def capture(ticker: str, cycle_id: str, factors: dict, isin: str = None,
             if not isinstance(fd, dict):
                 continue
             # A factor that produced no score has no inputs worth claiming.
-            scored = _num(fd.get("score")) is not None
+            # A refusal is one of those: it returns a neutral 0.0 so the
+            # composite has something to weight, but it measured nothing, and
+            # holding an observation incomplete for inputs a refusal could never
+            # have supplied marked 286 sound observations as unreproducible on
+            # 2026-09-03. Same predicate the recorder uses, from one place, so
+            # the flag can never contradict the row it describes.
+            scored = (_num(fd.get("score")) is not None
+                      and not is_refusal(fd))
             got = 0
             for key in keys:
                 name = f"{factor}.{key}"
@@ -360,6 +369,18 @@ def capture(ticker: str, cycle_id: str, factors: dict, isin: str = None,
                 rows.append((ticker, isin, cycle_id, now, factor, name,
                              _num(val), None if _num(val) is not None else str(val),
                              ASSUMPTION, "module constant", 0))
+            # Why a factor declined to measure. The value factor refused on 185
+            # stocks in one cycle through a bare `except Exception` whose text
+            # went nowhere, so "6.94% of the market fails to value" was all
+            # anyone could say about it. Stored like a constant — recorded, not
+            # counted — because it is a fact about the attempt rather than an
+            # input to a calculation, and counting it would let a factor that
+            # measured nothing report a full set.
+            if is_refusal(fd):
+                rows.append((ticker, isin, cycle_id, now, factor,
+                             "refusal_reason", None,
+                             str(fd.get("reason"))[:200], DERIVED,
+                             "factor function", 0))
             per_factor[factor] = {"scored": scored, "inputs_captured": got,
                                   "inputs_expected": len(keys)}
 

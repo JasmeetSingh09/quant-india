@@ -135,6 +135,12 @@ INVENTORY = {
     "prediction_tracker": {
         "BENCHMARK": BEHAVIOURAL, "MAX_CYCLE_AGE_DAYS": BEHAVIOURAL,
         "MIN_EFFECTIVE_N": BEHAVIOURAL, "IS_POSTGRES": ALIAS,
+        # Added during the payload/latency work and never registered, which is
+        # exactly what this section exists to catch. Neither changes a score:
+        # one caps how many rows a response lists, the other how long a
+        # computed scorecard is reused. Behavioural would be wrong — it would
+        # make trimming a JSON payload look like a model revision.
+        "MAX_LISTED_PREDICTIONS": METADATA, "EVAL_CACHE_TTL": ENVIRONMENT,
     },
     "security_identity": {
         "LINK_MAX_GAP_DAYS": BEHAVIOURAL, "LINK_MAX_OVERLAP_DAYS": BEHAVIOURAL,

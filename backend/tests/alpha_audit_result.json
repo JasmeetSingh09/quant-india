@@ -1,0 +1,490 @@
+{
+ "rows": [
+  {
+   "ticker": "IRB.NS",
+   "alpha": 6.56,
+   "signal": "NEUTRAL",
+   "conf": 0.82,
+   "mom_model": -6.46,
+   "mom_indep": -6.46
+  },
+  {
+   "ticker": "TVSMOTOR.NS",
+   "alpha": 30.18,
+   "signal": "BUY",
+   "conf": 0.691,
+   "mom_model": 30.36,
+   "mom_indep": 30.36
+  },
+  {
+   "ticker": "MARUTI.NS",
+   "alpha": -2.88,
+   "signal": "NEUTRAL",
+   "conf": 0.671,
+   "mom_model": -4.83,
+   "mom_indep": -4.83
+  },
+  {
+   "ticker": "TORNTPOWER.NS",
+   "alpha": 14.09,
+   "signal": "NEUTRAL",
+   "conf": 0.915,
+   "mom_model": 14.97,
+   "mom_indep": 14.97
+  },
+  {
+   "ticker": "SONATSOFTW.NS",
+   "alpha": 5.69,
+   "signal": "NEUTRAL",
+   "conf": 0.698,
+   "mom_model": 1.09,
+   "mom_indep": 1.09
+  },
+  {
+   "ticker": "JKCEMENT.NS",
+   "alpha": -24.27,
+   "signal": "SELL",
+   "conf": 0.766,
+   "mom_model": -22.0,
+   "mom_indep": -22.0
+  },
+  {
+   "ticker": "ZYDUSLIFE.NS",
+   "alpha": 29.55,
+   "signal": "BUY",
+   "conf": 0.665,
+   "mom_model": 14.37,
+   "mom_indep": 14.37
+  },
+  {
+   "ticker": "KPITTECH.NS",
+   "alpha": -35.71,
+   "signal": "SELL",
+   "conf": 0.831,
+   "mom_model": -48.84,
+   "mom_indep": -48.84
+  },
+  {
+   "ticker": "TORNTPHARM.NS",
+   "alpha": 24.18,
+   "signal": "BUY",
+   "conf": 0.666,
+   "mom_model": 43.12,
+   "mom_indep": 43.12
+  },
+  {
+   "ticker": "MUTHOOTFIN.NS",
+   "alpha": 7.92,
+   "signal": "NEUTRAL",
+   "conf": 0.748,
+   "mom_model": 6.8,
+   "mom_indep": 6.8
+  },
+  {
+   "ticker": "CEATLTD.NS",
+   "alpha": 15.02,
+   "signal": "BUY",
+   "conf": 0.65,
+   "mom_model": 14.25,
+   "mom_indep": 14.25
+  },
+  {
+   "ticker": "CASTROLIND.NS",
+   "alpha": -1.57,
+   "signal": "NEUTRAL",
+   "conf": 0.665,
+   "mom_model": -3.45,
+   "mom_indep": -3.45
+  },
+  {
+   "ticker": "SYMPHONY.NS",
+   "alpha": -36.6,
+   "signal": "SELL",
+   "conf": 0.613,
+   "mom_model": -26.08,
+   "mom_indep": -26.08
+  },
+  {
+   "ticker": "LAURUSLABS.NS",
+   "alpha": 28.21,
+   "signal": "BUY",
+   "conf": 0.763,
+   "mom_model": 111.77,
+   "mom_indep": 111.77
+  },
+  {
+   "ticker": "JSWHL.NS",
+   "alpha": -17.98,
+   "signal": "SELL",
+   "conf": 0.763,
+   "mom_model": -30.94,
+   "mom_indep": -30.94
+  },
+  {
+   "ticker": "OBEROIRLTY.NS",
+   "alpha": 27.39,
+   "signal": "BUY",
+   "conf": 0.698,
+   "mom_model": 15.53,
+   "mom_indep": 15.53
+  },
+  {
+   "ticker": "NMDC.NS",
+   "alpha": 37.25,
+   "signal": "BUY",
+   "conf": 0.665,
+   "mom_model": 24.62,
+   "mom_indep": 24.62
+  },
+  {
+   "ticker": "SUNPHARMA.NS",
+   "alpha": 38.03,
+   "signal": "BUY",
+   "conf": 0.797,
+   "mom_model": 26.78,
+   "mom_indep": 26.78
+  },
+  {
+   "ticker": "UNITDSPR.NS",
+   "alpha": 19.04,
+   "signal": "BUY",
+   "conf": 0.698,
+   "mom_model": 18.14,
+   "mom_indep": 18.14
+  },
+  {
+   "ticker": "BAJAJCON.NS",
+   "alpha": 49.32,
+   "signal": "STRONG BUY",
+   "conf": 0.779,
+   "mom_model": 128.25,
+   "mom_indep": 128.25
+  },
+  {
+   "ticker": "IPCALAB.NS",
+   "alpha": 13.95,
+   "signal": "NEUTRAL",
+   "conf": 0.666,
+   "mom_model": 22.41,
+   "mom_indep": 22.41
+  },
+  {
+   "ticker": "GALAXYSURF.NS",
+   "alpha": 13.08,
+   "signal": "NEUTRAL",
+   "conf": 0.669,
+   "mom_model": -10.08,
+   "mom_indep": -10.08
+  },
+  {
+   "ticker": "BHARTIARTL.NS",
+   "alpha": 12.11,
+   "signal": "NEUTRAL",
+   "conf": 0.665,
+   "mom_model": 4.96,
+   "mom_indep": 4.96
+  },
+  {
+   "ticker": "BAJAJ-AUTO.NS",
+   "alpha": 22.46,
+   "signal": "BUY",
+   "conf": 0.715,
+   "mom_model": 31.18,
+   "mom_indep": 31.18
+  },
+  {
+   "ticker": "LUPIN.NS",
+   "alpha": 49.46,
+   "signal": "STRONG BUY",
+   "conf": 0.665,
+   "mom_model": 27.2,
+   "mom_indep": 27.2
+  },
+  {
+   "ticker": "TATACONSUM.NS",
+   "alpha": 3.42,
+   "signal": "NEUTRAL",
+   "conf": 0.799,
+   "mom_model": 2.37,
+   "mom_indep": 2.37
+  },
+  {
+   "ticker": "POONAWALLA.NS",
+   "alpha": -19.19,
+   "signal": "SELL",
+   "conf": 0.665,
+   "mom_model": 9.55,
+   "mom_indep": 9.55
+  },
+  {
+   "ticker": "OFSS.NS",
+   "alpha": 31.46,
+   "signal": "BUY",
+   "conf": 0.915,
+   "mom_model": 42.73,
+   "mom_indep": 42.73
+  },
+  {
+   "ticker": "AIAENG.NS",
+   "alpha": 47.64,
+   "signal": "STRONG BUY",
+   "conf": 0.705,
+   "mom_model": 54.92,
+   "mom_indep": 54.92
+  },
+  {
+   "ticker": "NATIONALUM.NS",
+   "alpha": 46.64,
+   "signal": "STRONG BUY",
+   "conf": 0.797,
+   "mom_model": 105.45,
+   "mom_indep": 105.45
+  },
+  {
+   "ticker": "HINDUNILVR.NS",
+   "alpha": -7.96,
+   "signal": "NEUTRAL",
+   "conf": 0.665,
+   "mom_model": -19.44,
+   "mom_indep": -19.44
+  },
+  {
+   "ticker": "VMART.NS",
+   "alpha": 28.4,
+   "signal": "BUY",
+   "conf": 0.751,
+   "mom_model": 6.21,
+   "mom_indep": 6.21
+  },
+  {
+   "ticker": "PAYTM.NS",
+   "alpha": -6.52,
+   "signal": "NEUTRAL",
+   "conf": 0.651,
+   "mom_model": 13.29,
+   "mom_indep": 13.29
+  },
+  {
+   "ticker": "SAIL.NS",
+   "alpha": 31.36,
+   "signal": "BUY",
+   "conf": 0.718,
+   "mom_model": 45.12,
+   "mom_indep": 45.12
+  },
+  {
+   "ticker": "WIPRO.NS",
+   "alpha": 0.4,
+   "signal": "NEUTRAL",
+   "conf": 0.718,
+   "mom_model": -22.79,
+   "mom_indep": -22.79
+  },
+  {
+   "ticker": "ORIENTELEC.NS",
+   "alpha": 5.4,
+   "signal": "NEUTRAL",
+   "conf": 0.699,
+   "mom_model": -17.61,
+   "mom_indep": -17.61
+  },
+  {
+   "ticker": "BLUESTARCO.NS",
+   "alpha": 0.05,
+   "signal": "NEUTRAL",
+   "conf": 0.757,
+   "mom_model": -7.65,
+   "mom_indep": -7.65
+  },
+  {
+   "ticker": "NTPC.NS",
+   "alpha": 22.07,
+   "signal": "BUY",
+   "conf": 0.674,
+   "mom_model": 6.66,
+   "mom_indep": 6.66
+  },
+  {
+   "ticker": "ABFRL.NS",
+   "alpha": -21.36,
+   "signal": "SELL",
+   "conf": 0.848,
+   "mom_model": -26.81,
+   "mom_indep": -26.81
+  },
+  {
+   "ticker": "LTF.NS",
+   "alpha": 17.47,
+   "signal": "BUY",
+   "conf": 0.732,
+   "mom_model": 44.29,
+   "mom_indep": 44.29
+  },
+  {
+   "ticker": "APOLLOTYRE.NS",
+   "alpha": 13.85,
+   "signal": "NEUTRAL",
+   "conf": 0.701,
+   "mom_model": -4.34,
+   "mom_indep": -4.34
+  },
+  {
+   "ticker": "APOLLOHOSP.NS",
+   "alpha": 15.23,
+   "signal": "BUY",
+   "conf": 0.717,
+   "mom_model": 18.13,
+   "mom_indep": 18.13
+  },
+  {
+   "ticker": "AEGISLOG.NS",
+   "alpha": 24.37,
+   "signal": "BUY",
+   "conf": 0.695,
+   "mom_model": 100.91,
+   "mom_indep": 100.91
+  },
+  {
+   "ticker": "VBL.NS",
+   "alpha": 2.2,
+   "signal": "NEUTRAL",
+   "conf": 0.684,
+   "mom_model": -11.08,
+   "mom_indep": -11.08
+  },
+  {
+   "ticker": "DCBBANK.NS",
+   "alpha": 68.72,
+   "signal": "STRONG BUY",
+   "conf": 0.915,
+   "mom_model": 57.26,
+   "mom_indep": 57.26
+  },
+  {
+   "ticker": "NAVINFLUOR.NS",
+   "alpha": 36.71,
+   "signal": "BUY",
+   "conf": 0.732,
+   "mom_model": 63.12,
+   "mom_indep": 63.12
+  },
+  {
+   "ticker": "ADANIPORTS.NS",
+   "alpha": 36.01,
+   "signal": "BUY",
+   "conf": 0.915,
+   "mom_model": 28.35,
+   "mom_indep": 28.35
+  },
+  {
+   "ticker": "JBCHEPHARM.NS",
+   "alpha": -6.6,
+   "signal": "NEUTRAL",
+   "conf": 0.4,
+   "mom_indep": null
+  },
+  {
+   "ticker": "GODREJPROP.NS",
+   "alpha": 9.88,
+   "signal": "NEUTRAL",
+   "conf": 0.686,
+   "mom_model": 4.67,
+   "mom_indep": 4.67
+  },
+  {
+   "ticker": "INFY.NS",
+   "alpha": 6.4,
+   "signal": "NEUTRAL",
+   "conf": 0.708,
+   "mom_model": -19.23,
+   "mom_indep": -19.23
+  },
+  {
+   "ticker": "NATCOPHARM.NS",
+   "alpha": 26.17,
+   "signal": "BUY",
+   "conf": 0.699,
+   "mom_model": 6.41,
+   "mom_indep": 6.41
+  },
+  {
+   "ticker": "CGPOWER.NS",
+   "alpha": 11.17,
+   "signal": "NEUTRAL",
+   "conf": 0.915,
+   "mom_model": 22.98,
+   "mom_indep": 22.98
+  },
+  {
+   "ticker": "LICHSGFIN.NS",
+   "alpha": -4.16,
+   "signal": "NEUTRAL",
+   "conf": 0.915,
+   "mom_model": -9.12,
+   "mom_indep": -9.12
+  },
+  {
+   "ticker": "DABUR.NS",
+   "alpha": -5.74,
+   "signal": "NEUTRAL",
+   "conf": 0.665,
+   "mom_model": -20.34,
+   "mom_indep": -20.34
+  },
+  {
+   "ticker": "OIL.NS",
+   "alpha": 12.17,
+   "signal": "NEUTRAL",
+   "conf": 0.915,
+   "mom_model": 15.56,
+   "mom_indep": 15.56
+  },
+  {
+   "ticker": "FEDERALBNK.NS",
+   "alpha": 36.66,
+   "signal": "BUY",
+   "conf": 0.915,
+   "mom_model": 87.24,
+   "mom_indep": 87.24
+  },
+  {
+   "ticker": "KEYFINSERV.NS",
+   "alpha": 11.7,
+   "signal": "NEUTRAL",
+   "conf": 0.915,
+   "mom_model": 1.52,
+   "mom_indep": 1.52
+  },
+  {
+   "ticker": "ABB.NS",
+   "alpha": 23.95,
+   "signal": "BUY",
+   "conf": 0.667,
+   "mom_model": 50.79,
+   "mom_indep": 50.79
+  },
+  {
+   "ticker": "PERSISTENT.NS",
+   "alpha": -4.64,
+   "signal": "NEUTRAL",
+   "conf": 0.699,
+   "mom_model": 2.18,
+   "mom_indep": 2.18
+  },
+  {
+   "ticker": "AUROPHARMA.NS",
+   "alpha": 45.82,
+   "signal": "STRONG BUY",
+   "conf": 0.714,
+   "mom_model": 51.49,
+   "mom_indep": 51.49
+  }
+ ],
+ "fails": [
+  [
+   "nondeterministic",
+   "AEGISLOG.NS: 24.37 then 24.38"
+  ]
+ ],
+ "checks": 1391
+}

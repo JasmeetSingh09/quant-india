@@ -61,8 +61,44 @@ COST_GST_PCT = 18.0
 # complete showing as incomplete in its own audit.
 SCAN_COMPLETE_FRACTION = 0.90
 
+def is_refusal(factor_result) -> bool:
+    """
+    True when a factor answered "I could not measure this" rather than "I
+    measured this and it is zero".
+
+    Every failure path in alpha_model returns the same shape:
+
+        {"score": 0.0, "confidence": 0.0, "reason": "..."}
+
+    and every successful path returns a score with a positive confidence and no
+    reason at all. Both halves of the test are load-bearing:
+
+      - confidence alone is not enough. The value factor returns score -0.5 at
+        confidence 0.6 with a reason of "unusable valuation" for a company with
+        negative book value. That is a deliberate judgement, not a refusal, and
+        treating it as one would erase a real finding about a real company.
+      - reason alone is not enough, for the same case.
+
+    This lives here rather than in either caller because the recorder and the
+    provenance layer must agree on it exactly. They ask the question for
+    different purposes — one decides whether to store a number, the other
+    decides whether an observation is fully evidenced — and if their answers
+    ever diverged, the database would contain rows whose provenance flag
+    contradicted their own contents.
+    """
+    if not isinstance(factor_result, dict):
+        return False
+    if "reason" not in factor_result:
+        return False
+    try:
+        return float(factor_result.get("confidence") or 0) == 0.0
+    except (TypeError, ValueError):
+        return False
+
+
 MUST_AGREE = (
-    "RISK_FREE_RATE, TRADING_DAYS_PER_YEAR, MONTHS_PER_YEAR, BENCHMARK_INDEX "
+    "RISK_FREE_RATE, TRADING_DAYS_PER_YEAR, MONTHS_PER_YEAR, BENCHMARK_INDEX, "
+    "is_refusal "
     "and SCAN_COMPLETE_FRACTION are shared "
     "definitions: two modules disagreeing about them would report different "
     "risk-adjusted numbers for the same data. Liquidity floors and minimum "

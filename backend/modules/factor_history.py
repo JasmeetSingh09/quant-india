@@ -28,6 +28,8 @@ series after the fact invites the two to drift out of alignment.
 
 from datetime import datetime, timedelta
 
+from model_config import is_refusal
+
 try:
     from db import get_conn, IS_POSTGRES
 except Exception:                                   # pragma: no cover
@@ -169,6 +171,21 @@ def record(ticker: str, model: str, alpha_score=None, factors: dict = None,
         def _score(name):
             v = f.get(name)
             if isinstance(v, dict):
+                # A factor that could not compute returns a neutral 0.0 so the
+                # composite still has a number to weight. Storing that 0.0 here
+                # made the research record claim a measurement that was never
+                # taken: on 2026-09-03 it put 101 momentum and 185 value zeros
+                # into factor_history, indistinguishable from the stocks whose
+                # momentum genuinely was flat. Anyone later regressing this
+                # table on forward returns would have read 286 fabricated zeros
+                # per cycle as real observations, pulling any true relationship
+                # toward nothing.
+                #
+                # NULL is the honest value. It changes no score anywhere:
+                # compute_alpha_score still receives the 0.0 and weights it
+                # exactly as before. This decides only what gets written down.
+                if is_refusal(v):
+                    return None
                 v = v.get("score")
             try:
                 return None if v is None else float(v)
