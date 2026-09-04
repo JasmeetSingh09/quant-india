@@ -1734,6 +1734,22 @@ def scan_provenance_gap(cycle: str = Query(...)):
     return report(cycle)
 
 
+@app.get("/scan/piotroski-availability")
+def scan_piotroski_availability(cycle: str = Query(None)):
+    """
+    What the fundamental source actually supplied, per cycle.
+
+    Read-only diagnostic over rows already stored. An F-score of 3 does not say
+    whether six conditions were tested and failed or six could not be tested at
+    all; this reports which of the eight declared inputs were present, so the
+    two can be told apart. Defaults to the most recent cycle carrying a
+    presence set — observations recorded before that capture shipped have none
+    and cannot be given any.
+    """
+    from piotroski_availability import availability
+    return availability(cycle)
+
+
 @app.get("/scan/stalls")
 def scan_health_stalls(cycle: str = Query(None)):
     """Gaps in the write stream — where the scanner was not running."""
