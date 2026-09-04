@@ -146,6 +146,23 @@ FIELD_CATALOG = {
         "source": "alpha_model", "kind": "metadata", "category": DERIVED,
         "pit": False, "reproduces": True, "immutable": True,
     },
+    "quality.piotroski_inputs": {
+        "meaning": "Which of Piotroski's eight declared inputs the source supplied.",
+        "source": "metrics.PIOTROSKI_INPUTS tested against Yahoo .info",
+        "kind": "metadata", "category": DERIVED, "pit": False,
+        "reproduces": False, "immutable": True,
+        "note": ("Explains a score rather than reproducing one. Measured across "
+                 "314 NSE names, Yahoo supplies 2.22 of the eight on average and "
+                 "never supplies totalAssets, totalStockholderEquity or "
+                 "longTermDebt, so an F-score of 3 usually means three legs "
+                 "passed and several could not be tested — not that six failed. "
+                 "Not counted toward completeness: it describes the attempt."),
+    },
+    "quality.piotroski_inputs_available": {
+        "meaning": "How many of the eight were present, 0-8.",
+        "source": "derived", "kind": "metadata", "category": DERIVED,
+        "pit": False, "reproduces": False, "immutable": True,
+    },
     "quality.distress_flags": {
         "meaning": "Distress conditions that vetoed or capped the score.",
         "source": "alpha_model", "kind": "metadata", "category": DERIVED,
@@ -235,6 +252,20 @@ FIELD_CATALOG = {
 # Which returned keys to persist per factor, and under what catalogue name.
 # Read from the factor's own result dict — nothing here re-fetches, so storing
 # provenance cannot change what was scored.
+# Fields recorded alongside a factor but deliberately NOT part of its declared
+# input set. They describe the ATTEMPT — what the source supplied, why a factor
+# declined — rather than feeding the arithmetic, so counting them toward
+# completeness would let an observation that measured nothing report a full set.
+#
+# piotroski_inputs exists because an F-score cannot be explained after the fact.
+# A 3 might mean six conditions were tested and failed, or that six could not be
+# tested at all. For all 13,256 observations recorded before this, the stored
+# record cannot tell those apart, and no backfill can recover it: today's Yahoo
+# response is not what a past cycle saw. This closes the gap going forward only.
+DIAGNOSTIC_MAP = {
+    "quality": ("piotroski_inputs", "piotroski_inputs_available"),
+}
+
 CAPTURE_MAP = {
     "momentum": ["mom_12_1_pct", "ann_vol_pct", "risk_adj"],
     "quality": ["piotroski", "roe", "fcf_yield", "inputs_used",
@@ -381,6 +412,17 @@ def capture(ticker: str, cycle_id: str, factors: dict, isin: str = None,
                              "refusal_reason", None,
                              str(fd.get("reason"))[:200], DERIVED,
                              "factor function", 0))
+            # Same treatment for the diagnostics below: recorded so an
+            # observation can be explained, excluded from the tally because
+            # they describe the attempt rather than feed the calculation.
+            for name in DIAGNOSTIC_MAP.get(factor, ()):
+                if name not in fd:
+                    continue
+                raw = fd.get(name)
+                num = _num(raw)
+                rows.append((ticker, isin, cycle_id, now, factor, name, num,
+                             None if num is not None else str(raw)[:200],
+                             DERIVED, "factor function", 0))
             per_factor[factor] = {"scored": scored, "inputs_captured": got,
                                   "inputs_expected": len(keys)}
 

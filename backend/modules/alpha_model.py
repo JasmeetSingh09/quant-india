@@ -579,6 +579,11 @@ def _compute_quality_factor(ticker: str) -> dict:
                              ("fcf_yield", fcf_yield is not None)) if ok],
             "distress_flags": flags,
             "piotroski":   f_result.get("f_score"),
+            # Which of Piotroski's eight declared inputs the source supplied.
+            # Carried so the score can be explained later, not used to compute
+            # it — the F-score above is unchanged by the presence of this key.
+            "piotroski_inputs": f_result.get("inputs_present"),
+            "piotroski_inputs_available": f_result.get("inputs_available"),
             "roe":         round(roe * 100, 2) if roe is not None else None,
             "fcf_yield":   round(fcf_yield * 100, 2) if fcf_yield is not None else None,
             "interpretation": (

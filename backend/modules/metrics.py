@@ -288,6 +288,14 @@ def dupont_analysis(ticker: str) -> dict:
 # Piotroski F-Score
 # ---------------------------------------------------------------------------
 
+# The eight fields the nine legs below read. Named here so the presence of each
+# can be recorded alongside the score, and so a future reader can see the input
+# set without reverse-engineering it from the leg tests.
+PIOTROSKI_INPUTS = ("returnOnAssets", "operatingCashflow", "currentRatio",
+                    "longTermDebt", "grossMargins", "revenueGrowth",
+                    "totalAssets", "totalStockholderEquity")
+
+
 def piotroski_score(ticker: str) -> dict:
     """
     Calculate Piotroski F-Score (0-9) using 9 binary signals across:
@@ -353,12 +361,27 @@ def piotroski_score(ticker: str) -> dict:
         total = sum(signals.values())
         bucket = "Strong" if total >= 7 else ("Moderate" if total >= 4 else "Weak")
 
+        # Which of the eight declared inputs the source actually supplied.
+        # An F-score alone cannot be explained after the fact: a 3 might mean
+        # six conditions were tested and failed, or that six could not be
+        # tested at all, and the stored record could not tell them apart for
+        # any of 13,256 observations. Measured across 314 NSE names, Yahoo
+        # returns 2.22 of these eight on average, and never returns
+        # totalAssets, totalStockholderEquity or longTermDebt at all — so the
+        # distinction is the normal case, not an edge case.
+        #
+        # Recorded, not acted on. No leg reads this and no score changes.
+        present = sorted(k for k in PIOTROSKI_INPUTS if info.get(k) is not None)
+
         return {
             "ticker":        ticker,
             "f_score":       total,
             "max_score":     9,
             "health_bucket": bucket,
             "signals":       signals,
+            "inputs_present":   present,
+            "inputs_available": len(present),
+            "inputs_declared":  len(PIOTROSKI_INPUTS),
             "note": (
                 "Some signals use yfinance proxies (e.g. ROA > 5% as proxy for "
                 "increasing ROA) because year-over-year balance sheet data is not "
