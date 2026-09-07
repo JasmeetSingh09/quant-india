@@ -357,6 +357,49 @@ def resume_if_incomplete(chunk_days: int = 1200) -> dict:
             "earliest_before": earliest, "days_before": have_days}
 
 
+def backfill_recent(days: int = 10) -> dict:
+    """
+    Repair holes at the RECENT end of the archive.
+
+    Nothing else did this. `fetch_day` runs once a night on a cron and does not
+    retry, so a single attempt that loses a race with a restart, a network blip
+    or a slow publish loses that day for good. `resume_if_incomplete` does not
+    cover it either: it compares MIN(day) against the archive floor and extends
+    BACKWARDS, so once history reaches ARCHIVE_STARTS it reports "complete" and
+    stops looking — however many gaps sit behind the latest date. Coverage still
+    reads healthy because it counts days present, not days expected.
+
+    That combination is how Monday 2026-09-07 went missing between a stored
+    Friday and a stored Tuesday with nothing reporting a problem.
+
+    Holidays cost one 404 per pass. Without an exchange calendar a day with no
+    file is indistinguishable from a day whose fetch failed, and that is the
+    deliberate trade: a handful of wasted polite requests against silently
+    dropping real trading days. The window is short, so a holiday stops being
+    retried once it falls out of it.
+
+    Cheap when there is nothing to do — `backfill` skips weekends, days already
+    stored and anything before the floor, so a clean archive costs one query.
+    """
+    if _BACKFILL_STATE.get("running"):
+        return {"filled": False, "note": "A deep backfill is running; leaving "
+                                         "the archive to it."}
+    try:
+        before = coverage().get("days", 0)
+        res = backfill(days=days, skip_existing=True)
+        after = coverage().get("days", 0)
+    except Exception as e:
+        return {"filled": False, "error": f"{type(e).__name__}: {e}"}
+    gained = max(0, after - before)
+    if gained:
+        print(f"[bhavcopy] recent-gap repair stored {gained} missing day(s), "
+              f"{res.get('rows', 0)} rows")
+    return {"filled": bool(gained), "days_recovered": gained,
+            "days_attempted": res.get("days_attempted", 0),
+            "rows": res.get("rows", 0), "window_days": days,
+            "coverage_days": after}
+
+
 def backfill_status() -> dict:
     return dict(_BACKFILL_STATE)
 
@@ -385,6 +428,68 @@ def close_from_bhavcopy(ticker: str, max_age_days: int = 7):
         return None
 
 
+def recent_gaps(days: int = 30) -> dict:
+    """
+    Which weekdays in the recent window have no rows?
+
+    Coverage counted days PRESENT, never days EXPECTED, so an archive missing a
+    Monday between a stored Friday and a stored Tuesday still reported a healthy
+    row count and a fresh latest_day. Nothing in the response could have told
+    anyone a day was gone. This is the number that would have said so.
+
+    Holidays land in this list too — without an exchange calendar a closed
+    market and a failed fetch look identical from the table. So these are
+    CANDIDATE gaps: the repair pass asks NSE for each one, and a 404 is the
+    answer that it was a holiday. Persisting across many passes is the signal
+    worth reading, not a single appearance here.
+    """
+    # Scoped to the window on purpose. A bare SELECT DISTINCT day scans every
+    # row in the archive — one and a half million and growing — and coverage()
+    # is called on a page load, so the honest answer must also be a cheap one.
+    since = (datetime.now() - timedelta(days=days + 1)).strftime("%Y-%m-%d")
+    try:
+        _init_db()
+        conn = get_conn()
+        try:
+            rows = conn.execute(
+                "SELECT DISTINCT day FROM bhavcopy_eod WHERE day >= ?",
+                (since,)).fetchall()
+            edge = conn.execute(
+                "SELECT MIN(day), MAX(day) FROM bhavcopy_eod").fetchone()
+        finally:
+            conn.close()
+    except Exception as e:
+        return {"available": False, "reason": f"{type(e).__name__}"}
+
+    have = {str(r[0])[:10] for r in rows if r and r[0]}
+    oldest = str(edge[0])[:10] if edge and edge[0] else None
+    newest = str(edge[1])[:10] if edge and edge[1] else None
+    if not oldest:
+        return {"available": False, "reason": "no bhavcopy rows stored"}
+
+    floor = datetime.strptime(ARCHIVE_STARTS, "%Y-%m-%d")
+    # Today is excluded: NSE publishes after the close, so its absence is not a
+    # gap yet. Days before the archive floor or before the first day we ever
+    # stored are not gaps either — they were never claimed.
+    earliest_claim = max(floor, datetime.strptime(oldest, "%Y-%m-%d"))
+
+    missing = []
+    for i in range(1, days + 1):
+        d = datetime.now() - timedelta(days=i)
+        if d.weekday() >= 5 or d < earliest_claim:
+            continue
+        iso = d.strftime("%Y-%m-%d")
+        if iso not in have:
+            missing.append(iso)
+    missing.sort()
+    return {"available": True, "window_days": days,
+            "candidate_gaps": missing, "n": len(missing),
+            "latest_stored": newest,
+            "note": ("Weekdays in the window with no rows. Holidays appear here "
+                     "too and cannot be told apart without an exchange calendar; "
+                     "a gap that survives several repair passes is a real loss.")}
+
+
 def coverage() -> dict:
     _init_db()
     conn = get_conn()
@@ -393,9 +498,16 @@ def coverage() -> dict:
     s = conn.execute("SELECT COUNT(DISTINCT symbol) FROM bhavcopy_eod").fetchone()[0]
     last = conn.execute("SELECT MAX(day) FROM bhavcopy_eod").fetchone()[0]
     conn.close()
+    try:
+        gaps = recent_gaps(30)
+    except Exception:
+        gaps = {"available": False, "reason": "gap scan failed"}
     return {"rows": n, "days": d, "symbols": s, "latest_day": last,
+            "recent_gaps": gaps.get("candidate_gaps") if gaps.get("available") else None,
+            "recent_gap_count": gaps.get("n") if gaps.get("available") else None,
             "note": "Official NSE end-of-day. Independent of Yahoo — this is the "
-                    "fallback that still answers when Yahoo does not."}
+                    "fallback that still answers when Yahoo does not.",
+            "gap_note": gaps.get("note")}
 
 
 def closes_for_latest_day() -> dict:

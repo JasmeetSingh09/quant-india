@@ -21,6 +21,7 @@ rather than a new data source.
 """
 
 from statistics import median
+from bounded_cache import BoundedCache
 
 # Rupee thresholds for a retail-sized order. These are deliberately modest —
 # the question is not "could a fund trade this" but "could a person put a
@@ -29,7 +30,7 @@ FREELY_TRADEABLE = 5_00_00_000     # Rs 5 crore/day
 TRADEABLE_SMALL  = 1_00_00_000     # Rs 1 crore/day
 THIN             = 10_00_000       # Rs 10 lakh/day
 
-_CACHE: dict = {}
+_CACHE = BoundedCache(4000, "liquidity._CACHE")
 _TTL = 6 * 3600
 
 
@@ -106,8 +107,6 @@ def assess(ticker: str) -> dict:
                "note": "Barely trades. A signal here is not something you could act on, "
                        "and any backtested return assumes a fill that would not happen."}
 
-    if len(_CACHE) > 4000:
-        _CACHE.clear()
     _CACHE[key] = (now, out)
     return out
 

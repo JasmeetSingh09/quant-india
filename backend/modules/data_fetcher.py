@@ -3,6 +3,7 @@ import pandas as pd
 import time
 from datetime import datetime
 from functools import lru_cache
+from bounded_cache import BoundedCache
 
 # ---------------------------------------------------------------------------
 # Shared price cache
@@ -13,7 +14,7 @@ from functools import lru_cache
 # for a short TTL so repeat requests are served from memory — one download layer
 # shared by all algorithms.
 
-_PRICE_CACHE: dict = {}
+_PRICE_CACHE = BoundedCache(256, "data_fetcher._PRICE_CACHE")
 _PRICE_TTL = 600   # seconds (10 minutes)
 
 
@@ -414,7 +415,7 @@ def is_feed_active() -> bool:
 # request the same tickers repeatedly; without this each call hits Yahoo (slow, and
 # Yahoo throttles cloud IPs). When the market is CLOSED the price is frozen, so we can
 # cache for much longer.
-_LIVE_CACHE: dict = {}
+_LIVE_CACHE = BoundedCache(512, "data_fetcher._LIVE_CACHE")
 _LIVE_TTL_OPEN   = 45      # seconds while NSE is open
 _LIVE_TTL_CLOSED = 900     # 15 min when closed (price doesn't change)
 
@@ -497,7 +498,7 @@ def get_current_price(ticker: str) -> dict:
         return {"ticker": ticker, "error": str(e)}
 
 
-_INFO_CACHE: dict = {}       # ticker -> (fetched_at, info)
+_INFO_CACHE = BoundedCache(512, "data_fetcher._INFO_CACHE")   # ticker -> (fetched_at, info)
 _INFO_TTL = 6 * 3600         # fundamentals are daily data — no need to refetch per page load
 
 # A throttled Yahoo response can still carry plenty of quote/price keys while the
@@ -700,7 +701,7 @@ def get_financial_metrics(ticker: str) -> dict:
     }
 
 
-_FUND_CACHE: dict = {}
+_FUND_CACHE = BoundedCache(512, "data_fetcher._FUND_CACHE")
 _FUND_TTL = 24 * 60 * 60      # statements are annual/quarterly — a day is plenty
 
 

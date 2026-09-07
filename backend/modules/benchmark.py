@@ -19,13 +19,14 @@ from model_config import (BENCHMARK_INDEX as _BM,
                           BENCHMARK_NAME as _BMN)
 
 from datetime import datetime, timedelta
+from bounded_cache import BoundedCache
 
 BENCHMARK = _BM
 BENCHMARK_NAME = _BMN
 
 # One index, refetched at most every few hours. The comparison appears on
 # several screens, and none of them justify a fresh download each time.
-_CACHE: dict = {}
+_CACHE = BoundedCache(64, "benchmark._CACHE")
 _TTL_SECONDS = 3 * 3600
 
 

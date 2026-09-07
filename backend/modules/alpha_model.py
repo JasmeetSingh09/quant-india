@@ -48,6 +48,7 @@ import yfinance as yf
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
+from bounded_cache import BoundedCache
 
 # Bumped whenever a change alters what a score means. Stamped on every
 # result so a stored signal records which model produced it.
@@ -137,7 +138,7 @@ SIGNAL_COLOURS = {
 # no timeout param. The Top Picks scan makes dozens of these calls, so one hung
 # fetch stalls the whole scan. Guard every .info behind a hard timeout + a long
 # cache (fundamentals barely move intraday), degrading to {} instead of hanging.
-_INFO_CACHE: dict = {}          # ticker -> (fetched_at, info_dict)
+_INFO_CACHE = BoundedCache(512, "alpha_model._INFO_CACHE")   # ticker -> (fetched_at, info_dict)
 _INFO_TTL = 24 * 3600           # fundamentals are ~daily data
 _INFO_TIMEOUT = 6               # seconds; a slow fetch degrades to neutral
 
@@ -415,7 +416,7 @@ def _compute_momentum_factor(ticker: str, peers: list = None) -> dict:
 # Factor 3: Quality Score (-1 to +1)
 # ---------------------------------------------------------------------------
 
-_COVERAGE_CACHE: dict = {}     # ticker -> (fetched_at, coverage or None)
+_COVERAGE_CACHE = BoundedCache(512, "alpha_model._COVERAGE_CACHE")  # ticker -> (fetched_at, coverage or None)
 _COVERAGE_TTL = 24 * 3600      # annual statements; a day is ample
 
 

@@ -25,6 +25,7 @@ import numpy as np
 from db import IS_POSTGRES
 import pandas as pd
 import yfinance as yf
+from bounded_cache import BoundedCache
 
 _DB_PATH = Path(os.environ.get("QUANT_DATA_DIR", str(Path(__file__).parent.parent))) / "quant_platform.db"
 BENCHMARK = _BM
@@ -248,7 +249,7 @@ def snapshot(universe: list = None, allow_fallback: bool = False) -> dict:
                      f"{excluded['error']} on error.")}
 
 
-_CLOSE_CACHE: dict = {}          # ticker -> (timestamp, Series of closes)
+_CLOSE_CACHE = BoundedCache(256, "prediction_tracker._CLOSE_CACHE")  # ticker -> (timestamp, Series of closes)
 _CLOSE_TTL = 30 * 60             # 30 min; these are daily bars
 
 

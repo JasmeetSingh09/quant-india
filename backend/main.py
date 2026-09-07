@@ -198,6 +198,17 @@ def _start_picks_scheduler():
         # independent fallback fresh without anyone remembering to.
         from bhavcopy import fetch_day
         sched.add_job(fetch_day, "cron", hour=20, id="bhavcopy_daily")
+        # ...and a second pass that repairs what the nightly cron missed.
+        # The cron above fires once and does not retry, so any single failure —
+        # a restart, a blip, a late publish — dropped that trading day for good;
+        # bhavcopy_resume did not catch it either, because it only extends
+        # history backwards and calls itself complete once it reaches the floor.
+        # Production lost Monday 2026-09-07 in exactly that gap. This looks at
+        # the recent window instead, and costs one query when it is intact.
+        from bhavcopy import backfill_recent
+        sched.add_job(backfill_recent, "interval", hours=6,
+                      id="bhavcopy_recent", replace_existing=True,
+                      next_run_time=_dt0.now() + _td0(minutes=3))
         # Keep the history build alive. Two lessons are baked in here.
         #
         # The first attempt called asyncio.get_event_loop() from inside this
@@ -2212,6 +2223,46 @@ def bhavcopy_coverage():
     c = coverage()
     c["backfill"] = backfill_status()
     return c
+
+
+@app.get("/health/caches")
+def health_caches():
+    """
+    What the in-memory caches are holding, and what the bound is doing.
+
+    These were unbounded dicts. A pass over the exchange put an entry per stock
+    into each and nothing ever removed one, so memory tracked the size of the
+    universe rather than the size of the working set. They are LRU-bounded now,
+    and this is how that is checked from outside rather than assumed.
+
+    Read `evictions` against `hit_rate_pct`: evictions climbing while the hit
+    rate falls means a ceiling set below the working set, which costs refetches.
+    Evictions climbing with the hit rate steady is the bound doing its job.
+    """
+    try:
+        from bounded_cache import registry
+        rows = registry()
+    except Exception as e:
+        return {"available": False, "error": f"{type(e).__name__}: {e}"}
+    # psutil is not a declared dependency, so the import itself has to be
+    # inside the guard -- an ImportError here would 500 the health endpoint,
+    # which is a poor way for a health endpoint to behave.
+    try:
+        import psutil
+        rss_mb = round(psutil.Process().memory_info().rss / 1e6, 1)
+    except Exception:
+        rss_mb = None
+    return {
+        "available": True,
+        "rss_mb": rss_mb,
+        "caches": rows,
+        "total_entries": sum(r["entries"] for r in rows),
+        "total_capacity": sum(r["maxsize"] for r in rows),
+        "at_ceiling": [f"{r['module']}.{r['attr']}" for r in rows if r["full"]],
+        "note": ("Entries, not bytes. Byte accounting would need a deep sizer on "
+                 "every write, which costs more than it saves; per-entry cost is "
+                 "measured once and folded into each limit."),
+    }
 
 
 @app.get("/health/data")

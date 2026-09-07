@@ -14,6 +14,7 @@ If it is not set, auth is effectively disabled and everyone is "public" (safe de
 import os
 import time
 from fastapi import Header
+from bounded_cache import BoundedCache
 
 _JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "").strip()
 PUBLIC_USER = "public"
@@ -181,7 +182,7 @@ def _email_from_claims(payload: dict) -> str | None:
     return None
 
 
-_EMAIL_CACHE: dict[str, tuple[float, str | None]] = {}
+_EMAIL_CACHE = BoundedCache(500, "auth._EMAIL_CACHE")
 
 
 def _email_from_supabase(token: str) -> str | None:
@@ -212,8 +213,6 @@ def _email_from_supabase(token: str) -> str | None:
     except Exception:
         email = None
 
-    if len(_EMAIL_CACHE) > 500:
-        _EMAIL_CACHE.clear()
     _EMAIL_CACHE[key] = (now, email)
     return email
 

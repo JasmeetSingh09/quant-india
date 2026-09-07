@@ -33,6 +33,7 @@ import yfinance as yf
 from pathlib import Path
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from bounded_cache import BoundedCache
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
@@ -202,7 +203,7 @@ def _rebuild_if_global_unique(conn, table: str, columns_ddl: str, columns_csv: s
 # Price helpers
 # ---------------------------------------------------------------------------
 
-_SPLIT_CACHE: dict = {}
+_SPLIT_CACHE = BoundedCache(2000, "simulator._SPLIT_CACHE")
 _SPLIT_TTL = 6 * 3600
 
 
@@ -248,13 +249,11 @@ def _split_factor_since(ticker: str, entry_date) -> float:
     except Exception:
         factor = 1.0
 
-    if len(_SPLIT_CACHE) > 2000:
-        _SPLIT_CACHE.clear()
     _SPLIT_CACHE[key] = (now, factor)
     return factor
 
 
-_DIV_CACHE: dict = {}
+_DIV_CACHE = BoundedCache(2000, "simulator._DIV_CACHE")
 _DIV_TTL = 6 * 3600
 
 
@@ -300,8 +299,6 @@ def _dividends_since(ticker: str, entry_date, units: float) -> float:
                 total = float(div[idx > d0].sum())
         except Exception:
             total = 0.0
-        if len(_DIV_CACHE) > 2000:
-            _DIV_CACHE.clear()
         _DIV_CACHE[key] = (now, total)
     return float(total) * float(units)
 

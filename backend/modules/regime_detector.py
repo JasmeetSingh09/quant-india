@@ -44,6 +44,7 @@ import yfinance as yf
 from pathlib import Path
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from bounded_cache import BoundedCache
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
@@ -234,7 +235,7 @@ REGIME_WEIGHT_MULTIPLIERS = {
 # answer changes once a day at most. The dashboard called it on mount, so every
 # visitor waited for a model fit whose inputs had not moved since the previous
 # close.
-_REGIME_CACHE: dict = {}        # (ticker, lookback, states) -> (at, result)
+_REGIME_CACHE = BoundedCache(256, "regime_detector._REGIME_CACHE")  # (ticker, lookback, states) -> (at, result)
 REGIME_CACHE_TTL = 1800         # 30 minutes
 
 

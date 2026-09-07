@@ -28,13 +28,14 @@ from data_fetcher import (
     format_large_number,
     get_info,          # cached .info — a throttled partial payload blanks metrics
 )
+from bounded_cache import BoundedCache
 
 
 # ---------------------------------------------------------------------------
 # Full metrics snapshot
 # ---------------------------------------------------------------------------
 
-_METRICS_CACHE: dict = {}     # ticker -> (timestamp, data)
+_METRICS_CACHE = BoundedCache(512, "metrics._METRICS_CACHE")  # ticker -> (timestamp, data)
 _METRICS_TTL = 900            # 15 min — metrics barely move intraday
 
 

@@ -39,6 +39,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from bounded_cache import BoundedCache
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
@@ -47,11 +48,11 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 # Data helper
 # ---------------------------------------------------------------------------
 
-_HIST_CACHE: dict = {}          # (tickers, lookback) -> (timestamp, Series)
+_HIST_CACHE = BoundedCache(64, "monte_carlo._HIST_CACHE")   # (tickers, lookback) -> (timestamp, Series)
 # Raw per-ticker closes, shared by every portfolio that mentions the ticker.
 # Six hours because these are daily bars: within a trading day the only thing
 # that changes is the last point, and a scenario comparison does not turn on it.
-_PRICE_CACHE: dict = {}         # (ticker, start, end) -> (timestamp, Series)
+_PRICE_CACHE = BoundedCache(1200, "monte_carlo._PRICE_CACHE")  # (ticker, start, end) -> (timestamp, Series)
 _PRICE_TTL = 6 * 3600
 _HIST_TTL = 30 * 60             # 30 min — intraday drift is irrelevant to a 1y sim
 _HIST_LOCK = threading.Lock()
@@ -113,8 +114,6 @@ def _portfolio_daily_returns(holdings: dict, lookback_days: int = 504) -> pd.Ser
             s = None
         if s is not None:
             with _HIST_LOCK:
-                if len(_PRICE_CACHE) > 1200:
-                    _PRICE_CACHE.clear()
                 _PRICE_CACHE[ck] = (time.time(), s)
         return t, s
 
