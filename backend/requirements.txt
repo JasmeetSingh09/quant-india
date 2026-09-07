@@ -18,3 +18,4 @@ statsmodels
 feedparser
 arch
 xgboost
+psutil                  # RSS for /health/caches — a memory bound nobody can read is not a check
