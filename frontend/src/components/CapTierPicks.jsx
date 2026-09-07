@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { ScoreProvenance } from './Evidence'
 import { useNavigate } from 'react-router-dom'
 import { getUniverseTop } from '../api'
 import Spinner from './Spinner'
@@ -139,6 +140,12 @@ export default function CapTierPicks({ n = 10 }) {
           {(data?.universe_scored ?? 0).toLocaleString('en-IN')} NSE stocks scored
         </span>
       </div>
+
+      {/* This list serves the last COMPLETED nightly cycle, while Top Picks
+          recomputes live. The same stock can legitimately show a different
+          score in each; saying which is which is the whole point. */}
+      <ScoreProvenance mode="cycle" cycle={data?.serving_cycle}
+                       asOf={data?.scan?.finished_at} />
 
       {/* Tier selector */}
       <div className="flex gap-1 overflow-x-auto scrollbar-none">

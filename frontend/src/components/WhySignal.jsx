@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { getAlphaScore, getSignalHistory, getPredictionTrack } from '../api'
 import Spinner from './Spinner'
+import { EvidenceBadge } from './Evidence'
 
 /**
  * WhySignal — everything behind a BUY or SELL badge, on one screen.
@@ -150,6 +151,10 @@ export default function WhySignal({ ticker }) {
                   {up ? '+' : ''}{Number(v).toFixed(1)}
                 </span>
                 <span className="w-12 text-right text-gray-600 shrink-0 text-[10px]">±{max}</span>
+                {/* Without this a contribution reads as a measured, validated
+                    quantity. Momentum is the only one that has been tested at
+                    all, and it did not come back significant. */}
+                <span className="shrink-0"><EvidenceBadge factor={k} /></span>
               </div>
             )
           })}

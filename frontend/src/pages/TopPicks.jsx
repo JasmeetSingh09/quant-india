@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { EvidenceBadge, ScoreProvenance, SignalEvidenceNote } from '../components/Evidence'
 import { getTopPicks } from '../api'
 import Spinner from '../components/Spinner'
 import Explainer from '../components/Explainer'
@@ -52,6 +53,9 @@ function PickCard({ r, buy }) {
               <span className={`w-10 text-right font-mono ${pos ? 'text-green-400' : 'text-red-400'}`}>
                 {pos ? '+' : ''}{v.toFixed(0)}
               </span>
+              {/* A contribution with no evidence status reads as a measured
+                  fact. This says which of the four have been tested. */}
+              <EvidenceBadge factor={k} />
             </div>
           )
         })}
@@ -83,6 +87,21 @@ export default function TopPicks() {
           Stocks ranked by our 4-factor alpha model right now — an idea screen, not a guarantee.
         </p>
       </div>
+
+      {/* When these numbers were computed, and why another view may disagree.
+          Top Picks recomputes during the day; the universe list serves the last
+          completed nightly cycle. Both are correct; without saying so the
+          difference reads as the app being unreliable. */}
+      {data && (
+        <div className="card-sm">
+          <ScoreProvenance mode="live" asOf={data.as_of} />
+          <p className="text-[11px] text-gray-600 mt-2 pt-2 border-t border-gray-800">
+            Ranks {data.universe_size} large liquid stocks — not the whole market.
+            The nightly scan covers ~2,600.
+          </p>
+          <SignalEvidenceNote className="mt-2 pt-2 border-t border-gray-800" />
+        </div>
+      )}
 
       {isLoading && (
         <div className="card"><Spinner /><p className="text-center text-xs text-gray-500 mt-2">

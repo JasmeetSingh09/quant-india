@@ -1,4 +1,6 @@
-export default function AlphaMeter({ score }) {
+import { SignalEvidenceNote } from './Evidence'
+
+export default function AlphaMeter({ score, showEvidence = true }) {
   if (score == null) return null
   const clamped = Math.max(-100, Math.min(100, score))
   const pct     = ((clamped + 100) / 200) * 100
@@ -28,6 +30,13 @@ export default function AlphaMeter({ score }) {
         <span className="text-base font-bold font-mono" style={{ color }}>{display}</span>
         <span className="text-xs text-gray-700">+100</span>
       </div>
+      {/* The badge above is the model's output. This says what is known about
+          whether that output predicts anything — in the same eyeline, because
+          a validation status on another page is a validation status nobody
+          reads. */}
+      {showEvidence && (
+        <SignalEvidenceNote className="mt-2 pt-2 border-t border-gray-800" />
+      )}
     </div>
   )
 }
