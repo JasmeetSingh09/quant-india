@@ -4,9 +4,21 @@ adjusted_prices.py — bhavcopy closes, corrected for corporate actions.
 The archive stores what the exchange printed. A 1:1 bonus halves the quoted
 price overnight and a 10-to-1 face-value split divides it by ten, so a return
 computed across either from raw closes is measuring the corporate action rather
-than the company. Over long windows this dominates: 15 of 20 twelve-month
-returns were distorted by more than 10% against adjusted closes, and ITC's
-2018-2026 return flipped from +36.6% to -1.4%.
+than the company.
+
+Measured on a real event: VSTIND's 10:1 bonus printed 4456.45 on 2024-09-05 and
+481.25 the next day, a fall of 89.20% in which nothing happened to the company.
+The stock in fact rose 18.79% that day, and this module recovers exactly that —
+removing the artificial move while preserving the real one, which is the harder
+half.
+
+Dividends are the smaller but more persistent term: across 20 twelve-month
+windows, 15 differed by more than 10% between yfinance's dividend-adjusted and
+unadjusted closes, and ITC's 2018-2026 return flipped from +36.6% to -1.4%.
+That comparison isolates DIVIDENDS only — yfinance adjusts splits in both modes
+— and an earlier version of this note wrongly described it as covering splits
+as well. bhavcopy is unadjusted for both, so the archive's true distortion is
+the two compounded.
 
 This applies the correction at READ time. Nothing writes back to
 `bhavcopy_eod`, so the archive remains a record of the printed price and any

@@ -4,13 +4,28 @@ adjustment factors they imply.
 
 Why this exists
 ---------------
-bhavcopy stores exchange closes UNADJUSTED. Nothing in the pipeline adjusts
-them. Measured against split- and dividend-adjusted closes over long windows,
-15 of 20 twelve-month returns were distorted by more than 10% and ITC's
-2018-2026 return flipped sign: +36.6% adjusted against -1.4% raw. Momentum
-computed on the raw series is therefore measuring corporate actions as much as
-performance, and the distortion compounds the further back the window reaches —
-so a deeper archive makes it worse, not better.
+bhavcopy stores exchange closes UNADJUSTED — for splits and bonuses as well as
+dividends — and nothing in the pipeline adjusts them. Momentum computed on the
+raw series is therefore measuring corporate actions as much as performance, and
+the distortion compounds the further back a window reaches, so a deeper archive
+makes it worse rather than better.
+
+The size of it, measured two ways:
+
+  splits and bonuses   VSTIND's 10:1 bonus on 2024-09-06 printed 4456.45 then
+                       481.25 — a single-day fall of 89.20% that is entirely
+                       artificial. A twelve-month window spanning it is not
+                       approximately wrong, it is meaningless.
+  dividends            comparing yfinance auto_adjust=True against False across
+                       20 twelve-month windows, 15 were distorted by more than
+                       10% and ITC's 2018-2026 return flipped sign, +36.6%
+                       against -1.4%.
+
+A correction to how that second figure was first reported here: yfinance
+adjusts splits in BOTH modes and differs only on dividends, so the 15-of-20
+measurement isolates dividend distortion alone. It was originally described as
+covering splits too. bhavcopy is unadjusted for both, so the real distortion in
+the archive is larger than that number, not smaller.
 
 The other half of the problem is that the backtest reads bhavcopy while the
 live momentum factor reads yfinance with auto_adjust=True. They are not the
