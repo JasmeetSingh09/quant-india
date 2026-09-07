@@ -351,6 +351,49 @@ def backfill(start_year: int = 2011, start_month: int = 7,
     return total
 
 
+_BACKFILL_STATE = {"running": False, "started": None, "at": None,
+                   "result": None}
+
+
+def backfill_async(start_year: int = 2011, start_month: int = 7) -> dict:
+    """
+    Start the walk in the background and return immediately.
+
+    ~180 monthly requests paced at 1.2s outlives any HTTP request, so the call
+    starts the work and /actions/coverage reports progress — the same pattern
+    the bhavcopy backfill and the universe scan already use. A second start is
+    refused rather than stacked, because two walkers would double the request
+    rate against NSE for no benefit.
+    """
+    import threading
+    if _BACKFILL_STATE["running"]:
+        return {"started": False, "note": "A corporate-action backfill is "
+                                          "already running.",
+                "since": _BACKFILL_STATE["started"],
+                "at": _BACKFILL_STATE["at"]}
+
+    def _run():
+        _BACKFILL_STATE.update(running=True, started=datetime.now().isoformat(),
+                               at=None, result=None)
+        try:
+            _BACKFILL_STATE["result"] = backfill(
+                start_year, start_month,
+                progress=lambda key, n: _BACKFILL_STATE.update(
+                    at=f"{key} ({n} rows)"))
+        except Exception as e:
+            _BACKFILL_STATE["result"] = {"error": f"{type(e).__name__}: {e}"}
+        finally:
+            _BACKFILL_STATE["running"] = False
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"started": True, "from": f"{start_year}-{start_month:02d}",
+            "note": "Running in the background. Poll /actions/coverage."}
+
+
+def backfill_status() -> dict:
+    return dict(_BACKFILL_STATE)
+
+
 def _months_present() -> set:
     """Months already stored, so a resumed backfill does not refetch them."""
     try:

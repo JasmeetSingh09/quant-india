@@ -1734,6 +1734,46 @@ def scan_provenance_gap(cycle: str = Query(...)):
     return report(cycle)
 
 
+@app.post("/actions/backfill")
+def actions_backfill(start_year: int = Query(2011, ge=2000, le=2030),
+                     start_month: int = Query(7, ge=1, le=12)):
+    """
+    Walk NSE's corporate-action feed from the given month to now.
+
+    Defaults to 2011-07, the month bhavcopy began carrying ISIN — before that
+    the identity pipeline has nothing to key on, so a deeper walk would collect
+    actions that cannot be joined to a price series.
+
+    Runs in the background: roughly 180 monthly requests paced at 1.2s outlives
+    any HTTP request. Poll /actions/coverage. Writes only to corporate_actions,
+    which nothing else reads yet.
+    """
+    from corporate_actions import backfill_async
+    return backfill_async(start_year, start_month)
+
+
+@app.get("/actions/coverage")
+def actions_coverage():
+    """What the corporate-action archive holds, and any run in progress."""
+    from corporate_actions import coverage, backfill_status
+    out = coverage()
+    out["backfill"] = backfill_status()
+    return out
+
+
+@app.get("/actions/continuity")
+def actions_continuity(isin: str = Query(...), ex_date: str = Query(...)):
+    """
+    Does the adjusted price series go continuous across a known action?
+
+    The trust gate for the adjustment layer, runnable against real securities.
+    Returns the raw jump, the adjusted jump and the ratio between them rather
+    than a pass/fail with the threshold hidden inside, so the caller judges.
+    """
+    from adjusted_prices import continuity_check
+    return continuity_check(isin.strip().upper(), ex_date.strip())
+
+
 @app.get("/scan/piotroski-availability")
 def scan_piotroski_availability(cycle: str = Query(None)):
     """
