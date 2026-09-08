@@ -154,6 +154,64 @@ def _add_isin_column():
         conn.close()
 
 
+def _record_absent(day: datetime) -> None:
+    """
+    Remember that the exchange published nothing for this date.
+
+    Without this the walk never finishes. A holiday is missing from the price
+    table for ever, so missing_days keeps returning it, the resume keeps asking
+    for it, and roughly 240 dates -- sixteen a year across fifteen years -- get
+    re-requested from a public archive every fifteen minutes, permanently. The
+    archive is free and unauthenticated; hammering it that way is how a project
+    loses its source.
+
+    Only definitive 404s land here. A timeout writes nothing, because a network
+    failure recorded as a holiday would drop a real trading day silently and for
+    good -- and that is the one error this whole module exists to avoid.
+    """
+    try:
+        conn = get_conn()
+        try:
+            conn.execute("CREATE TABLE IF NOT EXISTS bhavcopy_absent ("
+                         "day TEXT PRIMARY KEY, checked_at TEXT NOT NULL)")
+            conn.commit()
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        try:
+            stmt = ("INSERT INTO bhavcopy_absent (day, checked_at) VALUES (?,?)")
+            stmt += (" ON CONFLICT (day) DO NOTHING" if IS_POSTGRES else "")
+            if not IS_POSTGRES:
+                stmt = stmt.replace("INSERT INTO", "INSERT OR IGNORE INTO")
+            conn.execute(stmt, (day.strftime("%Y-%m-%d"),
+                                datetime.now().isoformat()))
+            conn.commit()
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        finally:
+            conn.close()
+    except Exception:
+        pass
+
+
+def _absent_days() -> set:
+    """Dates the exchange has already told us it has no file for."""
+    try:
+        conn = get_conn()
+        try:
+            rows = conn.execute("SELECT day FROM bhavcopy_absent").fetchall()
+        finally:
+            conn.close()
+        return {str(r[0])[:10] for r in rows if r and r[0]}
+    except Exception:
+        return set()
+
+
 def fetch_day(day: datetime = None) -> dict:
     """
     Download and store one trading day. Weekends and holidays simply have no
@@ -164,16 +222,30 @@ def fetch_day(day: datetime = None) -> dict:
     d = day.strftime("%Y%m%d")
 
     raw = None
+    # A 404 from every candidate URL means the exchange has no file for this
+    # date -- a holiday. A timeout or a connection error means we do not know.
+    # Recording the second as if it were the first would erase a real trading
+    # day from the archive permanently, so the two are tracked apart.
+    answered, refused = False, True
     for url in _urls_for(day):
         try:
             r = requests.get(url, headers=_HEADERS, timeout=45)
+            answered = True
             if r.status_code == 200 and r.content[:2] == b"PK":
                 raw = r.content
                 break
+            if r.status_code not in (403, 404):
+                refused = False
         except Exception:
+            refused = False
             continue
     if not raw:
-        return {"day": d, "stored": 0, "note": "no file — weekend, holiday, or not published yet"}
+        if answered and refused:
+            _record_absent(day)
+            return {"day": d, "stored": 0, "absent": True,
+                    "note": "no file — the exchange was closed that day"}
+        return {"day": d, "stored": 0,
+                "note": "no file — not published yet, or the fetch failed"}
 
     try:
         z = zipfile.ZipFile(io.BytesIO(raw))
@@ -405,10 +477,12 @@ def backfill_range(start: str, end: str, workers: int = 4,
                 "range": [start, end], "note": "empty range"}
 
     have = _already_stored() if skip_existing else set()
+    absent = _absent_days() if skip_existing else set()
     targets = []
     d = d0
     while d <= d1:
-        if d.weekday() < 5 and d.strftime("%Y%m%d") not in have                 and d.strftime("%Y-%m-%d") not in have:
+        iso = d.strftime("%Y-%m-%d")
+        if d.weekday() < 5 and d.strftime("%Y%m%d") not in have                 and iso not in have and iso not in absent:
             targets.append(d)
         d += timedelta(days=1)
 
@@ -608,7 +682,8 @@ def close_from_bhavcopy(ticker: str, max_age_days: int = 7):
 
 
 def missing_days(start: str, end: str,
-                 respect_first_stored: bool = True) -> dict:
+                 respect_first_stored: bool = True,
+                 include_absent: bool = False) -> dict:
     """
     Weekdays in [start, end] with no rows. The general form of a gap.
 
@@ -660,12 +735,21 @@ def missing_days(start: str, end: str,
     # Today is never a gap: NSE publishes after the close.
     upper = min(d1, datetime.now() - timedelta(days=1))
 
-    missing, d = [], lower
+    # Dates the exchange has already answered 404 for are not gaps to chase.
+    # Without this the holiday calendar is rediscovered on every pass, for ever.
+    absent = set() if include_absent else _absent_days()
+
+    missing, skipped, d = [], 0, lower
     while d <= upper:
-        if d.weekday() < 5 and d.strftime("%Y-%m-%d") not in have:
-            missing.append(d.strftime("%Y-%m-%d"))
+        iso = d.strftime("%Y-%m-%d")
+        if d.weekday() < 5 and iso not in have:
+            if iso in absent:
+                skipped += 1
+            else:
+                missing.append(iso)
         d += timedelta(days=1)
     return {"available": True, "missing": missing, "n": len(missing),
+            "known_absent_in_range": skipped,
             "range": [lower.strftime("%Y-%m-%d"), upper.strftime("%Y-%m-%d")],
             "oldest_stored": oldest, "latest_stored": newest}
 

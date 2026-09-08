@@ -300,6 +300,57 @@ finally:
 
 print()
 print("=" * 72)
+print("A HOLIDAY IS ASKED FOR ONCE, NOT FOR EVER")
+print("=" * 72)
+
+# 52 of 186 days in one real chunk had no file -- sixteen a year, the NSE
+# holiday rate. They are missing from the price table permanently, so without a
+# record of the 404 the walk re-requests ~240 dates from a free public archive
+# every fifteen minutes and never reports done.
+seed(weekdays("2024-01-02", today))
+hole = weekdays("2024-01-02", today)[10]
+seed([d for d in weekdays("2024-01-02", today) if d != hole])
+check("before recording, the day is a gap",
+      hole in BC.missing_days("2024-01-02", today)["missing"])
+
+BC._record_absent(datetime.strptime(hole, "%Y-%m-%d"))
+m = BC.missing_days("2024-01-02", today)
+check("after a definitive 404 it is no longer chased",
+      hole not in m["missing"], f"{m['missing'][:3]}")
+check("but it is still counted, not hidden",
+      m.get("known_absent_in_range") == 1, f"{m.get('known_absent_in_range')}")
+check("include_absent=True can still see it",
+      hole in BC.missing_days("2024-01-02", today,
+                              include_absent=True)["missing"])
+
+calls = []
+real_fetch = BC.fetch_day
+BC.fetch_day = lambda day=None: (calls.append(day.strftime("%Y-%m-%d"))
+                                 or {"stored": 0})
+try:
+    calls.clear()
+    BC.backfill_range("2024-01-02", today)
+    check("backfill_range does not request a known-absent day",
+          hole not in calls, f"requested={hole in calls}")
+finally:
+    BC.fetch_day = real_fetch
+
+check("recording is idempotent",
+      (BC._record_absent(datetime.strptime(hole, "%Y-%m-%d")) or True)
+      and len(BC._absent_days()) == 1, f"{sorted(BC._absent_days())}")
+
+# The dangerous half: a timeout must NEVER be recorded as a holiday.
+import inspect  # noqa: E402
+fsrc = inspect.getsource(BC.fetch_day)
+check("only a definitive 404 records an absence",
+      "answered and refused" in fsrc,
+      "a network failure recorded as a holiday drops a real trading day")
+check("a connection error clears the refused flag",
+      fsrc.count("refused = False") >= 2,
+      "both the non-404 status and the exception path must clear it")
+
+print()
+print("=" * 72)
 print("missing_days")
 print("=" * 72)
 
