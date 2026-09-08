@@ -823,24 +823,69 @@ def closes_for_latest_day() -> dict:
         return {}
 
 
-def closes_history(symbols=None) -> dict:
+def closes_history(symbols=None, days_back: int = 420) -> dict:
     """
-    {symbol: {day: close}} across every stored day — the local substitute for
-    per-ticker price downloads when grading a large record.
+    {symbol: {day: close}} for the requested symbols, over a bounded window.
+
+    This was:
+
+        SELECT symbol, day, close FROM bhavcopy_eod WHERE close IS NOT NULL
+
+    -- the entire table -- pulled into Python with fetchall() and then filtered
+    by symbol in a loop afterwards. Asking for three tickers loaded every row
+    the archive held.
+
+    That was wasteful at 1.5 million rows and fatal at 6.6 million. When A4 took
+    the archive back to 2011 the query became roughly 1.3 GB of Python tuples on
+    a 2 GB instance and put production into a restart loop: the grading pass
+    runs on a timer, so each restart walked straight back into it. The archive
+    growing is not the bug -- the query never had a bound and nothing made that
+    visible until the table was big enough to kill the process.
+
+    Both axes are bounded in SQL now. The caller grades a one-year record and
+    the yfinance path beneath it asks for period="1y", so 420 calendar days
+    covers the same ground with room for holidays.
+
+    Day strings are interned because they repeat across every symbol: a few
+    hundred distinct dates against hundreds of thousands of rows, which is the
+    difference between one string object per date and one per row.
     """
+    from sys import intern
+
+    want = [s for s in (symbols or []) if s]
+    since = (datetime.now() - timedelta(days=max(1, days_back))).strftime("%Y-%m-%d")
+    out: dict = {}
+
+    def _collect(rows):
+        for sym, day, close in rows:
+            if close is None:
+                continue
+            try:
+                out.setdefault(sym, {})[intern(str(day)[:10])] = float(close)
+            except (TypeError, ValueError):
+                continue
+
     try:
         _init_db()
         conn = get_conn()
-        rows = conn.execute(
-            "SELECT symbol, day, close FROM bhavcopy_eod WHERE close IS NOT NULL"
-        ).fetchall()
-        conn.close()
+        try:
+            if want:
+                # Chunked so the parameter list cannot outgrow a driver limit.
+                CHUNK = 900
+                for i in range(0, len(want), CHUNK):
+                    part = want[i:i + CHUNK]
+                    ph = ",".join("?" for _ in part)
+                    _collect(conn.execute(
+                        "SELECT symbol, day, close FROM bhavcopy_eod "
+                        "WHERE close IS NOT NULL AND day >= ? "
+                        f"AND symbol IN ({ph})",
+                        tuple([since] + part)).fetchall())
+            else:
+                _collect(conn.execute(
+                    "SELECT symbol, day, close FROM bhavcopy_eod "
+                    "WHERE close IS NOT NULL AND day >= ?", (since,)).fetchall())
+        finally:
+            conn.close()
     except Exception:
         return {}
-    want = set(symbols) if symbols else None
-    out: dict = {}
-    for sym, day, close in rows:
-        if want and sym not in want:
-            continue
-        out.setdefault(sym, {})[day] = float(close)
     return out
