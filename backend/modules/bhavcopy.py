@@ -69,7 +69,21 @@ def _urls_for(day: datetime) -> list:
     return (new + old) if day.strftime("%Y-%m-%d") >= _FORMAT_SWITCH else (old + new)
 
 
-def _init_db():
+# Schema setup is idempotent but it is not free: a CREATE TABLE, an ALTER TABLE
+# and two CREATE INDEX, each taking a lock, on every call. fetch_day() calls it,
+# so a three-thousand-day walk issued twelve thousand DDL statements that queued
+# behind the walk's own writes -- which is how /bhavcopy/coverage, an endpoint
+# the stocks page calls, came to take 262 seconds while a backfill ran.
+#
+# Once per process is enough. `force` exists for tests, which delete the file
+# under the module and need the schema rebuilt.
+_SCHEMA_READY = False
+
+
+def _init_db(force: bool = False):
+    global _SCHEMA_READY
+    if _SCHEMA_READY and not force:
+        return
     conn = get_conn()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS bhavcopy_eod (
@@ -83,6 +97,7 @@ def _init_db():
     conn.close()
     _add_isin_column()
     _add_day_index()
+    _SCHEMA_READY = True
 
 
 def _add_day_index():

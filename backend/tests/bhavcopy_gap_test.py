@@ -58,7 +58,7 @@ def reset(days_present):
     """Rebuild the table holding exactly `days_present` (ISO strings)."""
     if os.path.exists(DB):
         os.remove(DB)
-    BC._init_db()
+    BC._init_db(force=True)
     conn = sqlite3.connect(DB)
     for d in days_present:
         conn.execute("INSERT OR REPLACE INTO bhavcopy_eod "

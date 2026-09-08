@@ -98,7 +98,7 @@ print("=" * 72)
 print("A REAL 2015 FILE, THROUGH THE PRODUCTION PARSER")
 print("=" * 72)
 
-BC._init_db()
+BC._init_db(force=True)
 got = None
 try:
     got = BC.fetch_day(datetime(2015, 6, 10))
@@ -201,7 +201,7 @@ BC.backfill_range_async = lambda s, e: (ranges.append((s, e))
 def seed(days):
     if os.path.exists(DB):
         os.remove(DB)
-    BC._init_db()
+    BC._init_db(force=True)
     conn = sqlite3.connect(DB)
     for d in days:
         conn.execute("INSERT OR REPLACE INTO bhavcopy_eod "
