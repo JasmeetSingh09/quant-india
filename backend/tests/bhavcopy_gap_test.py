@@ -31,6 +31,10 @@ import types
 from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "modules"))
+# Collection is paused by default (see nse_access: a written commitment
+# to NSE is enforced in code). These tests exercise the collection logic
+# itself, so they opt in explicitly. Set before bhavcopy is imported.
+os.environ["NSE_COLLECTION"] = "on"
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 except Exception:

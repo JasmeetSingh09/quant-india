@@ -23,6 +23,7 @@ import pandas as pd
 import requests
 
 from db import get_conn, IS_POSTGRES
+from nse_access import collection_paused, paused_result
 
 # NSE serves these to browsers, not to bare clients — without a UA and Referer
 # the archive returns 403.
@@ -217,6 +218,8 @@ def fetch_day(day: datetime = None) -> dict:
     Download and store one trading day. Weekends and holidays simply have no
     file, which is a 404 rather than an error worth alarming about.
     """
+    if collection_paused():
+        return {**paused_result("bhavcopy day"), "day": None, "stored": 0}
     _init_db()
     day = day or (datetime.now() - timedelta(days=1))
     d = day.strftime("%Y%m%d")
@@ -414,6 +417,9 @@ def backfill(days: int = 10, workers: int = 4, skip_existing: bool = True) -> di
     it puts nine hundred pointless requests through a public archive to learn
     what one query of its own table would have said.
     """
+    if collection_paused():
+        return {**paused_result("bhavcopy backfill"), "days_attempted": 0,
+                "days_stored": 0, "rows": 0}
     from concurrent.futures import ThreadPoolExecutor
 
     have = _already_stored() if skip_existing else set()
@@ -462,6 +468,9 @@ def backfill_range(start: str, end: str, workers: int = 4,
     calendar, so they are requested, answered with a 404, and counted as days
     with no file rather than as errors.
     """
+    if collection_paused():
+        return {**paused_result("bhavcopy range"), "days_attempted": 0,
+                "days_stored": 0, "rows": 0, "range": [start, end]}
     from concurrent.futures import ThreadPoolExecutor
 
     try:
@@ -579,6 +588,8 @@ def resume_if_incomplete(chunk_days: int = 1200) -> dict:
     Missing days are filled newest-first, because recent history is what the
     backtests reach for soonest.
     """
+    if collection_paused():
+        return {**paused_result("history resume"), "resumed": False}
     if _BACKFILL_STATE.get("running"):
         return {"resumed": False, "note": "A backfill is already running."}
 
@@ -634,6 +645,9 @@ def backfill_recent(days: int = 10) -> dict:
     Cheap when there is nothing to do — `backfill` skips weekends, days already
     stored and anything before the floor, so a clean archive costs one query.
     """
+    if collection_paused():
+        return {**paused_result("recent gap repair"), "filled": False,
+                "days_recovered": 0}
     if _BACKFILL_STATE.get("running"):
         return {"filled": False, "note": "A deep backfill is running; leaving "
                                          "the archive to it."}

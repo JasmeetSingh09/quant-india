@@ -64,6 +64,11 @@ try:
 except Exception:                                   # pragma: no cover
     from .db import get_conn, IS_POSTGRES
 
+try:
+    from nse_access import collection_paused
+except Exception:                                   # pragma: no cover
+    from .nse_access import collection_paused
+
 _READY = False
 
 # Actions that move the price. Everything else (AGMs, e-voting, board meetings)
@@ -302,6 +307,8 @@ def fetch_month(year: int, month: int, session=None) -> list:
     asked for — a request spanning all of 2015 came back with July only — so
     history is walked a month at a time rather than in one call.
     """
+    if collection_paused():
+        return []
     import requests
     s = session or requests.Session()
     if session is None:

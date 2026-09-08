@@ -2281,6 +2281,23 @@ def bhavcopy_coverage():
     return c
 
 
+@app.get("/health/nse-collection")
+def health_nse_collection():
+    """
+    Is this app currently collecting from NSE?
+
+    A written Non-Commercial User permission request went to NSE Data and
+    Analytics on 2026-09-08 stating that collection has been paused pending
+    their response. This endpoint is how that claim can be checked from
+    outside rather than taken on trust.
+
+    Stored data is unaffected and still served: the request concerned
+    collection and retention going forward.
+    """
+    from nse_access import status
+    return status()
+
+
 @app.get("/health/caches")
 def health_caches():
     """
