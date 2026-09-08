@@ -2060,6 +2060,27 @@ def factor_correlations():
     return matrix()
 
 
+@app.get("/factors/inputs")
+def factors_inputs(ticker: str = Query(...), cycle: str = Query(None)):
+    """
+    Everything stored behind one stock's observation: the inputs each factor
+    actually read, which ones were missing, the peers a valuation was compared
+    against and the articles a sentiment score was built from.
+
+    The scan has been capturing this since provenance shipped — seventy thousand
+    input rows and counting — and until now nothing served it. A user could see
+    that quality scored 0.42 and had no way to learn that three of the eight
+    Piotroski conditions could not be tested at all. A score with an unknown
+    denominator is not explainable, however precise it looks.
+    """
+    from factor_provenance import inputs_for
+    r = inputs_for(ticker.strip().upper(), cycle)
+    if not r.get("available"):
+        raise HTTPException(status_code=404, detail=r.get("reason",
+                                                          "no observation stored"))
+    return r
+
+
 @app.get("/factors/coverage")
 def factor_history_coverage():
     """How much history exists — the honest answer to 'why is this empty'."""
