@@ -82,6 +82,32 @@ def _init_db():
     conn.commit()
     conn.close()
     _add_isin_column()
+    _add_day_index()
+
+
+def _add_day_index():
+    """
+    An index on `day` alone.
+
+    The primary key is (symbol, day), which cannot serve `WHERE day >= ?` --
+    every gap scan and every MIN/MAX over the column was a full table scan.
+    That cost nothing at 1.5 million rows and made /bhavcopy/coverage take 38
+    seconds at 7.6 million, on an endpoint the stocks page calls.
+
+    On its own connection: a failed statement poisons the whole transaction on
+    Postgres, and an index that already exists must not take the caller's work
+    down with it.
+    """
+    try:
+        conn = get_conn()
+        try:
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_bhavcopy_day "
+                         "ON bhavcopy_eod (day)")
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception:
+        pass
 
 
 def _add_isin_column():
@@ -422,82 +448,59 @@ def backfill_range_async(start: str, end: str) -> dict:
 
 def resume_if_incomplete(chunk_days: int = 1200) -> dict:
     """
-    Continue building history after a restart, without being asked.
+    Keep filling the archive until nothing is missing, across any restarts.
 
-    A deep backfill takes hours and a deploy takes seconds. Every push restarts
-    the process, kills the daemon thread and loses the job — the days already
-    written survive in the table, but nothing resumes them, so the build stalls
-    wherever it happened to be and only a human noticing restarts it. That is
-    how a 640-day target quietly stops at 69.
+    A deep backfill takes hours and a deploy takes seconds. Every push kills the
+    daemon thread and loses the job -- the days already written survive, but
+    nothing resumes them, so the build stalls wherever it happened to be and
+    only a human noticing restarts it. That is how a 640-day target quietly
+    stopped at 69. So this polls rather than running once at startup.
 
-    Called at startup. It compares stored coverage against the archive floor
-    and continues if there is anything left, which makes progress monotonic
-    across any number of restarts. backfill() already skips days it has, so a
-    resume costs one query rather than re-fetching everything.
+    It asks what is MISSING rather than where the archive begins. Two earlier
+    versions of that question were both wrong:
+
+      backfill(chunk_days) counted days back from TODAY. At a 2024 floor one
+      chunk covered the whole gap, so it worked by accident; at a 2011 floor
+      every pass re-walks the same window from today, stores nothing new, and
+      fires again in fifteen minutes, for ever.
+
+      Anchoring on MIN(day) fixed that and introduced a quieter failure: it is
+      only correct if the stored days are contiguous. Fetch one day from 2011 by
+      hand and MIN(day) sits on the floor, so the walk declares itself complete
+      while three thousand days are absent from the middle. That is exactly what
+      a single-day probe did to this archive.
+
+    Missing days are filled newest-first, because recent history is what the
+    backtests reach for soonest.
     """
-    try:
-        _init_db()
-        from db import get_conn
-        conn = get_conn()
-        try:
-            # Same rule here: a day without ISIN is not finished.
-            row = conn.execute(
-                "SELECT MIN(day), COUNT(*) FROM ("
-                "  SELECT day FROM bhavcopy_eod GROUP BY day "
-                "  HAVING COUNT(isin) > 0) t"
-            ).fetchone()
-        finally:
-            conn.close()
-    except Exception as e:
-        return {"resumed": False, "reason": f"{type(e).__name__}"}
-
-    earliest = str(row[0])[:10] if row and row[0] else None
-    have_days = int(row[1] or 0) if row else 0
-
-    floor = datetime.strptime(ARCHIVE_STARTS, "%Y-%m-%d")
-    if earliest:
-        try:
-            if datetime.strptime(earliest, "%Y-%m-%d") <= floor:
-                return {"resumed": False, "complete": True,
-                        "earliest": earliest, "days": have_days,
-                        "note": "History already reaches the archive floor."}
-        except Exception:
-            pass
-
     if _BACKFILL_STATE.get("running"):
         return {"resumed": False, "note": "A backfill is already running."}
 
-    # Walk BACKWARDS from what we already have, one chunk at a time.
-    #
-    # This used to call backfill(chunk_days), which counts days back from TODAY.
-    # With the floor at 2024-01-01 that was harmless -- one chunk covered the
-    # whole gap. With the floor at 2011 it is a non-terminating loop: every pass
-    # re-walks the same 1,200 days back from today, stores nothing new, leaves
-    # `earliest` where it was, and fires again fifteen minutes later. The
-    # archive would never get deeper and nothing would say why.
-    #
-    # Anchoring each chunk to `earliest` instead makes progress monotonic: every
-    # completed pass moves the floor down by a chunk, and the walk terminates
-    # when it reaches ARCHIVE_STARTS.
-    if not earliest:
-        return {"resumed": False, "reason": "no stored days to walk back from"}
-    try:
-        earliest_dt = datetime.strptime(earliest, "%Y-%m-%d")
-    except Exception:
-        return {"resumed": False, "reason": f"unparseable earliest {earliest!r}"}
+    today = datetime.now().strftime("%Y-%m-%d")
+    # respect_first_stored=False on purpose: here a date before the oldest row
+    # IS work to do, which is the whole point of a backwards walk.
+    miss = missing_days(ARCHIVE_STARTS, today, respect_first_stored=False)
+    if not miss.get("available"):
+        return {"resumed": False, "reason": miss.get("reason")}
 
-    chunk_end = earliest_dt - timedelta(days=1)
-    if chunk_end < floor:
-        return {"resumed": False, "complete": True, "earliest": earliest,
-                "days": have_days,
-                "note": "History already reaches the archive floor."}
-    chunk_start = max(floor, chunk_end - timedelta(days=chunk_days))
+    gaps = miss["missing"]
+    if not gaps:
+        return {"resumed": False, "complete": True,
+                "oldest_stored": miss.get("oldest_stored"),
+                "latest_stored": miss.get("latest_stored"),
+                "note": "Every trading day between the floor and today is stored."}
+
+    newest_missing = gaps[-1]
+    chunk_end = datetime.strptime(newest_missing, "%Y-%m-%d")
+    chunk_start = max(datetime.strptime(ARCHIVE_STARTS, "%Y-%m-%d"),
+                      chunk_end - timedelta(days=chunk_days))
 
     started = backfill_range_async(chunk_start.strftime("%Y-%m-%d"),
                                    chunk_end.strftime("%Y-%m-%d"))
     return {**started, "resumed": True,
-            "earliest_before": earliest, "days_before": have_days,
-            "walking_back_to": chunk_start.strftime("%Y-%m-%d"),
+            "missing_before": len(gaps),
+            "oldest_missing": gaps[0], "newest_missing": newest_missing,
+            "filling": [chunk_start.strftime("%Y-%m-%d"), newest_missing],
             "floor": ARCHIVE_STARTS}
 
 
@@ -572,6 +575,69 @@ def close_from_bhavcopy(ticker: str, max_age_days: int = 7):
         return None
 
 
+def missing_days(start: str, end: str,
+                 respect_first_stored: bool = True) -> dict:
+    """
+    Weekdays in [start, end] with no rows. The general form of a gap.
+
+    Everything that asks "what is missing" asks it of a range: the recent
+    window for the repair pass, the whole archive for the resume walk. Both used
+    to answer it their own way, and the resume's way -- compare MIN(day) to the
+    floor -- is only correct if the stored days are contiguous. They are not.
+    One old day fetched by hand puts MIN(day) at the floor and the walk reports
+    itself complete with three thousand days absent from the middle. That is not
+    hypothetical; it is what a single-day probe did to this archive.
+
+    Scoped to the range and served by idx_bhavcopy_day, so asking is cheap.
+
+    respect_first_stored keeps dates before the first day ever stored out of the
+    answer: those were never claimed, and counting them would make an archive
+    that has just started look catastrophically broken.
+    """
+    try:
+        d0 = datetime.strptime(start[:10], "%Y-%m-%d")
+        d1 = datetime.strptime(end[:10], "%Y-%m-%d")
+    except Exception as e:
+        return {"available": False, "reason": f"bad range: {type(e).__name__}"}
+
+    try:
+        _init_db()
+        conn = get_conn()
+        try:
+            rows = conn.execute(
+                "SELECT DISTINCT day FROM bhavcopy_eod "
+                "WHERE day >= ? AND day <= ?",
+                (d0.strftime("%Y-%m-%d"), d1.strftime("%Y-%m-%d"))).fetchall()
+            edge = conn.execute(
+                "SELECT MIN(day), MAX(day) FROM bhavcopy_eod").fetchone()
+        finally:
+            conn.close()
+    except Exception as e:
+        return {"available": False, "reason": f"{type(e).__name__}"}
+
+    have = {str(r[0])[:10] for r in rows if r and r[0]}
+    oldest = str(edge[0])[:10] if edge and edge[0] else None
+    newest = str(edge[1])[:10] if edge and edge[1] else None
+    if not oldest:
+        return {"available": False, "reason": "no bhavcopy rows stored"}
+
+    floor = datetime.strptime(ARCHIVE_STARTS, "%Y-%m-%d")
+    lower = max(d0, floor)
+    if respect_first_stored:
+        lower = max(lower, datetime.strptime(oldest, "%Y-%m-%d"))
+    # Today is never a gap: NSE publishes after the close.
+    upper = min(d1, datetime.now() - timedelta(days=1))
+
+    missing, d = [], lower
+    while d <= upper:
+        if d.weekday() < 5 and d.strftime("%Y-%m-%d") not in have:
+            missing.append(d.strftime("%Y-%m-%d"))
+        d += timedelta(days=1)
+    return {"available": True, "missing": missing, "n": len(missing),
+            "range": [lower.strftime("%Y-%m-%d"), upper.strftime("%Y-%m-%d")],
+            "oldest_stored": oldest, "latest_stored": newest}
+
+
 def recent_gaps(days: int = 30) -> dict:
     """
     Which weekdays in the recent window have no rows?
@@ -587,48 +653,14 @@ def recent_gaps(days: int = 30) -> dict:
     answer that it was a holiday. Persisting across many passes is the signal
     worth reading, not a single appearance here.
     """
-    # Scoped to the window on purpose. A bare SELECT DISTINCT day scans every
-    # row in the archive — one and a half million and growing — and coverage()
-    # is called on a page load, so the honest answer must also be a cheap one.
     since = (datetime.now() - timedelta(days=days + 1)).strftime("%Y-%m-%d")
-    try:
-        _init_db()
-        conn = get_conn()
-        try:
-            rows = conn.execute(
-                "SELECT DISTINCT day FROM bhavcopy_eod WHERE day >= ?",
-                (since,)).fetchall()
-            edge = conn.execute(
-                "SELECT MIN(day), MAX(day) FROM bhavcopy_eod").fetchone()
-        finally:
-            conn.close()
-    except Exception as e:
-        return {"available": False, "reason": f"{type(e).__name__}"}
-
-    have = {str(r[0])[:10] for r in rows if r and r[0]}
-    oldest = str(edge[0])[:10] if edge and edge[0] else None
-    newest = str(edge[1])[:10] if edge and edge[1] else None
-    if not oldest:
-        return {"available": False, "reason": "no bhavcopy rows stored"}
-
-    floor = datetime.strptime(ARCHIVE_STARTS, "%Y-%m-%d")
-    # Today is excluded: NSE publishes after the close, so its absence is not a
-    # gap yet. Days before the archive floor or before the first day we ever
-    # stored are not gaps either — they were never claimed.
-    earliest_claim = max(floor, datetime.strptime(oldest, "%Y-%m-%d"))
-
-    missing = []
-    for i in range(1, days + 1):
-        d = datetime.now() - timedelta(days=i)
-        if d.weekday() >= 5 or d < earliest_claim:
-            continue
-        iso = d.strftime("%Y-%m-%d")
-        if iso not in have:
-            missing.append(iso)
-    missing.sort()
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    miss = missing_days(since, yesterday, respect_first_stored=True)
+    if not miss.get("available"):
+        return miss
     return {"available": True, "window_days": days,
-            "candidate_gaps": missing, "n": len(missing),
-            "latest_stored": newest,
+            "candidate_gaps": miss["missing"], "n": len(miss["missing"]),
+            "latest_stored": miss.get("latest_stored"),
             "note": ("Weekdays in the window with no rows. Holidays appear here "
                      "too and cannot be told apart without an exchange calendar; "
                      "a gap that survives several repair passes is a real loss.")}

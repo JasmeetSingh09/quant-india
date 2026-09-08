@@ -189,7 +189,7 @@ finally:
 
 print()
 print("=" * 72)
-print("THE RESUME WALK TERMINATES AND DEEPENS")
+print("THE RESUME WALK FILLS ACTUAL GAPS")
 print("=" * 72)
 
 ranges = []
@@ -211,39 +211,77 @@ def seed(days):
     conn.close()
 
 
+def weekdays(a, b):
+    out, d = [], datetime.strptime(a, "%Y-%m-%d")
+    stop = datetime.strptime(b, "%Y-%m-%d")
+    while d <= stop:
+        if d.weekday() < 5:
+            out.append(d.strftime("%Y-%m-%d"))
+        d += timedelta(days=1)
+    return out
+
+
+today = datetime.now().strftime("%Y-%m-%d")
 try:
     BC._BACKFILL_STATE["running"] = False
-    seed(["2024-01-02", "2026-09-07"])
+
+    # A contiguous archive from 2024-01-02: the gap is everything below it.
+    seed(weekdays("2024-01-02", today))
     ranges.clear()
     r = BC.resume_if_incomplete(chunk_days=400)
-    check("a resume walks back from the earliest stored day, not from today",
+    check("a contiguous archive walks back from its own edge",
           bool(ranges) and ranges[0][1] == "2024-01-01",
           f"chunk={ranges[0] if ranges else None}")
-    check("the chunk is bounded by chunk_days",
-          bool(ranges) and ranges[0][0] == "2022-11-27",
-          f"start={ranges[0][0] if ranges else None}")
+    if ranges:
+        span = (datetime.strptime(ranges[0][1], "%Y-%m-%d")
+                - datetime.strptime(ranges[0][0], "%Y-%m-%d")).days
+        check("the chunk is bounded by chunk_days", span == 400, f"span={span}d")
 
-    # The non-termination bug: each pass must move the floor DOWN.
+    # Each pass must move: fill that chunk, the next target must be older.
+    edge = "2022-11-27"
+    seed(weekdays(edge, today))
     ranges.clear()
-    seed(["2022-11-27", "2026-09-07"])
     BC.resume_if_incomplete(chunk_days=400)
-    check("the next pass asks for an EARLIER window, not the same one",
-          bool(ranges) and ranges[0][1] == "2022-11-26",
+    # The newest missing day is the last WEEKDAY below the archive edge, which
+    # is not simply edge-1: 2022-11-26 is a Saturday. Derived, not assumed --
+    # hard-coding it is how a test starts asserting the calendar.
+    want = datetime.strptime(edge, "%Y-%m-%d") - timedelta(days=1)
+    while want.weekday() >= 5:
+        want -= timedelta(days=1)
+    check("the next pass targets an EARLIER window, not the same one",
+          bool(ranges) and ranges[0][1] == want.strftime("%Y-%m-%d"),
+          f"chunk={ranges[0] if ranges else None} want={want:%Y-%m-%d}")
+
+    # THE REGRESSION. Anchoring on MIN(day) declared this complete while three
+    # thousand days were absent from the middle. A single hand-fetched day did
+    # exactly this to the real archive.
+    seed(["2011-07-04"] + weekdays("2024-01-02", today))
+    ranges.clear()
+    r = BC.resume_if_incomplete(chunk_days=400)
+    check("one day sitting on the floor does NOT mean complete",
+          r.get("complete") is not True, f"{str(r)[:110]}")
+    check("the interior gap is what gets filled",
+          bool(ranges) and ranges[0][1] == "2024-01-01",
+          f"chunk={ranges[0] if ranges else None}")
+    check("it reports how many days are actually missing",
+          (r.get("missing_before") or 0) > 3000, f"{r.get('missing_before')}")
+
+    # A gap in the MIDDLE of an otherwise full archive is found too.
+    days = [d for d in weekdays("2024-01-02", today)
+            if not ("2025-03-01" <= d <= "2025-03-31")]
+    seed(["2011-07-04"] + days)
+    ranges.clear()
+    r = BC.resume_if_incomplete(chunk_days=30)
+    check("a hole in the middle of a full stretch is targeted",
+          bool(ranges) and ranges[0][1].startswith("2025-03"),
           f"chunk={ranges[0] if ranges else None}")
 
-    # And it must stop rather than walk below the floor.
+    # Genuinely complete: every weekday from the floor to yesterday.
+    seed(weekdays(BC.ARCHIVE_STARTS, today))
     ranges.clear()
-    seed(["2011-07-04", "2026-09-07"])
     r = BC.resume_if_incomplete(chunk_days=400)
-    check("reaching the floor reports complete and asks for nothing",
-          r.get("complete") is True and not ranges, f"{r}")
-
-    ranges.clear()
-    seed(["2011-08-01", "2026-09-07"])
-    r = BC.resume_if_incomplete(chunk_days=4000)
-    check("a chunk larger than the remaining gap is clamped to the floor",
-          bool(ranges) and ranges[0][0] == "2011-07-04",
-          f"start={ranges[0][0] if ranges else None}")
+    check("a genuinely complete archive reports complete and asks nothing",
+          r.get("complete") is True and not ranges, f"{str(r)[:110]}")
 
     BC._BACKFILL_STATE["running"] = True
     ranges.clear()
@@ -259,6 +297,36 @@ try:
           not ranges and r.get("resumed") is False, f"{r}")
 finally:
     BC.backfill_range_async = real_async
+
+print()
+print("=" * 72)
+print("missing_days")
+print("=" * 72)
+
+seed(weekdays("2024-01-02", today))
+m = BC.missing_days("2024-01-02", today)
+check("a contiguous stretch has no missing days", m["n"] == 0, f"n={m['n']}")
+
+gone = weekdays("2024-01-02", today)
+hole = gone[50]
+seed([d for d in gone if d != hole])
+m = BC.missing_days("2024-01-02", today)
+check("one withheld weekday is found", m["missing"] == [hole], f"{m['missing']}")
+
+m = BC.missing_days(BC.ARCHIVE_STARTS, today, respect_first_stored=True)
+check("respect_first_stored hides pre-archive dates",
+      all(d >= "2024-01-02" for d in m["missing"]), f"{m['missing'][:3]}")
+m = BC.missing_days(BC.ARCHIVE_STARTS, today, respect_first_stored=False)
+check("without it, the whole backwards gap is work to do",
+      any(d < "2024-01-02" for d in m["missing"]), f"n={m['n']}")
+
+m = BC.missing_days("2024-01-02", today)
+check("today is never missing", today not in m["missing"])
+check("no weekend is ever missing",
+      not [d for d in m["missing"]
+           if datetime.strptime(d, "%Y-%m-%d").weekday() >= 5])
+check("a bad range is reported, not raised",
+      BC.missing_days("nope", today).get("available") is False)
 
 try:
     os.remove(DB)
