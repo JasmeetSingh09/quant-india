@@ -55,6 +55,8 @@ model rather than restated.
 
 from model_config import RISK_FREE_RATE as _RF
 
+import corporate_actions as CA
+
 import math
 from datetime import datetime
 
@@ -230,6 +232,148 @@ def _load(conn, canonical, pair_rows=None):
             except (TypeError, ValueError):
                 V[i, j] = 0.0
     return list(keys), days, C, V
+
+
+def _apply_adjustment(conn, keys, days, C, canonical):
+    """
+    Correct the price matrix for splits, bonuses and dividends, in place.
+
+    Until this existed the validation ran on the closes the exchange printed. A
+    1:4 bonus prints an 80% overnight fall in which nothing happened to the
+    company, and a 12-1 momentum window spanning one scored that as the worst
+    momentum on the exchange. The archive is unadjusted by design -- it records
+    what was printed -- so the correction belongs here, at read time.
+
+    Why this is not look-ahead
+    --------------------------
+    The convention is the same one adjusted_prices uses and the same one
+    yfinance's auto_adjust uses:
+
+        adjusted(t) = close(t) * PROD( m(a) for a where ex_date(a) > t )
+
+    The LEVEL at t therefore depends on actions after t, which were not knowable
+    at t. A RETURN does not. For t0 < t1,
+
+        adjusted(t1)/adjusted(t0) = [close(t1)/close(t0)] * F(t1)/F(t0)
+
+    and F(t0)/F(t1) is exactly the product of multipliers with ex_date in
+    (t0, t1]. Every action outside that window appears in both factors and
+    cancels. So a return computed over a window ending at or before the
+    formation date depends only on actions that had already happened by then.
+
+    Every number the frozen factors compute is a ratio -- momentum is a return
+    over a return, its volatility is the standard deviation of daily returns,
+    low_risk is volatility and drawdown, both ratio-based. None of them reads a
+    level. That is what makes this safe, and it is why the traded-value matrix V
+    is deliberately NOT adjusted: turnover is a level, the honest one is the
+    rupee value the exchange actually printed, and an adjusted level would smear
+    future corporate actions into a liquidity filter.
+
+    What it will not do
+    -------------------
+    It does not create or destroy an observation. A cell that was missing stays
+    missing and a cell that was priced stays priced, because a factor is a
+    positive multiplier and nothing here writes into an empty cell. Eligibility,
+    the day axis and the security axis are all unchanged -- only values move.
+
+    An action whose multiplier cannot be computed is skipped and counted, never
+    guessed. A dividend needs the close on the last trading day before its
+    ex-date; where that is missing the action is reported in `unapplied` rather
+    than approximated, because an approximated multiplier is an invisible error
+    in every earlier price.
+
+    Identity is whatever the resolver established and nothing more. Actions are
+    keyed by ISIN and mapped through the same canonical map the matrix rows use,
+    so a row that merges two ISINs receives both their actions, and two ISINs
+    the resolver declined to merge stay separate rows receiving only their own.
+    Nothing here stitches a series across an identity boundary the resolver
+    refused.
+    """
+    from bisect import bisect_left
+
+    n_rows, n_cols = C.shape
+    F = np.ones((n_rows, n_cols), dtype=np.float32)
+    index = {k: i for i, k in enumerate(keys)}
+
+    try:
+        rows = conn.execute(
+            "SELECT isin, ex_date, kind, num, den, amount FROM corporate_actions "
+            "WHERE parsed = 1 AND kind IN ('split', 'bonus', 'dividend') "
+            "ORDER BY ex_date").fetchall()
+    except Exception as e:
+        return F, {"applied": False, "reason": f"{type(e).__name__}",
+                   "note": "corporate actions unavailable; series left RAW"}
+
+    stats = {"actions_seen": len(rows), "applied": 0, "unapplied": 0,
+             "identities_with_actions": set(), "by_kind": {},
+             "unapplied_by_reason": {}}
+
+    def _skip(reason):
+        stats["unapplied"] += 1
+        stats["unapplied_by_reason"][reason] =             stats["unapplied_by_reason"].get(reason, 0) + 1
+
+    for isin, ex_date, kind, num, den, amount in rows:
+        if not isin or not ex_date:
+            _skip("no isin or ex_date")
+            continue
+        key = canonical.get(isin, isin)
+        i = index.get(key)
+        if i is None:
+            _skip("security not in the price matrix")
+            continue
+        ex = str(ex_date)[:10]
+        c = bisect_left(days, ex)
+        if c <= 0:
+            # Nothing stored before the ex-date, so no price it could correct.
+            _skip("ex-date at or before the first stored day")
+            continue
+
+        action = {"kind": kind, "num": num, "den": den, "amount": amount}
+        prev_close = None
+        if kind == CA.DIVIDEND:
+            prev_close = float(C[i, c - 1]) if np.isfinite(C[i, c - 1]) else None
+            if prev_close is None or prev_close <= 0:
+                _skip("no close before the ex-date")
+                continue
+        try:
+            m = CA.price_multiplier(action, prev_close=prev_close)
+        except Exception:
+            m = None
+        if m is None or not np.isfinite(m) or not (0 < m <= 1.0000001):
+            _skip("multiplier not computable")
+            continue
+
+        # F(t) = product over actions with ex_date > t, so every day strictly
+        # before the ex-date carries this multiplier and no day on or after it
+        # does. days is sorted, so that is the half-open slice [0, c).
+        F[i, :c] *= np.float32(m)
+        stats["applied"] += 1
+        stats["by_kind"][kind] = stats["by_kind"].get(kind, 0) + 1
+        stats["identities_with_actions"].add(key)
+
+    priced = np.isfinite(C)
+    moved = priced & (F != 1.0)
+    out = {
+        "applied": True,
+        "convention": ("adjusted(t) = close(t) * PROD(multiplier for ex_date > t); "
+                       "the most recent close is unadjusted and history is "
+                       "scaled to meet it"),
+        "actions_seen": stats["actions_seen"],
+        "actions_applied": stats["applied"],
+        "actions_unapplied": stats["unapplied"],
+        "unapplied_by_reason": stats["unapplied_by_reason"],
+        "applied_by_kind": stats["by_kind"],
+        "identities_with_actions": len(stats["identities_with_actions"]),
+        "priced_observations": int(priced.sum()),
+        "observations_adjusted": int(moved.sum()),
+        "observations_unchanged": int((priced & (F == 1.0)).sum()),
+        "traded_value_left_raw": True,
+        "look_ahead": ("none in any return: the factor cancels except for "
+                       "actions inside the window, all of which had occurred "
+                       "by the end of it. Levels do carry future actions, and "
+                       "no frozen factor reads a level."),
+    }
+    return F, out
 
 
 def _month_end_cols(days):
@@ -490,6 +634,14 @@ def validate(min_turnover: float = MIN_MONTHLY_TURNOVER,
             canonical, ident = {}, {"error": type(e).__name__}
         keys, days, C, V = _load(conn, canonical, pair_rows)
         del pair_rows
+        # The archive stores what the exchange printed, which is unadjusted.
+        # Correcting it here rather than in _load keeps the raw read and the
+        # correction separable, so a test can hold one against the other. V is
+        # built from raw prices inside _load and is deliberately left that way.
+        adj_factors, adjustment = _apply_adjustment(conn, keys, days, C, canonical)
+        if adjustment.get("applied"):
+            C = C * adj_factors
+        del adj_factors
     finally:
         try:
             conn.close()
@@ -722,6 +874,18 @@ def validate(min_turnover: float = MIN_MONTHLY_TURNOVER,
     survivors = [n for n, p in usable if alpha and p < alpha]
 
     return {
+        # Recorded on every run, so a stored result can never be read without
+        # knowing whether the prices under it were corrected. A validation whose
+        # adjustment state is unknown afterwards is not reproducible.
+        "price_series": {
+            "source": "bhavcopy_eod (NSE end-of-day, as printed)",
+            "adjusted_for_corporate_actions": bool(adjustment.get("applied")),
+            "adjustment": adjustment,
+            "data_range": [days[0], days[-1]],
+            "trading_days": len(days),
+            "securities_in_matrix": len(keys),
+            "identity_resolution": ident,
+        },
         "track_a": {
             "label": "V1.0 price-observable validation",
             "not": ("This is NOT full V1/V2 validation. It covers the two "
