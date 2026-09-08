@@ -2217,6 +2217,21 @@ def bhavcopy_backfill(days: int = Query(30, ge=1, le=1200)):
     return backfill_async(days)
 
 
+@app.post("/bhavcopy/backfill-range")
+def bhavcopy_backfill_range(start: str = Query(..., description="YYYY-MM-DD"),
+                            end: str = Query(..., description="YYYY-MM-DD")):
+    """
+    Fill an explicit date range in the background.
+
+    /bhavcopy/backfill counts days back from today and caps at 1200, which
+    cannot say "the twelve years before what we already have". The scheduled
+    resume walks backwards on its own; this exists so the walk can be driven and
+    checked rather than only waited on.
+    """
+    from bhavcopy import backfill_range_async
+    return backfill_range_async(start, end)
+
+
 @app.get("/bhavcopy/coverage")
 def bhavcopy_coverage():
     from bhavcopy import coverage, backfill_status

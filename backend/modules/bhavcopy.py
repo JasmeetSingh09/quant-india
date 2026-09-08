@@ -38,6 +38,36 @@ _URLS = [
     "https://archives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_{d}_F_0000.csv.zip",
 ]
 
+# Before 2024 the exchange published a different filename, a different layout
+# and a different directory tree. Both were probed against the live archive
+# rather than assumed: the old pattern serves 2011-07-04 through at least
+# 2023-06, the new one from 2024-01-02, and every file in both eras carries a
+# fully populated ISIN column -- which is the only reason this backfill is worth
+# running, since identity is what the corporate-action join is keyed on.
+_OLD_URLS = [
+    "https://nsearchives.nseindia.com/content/historical/EQUITIES/{Y}/{MON}/cm{D}{MON}{Y}bhav.csv.zip",
+    "https://archives.nseindia.com/content/historical/EQUITIES/{Y}/{MON}/cm{D}{MON}{Y}bhav.csv.zip",
+]
+_MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+           "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
+# Where the exchange changed format. Not a cliff worth trusting -- both eras are
+# always attempted -- but trying the likely one first halves the requests.
+_FORMAT_SWITCH = "2024-01-01"
+
+
+def _urls_for(day: datetime) -> list:
+    """Every URL that might serve this date, likeliest first.
+
+    Both eras are always tried. The switch date orders the attempts rather than
+    gating them, so a file sitting on the other side of it is still found
+    instead of being reported as a holiday.
+    """
+    d = day.strftime("%Y%m%d")
+    new = [u.format(d=d) for u in _URLS]
+    old = [u.format(Y=day.strftime("%Y"), MON=_MONTHS[day.month - 1],
+                    D=day.strftime("%d")) for u in _OLD_URLS]
+    return (new + old) if day.strftime("%Y-%m-%d") >= _FORMAT_SWITCH else (old + new)
+
 
 def _init_db():
     conn = get_conn()
@@ -93,9 +123,9 @@ def fetch_day(day: datetime = None) -> dict:
     d = day.strftime("%Y%m%d")
 
     raw = None
-    for url in _URLS:
+    for url in _urls_for(day):
         try:
-            r = requests.get(url.format(d=d), headers=_HEADERS, timeout=45)
+            r = requests.get(url, headers=_HEADERS, timeout=45)
             if r.status_code == 200 and r.content[:2] == b"PK":
                 raw = r.content
                 break
@@ -126,8 +156,13 @@ def fetch_day(day: datetime = None) -> dict:
     if c_series is not None:
         df = df[df[c_series].astype(str).str.strip().isin(["EQ", "BE"])]
 
-    c_o, c_h, c_l = col("OPNPRIC", "OPEN_PRICE"), col("HGHPRIC", "HIGH_PRICE"), col("LWPRIC", "LOW_PRICE")
-    c_v = col("TTLTRADGVOL", "TTL_TRD_QNTY", "VOLUME")
+    # The pre-2024 file names these OPEN/HIGH/LOW/TOTTRDQTY. Without the older
+    # spellings every historical day would parse, store, and silently carry a
+    # null OHLC -- a day present in the table and useless to anything reading it.
+    c_o = col("OPNPRIC", "OPEN_PRICE", "OPEN")
+    c_h = col("HGHPRIC", "HIGH_PRICE", "HIGH")
+    c_l = col("LWPRIC", "LOW_PRICE", "LOW")
+    c_v = col("TTLTRADGVOL", "TTL_TRD_QNTY", "VOLUME", "TOTTRDQTY")
     # The permanent identity. Present in the file since the start and discarded
     # until a backtest booked a ticker rename as a total loss.
     c_isin = col("ISIN")
@@ -200,11 +235,17 @@ def fetch_day(day: datetime = None) -> dict:
             "source": "NSE bhavcopy"}
 
 
-# NSE's archive at these URLs starts in early 2024 — measured, not assumed:
-# 2024-02-21 returns a file, 2023-11-15 does not, and neither is a holiday.
-# Asking for dates before this only produces 404s, so the depth of any
-# point-in-time universe built from this source is bounded here.
-ARCHIVE_STARTS = "2024-01-01"
+# The floor was 2024-01-01 because that is where the MODERN filename starts —
+# 2024-02-21 returns a file and 2023-11-15 does not. That was a fact about one
+# URL pattern, not about the archive. The pre-2024 pattern serves 2011-07-04
+# onward, with a fully populated ISIN column in every file, both verified
+# against the live archive.
+#
+# 2011-07 rather than deeper: it is where the corporate-action archive begins,
+# and a price with no actions to adjust it by is a price this app cannot use
+# honestly. Extending one without the other would buy history that the
+# adjustment layer has to refuse.
+ARCHIVE_STARTS = "2011-07-04"
 
 
 def _already_stored() -> set:
@@ -275,6 +316,57 @@ def backfill(days: int = 10, workers: int = 4, skip_existing: bool = True) -> di
                      f"archive does not serve it.")}
 
 
+def backfill_range(start: str, end: str, workers: int = 4,
+                   skip_existing: bool = True) -> dict:
+    """
+    Fetch every weekday in [start, end] that is not already stored.
+
+    backfill() counts days back from TODAY, which cannot express "the stretch
+    before what we already have". Reaching a floor thirteen years deep that way
+    means asking for five thousand days back and re-walking the entire archive
+    on every pass just to skip it -- and worse, a chunked resume can then never
+    get deeper than one chunk, because every chunk starts from today again. A
+    range is walked once and moves.
+
+    Weekends are skipped. Holidays are not knowable without an exchange
+    calendar, so they are requested, answered with a 404, and counted as days
+    with no file rather than as errors.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    try:
+        d0 = datetime.strptime(start[:10], "%Y-%m-%d")
+        d1 = datetime.strptime(end[:10], "%Y-%m-%d")
+    except Exception as e:
+        return {"error": f"bad date range: {type(e).__name__}: {e}"}
+    floor = datetime.strptime(ARCHIVE_STARTS, "%Y-%m-%d")
+    if d0 < floor:
+        d0 = floor
+    if d1 < d0:
+        return {"days_attempted": 0, "days_stored": 0, "rows": 0,
+                "range": [start, end], "note": "empty range"}
+
+    have = _already_stored() if skip_existing else set()
+    targets = []
+    d = d0
+    while d <= d1:
+        if d.weekday() < 5 and d.strftime("%Y%m%d") not in have                 and d.strftime("%Y-%m-%d") not in have:
+            targets.append(d)
+        d += timedelta(days=1)
+
+    out = []
+    if targets:
+        with ThreadPoolExecutor(max_workers=max(1, min(workers, 6))) as ex:
+            for r in ex.map(fetch_day, targets):
+                out.append(r)
+    stored = [o for o in out if o.get("stored")]
+    return {"range": [d0.strftime("%Y-%m-%d"), d1.strftime("%Y-%m-%d")],
+            "days_attempted": len(targets),
+            "days_stored": len(stored),
+            "days_with_no_file": len(targets) - len(stored),
+            "rows": sum(o.get("stored", 0) for o in out)}
+
+
 _BACKFILL_STATE = {"running": False, "started": None, "result": None}
 
 
@@ -303,6 +395,28 @@ def backfill_async(days: int = 30) -> dict:
 
     threading.Thread(target=_run, daemon=True).start()
     return {"started": True, "days": days,
+            "note": "Running in the background. Poll /bhavcopy/coverage for progress."}
+
+
+def backfill_range_async(start: str, end: str) -> dict:
+    """backfill_range in the background, sharing the same running-guard."""
+    import threading
+    if _BACKFILL_STATE["running"]:
+        return {"started": False, "note": "A backfill is already running.",
+                "since": _BACKFILL_STATE["started"]}
+
+    def _run():
+        _BACKFILL_STATE.update(running=True, started=datetime.now().isoformat(),
+                               result=None)
+        try:
+            _BACKFILL_STATE["result"] = backfill_range(start, end)
+        except Exception as e:
+            _BACKFILL_STATE["result"] = {"error": f"{type(e).__name__}: {e}"}
+        finally:
+            _BACKFILL_STATE["running"] = False
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"started": True, "range": [start, end],
             "note": "Running in the background. Poll /bhavcopy/coverage for progress."}
 
 
@@ -353,8 +467,38 @@ def resume_if_incomplete(chunk_days: int = 1200) -> dict:
     if _BACKFILL_STATE.get("running"):
         return {"resumed": False, "note": "A backfill is already running."}
 
-    return {**backfill_async(chunk_days), "resumed": True,
-            "earliest_before": earliest, "days_before": have_days}
+    # Walk BACKWARDS from what we already have, one chunk at a time.
+    #
+    # This used to call backfill(chunk_days), which counts days back from TODAY.
+    # With the floor at 2024-01-01 that was harmless -- one chunk covered the
+    # whole gap. With the floor at 2011 it is a non-terminating loop: every pass
+    # re-walks the same 1,200 days back from today, stores nothing new, leaves
+    # `earliest` where it was, and fires again fifteen minutes later. The
+    # archive would never get deeper and nothing would say why.
+    #
+    # Anchoring each chunk to `earliest` instead makes progress monotonic: every
+    # completed pass moves the floor down by a chunk, and the walk terminates
+    # when it reaches ARCHIVE_STARTS.
+    if not earliest:
+        return {"resumed": False, "reason": "no stored days to walk back from"}
+    try:
+        earliest_dt = datetime.strptime(earliest, "%Y-%m-%d")
+    except Exception:
+        return {"resumed": False, "reason": f"unparseable earliest {earliest!r}"}
+
+    chunk_end = earliest_dt - timedelta(days=1)
+    if chunk_end < floor:
+        return {"resumed": False, "complete": True, "earliest": earliest,
+                "days": have_days,
+                "note": "History already reaches the archive floor."}
+    chunk_start = max(floor, chunk_end - timedelta(days=chunk_days))
+
+    started = backfill_range_async(chunk_start.strftime("%Y-%m-%d"),
+                                   chunk_end.strftime("%Y-%m-%d"))
+    return {**started, "resumed": True,
+            "earliest_before": earliest, "days_before": have_days,
+            "walking_back_to": chunk_start.strftime("%Y-%m-%d"),
+            "floor": ARCHIVE_STARTS}
 
 
 def backfill_recent(days: int = 10) -> dict:
