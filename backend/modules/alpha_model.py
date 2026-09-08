@@ -416,6 +416,18 @@ def _compute_momentum_factor(ticker: str, peers: list = None) -> dict:
 # Factor 3: Quality Score (-1 to +1)
 # ---------------------------------------------------------------------------
 
+_SCORE_CACHE = BoundedCache(512, "alpha_model._SCORE_CACHE")
+# 15 minutes. Every input behind a score is daily-frequency data and is already
+# cached -- .info for 24h, interest coverage for 24h, the picks list for 6h --
+# but the score itself was recomputed on every request, so two people opening
+# the same stock a second apart each paid a full round of Yahoo calls. Measured
+# cold at 7.6s, essentially all of it network.
+#
+# This caches the RESULT, not an input, so it cannot change a score: a miss
+# recomputes exactly what a hit returns. The universe scan is unaffected, since
+# it visits each ticker once per cycle and that is far longer than this TTL.
+_SCORE_TTL = 15 * 60
+
 _COVERAGE_CACHE = BoundedCache(512, "alpha_model._COVERAGE_CACHE")  # ticker -> (fetched_at, coverage or None)
 _COVERAGE_TTL = 24 * 3600      # annual statements; a day is ample
 
@@ -762,6 +774,15 @@ def compute_alpha_score(
     if not ticker:
         return {"error": "Ticker is required"}
 
+    # Custom weights or an explicit peer list are an experiment rather than the
+    # frozen model, so they are never served from nor written to the cache.
+    _cacheable = weights is None and peers is None
+    if _cacheable:
+        import time as _t
+        _hit = _SCORE_CACHE.get(ticker)
+        if _hit and _t.time() - _hit[0] < _SCORE_TTL:
+            return _hit[1]
+
     sentiment_f = _compute_sentiment_factor(ticker)
     momentum_f  = _compute_momentum_factor(ticker, peers)
     quality_f   = _compute_quality_factor(ticker)
@@ -828,7 +849,7 @@ def compute_alpha_score(
         for name in w
     }
 
-    return _sanitize({
+    _out = _sanitize({
         "ticker":        ticker,
         "alpha_score":   alpha_score,
         "signal":        signal,
@@ -871,6 +892,10 @@ def compute_alpha_score(
         "disclaimer": "Signal model only. Not financial advice.",
         "computed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     })
+    if _cacheable:
+        import time as _t2
+        _SCORE_CACHE[ticker] = (_t2.time(), _out)
+    return _out
 
 
 _FACTOR_LABELS = {
