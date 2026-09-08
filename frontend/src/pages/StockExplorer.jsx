@@ -499,6 +499,19 @@ function StockDetail({ ticker, onBack }) {
   const h   = metrics?.health  || {}
   const s   = sent?.summary    || {}
 
+  // A bank has no cost of goods sold and no working-capital cycle, so gross
+  // margin and the current ratio are not missing from its page — they do not
+  // exist for it. The server decides which, and why; this only renders it.
+  const appl     = metrics?.applicability || {}
+  const naReason = appl.not_applicable || {}
+  const naShort  = appl.company_kind === 'bank'      ? 'not meaningful for a bank'
+                 : appl.company_kind === 'financial' ? 'not meaningful for a lender'
+                 : null
+
+  // Percentages, without the truthiness bug. `x ? fmt(x) : null` renders a
+  // genuine 0 as a dash, which is how a real zero came to look like a data gap.
+  const pct = v => (v === null || v === undefined ? null : `${(v * 100).toFixed(1)}%`)
+
   return (
     <div className="p-4 sm:p-6 space-y-6">
 
@@ -715,22 +728,26 @@ function StockDetail({ ticker, onBack }) {
               <h2 className="font-semibold text-sm text-gray-400 uppercase tracking-wider">Valuation</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {[
-                  ['P/E Ratio',      m.pe_ratio?.toFixed(1),        'pe_ratio'],
-                  ['Forward P/E',    m.forward_pe?.toFixed(1),       'pe_ratio'],
-                  ['PEG Ratio',      m.peg_ratio?.toFixed(2),        null],
-                  ['EV/EBITDA',      m.ev_ebitda?.toFixed(1),        'ev_ebitda'],
-                  ['P/B Ratio',      m.price_to_book?.toFixed(2),    null],
-                  ['EV',             m.enterprise_value_fmt || null, null],
-                  ['ROE',            m.roe ? `${(m.roe * 100).toFixed(1)}%` : null,             'roe'],
-                  ['ROA',            m.roa ? `${(m.roa * 100).toFixed(1)}%` : null,             'roa'],
-                  ['Gross Margin',   m.gross_margin ? `${(m.gross_margin * 100).toFixed(1)}%` : null, null],
-                  ['Op. Margin',     m.operating_margin ? `${(m.operating_margin * 100).toFixed(1)}%` : null, null],
-                  ['Profit Margin',  m.profit_margin ? `${(m.profit_margin * 100).toFixed(1)}%` : null, 'profit_margin'],
-                  ['D/E Ratio',      m.debt_to_equity?.toFixed(2),   'debt_to_equity'],
-                  ['Current Ratio',  m.current_ratio?.toFixed(2),    null],
-                  ['Quick Ratio',    m.quick_ratio?.toFixed(2),      null],
-                ].map(([l, v, tip]) => (
-                  <StatCard key={l} label={l} value={v} tip={tip} />
+                  // `pct` is a helper rather than `x ? ... : null` on purpose:
+                  // a truthiness check treats a real 0 as absent, which is how
+                  // SBIN's gross margin of exactly 0.0 came to render as a dash.
+                  ['P/E Ratio',      m.pe_ratio?.toFixed(1),        'pe_ratio',   'pe_ratio'],
+                  ['Forward P/E',    m.forward_pe?.toFixed(1),       'pe_ratio',  'forward_pe'],
+                  ['PEG Ratio',      m.peg_ratio?.toFixed(2),        null,        'peg_ratio'],
+                  ['EV/EBITDA',      m.ev_ebitda?.toFixed(1),        'ev_ebitda', 'ev_ebitda'],
+                  ['P/B Ratio',      m.price_to_book?.toFixed(2),    null,        'price_to_book'],
+                  ['EV',             m.enterprise_value_fmt || null, null,        null],
+                  ['ROE',            pct(m.roe),                     'roe',       'roe'],
+                  ['ROA',            pct(m.roa),                     'roa',       'roa'],
+                  ['Gross Margin',   pct(m.gross_margin),            null,        'gross_margin'],
+                  ['Op. Margin',     pct(m.operating_margin),        null,        'operating_margin'],
+                  ['Profit Margin',  pct(m.profit_margin),           'profit_margin', 'profit_margin'],
+                  ['D/E Ratio',      m.debt_to_equity?.toFixed(2),   'debt_to_equity', 'debt_to_equity'],
+                  ['Current Ratio',  m.current_ratio?.toFixed(2),    null,        'current_ratio'],
+                  ['Quick Ratio',    m.quick_ratio?.toFixed(2),      null,        'quick_ratio'],
+                ].map(([l, v, tip, key]) => (
+                  <StatCard key={l} label={l} value={v} tip={tip}
+                            na={key ? naReason[key] : null} naShort={naShort} />
                 ))}
               </div>
 

@@ -533,8 +533,14 @@ def stock_metrics(ticker: str = Query(..., description="NSE ticker e.g. RELIANCE
     health   = financial_health_score(ticker)
     dupont   = dupont_analysis(ticker)
     peers    = peer_comparison(ticker)
+    # A bank has no cost of goods sold and no working-capital cycle, so gross
+    # margin, current ratio and EV/EBITDA are not missing from its page — they
+    # do not exist for it. Sent alongside so the UI can say which of the two
+    # a dash actually means.
+    from metric_applicability import annotate
     return {
         "metrics":   metrics,
+        "applicability": annotate(metrics),
         "health":    health,
         "dupont":    dupont,
         "peers":     peers,
