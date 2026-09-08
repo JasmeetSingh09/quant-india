@@ -1825,6 +1825,26 @@ def strategy_compare_versions(a: str = Query(...), b: str = Query(...)):
     return r
 
 
+@app.get("/validation/a5-gate")
+def validation_a5_gate(required: int = Query(199, ge=1, le=5000)):
+    """
+    Can the archive support the pre-registered momentum validation?
+
+    Counts only. No return, no Sharpe, no p-value — the stopping rule has to be
+    evaluated before a performance number exists, because once one is on the
+    screen it is too late to decide the sample was too small.
+
+    Reports raw observations, unique securities, unique formation dates and
+    effective sample size as four separate numbers, because conflating them is
+    how an underpowered test gets reported as a finding.
+    """
+    from a5_gate import gate
+    r = gate(required=required)
+    if not r.get("available"):
+        raise HTTPException(status_code=400, detail=r.get("reason"))
+    return r
+
+
 @app.get("/validation/pit")
 def validation_pit(min_turnover: float = Query(1e7, ge=0),
                    buckets: int = Query(5, ge=3, le=10)):
