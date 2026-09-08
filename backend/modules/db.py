@@ -83,6 +83,42 @@ def _translate(sql: str) -> str:
     return s
 
 
+# psycopg2's executemany is NOT a batch. It sends one statement per row over
+# the wire -- the docs say plainly that it is "not faster than executing
+# execute() in a loop" -- so a 2,000-row day cost 2,000 round-trips to Supabase.
+# The bhavcopy comment claiming executemany had cut the round-trips was working
+# from a false premise: it removed the Python loop, not the network.
+#
+# Measured on the historical walk: ~2-3 minutes per trading day, 1.5 days a
+# minute across four workers, which put the 3,060-day backfill at 34 hours.
+#
+# execute_values sends ONE multi-row INSERT instead. This rewrite finds the
+# VALUES tuple and replaces it with the single placeholder execute_values wants,
+# keeping any ON CONFLICT tail intact.
+_INSERT_VALUES = re.compile(
+    r"^(?P<head>\s*INSERT\b.*?\bVALUES\b)"
+    r"\s*\(\s*%s\s*(?:,\s*%s\s*)*\)"
+    r"(?P<tail>.*)$",
+    re.I | re.S)
+
+
+def _as_values_template(translated_sql: str):
+    """
+    The execute_values form of an INSERT, or None if it does not apply.
+
+    Returns None for anything that is not a single-tuple INSERT -- an UPDATE
+    (watchlist passes one), a multi-tuple VALUES, or a tail carrying its own
+    placeholder or a literal %, which execute_values would misread.
+    """
+    m = _INSERT_VALUES.match(translated_sql)
+    if not m:
+        return None
+    tail = m.group("tail")
+    if "%" in tail:
+        return None
+    return f"{m.group('head')} %s{tail}"
+
+
 class _PgCursor:
     """Wraps a psycopg2 cursor to expose the fetchone/fetchall/lastrowid the app expects."""
     def __init__(self, cur, raw):
@@ -119,8 +155,19 @@ class _PgConn:
         return _PgCursor(cur, self._raw)
 
     def executemany(self, sql, seq):
+        rows = list(seq)
+        translated = _translate(sql)
+        template = _as_values_template(translated) if rows else None
+        if template is not None:
+            try:
+                from psycopg2.extras import execute_values
+                cur = self._raw.cursor()
+                execute_values(cur, template, rows, page_size=500)
+                return _PgCursor(cur, self._raw)
+            except ImportError:
+                pass
         cur = self._raw.cursor()
-        cur.executemany(_translate(sql), list(seq))
+        cur.executemany(translated, rows)
         return _PgCursor(cur, self._raw)
 
     def commit(self):

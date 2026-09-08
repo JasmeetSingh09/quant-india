@@ -231,6 +231,19 @@ def fetch_day(day: datetime = None) -> dict:
         except Exception:
             continue
 
+    # One (symbol, day) per statement. Sampled files carry no duplicate symbol
+    # after the EQ/BE filter, but three days out of three thousand seven hundred
+    # is a sample, not a guarantee -- and the batched INSERT is a single
+    # statement, so Postgres rejects the whole day with "ON CONFLICT DO UPDATE
+    # command cannot affect row a second time" rather than letting the later row
+    # win. The per-row fallback would still store it correctly, just slowly.
+    # Keeping the last occurrence matches what INSERT OR REPLACE did before.
+    if rows:
+        deduped = {}
+        for r in rows:
+            deduped[(r[0], r[1])] = r
+        rows = list(deduped.values())
+
     conn = get_conn()
     stmt = ("INSERT INTO bhavcopy_eod (symbol, day, open, high, low, close, "
             "volume, isin) VALUES (?,?,?,?,?,?,?,?)")
@@ -243,8 +256,12 @@ def fetch_day(day: datetime = None) -> dict:
         stmt = stmt.replace("INSERT INTO", "INSERT OR REPLACE INTO")
     # One statement per row meant ~2,400 round-trips per day and 1.5 million
     # across the archive, which turned the ISIN re-fetch into a 16-to-40 hour
-    # job. The data and the conflict rules are identical; only the number of
-    # round-trips changes.
+    # job -- and switching to executemany did NOT fix that, though this comment
+    # used to claim it had. psycopg2's executemany still sends one statement per
+    # row; its own documentation says it is "not faster than executing execute()
+    # in a loop". It removed the Python loop, not the network. The round-trips
+    # are actually collapsed in db.py, which rewrites a single-tuple INSERT into
+    # one multi-row execute_values call.
     #
     # The per-row loop survives as a fallback because executemany is
     # all-or-nothing: one malformed row would lose the whole day, and losing a
