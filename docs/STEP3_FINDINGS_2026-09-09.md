@@ -11,6 +11,28 @@ places where the audit itself was wrong.
 - **Mode:** read-only throughout. No production row was created, altered,
   repaired, backfilled, normalised or deleted. V1.4 untouched.
 
+## Step 3 status (adopted 2026-09-09)
+
+| Area | Status |
+|---|---|
+| Historical price integrity | **PASS** |
+| ISIN coverage | **PASS** — 100% of 6,598,053 rows |
+| Missing-data accounting | **PASS** — 0 unexplained of 70,576 |
+| ISIN -> corporate-action linkage | **Strong evidence, no defect found** (Step 3A) |
+| Resolver ambiguous cases | **6 investigated separately** — see Step 3B |
+| Corporate-action completeness | **PARTIAL** — 38.8% unparsed; one confirmed missing action |
+| News relevance | **Not established by this audit** |
+| **Overall data integrity** | **PARTIAL, not PASS** |
+
+The distinction that matters most: the **identity layer** and the **adjustment
+mechanism** both hold up under direct evidence. **Corporate-action
+completeness** does not yet, and it is a separate thing. A correct mechanism fed
+an incomplete dataset still produces wrong adjusted prices, so the adjusted-price
+layer is not fully validated until the 12,778 unparsed actions are characterised.
+
+Momentum / Low-Risk historical validation should not be called fully trustworthy
+before that work is done.
+
 ## Does the evidence support "production data integrity audited"?
 
 **Partly. Two domains are genuinely audited. Two produced findings that need a
