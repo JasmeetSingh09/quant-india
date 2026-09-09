@@ -33,6 +33,7 @@ reported as passing.
 """
 
 import datetime as _dt
+import re
 import time
 
 try:
@@ -54,6 +55,11 @@ def _future_boundary() -> str:
     stated in the finding rather than hidden here.
     """
     return (_dt.datetime.utcnow().date() + _dt.timedelta(days=1)).isoformat()
+
+
+def _ph():
+    """The parameter marker for whichever database is behind get_conn()."""
+    return "%s" if IS_POSTGRES else "?"
 
 
 def _one(conn, sql, args=(), default=None):
@@ -936,4 +942,117 @@ def audit() -> dict:
                             "commensurable -- a duplicate row and an undated "
                             "article are different units -- and averaging them "
                             "would hide which half is broken."),
+    }
+
+
+# ------------------------------------------------- why the scan skips stocks
+
+_ERR_NOISE = re.compile(r"[A-Z0-9&.\-]{2,}\.NS|\b\d{4}-\d{2}-\d{2}\b|\b\d+\b")
+
+
+def _err_signature(err: str) -> str:
+    """
+    Collapse an error to its shape, so 188 messages become a handful of causes.
+
+    Ticker names, dates and numbers are stripped: "no price data for ABC.NS"
+    and "no price data for XYZ.NS" are one cause, not two. Without this the
+    grouping just re-lists the failures.
+    """
+    s = (err or "").strip()
+    if not s:
+        return "(no error recorded)"
+    s = _ERR_NOISE.sub("<x>", s)
+    return " ".join(s.split())[:120]
+
+
+def scan_failures(cycle: str = None, sample: int = 10) -> dict:
+    """
+    The securities the daily alpha scan does not score, and why.
+
+    188 of 2,895 fail every day. They are recorded in `alpha_scan2.error` and
+    surfaced nowhere -- not on the landing page, not in the app. A number that
+    nobody reads is the same as a number nobody measured, so this reads it.
+
+    Two questions matter more than the count. Is the failing set STABLE across
+    cycles -- which would mean a systematic cause like delisting or a data gap,
+    something a universe filter should exclude -- or does it move, which would
+    mean throttling and a different fix entirely. And are the failures
+    concentrated in securities anyone would trade.
+    """
+    conn = get_conn()
+    t0 = time.time()
+    ph = _ph()
+    try:
+        if not cycle:
+            r = _one(conn, "SELECT MAX(cycle) FROM alpha_scan2")
+            cycle = r[0] if r and not isinstance(r, dict) else None
+        if not cycle:
+            return {"audit": "scan_failures", "status": "UNMEASURED",
+                    "reason": "no scan cycle recorded"}
+
+        rows = conn.execute(
+            "SELECT ticker, error, market_cap FROM alpha_scan2 "
+            f"WHERE cycle = {ph} AND alpha_score IS NULL", (cycle,)).fetchall()
+        total = _one(conn, f"SELECT COUNT(*) FROM alpha_scan2 WHERE cycle = {ph}",
+                     (cycle,))
+        total = 0 if isinstance(total, dict) or not total else (total[0] or 0)
+
+        # Is it the same set every day? That is the difference between a
+        # systematic exclusion and a transient one, and it decides the fix.
+        cycles = [str(r[0]) for r in conn.execute(
+            "SELECT DISTINCT cycle FROM alpha_scan2 ORDER BY cycle DESC "
+            "LIMIT 4").fetchall()]
+        overlap = None
+        if len(cycles) > 1:
+            prev = {str(r[0]) for r in conn.execute(
+                "SELECT ticker FROM alpha_scan2 "
+                f"WHERE cycle = {ph} AND alpha_score IS NULL",
+                (cycles[1],)).fetchall()}
+            now = {str(r[0]) for r in rows}
+            if prev:
+                overlap = {
+                    "previous_cycle": cycles[1],
+                    "failed_then": len(prev),
+                    "failed_now": len(now),
+                    "in_both": len(prev & now),
+                    "pct_of_today_also_failed_yesterday":
+                        round(100.0 * len(prev & now) / max(len(now), 1), 1),
+                    "new_today": sorted(now - prev)[:sample],
+                    "recovered_today": sorted(prev - now)[:sample],
+                }
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return {"audit": "scan_failures", "status": "UNMEASURED",
+                "reason": f"{type(e).__name__}: {e}"}
+    finally:
+        conn.close()
+
+    causes = {}
+    for ticker, err, mcap in rows:
+        sig = _err_signature(err)
+        d = causes.setdefault(sig, {"n": 0, "examples": [], "with_market_cap": 0})
+        d["n"] += 1
+        if mcap:
+            d["with_market_cap"] += 1
+        if len(d["examples"]) < sample:
+            d["examples"].append(str(ticker))
+
+    ordered = dict(sorted(causes.items(), key=lambda kv: -kv[1]["n"]))
+    no_reason = sum(v["n"] for k, v in causes.items()
+                    if k == "(no error recorded)")
+    return {
+        "audit": "scan_failures",
+        "read_only": True,
+        "cycle": cycle,
+        "seconds": round(time.time() - t0, 1),
+        "examined": {"tickers_in_cycle": total, "failed": len(rows)},
+        "failed_without_a_recorded_reason": no_reason,
+        "causes": ordered,
+        "stability_vs_previous_cycle": overlap,
+        "note": ("A failure with no recorded reason is the only one that is a "
+                 "defect in the scan itself; the rest are the scan correctly "
+                 "reporting that a security cannot be scored."),
     }
