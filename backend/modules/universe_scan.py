@@ -207,7 +207,24 @@ def get_state() -> dict:
         # counts above are left untouched because they are the honest record.
         "pct": round(min(done / total * 100, 100.0), 1) if total else 0.0,
         "running": _THREAD is not None and _THREAD.is_alive(),
+        # Reported, not hidden. Excluding these is defensible; excluding them
+        # silently is how 188 daily "failures" went unexamined for months in
+        # the first place, and a filter nobody can see is worse than the
+        # failures it replaces.
+        "excluded_no_market_data": _excluded_count(),
     }
+
+
+def _excluded_count():
+    """How many securities the universe filter is currently holding back."""
+    try:
+        conn = get_conn()
+        try:
+            return len(_persistently_unscoreable(conn))
+        finally:
+            conn.close()
+    except Exception:
+        return None
 
 
 def _set_state(**kw):
@@ -425,6 +442,24 @@ def _scan_loop_inner():
 
     cycle = _current_cycle()
     universe = _universe()
+
+    # Drop the securities the price source has no data for at all. They are not
+    # scan failures: 188 of 2,892 on 2026-09-09, one single cause, zero without
+    # a recorded reason, and 187 of them failed the day before too. Attempting
+    # them again each morning buys nothing and reports a failure count that was
+    # never a failure.
+    #
+    # `total` below is set from the FILTERED list on purpose, so the progress
+    # note says what the scan is actually trying to do rather than counting
+    # attempts it has already decided not to make.
+    _conn = get_conn()
+    try:
+        _skip = _persistently_unscoreable(_conn)
+    finally:
+        _conn.close()
+    if _skip:
+        universe = [t for t in universe if t not in _skip]
+
     done = _already_done(cycle)
     todo = [t for t in universe if t not in done]
 
@@ -840,3 +875,80 @@ def stored_scores_for_today() -> dict:
         conn.close()
     return {r[0]: {"alpha_score": r[1], "signal": r[2], "confidence": r[3]}
             for r in rows}
+
+
+# --------------------------------------------- securities with no data at all
+
+# How many recent cycles to look at, and how many of them a ticker must have
+# failed in to be skipped. Three of three, not one of one: eight tickers
+# recovered between 2026-09-08 and 09-09, so a single bad cycle is not evidence
+# of anything and a snapshot would have excluded them permanently.
+UNSCOREABLE_LOOKBACK = 3
+UNSCOREABLE_MIN_FAILS = 3
+
+# Only THIS failure means "the data source has nothing for this symbol". A
+# timeout, a 429 or a parse error must never lead to a ticker being dropped
+# from the universe -- those are our problems, not the security's.
+_NO_DATA = "no market data found"
+
+
+def _persistently_unscoreable(conn) -> set:
+    """
+    Tickers that have had no market data for several cycles running.
+
+    These are not scan failures. They are securities the price source cannot
+    price at all -- illiquid microcaps, and instruments that are not equities
+    (SMALL250.NS is an index). Measured on the 2026-09-09 cycle: 188 of 2,892
+    attempted, 187 of which also failed the day before, one single cause, and
+    zero without a recorded reason. A 99.5% overlap is a property of the
+    universe, not of the scan.
+
+    Excluding them changes no output. Every consumer of alpha_scan2 already
+    filters `alpha_score IS NOT NULL`, so a ticker that fails contributes
+    nothing to a ranking, a peer set or a top-picks list today. What changes is
+    that the scan stops spending time on securities it has no chance of
+    scoring, and stops reporting 188 daily failures that were never failures.
+
+    The rule is deliberately recoverable: a ticker that starts having data is
+    back in the universe within `UNSCOREABLE_LOOKBACK` cycles, because eight of
+    them did exactly that on 2026-09-09.
+    """
+    ph = "%s" if IS_POSTGRES else "?"
+    try:
+        cycles = [str(r[0]) for r in conn.execute(
+            "SELECT DISTINCT cycle FROM alpha_scan2 ORDER BY cycle DESC "
+            f"LIMIT {int(UNSCOREABLE_LOOKBACK)}").fetchall()]
+        if len(cycles) < UNSCOREABLE_MIN_FAILS:
+            return set()            # not enough history to judge anything
+        marks = ",".join([ph] * len(cycles))
+        rows = conn.execute(
+            "SELECT ticker, COUNT(*) FROM alpha_scan2 "
+            f"WHERE cycle IN ({marks}) AND alpha_score IS NULL "
+            f"AND LOWER(error) LIKE {ph} "
+            "GROUP BY ticker", tuple(cycles) + (f"%{_NO_DATA}%",)).fetchall()
+        return {str(t) for t, n in rows if (n or 0) >= UNSCOREABLE_MIN_FAILS}
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return set()                # never let this break a scan
+
+
+def unscoreable_report() -> dict:
+    """What the filter is excluding, so it is never an invisible number."""
+    conn = get_conn()
+    try:
+        skipped = _persistently_unscoreable(conn)
+        return {
+            "rule": (f"no market data in {UNSCOREABLE_MIN_FAILS} of the last "
+                     f"{UNSCOREABLE_LOOKBACK} cycles"),
+            "excluded": len(skipped),
+            "examples": sorted(skipped)[:20],
+            "recoverable": True,
+            "note": ("Only the 'no market data found' error qualifies. A "
+                     "timeout or a 429 is our problem, not the security's, and "
+                     "never removes a ticker from the universe."),
+        }
+    finally:
+        conn.close()
