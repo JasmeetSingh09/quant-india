@@ -397,6 +397,27 @@ check("the same drop WITH a corporate action does NOT fail",
 check("  ...and the move is still counted, not hidden",
       f["examined"] >= 1, f"examined={f['examined']}")
 
+# A resumption after a long silence is NOT an overnight move. A stock that
+# stops trading and comes back months later at a different price has produced
+# no defect; the two observations are simply not adjacent in time.
+build_clean()
+seed_actions([])
+corrupt("DELETE FROM bhavcopy_eod WHERE symbol='S4.NS' "
+        "AND day >= '2026-01-05' AND day <= '2026-01-25'")
+corrupt("UPDATE bhavcopy_eod SET close = close * 20, open = open * 20, "
+        "high = high * 20, low = low * 20 "
+        "WHERE symbol='S4.NS' AND day > '2026-01-25'")
+r = DI.continuity_integrity()
+f = [x for x in r["findings"] if "corporate action" in x["check"]][0]
+check("a resumption after a 21-day silence is NOT counted as a defect",
+      f["bad"] == 0, f"bad={f['bad']}")
+check("  ...but it IS reported separately, not dropped",
+      r["examined"]["large_moves_after_long_silence"] == 1,
+      str(r["examined"].get("resumption_examples")))
+check("  ...and the adjacent count excludes it",
+      r["examined"]["large_moves_adjacent"] == 0,
+      str(r["examined"]["large_moves_adjacent"]))
+
 # A calendar gap is listed, never failed -- a holiday and a hole look identical.
 build_clean()
 seed_actions([])

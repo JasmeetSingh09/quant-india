@@ -327,7 +327,7 @@ def identity_integrity(sample_offenders: int = 8) -> dict:
 # ---------------------------------------------------------------- continuity
 
 def continuity_integrity(move_pct: float = 40.0, sample_offenders: int = 12,
-                         gap_days: int = 5) -> dict:
+                         gap_days: int = 5, resume_days: int = 10) -> dict:
     """
     Jumps in a price series, and whether a corporate action explains them.
 
@@ -390,14 +390,21 @@ def continuity_integrity(move_pct: float = 40.0, sample_offenders: int = 12,
             # The +/- 3 day window is expressed in SQL-portable string dates by
             # comparing against the day itself; a date function differs between
             # SQLite and Postgres, so the window is applied in Python below.
+            # `prev_day` matters as much as `prev`. LAG returns the previous
+            # STORED day, which for a suspended stock can be years earlier. A
+            # security that stopped trading in 2015 and resumed in 2020 shows
+            # here as one enormous "overnight" move, and calling that a data
+            # defect would be wrong -- nothing about the price is incorrect,
+            # the two observations are simply not adjacent in time.
             rows = conn.execute(f"""
                 WITH stepped AS (
                     SELECT symbol, isin, day, close,
-                           LAG(close) OVER (PARTITION BY symbol ORDER BY day) AS prev
+                           LAG(close) OVER (PARTITION BY symbol ORDER BY day) AS prev,
+                           LAG(day)   OVER (PARTITION BY symbol ORDER BY day) AS prev_day
                     FROM bhavcopy_eod
                     WHERE close IS NOT NULL AND close > 0
                 )
-                SELECT symbol, isin, day,
+                SELECT symbol, isin, day, prev_day,
                        100.0 * (close - prev) / prev AS pct
                 FROM stepped
                 WHERE prev IS NOT NULL AND prev > 0
@@ -421,9 +428,23 @@ def continuity_integrity(move_pct: float = 40.0, sample_offenders: int = 12,
                                  "detail": "corporate_actions unreadable",
                                  "offenders": []})
             else:
-                explained = unexplained = 0
-                for sym, isin, day, pct in rows:
+                explained = unexplained = stale = 0
+                stale_eg = []
+                for sym, isin, day, prev_day, pct in rows:
                     d = str(day)[:10]
+                    # Not adjacent in time -> not an overnight move at all.
+                    apart = None
+                    if prev_day:
+                        try:
+                            apart = (_dt.date.fromisoformat(d)
+                                     - _dt.date.fromisoformat(str(prev_day)[:10])).days
+                        except Exception:
+                            apart = None
+                    if apart is not None and apart > resume_days:
+                        stale += 1
+                        if len(stale_eg) < sample_offenders:
+                            stale_eg.append(f"{sym}@{d} {pct:+.1f}% after {apart}d silent")
+                        continue
                     near = False
                     if isin:
                         base = _dt.date.fromisoformat(d)
@@ -437,16 +458,23 @@ def continuity_integrity(move_pct: float = 40.0, sample_offenders: int = 12,
                         unexplained += 1
                         if len(offenders) < sample_offenders:
                             offenders.append(f"{sym}@{d} {pct:+.1f}%")
+                adjacent = len(rows) - stale
                 findings.append(_finding(
-                    "a large move is explained by a corporate action",
-                    len(rows), unexplained,
-                    f"moves of at least {move_pct}% day-over-day; a corporate "
+                    "a large overnight move is explained by a corporate action",
+                    adjacent, unexplained,
+                    f"moves of at least {move_pct}% between CONSECUTIVE trading "
+                    f"days no more than {resume_days} days apart; a corporate "
                     f"action on the same ISIN within 3 days counts as explained. "
-                    f"{explained} explained, {unexplained} not. An unexplained "
-                    f"jump of this size is where momentum goes wrong.",
+                    f"{explained} explained, {unexplained} not. A further {stale} "
+                    f"large moves were excluded as resumptions after a long "
+                    f"silence -- those are not overnight moves and are reported "
+                    f"separately rather than counted as defects.",
                     offenders))
                 examined["large_moves_examined"] = len(rows)
                 examined["large_moves_total"] = big
+                examined["large_moves_adjacent"] = adjacent
+                examined["large_moves_after_long_silence"] = stale
+                examined["resumption_examples"] = stale_eg[:6]
         except Exception as e:
             try:
                 conn.rollback()
