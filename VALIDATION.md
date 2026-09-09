@@ -7,16 +7,42 @@ that anyone can re-run:
 
 ```bash
 cd backend
-python tests/test_core_properties.py         # ~81,000 assertions
-python tests/test_new_algorithms_stress.py   # ~87,000 assertions
+python tests/test_core_properties.py         # 81,215 assertions, offline
+python tests/test_new_algorithms_stress.py   # 87,173 assertions, offline
+```
+
+**168,388 assertions, currently passing.** These are property/edge-case tests
+(invariants over randomised inputs), not just smoke tests. Both RNGs (numpy and
+the stdlib `random`) are seeded and these two suites make no network calls, so
+they are **deterministic** — repeated runs produce an identical check count and
+result, which is what makes the number above checkable rather than asserted.
+Measured 2026-09-09: `test_core_properties.py` returned 81,215 on three
+consecutive runs.
+
+### A third suite, and why its count is not in that number
+
+```bash
 python tests/test_modules_integration.py     # import-safety + integration
 ```
 
-**~168,000 assertions total, currently passing.** These are property/edge-case
-tests (invariants over randomised inputs), not just smoke tests. Both RNGs (numpy
-and the stdlib `random`) are seeded and all network calls are monkeypatched, so
-the suite is **deterministic** — repeated runs produce an identical check count
-and result, which is what makes the numbers above checkable rather than asserted.
+This one is **not offline and not deterministic**, and the number above
+deliberately excludes it. It resolves synthetic tickers (`B0.NS`, `V1.NS`, `Z.NS`)
+against live Yahoo, so its log fills with 404s, it takes **over fifteen minutes**,
+and its result depends on Yahoo's availability and rate limiting. That is not
+import cost — all 90 modules import in **9.2 seconds** together.
+
+Until it is network-isolated, run it as an integration check, not as evidence for
+a headline count.
+
+An earlier version of this file claimed all three suites passed and that "all
+network calls are monkeypatched". Neither was true of this third suite. It was
+also **failing**: `compute_alpha_score` memoises per ticker (`_SCORE_CACHE`,
+15-minute TTL), which is correct in production and fatal to a test that patches
+the four factor functions and calls it 41 times expecting 41 different answers —
+it returned the first answer every time. The model was never wrong; clearing the
+cache between iterations gives 41 checks and 0 failures. But forty of those
+checks had been asserting nothing while still counting themselves, which is worse
+than failing, and it survived because nobody ran the command.
 
 ---
 

@@ -1,4 +1,6 @@
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { getScanStatus } from '../api'
 import {
   Zap, Wand2, Shuffle, Lightbulb, SlidersHorizontal, PlayCircle, History, LineChart,
 } from 'lucide-react'
@@ -26,6 +28,21 @@ export default function Landing() {
   const navigate = useNavigate()
   const goSignIn = () => navigate('/login')
 
+  // Read live rather than hardcode. The number here said 2,401 for long enough
+  // that it drifted 303 clear of the truth without anything noticing, because
+  // a literal in a JSX array cannot correct itself. The scan publishes what it
+  // actually scored, so ask it.
+  const { data: scan } = useQuery({
+    queryKey: ['universe-status'],
+    queryFn: getScanStatus,
+    staleTime: 60 * 60 * 1000,
+    retry: 1,
+  })
+  const scored = scan?.data?.succeeded
+  // The fallback is the last measured value, not an aspiration, and it is
+  // labelled the same way whether it is live or not.
+  const scoredLabel = (scored ?? 2704).toLocaleString('en-IN')
+
   return (
     <div className="min-h-screen bg-gray-950 text-gray-200">
       {/* Top bar */}
@@ -45,10 +62,10 @@ export default function Landing() {
           Quantitative portfolio research for the NSE
         </p>
         <h1 className="text-4xl sm:text-5xl font-bold text-white leading-tight">
-          The maths quant desks use, on all 2,400 NSE stocks
+          The maths quant desks use, across the NSE
         </h1>
         <p className="mt-5 text-lg text-gray-400">
-          A four-factor alpha model scoring the entire NSE daily. Nine portfolio
+          A four-factor alpha model scoring thousands of NSE stocks daily. Nine portfolio
           optimisers — Markowitz, Black-Litterman, HRP, Min-CVaR. Monte Carlo,
           GARCH volatility, Fama-French factors and a three-state regime model.
           Build a portfolio with them, see exactly what could go wrong, and
@@ -66,9 +83,9 @@ export default function Landing() {
       <section className="max-w-6xl mx-auto px-6 pt-4">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
-            ['2,401', 'NSE stocks scored daily'],
+            [scoredLabel, 'NSE stocks scored daily'],
             ['9', 'portfolio optimisers'],
-            ['168,389', 'test assertions passing'],
+            ['168,388', 'test assertions passing'],
             ['4', 'factors per alpha score'],
           ].map(([n, l]) => (
             <div key={l} className="card-sm text-center">

@@ -105,7 +105,9 @@ export const getChallenges  = () => api.get('/simulator/challenges')
 export const getAlphaScore  = ticker => api.get(`/alpha/score?ticker=${ticker}`)
 export const scanAlpha      = body => api.post('/alpha/scan', body)
 export const getTopPicks    = () => api.get('/alpha/top-picks', { timeout: 150000 })
-// Full-universe scan (all 2,401 NSE names), split by SEBI cap tier
+// Full-universe scan across the NSE, split by SEBI cap tier. No count here:
+// the last hardcoded one drifted 303 clear of the truth. /alpha/universe/status
+// reports what was actually scored.
 // Guided flow: five answers -> a portfolio plus a downside verdict
 // Fire-and-forget product analytics. Never awaited and never surfaced: a
 // failed metric must not interrupt, slow, or error the action being measured.
