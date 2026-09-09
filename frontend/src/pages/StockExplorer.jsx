@@ -17,6 +17,7 @@ import WhySignal from '../components/WhySignal'
 import SixFactor from '../components/SixFactor'
 import FactorInputs from '../components/FactorInputs'
 import EvidencePanel from '../components/EvidencePanel'
+import SignalTrackRecord from '../components/SignalTrackRecord'
 import StockContext from '../components/StockContext'
 import StatCard from '../components/StatCard'
 import { Search, TrendingUp, TrendingDown, ArrowLeft, ExternalLink, Filter, LayoutList, LayoutGrid } from 'lucide-react'
@@ -821,6 +822,12 @@ function StockDetail({ ticker, onBack }) {
               {alphaLoading ? <Spinner size="sm" /> : alpha && (
                 <div className="card">
                   <AlphaMeter score={alpha.alpha_score} />
+                  {/* How this label has actually done. A signal shown without
+                      its record invites the reader to supply one, and the one
+                      they supply is always better than the truth. */}
+                  <ErrorBoundary name="signal track record">
+                    <SignalTrackRecord signal={alpha.signal} />
+                  </ErrorBoundary>
                   <div className="mt-5 space-y-3">
                     {Object.entries(alpha.contributions || {}).map(([factor, contrib]) => (
                       <div key={factor}>
