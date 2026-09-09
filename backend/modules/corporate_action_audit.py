@@ -580,7 +580,7 @@ def missed_actions(max_rows: int = 60000, sample: int = 40) -> dict:
             stored[key].add(kind)
         subjects.setdefault(key, set()).add(str(subject or ""))
 
-    missed, by_kind, inside = [], {}, 0
+    missed, material_rows, by_kind, inside = [], [], {}, 0
     for key, subs in subjects.items():
         want = {}
         for s in subs:
@@ -596,8 +596,13 @@ def missed_actions(max_rows: int = 60000, sample: int = 40) -> dict:
             inside += 1
         for k in gap:
             by_kind[k] = by_kind.get(k, 0) + 1
-        if len(missed) < sample:
-            missed.append({
+        # Splits and bonuses are ALWAYS listed in full. A missed dividend costs
+        # a percent or two; a missed split costs a factor of five, and the
+        # decision about which securities to exclude turns on knowing exactly
+        # which ones those are. Dividends fill whatever room is left.
+        material = bool(gap & {"split", "bonus"})
+        if material or len(missed) < sample:
+            (material_rows if material else missed).append({
                 "isin": isin, "ex_date": ex,
                 "missed": sorted(gap),
                 "recovered": {k: want[k] for k in sorted(gap)},
@@ -621,7 +626,8 @@ def missed_actions(max_rows: int = 60000, sample: int = 40) -> dict:
             "by_kind": by_kind,
             "inside_price_coverage": inside,
         },
-        "examples": missed,
+        "split_and_bonus_misses_in_full": material_rows,
+        "dividend_misses_sample": missed,
         "note": ("The conservative reader refuses bonus debentures and bonus "
                  "preference shares, because applying an equity multiplier to "
                  "those would corrupt a series -- a false positive is worse "
