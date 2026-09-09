@@ -207,6 +207,50 @@ except Exception:
 
 print()
 print("=" * 72)
+print("THE STOPPING RULE — FIXED BEFORE THERE IS A RESULT TO WANT")
+print("=" * 72)
+
+# 199 protects against testing EARLY. It says nothing about testing REPEATEDLY
+# once past it, and that is how this gate would most plausibly be broken: run at
+# 199, get p = 0.09, run again at 205, again at 211, write down the first
+# p < 0.05. Every step looks disciplined; the false-positive rate is not 5%.
+cs = G.confirmatory_status(windows=171)
+check("the rule exists and is stated", "exactly once" in G.ANALYSIS_RULE)
+check("it names the threshold it fires at", "199" in G.ANALYSIS_RULE)
+check("it says a later run is exploratory",
+      "exploratory" in G.ANALYSIS_RULE.lower())
+check("it records WHEN it was adopted", G.ANALYSIS_RULE_ADOPTED == "2026-09-09")
+check("and the count at adoption, so it cannot be backdated",
+      G.ANALYSIS_RULE_ADOPTED_AT_WINDOWS == 171,
+      "adopted while underpowered and with no result in hand")
+check("the rejected alternative is on the record",
+      "alpha-spending" in cs.get("rejected_alternative", ""),
+      "choosing it later, after a null, would be optional stopping in a suit")
+
+check("below the threshold the test is not due", cs["due_now"] is False)
+check("and says so", cs["status"] == "not yet due", cs["status"])
+check("at the threshold it becomes due",
+      G.confirmatory_status(windows=199)["due_now"] is True)
+check("above the threshold it is still due, not overdue-and-skipped",
+      G.confirmatory_status(windows=250)["due_now"] is True)
+check("it has not been run", cs["already_run"] is False)
+
+seed(600, 3)   # the previous section left the table dropped
+check("the gate carries the rule in its payload",
+      "stopping_rule" in G.gate(), "so it cannot be read without it")
+
+import inspect as _i  # noqa: E402
+_code = _code_only(_i.getsource(G))
+check("the gate still computes no performance number",
+      not any(w in _code.lower() for w in ("sharpe", "p_value", "pvalue",
+                                           "mean_return", "excess_return")))
+check("the only write is the schema for the run record",
+      "INSERT " not in _code.upper() and "UPDATE " not in _code.upper()
+      and "DELETE " not in _code.upper(),
+      "CREATE TABLE IF NOT EXISTS only — schema, never a score")
+
+print()
+print("=" * 72)
 print(f"passed {len(PASS)}, failed {len(FAIL)}")
 for f in FAIL:
     print(f"  FAILED: {f}")

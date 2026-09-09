@@ -29,8 +29,11 @@ They mostly measure whether that month was kind to momentum. The primary
 hypothesis is tested on the monthly spread series, so the effective sample size
 for it is the number of non-overlapping months -- not the number of rows.
 
-Read-only. Nothing here writes, and nothing here is allowed to change what the
-model does.
+No performance number is computed here: no return, no Sharpe, no p-value, and
+nothing that could be mistaken for a result. The single exception to "reads
+only" is confirmatory_status, which ensures the one-row table recording whether
+the confirmatory run has happened -- schema, never data, and never a score.
+Nothing here is allowed to change what the model does.
 """
 
 from datetime import datetime
@@ -56,6 +59,45 @@ except Exception:                                   # pragma: no cover
 REQUIRED_WINDOWS_GROSS = 199
 REQUIRED_WINDOWS_NET = 686
 
+# ---------------------------------------------------------------- stopping rule
+#
+# The 199 threshold protects against testing EARLY. On its own it does nothing
+# about testing REPEATEDLY once the count is past it, and that is the way this
+# particular gate would most plausibly be broken.
+#
+# The failure needs no bad intent. The count crosses 199 in early 2029, the test
+# runs and returns p = 0.09. Nobody publishes a null. Six months later the
+# archive holds 205 windows, so it is run again -- more data, surely better --
+# and again at 211, and the first p < 0.05 is the one that gets written down.
+# Every individual step looks disciplined. The real false-positive rate is far
+# above 5%, and the 199 bar ends up certifying a guarantee it never delivered.
+#
+# This is the same error as moving 199 to 172, only harder to see, because it is
+# distributed across several defensible-looking decisions instead of one
+# indefensible one.
+#
+# So the rule is fixed now, while there is no result to be tempted by:
+#
+#   The confirmatory test runs ONCE, on the first scan cycle at which the
+#   independent-window count reaches REQUIRED_WINDOWS_GROSS, and reports
+#   whatever it returns. Any later run is exploratory, is labelled exploratory,
+#   and cannot replace the confirmatory result.
+#
+# The alternative, a sequential design with alpha-spending, legitimately permits
+# interim looks by making the early thresholds much stricter. It is a fine
+# choice and it is NOT what is adopted here, because it has to be specified in
+# advance too and the simpler rule fits what is already built. Recording the
+# rejected option matters: choosing it later, after seeing a null at 199, would
+# be optional stopping wearing a better suit.
+ANALYSIS_RULE = (
+    "The confirmatory momentum test runs exactly once, on the first scan cycle "
+    "at which independent windows >= 199, and reports whatever it returns. Any "
+    "subsequent run is exploratory and cannot replace it. Adopted 2026-09-09, "
+    "while the count stood at 171 and no result existed."
+)
+ANALYSIS_RULE_ADOPTED = "2026-09-09"
+ANALYSIS_RULE_ADOPTED_AT_WINDOWS = 171
+
 
 def _trading_days(conn):
     rows = conn.execute(
@@ -69,6 +111,49 @@ def _month_ends(days):
     for i, d in enumerate(days):
         last[d[:7]] = i
     return sorted(last.items())
+
+
+def confirmatory_status(windows: int = None) -> dict:
+    """
+    Has the one confirmatory run happened, and is it due?
+
+    Enforcement rather than memory. In 2029 nobody will recall that the rule
+    said once; the table will.
+    """
+    ran = None
+    try:
+        conn = get_conn()
+        try:
+            conn.execute("CREATE TABLE IF NOT EXISTS a5_confirmatory_run ("
+                         "id INTEGER PRIMARY KEY CHECK (id = 1), "
+                         "ran_at TEXT NOT NULL, cycle TEXT, windows INTEGER, "
+                         "result TEXT)")
+            conn.commit()
+            row = conn.execute("SELECT ran_at, cycle, windows FROM "
+                               "a5_confirmatory_run WHERE id = 1").fetchone()
+            ran = {"ran_at": row[0], "cycle": row[1], "windows": row[2]} if row else None
+        finally:
+            conn.close()
+    except Exception as e:
+        return {"available": False, "reason": f"{type(e).__name__}"}
+
+    due = windows is not None and windows >= REQUIRED_WINDOWS_GROSS
+    return {
+        "available": True,
+        "rule": ANALYSIS_RULE,
+        "adopted": ANALYSIS_RULE_ADOPTED,
+        "adopted_at_windows": ANALYSIS_RULE_ADOPTED_AT_WINDOWS,
+        "rejected_alternative": ("sequential design with alpha-spending "
+                                 "(O'Brien-Fleming); viable, but adopting it "
+                                 "later after seeing a null would itself be "
+                                 "optional stopping"),
+        "already_run": bool(ran),
+        "run_record": ran,
+        "due_now": bool(due and not ran),
+        "status": ("already run — any further run is exploratory" if ran
+                   else "due" if due
+                   else "not yet due"),
+    }
 
 
 def gate(required: int = REQUIRED_WINDOWS_GROSS) -> dict:
@@ -164,6 +249,7 @@ def gate(required: int = REQUIRED_WINDOWS_GROSS) -> dict:
                       "quadruples the requirement"),
         },
 
+        "stopping_rule": confirmatory_status(best),
         "verdict": {
             "best_horizon_months": best_h,
             "best_horizon_windows": best,
