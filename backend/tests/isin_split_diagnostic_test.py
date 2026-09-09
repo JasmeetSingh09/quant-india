@@ -109,6 +109,30 @@ c = one_case(D.diagnose(["SPLITCO"]))
 check("a split filed under the OLD isin is also classified A",
       c["verdict"] == "A", c["verdict"])
 
+# The AJANTPHARM shape, which fooled an earlier version of this diagnostic.
+# The last observation under the OLD isin falls ON the ex-date, so it already
+# trades at the post-split level and NO multiplier applies at that boundary.
+# adjusted(t) = close(t) * PROD(m for ex_date > t) -- strictly greater.
+onday_old = series("ONDAY.NS", "INE999999991", D0, 30, 100.0)
+onday_new = series("ONDAY.NS", "INE999999992", D0 + timedelta(days=30), 30, 99.85)
+build(onday_old + onday_new,
+      [("INE999999991", (D0 + timedelta(days=29)).isoformat(),
+        "split", 10, 5, None, 1)])
+c = one_case(D.diagnose(["ONDAY"]))
+print(f"  ex-date == last pre-observation day: raw {c['raw_return_pct']}%, "
+      f"adjusted {c['adjusted_return_pct']}%")
+check("an ex-date at/behind the last old-ISIN day applies NO multiplier",
+      c["multiplier_applying_at_this_boundary"] is None,
+      str(c["multiplier_applying_at_this_boundary"]))
+check("  ...so the adjusted return stays near the raw one",
+      abs(c["adjusted_return_pct"] - c["raw_return_pct"]) < 1e-6,
+      f"raw {c['raw_return_pct']}% vs adj {c['adjusted_return_pct']}%")
+check("  ...and it does NOT invent a +99% jump",
+      abs(c["adjusted_return_pct"]) < 5,
+      f"{c['adjusted_return_pct']}%")
+check("  ...the boundary is explained in words",
+      bool(c["boundary_note"]), (c["boundary_note"] or "")[:50])
+
 print()
 print("=" * 74)
 print("B — THE ACTION EXISTS BUT CANNOT REACH THE PRICES")

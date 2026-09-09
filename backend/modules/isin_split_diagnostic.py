@@ -188,14 +188,31 @@ def diagnose(symbols: list = None, max_symbols: int = 12,
                         for a in price_affecting:
                             mult *= a["multiplier"]
 
+                # adjusted(t) = close(t) * PROD(m for ex_date > t).
+                #
+                # STRICTLY greater. If the last observation under the old ISIN
+                # falls ON or AFTER the ex-date, that price already trades at
+                # the post-action level and multiplying it again would invent a
+                # discontinuity where none exists. Production gets this right
+                # via bisect_left, which applies the factor only to columns
+                # before the ex-date; an earlier version of this diagnostic did
+                # not, and reported +99.71% for AJANTPHARM on a boundary whose
+                # raw return was -0.15% -- that is to say, on a series that was
+                # already perfectly continuous.
+                applies_here = [a for a in price_affecting
+                                if last_pre and a["ex_date"] > last_pre["day"]]
+                mult_at_boundary = None
+                if applies_here:
+                    mult_at_boundary = 1.0
+                    for a in applies_here:
+                        mult_at_boundary *= a["multiplier"]
+
                 adj_ret = None
-                if raw_ret is not None and mult:
-                    # adjusted(t) = close(t) * PROD(m for ex_date > t). The action
-                    # sits between the two observations, so it multiplies the
-                    # earlier close only.
+                if raw_ret is not None:
+                    m_eff = mult_at_boundary or 1.0
                     adj_ret = round(100.0 * (first_post["close"]
-                                             - last_pre["close"] * mult)
-                                    / (last_pre["close"] * mult), 2)
+                                             - last_pre["close"] * m_eff)
+                                    / (last_pre["close"] * m_eff), 2)
 
                 # --- classify -------------------------------------------------
                 if acts is None:
@@ -243,6 +260,13 @@ def diagnose(symbols: list = None, max_symbols: int = 12,
                     "actions_near_transition": acts,
                     "price_affecting_actions": price_affecting,
                     "combined_multiplier": mult,
+                    "multiplier_applying_at_this_boundary": mult_at_boundary,
+                    "boundary_note": (
+                        "the last old-ISIN observation is on or after the "
+                        "ex-date, so it already trades post-action and no "
+                        "multiplier applies at this boundary"
+                        if (price_affecting and not mult_at_boundary)
+                        else None),
                     "last_pre_action_observation": last_pre,
                     "first_post_action_observation": first_post,
                     "raw_return_pct": raw_ret,
