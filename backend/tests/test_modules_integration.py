@@ -3,6 +3,14 @@ Part 2: import-safety of every module, remaining optimizers, alpha signal
 thresholds end-to-end, GARCH, and sentiment correctness.
 """
 import sys, math, warnings, random, importlib, glob, os
+
+# Windows consoles default to cp1252, which cannot encode the check mark this
+# file prints on success. Redirected to a file the suite therefore exited 1
+# with zero failures -- a green run that any CI would read as red.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 from pathlib import Path
 warnings.filterwarnings("ignore")
 from pathlib import Path

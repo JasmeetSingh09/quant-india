@@ -32,7 +32,9 @@ and its result depends on Yahoo's availability and rate limiting. That is not
 import cost — all 90 modules import in **9.2 seconds** together.
 
 Until it is network-isolated, run it as an integration check, not as evidence for
-a headline count.
+a headline count. It currently reports **1,613 checks, 0 failures** (2026-09-09),
+which would make 170,001 in total — but that third figure is only as stable as
+Yahoo is, which is why the headline stops at 168,388.
 
 An earlier version of this file claimed all three suites passed and that "all
 network calls are monkeypatched". Neither was true of this third suite. It was
