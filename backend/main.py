@@ -2400,6 +2400,35 @@ def health_resolver_ambiguous():
     return ISD.ambiguous_transitions()
 
 
+@app.get("/health/corporate-action-audit")
+def health_corporate_action_audit(part: str = Query("taxonomy"),
+                                  symbol: str = Query(None),
+                                  ex_date: str = Query(None)):
+    """
+    Read-only. What the unparsed corporate actions actually are.
+
+    `parsed = 0` means the subject line was not recognised, NOT that the action
+    is inert -- an Annual General Meeting is unparsed and harmless, a bonus in
+    an unexpected format is unparsed and a defect, and both are in the same
+    population. This separates them using the raw subject text, which is
+    already stored, so nothing has to be refetched.
+
+    part=taxonomy   the whole population, bucketed
+    part=event      one event taken apart (needs symbol and ex_date)
+    part=boundaries the three indeterminate transitions from Step 3B
+
+    Nothing here writes, reparses into storage, or recalculates a score.
+    """
+    import corporate_action_audit as CAA
+    if part == "event":
+        if not symbol or not ex_date:
+            return {"error": "part=event needs symbol and ex_date"}
+        return CAA.event_reconstruction(symbol, ex_date)
+    if part == "boundaries":
+        return CAA.boundary_reconstruction()
+    return CAA.taxonomy()
+
+
 @app.get("/health/nse-collection")
 def health_nse_collection():
     """
