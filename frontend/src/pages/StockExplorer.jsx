@@ -15,6 +15,7 @@ import AlphaMeter from '../components/AlphaMeter'
 import SignalHistory from '../components/SignalHistory'
 import WhySignal from '../components/WhySignal'
 import SixFactor from '../components/SixFactor'
+import FactorInputs from '../components/FactorInputs'
 import StockContext from '../components/StockContext'
 import StatCard from '../components/StatCard'
 import { Search, TrendingUp, TrendingDown, ArrowLeft, ExternalLink, Filter, LayoutList, LayoutGrid } from 'lucide-react'
@@ -810,6 +811,9 @@ function StockDetail({ ticker, onBack }) {
               <ErrorBoundary name="bull base bear"><ScenarioValuation ticker={ticker} /></ErrorBoundary>
               <ErrorBoundary name="six-factor view"><SixFactor ticker={ticker} /></ErrorBoundary>
               <ErrorBoundary name="why this signal"><WhySignal ticker={ticker} /></ErrorBoundary>
+              {/* What the model actually read, and what it could not. The
+                  scan has recorded this all along and nothing displayed it. */}
+              <ErrorBoundary name="factor inputs"><FactorInputs ticker={ticker} /></ErrorBoundary>
               {alphaLoading ? <Spinner size="sm" /> : alpha && (
                 <div className="card">
                   <AlphaMeter score={alpha.alpha_score} />

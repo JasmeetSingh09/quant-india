@@ -138,6 +138,7 @@ export const getFactorStrategies = (start='2019-01-01', fraction=0.2) =>
   api.get(`/factors/strategies?start=${start}&fraction=${fraction}`, { timeout: 300000 })
 export const getFactorEvidence   = (full=false) => api.get(`/factors/evidence?full=${full}`, { timeout: 240000 })
 export const getFactorChange     = (t, days=30) => api.get(`/factors/change?ticker=${encodeURIComponent(t)}&days=${days}`)
+export const getFactorInputs     = (t, cycle) => api.get(`/factors/inputs?ticker=${encodeURIComponent(t)}${cycle ? `&cycle=${encodeURIComponent(cycle)}` : ''}`)
 export const getFactorDivergence = (t, days=30) => api.get(`/factors/divergence?ticker=${encodeURIComponent(t)}&days=${days}`)
 export const getFactorCoverage   = () => api.get('/factors/coverage')
 export const multiShock      = body => api.post('/portfolio/shock/multi', body, { timeout: 300000 })
