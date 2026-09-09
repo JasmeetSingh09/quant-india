@@ -111,6 +111,32 @@ for subject, kind, expect in UNCHANGED:
     check(f"unchanged: {subject[:46]:<46} {kind}", ok,
           "" if ok else f"expected {expect}, got {got}")
 
+# The feed runs words together, and the SHIPPED parser read these correctly
+# because its regex had no leading word boundary. Adding one dropped 24 real
+# dividends in production -- one of them Rs 850 -- and the dry run caught it
+# before anything was written. These are here so it cannot happen twice.
+RUN_TOGETHER = [
+    ("Annual General Meetingdividend - Rs 7.50 Per Share", 7.5),
+    ("Annual General Meetingdividend - Re 0.20 Per Share", 0.20),
+    ("Interimdividend - Rs 1.30  Per Share", 1.30),
+    ("Specia Ldividend - Rs 850 Per Share", 850.0),
+    ("Annual General Me0etingdividend - Rs 1.2 Per Share", 1.2),
+    ("Annual General Meetingdividend - Rs  45 Per Share", 45.0),
+]
+for subject, amt in RUN_TOGETHER:
+    got = one(subject, "dividend")
+    ok = got is not None and abs(got["amount"] - amt) < 1e-9
+    check(f"run-together: {subject[:44]:<44} Rs {amt}", ok,
+          "" if ok else f"got {got} -- a word boundary would drop this")
+
+# And the other side of that boundary: "div" MUST stay bounded, or the "Div"
+# inside "Sub-Division" turns a face-value split into a cash payout.
+for subject in ("Sub-Division From Rs 10/- Per Share To Rs 2/- Per Share",
+                "Face Valus Split (Sub-Division) - From Rs 10/- Per To Rs 2/- Per Share"):
+    check(f"no phantom dividend in: {subject[:44]}",
+          "dividend" not in kinds(subject),
+          f"got {kinds(subject)} -- 'Div' inside 'Division' is not a payout")
+
 check("an inert line still yields nothing",
       parse_subject("Annual General Meeting") == [])
 check("a board meeting still yields nothing",

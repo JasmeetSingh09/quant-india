@@ -130,10 +130,22 @@ _NOT_EQUITY_BONUS = re.compile(
 # "Div.Rs.3/- Per Share", "Fin.Div.Rs.2/-", "Div. Of Rs.10 Per Share",
 # "Div-Rs.0.60 Per Share". The feed abbreviates far more often than it spells
 # the word out, and the old pattern only read the spelled-out form.
+# The two halves are bounded differently, and it matters.
+#
+# "dividend" carries NO leading word boundary, because the feed runs words
+# together: "Annual General Meetingdividend - Rs 7.50 Per Share", "Interim-
+# dividend", "Specia Ldividend - Rs 850 Per Share". The shipped regex had no
+# boundary either and read all of them; adding one silently dropped 24 real
+# dividends, one of them Rs 850, and the dry run caught it before any write.
+#
+# "div" DOES carry boundaries on both sides, because unbounded it would find
+# the "Div" inside "Sub-Division" and turn a face-value split into a cash
+# payout. \bdiv\b fails there -- "Division" has no boundary after "div" -- and
+# fails inside "subdivision" for want of one before it.
 _DIV_RE = re.compile(
-    r"\b(?:dividend|div)\b\.?[^0-9r]{0,20}?r[se]\.?\s*([0-9]+(?:\.[0-9]+)?)",
+    r"(?:dividend|\bdiv\b)\.?[^0-9r]{0,20}?r[se]\.?\s*([0-9]+(?:\.[0-9]+)?)",
     re.I)
-_DIV_WORD = re.compile(r"\b(?:dividend|div)\b", re.I)
+_DIV_WORD = re.compile(r"(?:dividend|\bdiv\b)", re.I)
 
 
 def parse_subject(subject: str) -> list:

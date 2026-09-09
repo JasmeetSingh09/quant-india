@@ -691,11 +691,19 @@ def reparse_dry_run(sample: int = 25) -> dict:
 
     import corporate_actions as CA
 
-    # What is stored now, per (isin, ex_date), and the subjects behind it.
+    # The comparison unit is (isin, ex_date, SUBJECT), because that is the unit
+    # `store()` actually writes: sig is derived from the subject and the kind,
+    # so one date can legitimately carry two different dividend rows -- an
+    # interim and a final, each with its own subject and its own amount.
+    #
+    # Keying on (isin, ex_date, kind) instead collapses those two into one,
+    # last-write-wins over an unordered set, and then compares one row's stored
+    # amount against the other row's re-parsed amount. That produced 12
+    # "conflicts" that were entirely an artifact of the comparison.
     stored, subjects = {}, {}
     for isin, ex, subject, kind, num, den, amount, parsed in rows:
-        key = (str(isin), str(ex)[:10])
-        subjects.setdefault(key, set()).add(str(subject or ""))
+        key = (str(isin), str(ex)[:10], str(subject or ""))
+        subjects[key] = str(subject or "")
         if int(parsed or 0) and kind in ("split", "bonus", "dividend"):
             stored.setdefault(key, {})[kind] = {
                 "num": None if num is None else float(num),
@@ -707,16 +715,15 @@ def reparse_dry_run(sample: int = 25) -> dict:
     add_by_kind = {}
     add_inside = 0
 
-    for key, subs in subjects.items():
+    for key, subj in subjects.items():
         want = {}
-        for s in subs:
-            for a in CA.parse_subject(s):
-                want[a["kind"]] = a
+        for a in CA.parse_subject(subj):
+            want[a["kind"]] = a
         have = stored.get(key, {})
-        isin, ex = key
+        isin, ex, _ = key
         lo_hi = cover.get(isin)
         inside = bool(lo_hi and lo_hi[0] <= ex <= lo_hi[1])
-        subject = sorted(subs)[0][:150]
+        subject = subj[:150]
 
         for kind, a in want.items():
             if kind not in have:
