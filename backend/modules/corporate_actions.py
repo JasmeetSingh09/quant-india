@@ -89,15 +89,51 @@ _API = ("https://www.nseindia.com/api/corporates-corporateActions?index=equities
 # Parsing
 # ---------------------------------------------------------------------------
 
-# "From Rs 10/- Per Share To Re 1/- Per Share" | "From Rs 10 To Rs 1"
+# A face-value change, in any of the forms the feed actually writes it:
+#   "Face Value Split From Rs 10/- To Re 1/-"   (the only one the old regex read)
+#   "Face Value Split Rs.10/- To Rs.2/-"        (no "from")
+#   "Sub-Division From Rs 10/- Per Share To Rs 2/- Per Share"  (no "split")
+#   "Face Valus Split (Sub-Division) - From Rs 10/- Per To Rs 2/- Per Share"
+#                                               (the feed's own typo)
+#
+# The face-value context is REQUIRED, and that is the safety property: without
+# it, "Rights 3:4 @ Premium Rs.32/- Per Share" offers two numbers and a "to"
+# and would be read as a split. A rights premium is not a face value.
 _SPLIT_RE = re.compile(
-    r"from\s+r[se]\.?\s*([0-9]+(?:\.[0-9]+)?)\s*/?-?\s*(?:per\s+share)?\s*"
-    r"to\s+r[se]\.?\s*([0-9]+(?:\.[0-9]+)?)", re.I)
-# "Bonus 1:1", "Bonus 6:11", "Bonus 1 : 1250"
-_BONUS_RE = re.compile(r"bonus\s*(?:issue)?\s*([0-9]+)\s*:\s*([0-9]+)", re.I)
-# "Dividend - Rs 16.25/- Per Share", "Dividend Re 0.20/- Per Share"
+    r"(?:face\s*val\w*|sub-?divi\w*)"
+    r"[^0-9]{0,60}?r[se]\.?\s*([0-9]+(?:\.[0-9]+)?)"
+    r"[^0-9]{0,30}?to\s*r[se]\.?\s*([0-9]+(?:\.[0-9]+)?)", re.I)
+
+# "Bonus 1:1", "Bonus - 3:1", "Bonus Issue 1:2", "Bonus 1 : 1250".
+#
+# The old pattern demanded the ratio immediately after the word, which is why
+# "Bonus - 3:1" was missed -- and also why "Bonus Ncrps 1:10" was never matched.
+# That safety was accidental. Allowing anything between the word and the ratio
+# is what recovers the hyphen form, and it is exactly what would let a
+# preference-share or debenture bonus through, so the exclusion below is now
+# load-bearing rather than incidental.
+_BONUS_RE = re.compile(
+    r"\bbonus\b"
+    r"(?![^0-9:]{0,40}?(?:debenture|preference|pref\b|ncrps\b|ncrp\b|ncd\b|"
+    r"rps\b|ccps\b|ocrps\b))"
+    r"[^0-9]{0,20}?([0-9]+)\s*:\s*([0-9]+)", re.I)
+
+# NCRPS is Non-Convertible Redeemable Preference Shares; NCD a debenture. A
+# bonus of either does not divide the equity price, and applying a multiplier
+# to one would corrupt a series that was correct. "Bonus Ncrps 46:1" carries a
+# factor of 0.021 -- a 98% phantom crash -- if it is ever believed.
+_NOT_EQUITY_BONUS = re.compile(
+    r"bonus[^0-9:]{0,40}?(?:debenture|preference|pref\b|ncrps\b|ncrp\b|ncd\b|"
+    r"rps\b|ccps\b|ocrps\b)", re.I)
+
+# "Dividend - Rs 16.25/- Per Share", "Dividend Re 0.20/- Per Share",
+# "Div.Rs.3/- Per Share", "Fin.Div.Rs.2/-", "Div. Of Rs.10 Per Share",
+# "Div-Rs.0.60 Per Share". The feed abbreviates far more often than it spells
+# the word out, and the old pattern only read the spelled-out form.
 _DIV_RE = re.compile(
-    r"dividend[^0-9r]*?r[se]\.?\s*([0-9]+(?:\.[0-9]+)?)", re.I)
+    r"\b(?:dividend|div)\b\.?[^0-9r]{0,20}?r[se]\.?\s*([0-9]+(?:\.[0-9]+)?)",
+    re.I)
+_DIV_WORD = re.compile(r"\b(?:dividend|div)\b", re.I)
 
 
 def parse_subject(subject: str) -> list:
@@ -115,21 +151,31 @@ def parse_subject(subject: str) -> list:
         return []
     out = []
 
+    # The face-value context lives inside _SPLIT_RE now, so the separate
+    # `"split" in s` test is gone -- it was what hid every "Sub-Division"
+    # line, which says the same thing without using the word.
     m = _SPLIT_RE.search(s)
-    if m and "split" in s.lower():
+    if m:
         old_fv, new_fv = float(m.group(1)), float(m.group(2))
         if old_fv > 0 and new_fv > 0 and old_fv != new_fv:
             out.append({"kind": SPLIT, "num": old_fv, "den": new_fv})
 
-    m = _BONUS_RE.search(s)
-    if m:
-        a, b = float(m.group(1)), float(m.group(2))
-        if a > 0 and b > 0:
-            out.append({"kind": BONUS, "num": a, "den": b})
+    if not _NOT_EQUITY_BONUS.search(s):
+        m = _BONUS_RE.search(s)
+        if m:
+            a, b = float(m.group(1)), float(m.group(2))
+            if a > 0 and b > 0:
+                out.append({"kind": BONUS, "num": a, "den": b})
 
-    # Only read a dividend when the word appears; "Rs" alone is not enough,
+    # Only read a dividend when the word appears -- "Rs" alone is not enough,
     # and a rights issue price must never be mistaken for a cash payout.
-    if "dividend" in s.lower() and "rights" not in s.lower():
+    #
+    # Known limitation, deliberately left alone: a line carrying two payouts
+    # ("Div. Of Rs.8 Per Share + Spl. Div Of Rs.3/-") yields only the first.
+    # Summing them is a change to what a dividend MEANS here, not a parsing
+    # fix, and it belongs in its own decision rather than smuggled into this
+    # one. The residual is the smaller payout, on a handful of lines.
+    if _DIV_WORD.search(s) and "rights" not in s.lower():
         m = _DIV_RE.search(s)
         if m:
             amt = float(m.group(1))

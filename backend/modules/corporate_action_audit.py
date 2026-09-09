@@ -641,3 +641,143 @@ def missed_actions(max_rows: int = 60000, sample: int = 40) -> dict:
                  "those would corrupt a series -- a false positive is worse "
                  "than the miss it replaces."),
     }
+
+
+# ------------------------------------------------------------- the dry run
+
+def reparse_dry_run(sample: int = 25) -> dict:
+    """
+    What a re-parse WOULD write, without writing any of it.
+
+    Three categories, and only one of them is the point:
+
+      ADD       the fix working -- an action the feed described and the old
+                parser never stored.
+      CONFLICT  the new parser disagrees with a stored action's numbers. This
+                must be ZERO. A non-zero count means the re-parse would rewrite
+                history that was already correct, and the write must not
+                proceed.
+      DROP      the new parser no longer finds something the old one stored.
+                Also must be ZERO, for the same reason.
+
+    A re-parse is judged safe on CONFLICT and DROP being empty, not on ADD
+    being large. A parser that recognises more is not automatically better --
+    reading "Bonus Ncrps 46:1" as an equity bonus would apply a 0.021 factor
+    to a series that was correct, which is worse than the miss it replaces.
+
+    Nothing here writes. It reads corporate_actions and reports a diff.
+    """
+    conn = get_conn()
+    t0 = time.time()
+    try:
+        rows = conn.execute(
+            "SELECT isin, ex_date, subject, kind, num, den, amount, parsed "
+            "FROM corporate_actions ORDER BY ex_date").fetchall()
+        total = conn.execute("SELECT COUNT(*) FROM corporate_actions").fetchone()[0]
+        cover = {}
+        for isin, lo, hi in conn.execute(
+                "SELECT isin, MIN(day), MAX(day) FROM bhavcopy_eod "
+                "WHERE isin IS NOT NULL GROUP BY isin").fetchall():
+            cover[str(isin)] = (str(lo)[:10], str(hi)[:10])
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return {"audit": "reparse_dry_run", "status": "UNMEASURED",
+                "reason": f"{type(e).__name__}: {e}"}
+    finally:
+        conn.close()
+
+    import corporate_actions as CA
+
+    # What is stored now, per (isin, ex_date), and the subjects behind it.
+    stored, subjects = {}, {}
+    for isin, ex, subject, kind, num, den, amount, parsed in rows:
+        key = (str(isin), str(ex)[:10])
+        subjects.setdefault(key, set()).add(str(subject or ""))
+        if int(parsed or 0) and kind in ("split", "bonus", "dividend"):
+            stored.setdefault(key, {})[kind] = {
+                "num": None if num is None else float(num),
+                "den": None if den is None else float(den),
+                "amount": None if amount is None else float(amount)}
+
+    adds, conflicts, drops = [], [], []
+    n_add = n_conflict = n_drop = 0
+    add_by_kind = {}
+    add_inside = 0
+
+    for key, subs in subjects.items():
+        want = {}
+        for s in subs:
+            for a in CA.parse_subject(s):
+                want[a["kind"]] = a
+        have = stored.get(key, {})
+        isin, ex = key
+        lo_hi = cover.get(isin)
+        inside = bool(lo_hi and lo_hi[0] <= ex <= lo_hi[1])
+        subject = sorted(subs)[0][:150]
+
+        for kind, a in want.items():
+            if kind not in have:
+                n_add += 1
+                add_by_kind[kind] = add_by_kind.get(kind, 0) + 1
+                if inside:
+                    add_inside += 1
+                if kind in ("split", "bonus") or len(adds) < sample:
+                    adds.append({"isin": isin, "ex_date": ex, "kind": kind,
+                                 "new": {k: v for k, v in a.items() if k != "kind"},
+                                 "inside_price_coverage": inside,
+                                 "subject": subject})
+                continue
+            old = have[kind]
+            same = True
+            for f in ("num", "den", "amount"):
+                o, nv = old.get(f), a.get(f)
+                if o is None and nv is None:
+                    continue
+                if o is None or nv is None or abs(float(o) - float(nv)) > 1e-9:
+                    same = False
+            if not same:
+                n_conflict += 1
+                if len(conflicts) < sample:
+                    conflicts.append({"isin": isin, "ex_date": ex, "kind": kind,
+                                      "stored": old,
+                                      "new": {k: v for k, v in a.items()
+                                              if k != "kind"},
+                                      "subject": subject})
+
+        for kind in have:
+            if kind not in want:
+                n_drop += 1
+                if len(drops) < sample:
+                    drops.append({"isin": isin, "ex_date": ex, "kind": kind,
+                                  "stored": have[kind], "subject": subject})
+
+    safe = (n_conflict == 0 and n_drop == 0)
+    return {
+        "audit": "reparse_dry_run",
+        "read_only": True,
+        "wrote_nothing": True,
+        "seconds": round(time.time() - t0, 1),
+        "examined": {"rows_read": len(rows), "corporate_actions_total": total,
+                     "complete": len(rows) >= total,
+                     "distinct_events": len(subjects)},
+        "diff": {
+            "ADD_new_actions": n_add,
+            "ADD_by_kind": add_by_kind,
+            "ADD_inside_price_coverage": add_inside,
+            "CONFLICT_would_change_a_stored_action": n_conflict,
+            "DROP_would_lose_a_stored_action": n_drop,
+        },
+        "safe_to_write": safe,
+        "verdict": ("no stored action would change or be lost; the re-parse "
+                    "only adds" if safe else
+                    "the re-parse would alter or lose stored actions -- DO NOT "
+                    "WRITE until each is explained"),
+        "adds": adds,
+        "conflicts": conflicts,
+        "drops": drops,
+        "note": ("Judged on CONFLICT and DROP being zero, not on ADD being "
+                 "large. Recognising more is not automatically better."),
+    }

@@ -2428,6 +2428,8 @@ def health_corporate_action_audit(part: str = Query("taxonomy"),
         return CAA.boundary_reconstruction()
     if part == "missed":
         return CAA.missed_actions()
+    if part == "dryrun":
+        return CAA.reparse_dry_run()
     return CAA.taxonomy()
 
 
