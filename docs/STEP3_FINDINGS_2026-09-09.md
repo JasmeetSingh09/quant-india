@@ -96,6 +96,39 @@ Many of the 1,667 may be explained by actions that are stored but unparsed.
 **Status: the real unexplained-move count is unknown until the check is re-run
 with both corrections.**
 
+### Rerun after the correction (deployed 2026-09-09T12:52Z)
+
+| | |
+|---|---|
+| day-over-day steps examined | 6,593,800 |
+| large moves (>=40%) total | 2,233 |
+| — adjacent (neighbours <=10 days apart) | 2,163 |
+| — resumptions after a long silence | 70, now excluded |
+| of the 2,163: explained by a corporate action | 566 |
+| of the 2,163: not explained | **1,597** |
+
+The correction did what it should. Every absurd outlier was a resumption and is
+now classified as one rather than counted as a defect: WINSOME +5,600% after
+1,404 days silent, ARIHANT +2,188% after 1,537 days, MBECL +4,072% after 704.
+
+**The remaining 1,597 are still NOT called defects**, and the new offender list
+shows why. After the extremes are removed the top entries are +267% and +191%,
+then repeated *exact* +100.0% values — KSERASERA on 2020-03-24, 2020-03-27 and
+2020-04-13. An exact doubling recurring on separate days is the signature of a
+**sub-rupee stock moving one tick**: at Rs 0.05 a single Rs 0.05 tick is +100%.
+That is the price grid, not corruption, and a percentage threshold is the wrong
+instrument at that price level.
+
+Two accounting gaps also remain open:
+
+- 12,778 of 32,964 corporate actions (38.8%) are unparsed and so can explain
+  nothing;
+- 1,458 of 4,342 ISINs have no corporate action on record at all (coverage is
+  2,884 ISINs).
+
+Until both are accounted for, the honest statement is that the true unexplained
+count is **unknown, and bounded above by 1,597**.
+
 ## 4. Identity — the merge check passes; the reuse check has a wrong premise
 
 **6,598,053 rows · 4,253 symbols · 4,342 distinct ISINs · 162.4s.**
