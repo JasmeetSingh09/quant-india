@@ -199,8 +199,7 @@ def get_state() -> dict:
         "scored_total": scanned,
         "succeeded": ok_n,
         "failed": err_n,
-        "progress_note": (f"{done} of {total} attempted; {ok_n} scored, {err_n} failed."
-                          if total else f"{done} attempted; {ok_n} scored, {err_n} failed."),
+        "progress_note": _progress_note(done, total, ok_n, err_n, _excluded_count()),
         # The universe grows between a scan starting and finishing — bhavcopy
         # adds symbols nightly — so `done` can exceed the `total` captured at
         # the start, and the bar reads over 100%. Clamped for display; the raw
@@ -952,3 +951,34 @@ def unscoreable_report() -> dict:
         }
     finally:
         conn.close()
+
+
+def _progress_note(done, total, ok_n, err_n, excluded=None) -> str:
+    """
+    One sentence describing the pass, that stays true when done > total.
+
+    `done` counts rows written for this cycle; `total` is the size of the
+    universe as it stands now. They can disagree in both directions and neither
+    is wrong:
+
+      done < total   a pass in progress, the ordinary case.
+      done > total   the universe shrank underneath a finished pass. Either
+                     bhavcopy added symbols mid-scan, or -- since the
+                     no-market-data filter landed -- rows exist for securities
+                     that are no longer attempted.
+
+    The old wording was `f"{done} of {total} attempted"`, which rendered as
+    "2892 of 2713 attempted" the moment the filter narrowed the universe. Both
+    numbers were right and the sentence was not, which is its own small lesson:
+    a number can be correct and still say something false once it is put in a
+    sentence with another one.
+    """
+    done = int(done or 0)
+    total = int(total or 0)
+    if not total:
+        return f"{done:,} attempted; {ok_n:,} scored, {err_n:,} failed."
+    if done > total:
+        extra = f" ({excluded:,} excluded for having no market data)" if excluded else ""
+        return (f"{done:,} rows recorded this cycle against a universe now "
+                f"numbering {total:,}{extra}; {ok_n:,} scored, {err_n:,} failed.")
+    return f"{done:,} of {total:,} attempted; {ok_n:,} scored, {err_n:,} failed."
