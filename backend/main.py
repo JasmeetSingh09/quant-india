@@ -194,6 +194,19 @@ def _start_picks_scheduler():
         sched.add_job(_warm_regime, "interval", minutes=25, id="warm_regime",
                       replace_existing=True,
                       next_run_time=_dt0.now() + _td0(seconds=40))
+
+        def _warm_integrity():
+            try:
+                from integrity_evidence import warm
+                warm()
+            except Exception as _e:
+                print(f"[warm] integrity: {type(_e).__name__}")
+
+        # The audit behind this takes ~22 seconds. Warmed on a timer so the
+        # evidence layer is instant on a page load rather than blocking one.
+        sched.add_job(_warm_integrity, "interval", hours=6, id="warm_integrity",
+                      replace_existing=True,
+                      next_run_time=_dt0.now() + _td0(minutes=2))
         # NSE publishes bhavcopy after the close; a daily pull keeps the
         # independent fallback fresh without anyone remembering to.
         from bhavcopy import fetch_day
@@ -1966,6 +1979,25 @@ def factor_strategy_comparison(start: str = Query("2019-01-01"),
     """
     from factor_strategies import compare
     return compare(start=start, fraction=fraction)
+
+
+@app.get("/evidence/integrity")
+def evidence_integrity(refresh: bool = Query(False)):
+    """
+    The machinery axis: is the app computing what it claims to compute?
+
+    Deliberately separate from /factors/evidence, which answers whether a factor
+    PREDICTS returns. That question is unresolved for all six factors and stays
+    that way until at least 2029, so an evidence layer built on it alone is the
+    same colour on every stock every day and stops being read. This axis has
+    answers today.
+
+    Every claim is measured at request time from stored rows. Claims resting
+    only on a test having passed are absent: that is a statement about process,
+    not a measurement.
+    """
+    from integrity_evidence import integrity
+    return integrity(refresh=refresh)
 
 
 @app.get("/factors/evidence")
