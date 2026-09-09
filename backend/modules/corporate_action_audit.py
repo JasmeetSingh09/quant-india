@@ -1002,16 +1002,22 @@ def post_write_verify() -> dict:
 
         # 4. No preference-share or debenture bonus may have become an equity
         # bonus. This is the one that would corrupt a correct series.
+        # The LIKE patterns are PARAMETERS, not literals. Inlined as
+        # '%ncrps%' they carry a "%n", and psycopg2 reads % as a parameter
+        # marker whenever any params are passed -- which the db wrapper always
+        # does, even an empty tuple. That raises "IndexError: tuple index out
+        # of range" on Postgres and works perfectly on SQLite, so it is
+        # invisible to every local test in this repo.
+        ph = _ph()
+        pats = ("%ncrps%", "%ncd %", "%debenture%", "%preference%")
+        where = ("kind = 'bonus' AND (" +
+                 " OR ".join(f"LOWER(subject) LIKE {ph}" for _ in pats) + ")")
         bad = conn.execute(
-            "SELECT COUNT(*) FROM corporate_actions WHERE kind = 'bonus' AND ("
-            "LOWER(subject) LIKE '%ncrps%' OR LOWER(subject) LIKE '%ncd %' OR "
-            "LOWER(subject) LIKE '%debenture%' OR LOWER(subject) LIKE '%preference%'"
-            ")").fetchone()[0]
+            f"SELECT COUNT(*) FROM corporate_actions WHERE {where}",
+            pats).fetchone()[0]
         examples = [f"{r[0]}@{str(r[1])[:10]} {str(r[2])[:70]}" for r in conn.execute(
-            "SELECT isin, ex_date, subject FROM corporate_actions "
-            "WHERE kind = 'bonus' AND (LOWER(subject) LIKE '%ncrps%' OR "
-            "LOWER(subject) LIKE '%debenture%' OR LOWER(subject) LIKE '%preference%') "
-            "LIMIT 5").fetchall()]
+            f"SELECT isin, ex_date, subject FROM corporate_actions WHERE {where} "
+            "LIMIT 5", pats).fetchall()]
         out["preference_or_debenture_stored_as_equity_bonus"] = {
             "count": bad, "clean": bad == 0, "examples": examples}
 
