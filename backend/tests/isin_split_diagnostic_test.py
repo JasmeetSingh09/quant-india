@@ -113,25 +113,51 @@ check("a split filed under the OLD isin is also classified A",
 # The last observation under the OLD isin falls ON the ex-date, so it already
 # trades at the post-split level and NO multiplier applies at that boundary.
 # adjusted(t) = close(t) * PROD(m for ex_date > t) -- strictly greater.
-onday_old = series("ONDAY.NS", "INE999999991", D0, 30, 100.0)
-onday_new = series("ONDAY.NS", "INE999999992", D0 + timedelta(days=30), 30, 99.85)
+# The ex-date falls on the LAST day of the old ISIN, and the price genuinely
+# halves on that day -- which is what a 10->5 face-value change looks like.
+onday_old = (series("ONDAY.NS", "INE999999991", D0, 29, 100.0)
+             + [("ONDAY.NS", (D0 + timedelta(days=29)).isoformat(), 50.0,
+                 "INE999999991")])
+onday_new = series("ONDAY.NS", "INE999999992", D0 + timedelta(days=30), 30, 50.0)
 build(onday_old + onday_new,
       [("INE999999991", (D0 + timedelta(days=29)).isoformat(),
         "split", 10, 5, None, 1)])
 c = one_case(D.diagnose(["ONDAY"]))
-print(f"  ex-date == last pre-observation day: raw {c['raw_return_pct']}%, "
+print(f"  ex-date on the old ISIN's last day: raw {c['raw_return_pct']}%, "
       f"adjusted {c['adjusted_return_pct']}%")
-check("an ex-date at/behind the last old-ISIN day applies NO multiplier",
-      c["multiplier_applying_at_this_boundary"] is None,
-      str(c["multiplier_applying_at_this_boundary"]))
-check("  ...so the adjusted return stays near the raw one",
-      abs(c["adjusted_return_pct"] - c["raw_return_pct"]) < 1e-6,
-      f"raw {c['raw_return_pct']}% vs adj {c['adjusted_return_pct']}%")
-check("  ...and it does NOT invent a +99% jump",
-      abs(c["adjusted_return_pct"]) < 5,
-      f"{c['adjusted_return_pct']}%")
-check("  ...the boundary is explained in words",
-      bool(c["boundary_note"]), (c["boundary_note"] or "")[:50])
+check("returns are measured across the EX-DATE, not the ISIN boundary",
+      c["across_the_ex_date"] is not None
+      and c["across_the_ex_date"]["ex_date"] == (D0 + timedelta(days=29)).isoformat(),
+      str((c["across_the_ex_date"] or {}).get("ex_date")))
+check("  ...the raw return shows the halving",
+      abs(c["raw_return_pct"] + 50) < 1e-6, f"{c['raw_return_pct']}%")
+check("  ...and the adjusted return is exactly flat",
+      abs(c["adjusted_return_pct"]) < 1e-6, f"{c['adjusted_return_pct']}%")
+
+# The AHCL shape: the ISIN changes on one day and the action goes ex on a LATER
+# day. Anchoring on the ISIN boundary straddles no action at all and applying
+# the multiplier there invented +895% in production. The anchor must follow the
+# ex-date wherever it falls.
+ah_old = series("AHSHAPE.NS", "INE999999993", D0, 30, 100.0)   # ends D0+29
+ah_new = ([("AHSHAPE.NS", (D0 + timedelta(days=30)).isoformat(), 99.6, "INE999999994")]
+          + [("AHSHAPE.NS", (D0 + timedelta(days=31 + k)).isoformat(), 10.0,
+              "INE999999994") for k in range(10)])
+build(ah_old + ah_new,
+      [("INE999999993", (D0 + timedelta(days=31)).isoformat(),
+        "split", 10, 1, None, 1)])
+c = one_case(D.diagnose(["AHSHAPE"]))
+x = c["across_the_ex_date"]
+print(f"  isin boundary raw {c['isin_boundary_raw_return_pct']}%  |  "
+      f"across ex-date raw {x['raw_return_pct']}% adjusted {x['adjusted_return_pct']}%")
+check("the ISIN boundary and the ex-date are recognised as different days",
+      x["ex_date"] != c["new_first_seen"], f"ex {x['ex_date']} vs isin {c['new_first_seen']}")
+check("  ...the ISIN-boundary return is reported separately and stays flat",
+      abs(c["isin_boundary_raw_return_pct"]) < 1,
+      f"{c['isin_boundary_raw_return_pct']}%")
+check("  ...the ex-date return shows the real 90% drop",
+      x["raw_return_pct"] < -85, f"{x['raw_return_pct']}%")
+check("  ...and adjusting it lands near flat, not near +895%",
+      abs(x["adjusted_return_pct"]) < 5, f"{x['adjusted_return_pct']}%")
 
 print()
 print("=" * 74)
@@ -205,8 +231,11 @@ c = one_case(D.diagnose(["QUIETCO"]))
 print(f"  verdict {c['verdict']}: {c['why'][:88]}")
 check("an ISIN change with no action is classified D", c["verdict"] == "D",
       c["verdict"])
-check("  ...and the raw return is flat, consistent with D",
-      abs(c["raw_return_pct"]) < 1e-6, f"{c['raw_return_pct']}%")
+check("  ...and there is no ex-date return, because there is no action",
+      c["across_the_ex_date"] is None and c["raw_return_pct"] is None)
+check("  ...while the ISIN-boundary return is flat, consistent with D",
+      abs(c["isin_boundary_raw_return_pct"]) < 1e-6,
+      f"{c['isin_boundary_raw_return_pct']}%")
 
 print()
 print("=" * 74)

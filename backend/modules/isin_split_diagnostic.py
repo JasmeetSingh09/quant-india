@@ -199,20 +199,56 @@ def diagnose(symbols: list = None, max_symbols: int = 12,
                 # not, and reported +99.71% for AJANTPHARM on a boundary whose
                 # raw return was -0.15% -- that is to say, on a series that was
                 # already perfectly continuous.
-                applies_here = [a for a in price_affecting
-                                if last_pre and a["ex_date"] > last_pre["day"]]
-                mult_at_boundary = None
-                if applies_here:
-                    mult_at_boundary = 1.0
-                    for a in applies_here:
-                        mult_at_boundary *= a["multiplier"]
+                # ANCHOR ON THE EX-DATE, NOT ON THE ISIN TRANSITION.
+                #
+                # They are not the same day and assuming they were produced two
+                # wrong numbers here already. AHCL changed ISIN on 2026-04-23
+                # while its split and bonus went ex on 2026-04-24, so the
+                # ISIN-boundary pair straddles no action at all -- its raw
+                # return is -0.42%, and applying the multiplier to it invented
+                # +895%. The pair that actually straddles the event is
+                # (last close strictly before ex_date, first close on/after it).
+                ex_ret = {}
+                if price_affecting:
+                    ex = min(a["ex_date"] for a in price_affecting)
+                    m_ex = 1.0
+                    for a in price_affecting:
+                        if a["ex_date"] == ex:
+                            m_ex *= a["multiplier"]
+                    pre = post = None
+                    try:
+                        r = conn.execute(
+                            "SELECT day, close FROM bhavcopy_eod "
+                            f"WHERE symbol = {ph} AND day < {ph} AND close > 0 "
+                            "ORDER BY day DESC LIMIT 1", (sym, ex)).fetchone()
+                        if r:
+                            pre = {"day": str(r[0])[:10], "close": float(r[1])}
+                        r = conn.execute(
+                            "SELECT day, close FROM bhavcopy_eod "
+                            f"WHERE symbol = {ph} AND day >= {ph} AND close > 0 "
+                            "ORDER BY day ASC LIMIT 1", (sym, ex)).fetchone()
+                        if r:
+                            post = {"day": str(r[0])[:10], "close": float(r[1])}
+                    except Exception:
+                        try:
+                            conn.rollback()
+                        except Exception:
+                            pass
+                    if pre and post and pre["close"]:
+                        rr = 100.0 * (post["close"] - pre["close"]) / pre["close"]
+                        aa = (100.0 * (post["close"] - pre["close"] * m_ex)
+                              / (pre["close"] * m_ex))
+                        ex_ret = {
+                            "ex_date": ex,
+                            "multiplier_at_ex_date": round(m_ex, 6),
+                            "last_close_before_ex": pre,
+                            "first_close_on_or_after_ex": post,
+                            "raw_return_pct": round(rr, 2),
+                            "adjusted_return_pct": round(aa, 2),
+                        }
 
+                mult_at_boundary = None
                 adj_ret = None
-                if raw_ret is not None:
-                    m_eff = mult_at_boundary or 1.0
-                    adj_ret = round(100.0 * (first_post["close"]
-                                             - last_pre["close"] * m_eff)
-                                    / (last_pre["close"] * m_eff), 2)
 
                 # --- classify -------------------------------------------------
                 if acts is None:
@@ -260,17 +296,17 @@ def diagnose(symbols: list = None, max_symbols: int = 12,
                     "actions_near_transition": acts,
                     "price_affecting_actions": price_affecting,
                     "combined_multiplier": mult,
+                    "across_the_ex_date": ex_ret or None,
                     "multiplier_applying_at_this_boundary": mult_at_boundary,
                     "boundary_note": (
-                        "the last old-ISIN observation is on or after the "
-                        "ex-date, so it already trades post-action and no "
-                        "multiplier applies at this boundary"
-                        if (price_affecting and not mult_at_boundary)
-                        else None),
+                        "returns are measured across the EX-DATE, which is "
+                        "not always the day the ISIN changed"
+                        if price_affecting else None),
                     "last_pre_action_observation": last_pre,
                     "first_post_action_observation": first_post,
-                    "raw_return_pct": raw_ret,
-                    "adjusted_return_pct": adj_ret,
+                    "isin_boundary_raw_return_pct": raw_ret,
+                    "raw_return_pct": (ex_ret or {}).get("raw_return_pct"),
+                    "adjusted_return_pct": (ex_ret or {}).get("adjusted_return_pct"),
                     "verdict": verdict,
                     "why": why,
                 })
