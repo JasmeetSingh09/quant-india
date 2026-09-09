@@ -2431,6 +2431,8 @@ def health_corporate_action_audit(part: str = Query("taxonomy"),
         return CAA.missed_actions()
     if part == "dryrun":
         return CAA.reparse_dry_run()
+    if part == "postwrite":
+        return CAA.post_write_verify()
     if part == "apply":
         # The only writing path in this endpoint. It refuses without the token,
         # and every insert is ON CONFLICT DO NOTHING, so an existing corporate

@@ -952,3 +952,106 @@ def reparse_apply(confirm: str = "") -> dict:
                  "the persisted delta equals the plan AND nothing pre-existing "
                  "changed."),
     }
+
+
+# ------------------------------------------------------ post-write checks
+
+def post_write_verify() -> dict:
+    """
+    The checklist, run against production after the re-parse. Read-only.
+
+    Each item answers a question that the write itself could not answer about
+    itself. `reparse_apply` reports what it believes it did; this reports what
+    is actually in the table now, computed independently.
+    """
+    import corporate_actions as CA
+
+    conn = get_conn()
+    t0 = time.time()
+    out = {}
+    try:
+        total = conn.execute("SELECT COUNT(*) FROM corporate_actions").fetchone()[0]
+        parsed = conn.execute(
+            "SELECT COUNT(*) FROM corporate_actions WHERE parsed = 1").fetchone()[0]
+        unparsed = conn.execute(
+            "SELECT COUNT(*) FROM corporate_actions WHERE parsed = 0").fetchone()[0]
+        by_kind = {str(k): n for k, n in conn.execute(
+            "SELECT kind, COUNT(*) FROM corporate_actions GROUP BY kind").fetchall()}
+        out["counts"] = {"total": total, "parsed": parsed, "unparsed": unparsed,
+                         "by_kind": by_kind}
+
+        # 2 + 3. Re-run the dry run's logic: after a correct write it must find
+        # nothing left to add, and still nothing to change or lose.
+        rows = conn.execute(
+            "SELECT isin, ex_date, subject, kind, parsed "
+            "FROM corporate_actions").fetchall()
+        stored, subjects = {}, {}
+        for isin, ex, subject, kind, p in rows:
+            key = (str(isin), str(ex)[:10], str(subject or ""))
+            subjects[key] = str(subject or "")
+            if int(p or 0) and kind in ("split", "bonus", "dividend"):
+                stored.setdefault(key, set()).add(str(kind))
+        remaining = 0
+        for key, subj in subjects.items():
+            have = stored.get(key, set())
+            for a in CA.parse_subject(subj):
+                if a["kind"] not in have:
+                    remaining += 1
+        out["still_recoverable_after_write"] = remaining
+        out["all_planned_additions_present"] = (remaining == 0)
+
+        # 4. No preference-share or debenture bonus may have become an equity
+        # bonus. This is the one that would corrupt a correct series.
+        bad = conn.execute(
+            "SELECT COUNT(*) FROM corporate_actions WHERE kind = 'bonus' AND ("
+            "LOWER(subject) LIKE '%ncrps%' OR LOWER(subject) LIKE '%ncd %' OR "
+            "LOWER(subject) LIKE '%debenture%' OR LOWER(subject) LIKE '%preference%'"
+            ")").fetchone()[0]
+        examples = [f"{r[0]}@{str(r[1])[:10]} {str(r[2])[:70]}" for r in conn.execute(
+            "SELECT isin, ex_date, subject FROM corporate_actions "
+            "WHERE kind = 'bonus' AND (LOWER(subject) LIKE '%ncrps%' OR "
+            "LOWER(subject) LIKE '%debenture%' OR LOWER(subject) LIKE '%preference%') "
+            "LIMIT 5").fetchall()]
+        out["preference_or_debenture_stored_as_equity_bonus"] = {
+            "count": bad, "clean": bad == 0, "examples": examples}
+
+        # 5 + 6. The two named events.
+        named = {}
+        for label, isin, ex in (("JBMA", "INE927D01010", "2014-10-08"),
+                                ("20MICRONS", "INE144J01019", "2013-01-28")):
+            ph = _ph()
+            got = [{"kind": str(r[0]), "num": r[1], "den": r[2],
+                    "amount": r[3], "parsed": int(r[4] or 0)}
+                   for r in conn.execute(
+                       "SELECT kind, num, den, amount, parsed FROM "
+                       f"corporate_actions WHERE isin = {ph} AND ex_date = {ph} "
+                       "ORDER BY kind", (isin, ex)).fetchall()]
+            m = 1.0
+            for a in got:
+                if a["parsed"] and a["kind"] in ("split", "bonus"):
+                    try:
+                        mm = CA.price_multiplier(a)
+                    except Exception:
+                        mm = None
+                    if mm:
+                        m *= mm
+            named[label] = {"isin": isin, "ex_date": ex, "actions": got,
+                            "combined_multiplier": round(m, 6)}
+        out["named_events"] = named
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return {"audit": "post_write_verify", "status": "UNMEASURED",
+                "reason": f"{type(e).__name__}: {e}"}
+    finally:
+        conn.close()
+
+    out["audit"] = "post_write_verify"
+    out["read_only"] = True
+    out["seconds"] = round(time.time() - t0, 1)
+    out["all_clear"] = bool(
+        out["all_planned_additions_present"]
+        and out["preference_or_debenture_stored_as_equity_bonus"]["clean"])
+    return out
