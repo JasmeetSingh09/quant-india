@@ -40,3 +40,8 @@ Thumbs.db
 # Test run outputs — regenerated on every run, never source.
 backend/distress_study_rows.json
 backend/tests/alpha_audit_result.json
+
+# SQLite write-ahead sidecars. Transient runtime state -- two of these were
+# tracked and got committed as deletions the moment a checkpoint ran.
+*.db-wal
+*.db-shm
