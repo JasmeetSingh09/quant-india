@@ -45,13 +45,24 @@ _BUILDING = threading.Lock()
 
 
 def _claim(cid, headline, ok, measured, method, detail=None):
+    """
+    ok=True -> verified, False -> failed, None -> unknown, "partial" -> partial.
+
+    Four states, because three were not enough. A claim about a PROPORTION is
+    badly served by a binary: provenance coverage at 73% is neither "verified"
+    (it plainly is not) nor "failed" (three quarters of it works), and forcing
+    it into either misinforms in a different direction. `unknown` is reserved
+    for a check that could not run at all, which is a distinct thing again -- a
+    check that did not happen is not a check that passed.
+    """
+    status = ("partial" if ok == "partial"
+              else "verified" if ok is True
+              else "failed" if ok is False
+              else "unknown")
     return {
         "id": cid,
         "claim": headline,
-        # `verified` and `failed` are both real answers. `unknown` means the
-        # audit could not measure it, which is neither and must not read as
-        # either -- a check that did not run is not a check that passed.
-        "status": "verified" if ok is True else ("failed" if ok is False else "unknown"),
+        "status": status,
         "measured": measured,
         "method": method,
         "detail": detail,
@@ -106,12 +117,22 @@ def _build() -> dict:
     unexplained = fh.get("missing_provenance")
     rows = fh.get("rows") or 0
     with_inputs = fh.get("with_raw_inputs") or 0
+    # The first version of this claim read "Every score carries the inputs it
+    # was computed from" and was marked verified on `with_inputs > 0` -- which
+    # passed at 1,973 of 2,704, or 73%. A claim of "every" verified by "some" is
+    # the exact overclaim this panel exists to prevent, and it got as far as
+    # production before being caught. The claim now states the proportion, and
+    # is verified only when the proportion is complete.
+    pct = (100.0 * with_inputs / rows) if rows else None
     claims.append(_claim(
         "provenance_recorded",
-        "Every score carries the inputs it was computed from",
-        (with_inputs > 0 and rows > 0) if rows else None,
-        f"{with_inputs:,} of {rows:,} observations carry their raw inputs",
-        "Inputs are captured at scan time, not reconstructed afterwards.",
+        "Scores record the inputs they were computed from",
+        (True if (rows and with_inputs == rows)
+         else "partial" if (rows and with_inputs) else None if not rows else False),
+        (f"{with_inputs:,} of {rows:,} observations ({pct:.0f}%) carry their "
+         f"raw inputs" if rows else "not measured"),
+        ("Inputs are captured at scan time, not reconstructed afterwards. "
+         "Observations without them cannot be given any later."),
         {"rows": rows, "with_raw_inputs": with_inputs,
          "missing_provenance": unexplained,
          "input_rows": prov.get("input_rows")},
@@ -144,6 +165,7 @@ def _build() -> dict:
 
     verified = sum(1 for c in claims if c["status"] == "verified")
     failed_n = sum(1 for c in claims if c["status"] == "failed")
+    partial_n = sum(1 for c in claims if c["status"] == "partial")
     return {
         "available": True,
         "axis": "machinery",
@@ -154,8 +176,10 @@ def _build() -> dict:
         "claims": claims,
         "verified": verified,
         "failed": failed_n,
-        "unknown": len(claims) - verified - failed_n,
+        "partial": partial_n,
+        "unknown": len(claims) - verified - failed_n - partial_n,
         "summary": (f"{verified} of {len(claims)} verified"
+                    + (f", {partial_n} partial" if partial_n else "")
                     + (f", {failed_n} FAILED" if failed_n else "")),
         "computed_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "note": ("Every claim here is measured at request time from stored "

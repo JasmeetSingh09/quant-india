@@ -16,6 +16,7 @@ import SignalHistory from '../components/SignalHistory'
 import WhySignal from '../components/WhySignal'
 import SixFactor from '../components/SixFactor'
 import FactorInputs from '../components/FactorInputs'
+import EvidencePanel from '../components/EvidencePanel'
 import StockContext from '../components/StockContext'
 import StatCard from '../components/StatCard'
 import { Search, TrendingUp, TrendingDown, ArrowLeft, ExternalLink, Filter, LayoutList, LayoutGrid } from 'lucide-react'
@@ -814,6 +815,9 @@ function StockDetail({ ticker, onBack }) {
               {/* What the model actually read, and what it could not. The
                   scan has recorded this all along and nothing displayed it. */}
               <ErrorBoundary name="factor inputs"><FactorInputs ticker={ticker} /></ErrorBoundary>
+              {/* Two questions, kept apart: is the arithmetic sound, and
+                  does the signal predict. Only the first has answers. */}
+              <ErrorBoundary name="evidence"><EvidencePanel /></ErrorBoundary>
               {alphaLoading ? <Spinner size="sm" /> : alpha && (
                 <div className="card">
                   <AlphaMeter score={alpha.alpha_score} />

@@ -49,8 +49,8 @@ HEALTHY = {
                      "max_abs_diff": 0.000371},
     "duplicates": {"alpha_scan2": 0, "factor_history": 0, "factor_inputs": 0},
     "provenance": {"input_rows": 70096},
-    "factor_history": {"rows": 2682, "with_raw_inputs": 1960,
-                       "missing_provenance": 722},
+    "factor_history": {"rows": 2682, "with_raw_inputs": 2682,
+                       "missing_provenance": 0},
 }
 
 
@@ -76,6 +76,32 @@ for c in r["claims"]:
 check("the axis is named", r["axis"] == "machinery")
 check("all five claims are verified", r["verified"] == 5, f"{r['summary']}")
 check("none failed", r["failed"] == 0)
+
+# The claim about provenance said "Every score carries the inputs" and was
+# verified on with_inputs > 0 -- which passed at 73% coverage, in production.
+# A claim of "every" verified by "some" is the overclaim this panel exists to
+# prevent, so partial coverage must now read as partial.
+partial = with_audit({**HEALTHY,
+                      "factor_history": {"rows": 2704, "with_raw_inputs": 1973,
+                                         "missing_provenance": 731}})
+pc = {c["id"]: c for c in partial["claims"]}["provenance_recorded"]
+check("73% provenance coverage does NOT verify",
+      pc["status"] != "verified", f"status={pc['status']}")
+check("...and is PARTIAL rather than failed",
+      pc["status"] == "partial",
+      "three quarters working is not a failure, and not a pass either")
+check("partial is counted separately in the summary",
+      "partial" in partial["summary"], partial["summary"])
+zero = with_audit({**HEALTHY,
+                   "factor_history": {"rows": 2704, "with_raw_inputs": 0,
+                                      "missing_provenance": 2704}})
+check("zero coverage IS a failure",
+      {c["id"]: c for c in zero["claims"]}["provenance_recorded"]["status"] == "failed")
+check("and the proportion is stated, not hidden",
+      "73%" in pc["measured"], pc["measured"])
+check("the claim no longer says 'every'",
+      "every" not in pc["claim"].lower(), pc["claim"])
+r = with_audit(HEALTHY)
 check("reproducibility cites the real numbers",
       "500" in by_id["reproducible"]["measured"]
       and "0 mismatched" in by_id["reproducible"]["measured"])
