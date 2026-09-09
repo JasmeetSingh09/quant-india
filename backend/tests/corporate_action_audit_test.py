@@ -250,6 +250,16 @@ print("  and the traps — these must stay EMPTY:")
 # Applying 0.5 to one of these would corrupt a series that was correct.
 TRAPS = [
     ("Bonus Preference Shares 21:1", "preference shares, not equity"),
+    # The acronyms. These five got through the first version of the guard,
+    # which spelled out "preference" and "debenture" but not NCRPS, and were
+    # only caught because the production misses were listed in full rather
+    # than sampled. Bonus Ncrps 46:1 would have applied a 0.021 multiplier --
+    # a 98% phantom crash -- to a series that was correct.
+    ("Scheme Of Arrangement - Bonus Ncrps 1:10", "NCRPS is preference shares"),
+    ("Bonus Ncrps 46:1", "NCRPS, and a 0.021 multiplier if believed"),
+    ("Bonus Ncrps 1:116", "NCRPS"),
+    ("Bonus Ncrps 4:1", "NCRPS"),
+    ("Scheme Of Arrangement - Bonus Ncd 2:1", "NCD is a debenture"),
     ("Scheme Of Arrangement - Bonus Debentures 1:1", "debentures, not equity"),
     ("Scheme Of Arangement- Bonus - 1 Debenture For 1 Equity Share Held",
      "debenture bonus written in words"),

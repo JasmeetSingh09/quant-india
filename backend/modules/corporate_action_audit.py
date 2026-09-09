@@ -498,8 +498,16 @@ _M_BONUS = re.compile(
 _M_DIV = re.compile(r"\b(?:dividend|div\.?)\b[^0-9r]{0,20}?r[se]\.?\s*"
                     r"([0-9]+(?:\.[0-9]+)?)", re.I)
 
-_DEBENTURE_BONUS = re.compile(r"bonus[^0-9:]{0,40}?(?:debenture|preference|pref\b)",
-                              re.I)
+# The acronyms have to be named. NCRPS is Non-Convertible Redeemable Preference
+# Shares and NCD is a debenture, and the first version of this guard -- which
+# spelled out "preference" and "debenture" in full -- still recovered five
+# "Bonus Ncrps 46:1" rows as equity bonuses. That is precisely the false
+# positive this guard exists to prevent, and it survived because the earlier
+# report SAMPLED the misses instead of listing them. It was caught the moment
+# they were all printed.
+_DEBENTURE_BONUS = re.compile(
+    r"bonus[^0-9:]{0,40}?(?:debenture|preference|pref\b|ncrps\b|ncd\b|"
+    r"rps\b|ccps\b|ocrps\b|ncrp\b)", re.I)
 
 
 def recoverable_actions(subject: str) -> list:
