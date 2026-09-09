@@ -469,3 +469,161 @@ def boundary_reconstruction(cases: list = None, window_days: int = 120) -> dict:
             "seconds": round(time.time() - t0, 1), "cases": out,
             "note": ("An E is revised only where the stored text settles it. "
                      "Where it does not, E stands.")}
+
+
+# ------------------------------------------------- actions never stored at all
+
+# A stricter reader than the production one, used ONLY to measure what the
+# production reader missed. It is deliberately conservative: every pattern here
+# demands context that rules out the look-alikes, because the failure mode that
+# matters is not a miss, it is a FALSE POSITIVE. Applying an equity multiplier
+# to a bonus DEBENTURE issue would silently corrupt a price series, which is
+# worse than leaving it unadjusted.
+
+# "Face Value Split Rs.10/- To Rs.2/-", "Sub-Division From Rs 10 To Rs 2".
+# Requires face-value or sub-division context, so a rights premium or a
+# dividend amount can never be read as a face value.
+_M_SPLIT = re.compile(
+    r"(?:face\s*value|sub-?divi[sz]i?on?)"
+    r"[^0-9]{0,40}?r[se]\.?\s*([0-9]+(?:\.[0-9]+)?)"
+    r"[^0-9]{0,20}?to\s*r[se]\.?\s*([0-9]+(?:\.[0-9]+)?)", re.I)
+
+# "Bonus 1:1", "Bonus - 3:1", "Bonus Issue 1:2". Refuses anything naming
+# debentures or preference shares between the word and the ratio.
+_M_BONUS = re.compile(
+    r"\bbonus\b(?![^0-9:]{0,40}?(?:debenture|preference|pref\b))"
+    r"[^0-9]{0,20}?([0-9]+)\s*:\s*([0-9]+)", re.I)
+
+# "Dividend - Rs 16.25", "Div.Rs.3/-", "Div Rs 2 Per Share".
+_M_DIV = re.compile(r"\b(?:dividend|div\.?)\b[^0-9r]{0,20}?r[se]\.?\s*"
+                    r"([0-9]+(?:\.[0-9]+)?)", re.I)
+
+_DEBENTURE_BONUS = re.compile(r"bonus[^0-9:]{0,40}?(?:debenture|preference|pref\b)",
+                              re.I)
+
+
+def recoverable_actions(subject: str) -> list:
+    """
+    Price-affecting events a conservative reader can find in this subject.
+
+    Used to measure the gap against what production actually stored. Never
+    written anywhere.
+    """
+    s = subject or ""
+    out = []
+    m = _M_SPLIT.search(s)
+    if m:
+        old_fv, new_fv = float(m.group(1)), float(m.group(2))
+        if old_fv > 0 and new_fv > 0 and old_fv != new_fv:
+            out.append({"kind": "split", "num": old_fv, "den": new_fv,
+                        "multiplier": round(new_fv / old_fv, 6)})
+    if not _DEBENTURE_BONUS.search(s):
+        m = _M_BONUS.search(s)
+        if m:
+            a, b = float(m.group(1)), float(m.group(2))
+            if a > 0 and b > 0:
+                out.append({"kind": "bonus", "num": a, "den": b,
+                            "multiplier": round(b / (a + b), 6)})
+    if "rights" not in s.lower():
+        m = _M_DIV.search(s)
+        if m:
+            amt = float(m.group(1))
+            if amt > 0:
+                out.append({"kind": "dividend", "amount": amt})
+    return out
+
+
+def missed_actions(max_rows: int = 60000, sample: int = 40) -> dict:
+    """
+    Events the feed described and the archive never stored.
+
+    The 12,778 unparsed rows are NOT the right measure of this problem, and
+    JBMA is why. Its subject reads "Bonus 1:1 And Face Value Split Rs.10/- To
+    Rs.5/- Per Share": one line carrying two actions. `parse_subject` found the
+    bonus and missed the split, so `store()` wrote a single row with parsed = 1
+    and the split was never recorded anywhere. It is not in the 12,778. It is
+    not in the table at all. The only trace it leaves is a price series that
+    halves twice while the record explains one halving.
+
+    So this walks every subject line, parsed or not, re-reads it with a
+    deliberately conservative reader, and reports what production did not store.
+    """
+    conn = get_conn()
+    t0 = time.time()
+    try:
+        rows = conn.execute(
+            "SELECT isin, ex_date, subject, kind, parsed FROM corporate_actions "
+            f"ORDER BY ex_date LIMIT {int(max_rows)}").fetchall()
+        total = conn.execute("SELECT COUNT(*) FROM corporate_actions").fetchone()[0]
+        cover = {}
+        for isin, lo, hi in conn.execute(
+                "SELECT isin, MIN(day), MAX(day) FROM bhavcopy_eod "
+                "WHERE isin IS NOT NULL GROUP BY isin").fetchall():
+            cover[str(isin)] = (str(lo)[:10], str(hi)[:10])
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return {"audit": "missed_actions", "status": "UNMEASURED",
+                "reason": f"{type(e).__name__}: {e}"}
+    finally:
+        conn.close()
+
+    # What production stored, per event.
+    stored = {}
+    subjects = {}
+    for isin, ex, subject, kind, parsed in rows:
+        key = (str(isin), str(ex)[:10])
+        stored.setdefault(key, set())
+        if int(parsed or 0) and kind in ("split", "bonus", "dividend"):
+            stored[key].add(kind)
+        subjects.setdefault(key, set()).add(str(subject or ""))
+
+    missed, by_kind, inside = [], {}, 0
+    for key, subs in subjects.items():
+        want = {}
+        for s in subs:
+            for a in recoverable_actions(s):
+                want[a["kind"]] = a
+        gap = set(want) - stored.get(key, set())
+        if not gap:
+            continue
+        isin, ex = key
+        lo_hi = cover.get(isin)
+        in_cov = bool(lo_hi and lo_hi[0] <= ex <= lo_hi[1])
+        if in_cov:
+            inside += 1
+        for k in gap:
+            by_kind[k] = by_kind.get(k, 0) + 1
+        if len(missed) < sample:
+            missed.append({
+                "isin": isin, "ex_date": ex,
+                "missed": sorted(gap),
+                "recovered": {k: want[k] for k in sorted(gap)},
+                "already_stored": sorted(stored.get(key, set())),
+                "inside_price_coverage": in_cov,
+                "subject": sorted(subs)[0][:150],
+            })
+
+    return {
+        "audit": "missed_actions",
+        "read_only": True,
+        "seconds": round(time.time() - t0, 1),
+        "examined": {
+            "corporate_action_rows_read": len(rows),
+            "corporate_actions_total": total,
+            "complete": len(rows) >= total,
+            "distinct_events": len(subjects),
+        },
+        "headline": {
+            "events_with_a_missed_action": sum(by_kind.values()),
+            "by_kind": by_kind,
+            "inside_price_coverage": inside,
+        },
+        "examples": missed,
+        "note": ("The conservative reader refuses bonus debentures and bonus "
+                 "preference shares, because applying an equity multiplier to "
+                 "those would corrupt a series -- a false positive is worse "
+                 "than the miss it replaces."),
+    }

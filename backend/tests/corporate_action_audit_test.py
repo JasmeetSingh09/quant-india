@@ -221,6 +221,60 @@ check("a complete record is reported as explaining the move",
       r2["verdict"] == "record explains the move",
       f"ratio {r2['recorded_over_implied']}")
 
+
+print()
+print("=" * 74)
+print("THE CONSERVATIVE READER — A FALSE POSITIVE IS WORSE THAN A MISS")
+print("=" * 74)
+
+# Must be RECOVERED. Each is a real production subject the shipped parser missed.
+RECOVER = [
+    ("Bonus 1:1 And Face Value Split Rs.10/- To Rs.5/- Per Share",
+     {"split", "bonus"}, "JBMA -- one line, two actions, one parsed"),
+    ("Face Value Split Rs.10/- To Rs.2/-", {"split"},
+     "the shipped regex demands the word 'from'"),
+    ("Sub-Division From Rs 10/- Per Share To Rs 2/- Per Share", {"split"},
+     "the shipped parser also demands the word 'split'"),
+    ("Bonus - 3:1", {"bonus"}, "a hyphen blocks the shipped regex"),
+    ("Annual Geneeral Meeting/Div.Rs.3/- Per Share", {"dividend"},
+     "abbreviated 'Div.' behind a feed typo"),
+]
+for subject, expect, why in RECOVER:
+    got = {a["kind"] for a in CAA.recoverable_actions(subject)}
+    check(f"recovers {sorted(expect)} from: {subject[:42]}", got == expect,
+          f"got {sorted(got)} | {why}")
+
+print()
+print("  and the traps — these must stay EMPTY:")
+# A bonus of DEBENTURES or PREFERENCE shares does not divide the equity price.
+# Applying 0.5 to one of these would corrupt a series that was correct.
+TRAPS = [
+    ("Bonus Preference Shares 21:1", "preference shares, not equity"),
+    ("Scheme Of Arrangement - Bonus Debentures 1:1", "debentures, not equity"),
+    ("Scheme Of Arangement- Bonus - 1 Debenture For 1 Equity Share Held",
+     "debenture bonus written in words"),
+    ("Rights 3:4 @ Premium Rs.32/- Per Share",
+     "a rights premium is not a face value and rights are not modelled"),
+    ("Annual General Meeting", "inert"),
+    ("Interest Payment", "inert"),
+    ("Buy-Back Of Equity Shares", "not expressible as one multiplier"),
+]
+for subject, why in TRAPS:
+    got = CAA.recoverable_actions(subject)
+    check(f"  refuses: {subject[:48]}", got == [], f"{why} | got {got}")
+
+# The JBMA arithmetic, end to end.
+acts = CAA.recoverable_actions(
+    "Bonus 1:1 And Face Value Split Rs.10/- To Rs.5/- Per Share")
+m = 1.0
+for a in acts:
+    m *= a["multiplier"]
+check("JBMA's recovered multiplier is 0.25", abs(m - 0.25) < 1e-9, str(m))
+check("  ...which matches the 0.2399 the prices imply",
+      abs(m - 0.239857) / 0.239857 < 0.05,
+      "the residual is a genuine ~4% move that day, not a missing action")
+
+
 try:
     os.remove(DB)
 except Exception:

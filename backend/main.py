@@ -2426,6 +2426,8 @@ def health_corporate_action_audit(part: str = Query("taxonomy"),
         return CAA.event_reconstruction(symbol, ex_date)
     if part == "boundaries":
         return CAA.boundary_reconstruction()
+    if part == "missed":
+        return CAA.missed_actions()
     return CAA.taxonomy()
 
 
