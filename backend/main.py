@@ -2403,7 +2403,8 @@ def health_resolver_ambiguous():
 @app.get("/health/corporate-action-audit")
 def health_corporate_action_audit(part: str = Query("taxonomy"),
                                   symbol: str = Query(None),
-                                  ex_date: str = Query(None)):
+                                  ex_date: str = Query(None),
+                                  confirm: str = Query("")):
     """
     Read-only. What the unparsed corporate actions actually are.
 
@@ -2430,6 +2431,11 @@ def health_corporate_action_audit(part: str = Query("taxonomy"),
         return CAA.missed_actions()
     if part == "dryrun":
         return CAA.reparse_dry_run()
+    if part == "apply":
+        # The only writing path in this endpoint. It refuses without the token,
+        # and every insert is ON CONFLICT DO NOTHING, so an existing corporate
+        # action cannot be altered by it under any circumstance.
+        return CAA.reparse_apply(confirm=confirm)
     return CAA.taxonomy()
 
 

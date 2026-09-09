@@ -22,8 +22,17 @@ The raw `subject` text is stored (400 chars), which is what makes the separation
 possible at all: the evidence needed to reclassify these rows is already in the
 database and no refetch is required.
 
-Read-only. Nothing here writes, repairs, reparses into storage, or recalculates
-a score.
+Read-only, with ONE exception
+-----------------------------
+Everything here reads, except `reparse_apply`, which inserts the actions the
+dry run identified and is the only function in this module that writes. It
+refuses without an explicit confirmation token, and every insert carries ON
+CONFLICT DO NOTHING on the primary key, so the database itself -- not this
+module's good intentions -- guarantees that an existing row cannot be altered.
+
+That distinction is worth stating rather than leaving to a reader's assumption,
+because this file previously claimed to write nothing at all, and a stale claim
+in a docstring is the same kind of defect as a stale claim in a report.
 """
 
 import re
@@ -787,4 +796,159 @@ def reparse_dry_run(sample: int = 25) -> dict:
         "drops": drops,
         "note": ("Judged on CONFLICT and DROP being zero, not on ADD being "
                  "large. Recognising more is not automatically better."),
+    }
+
+
+# --------------------------------------------------------------- the write
+
+def reparse_apply(confirm: str = "") -> dict:
+    """
+    Insert the actions the v2 dry run identified. Nothing else.
+
+    Additive-only is enforced by the DATABASE, not by this function's good
+    intentions: every insert carries ON CONFLICT DO NOTHING on the primary key
+    (isin, ex_date, sig). If the plan were wrong, the worst it could do is
+    fail to insert -- it cannot overwrite or alter a row that already exists.
+    That property is what makes the operation safe to run at all, because the
+    parser that produced this plan was, two revisions ago, quietly destroying
+    twenty-four dividends.
+
+    Before and after, the pre-existing parsed rows are fingerprinted. The
+    verification is not "the count went up by the number I expected" -- it is
+    "every row that existed before still exists with the same values".
+    """
+    if confirm != "APPLY-REPARSE":
+        return {"applied": False, "refused": True,
+                "reason": ("this endpoint writes to production and requires "
+                           "confirm=APPLY-REPARSE"),
+                "hint": "run part=dryrun first and read the diff"}
+
+    import corporate_actions as CA
+    from datetime import datetime
+
+    conn = get_conn()
+    t0 = time.time()
+    inserted = attempted = 0
+    plan = []
+    try:
+        rows = conn.execute(
+            "SELECT isin, symbol, ex_date, subject, kind, num, den, amount, "
+            "parsed FROM corporate_actions ORDER BY ex_date").fetchall()
+
+        before_total = conn.execute(
+            "SELECT COUNT(*) FROM corporate_actions").fetchone()[0]
+        before_parsed = conn.execute(
+            "SELECT COUNT(*) FROM corporate_actions WHERE parsed = 1").fetchone()[0]
+
+        # Fingerprint every pre-existing parsed action, so "nothing changed"
+        # can be checked rather than asserted.
+        before_fp = set()
+        for isin, ex, sig, kind, num, den, amount in conn.execute(
+                "SELECT isin, ex_date, sig, kind, num, den, amount "
+                "FROM corporate_actions WHERE parsed = 1").fetchall():
+            before_fp.add((str(isin), str(ex)[:10], str(sig), str(kind),
+                           None if num is None else float(num),
+                           None if den is None else float(den),
+                           None if amount is None else float(amount)))
+
+        # Rebuild the plan exactly as the dry run does: per (isin, ex_date,
+        # subject), which is the unit store() writes.
+        stored, meta = {}, {}
+        for isin, sym, ex, subject, kind, num, den, amount, parsed in rows:
+            key = (str(isin), str(ex)[:10], str(subject or ""))
+            meta[key] = str(sym or "")
+            if int(parsed or 0) and kind in ("split", "bonus", "dividend"):
+                stored.setdefault(key, set()).add(kind)
+
+        for key, sym in meta.items():
+            isin, ex, subject = key
+            have = stored.get(key, set())
+            for a in CA.parse_subject(subject):
+                if a["kind"] in have:
+                    continue
+                plan.append({
+                    "isin": isin, "symbol": sym, "ex_date": ex,
+                    "kind": a["kind"], "num": a.get("num"),
+                    "den": a.get("den"), "amount": a.get("amount"),
+                    "subject": subject,
+                    "sig": CA._sig(subject, a["kind"]),
+                })
+
+        now = datetime.now().isoformat()
+        for p in plan:
+            attempted += 1
+            vals = (p["isin"], p["symbol"], p["ex_date"], p["kind"], p["num"],
+                    p["den"], p["amount"], p["subject"][:400], 1, p["sig"], now)
+            try:
+                if IS_POSTGRES:
+                    conn.execute(
+                        "INSERT INTO corporate_actions (isin, symbol, ex_date,"
+                        " kind, num, den, amount, subject, parsed, sig,"
+                        " fetched_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)"
+                        " ON CONFLICT (isin, ex_date, sig) DO NOTHING", vals)
+                else:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO corporate_actions (isin, symbol,"
+                        " ex_date, kind, num, den, amount, subject, parsed,"
+                        " sig, fetched_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)", vals)
+                inserted += 1
+            except Exception as e:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                return {"applied": False, "error": f"{type(e).__name__}: {e}",
+                        "inserted_before_failure": inserted,
+                        "note": "rolled back; nothing was committed"}
+        conn.commit()
+
+        after_total = conn.execute(
+            "SELECT COUNT(*) FROM corporate_actions").fetchone()[0]
+        after_parsed = conn.execute(
+            "SELECT COUNT(*) FROM corporate_actions WHERE parsed = 1").fetchone()[0]
+        after_fp = set()
+        for isin, ex, sig, kind, num, den, amount in conn.execute(
+                "SELECT isin, ex_date, sig, kind, num, den, amount "
+                "FROM corporate_actions WHERE parsed = 1").fetchall():
+            after_fp.add((str(isin), str(ex)[:10], str(sig), str(kind),
+                          None if num is None else float(num),
+                          None if den is None else float(den),
+                          None if amount is None else float(amount)))
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return {"applied": False, "error": f"{type(e).__name__}: {e}"}
+    finally:
+        conn.close()
+
+    lost = before_fp - after_fp
+    gained = after_fp - before_fp
+    delta = after_total - before_total
+
+    return {
+        "applied": True,
+        "seconds": round(time.time() - t0, 1),
+        "planned": len(plan),
+        "insert_statements_run": attempted,
+        "counts": {
+            "rows_before": before_total, "rows_after": after_total,
+            "row_delta": delta,
+            "parsed_before": before_parsed, "parsed_after": after_parsed,
+            "parsed_delta": after_parsed - before_parsed,
+        },
+        "preservation": {
+            "pre_existing_parsed_rows": len(before_fp),
+            "pre_existing_rows_lost_or_altered": len(lost),
+            "new_parsed_rows": len(gained),
+            "intact": len(lost) == 0,
+            "lost_examples": [list(x) for x in list(lost)[:10]],
+        },
+        "reconciles": (delta == len(plan) and len(lost) == 0),
+        "note": ("Additive-only is enforced by ON CONFLICT DO NOTHING on the "
+                 "primary key, so an existing row cannot be altered even if "
+                 "the plan were wrong. `reconciles` is the check that matters: "
+                 "the persisted delta equals the plan AND nothing pre-existing "
+                 "changed."),
     }
