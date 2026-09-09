@@ -18,20 +18,36 @@ places where the audit itself was wrong.
 | Historical price integrity | **PASS** |
 | ISIN coverage | **PASS** — 100% of 6,598,053 rows |
 | Missing-data accounting | **PASS** — 0 unexplained of 70,576 |
-| ISIN -> corporate-action linkage | **Strong evidence, no defect found** (Step 3A) |
+| ISIN -> corporate-action linkage | **PASS** — 36 A / 0 B / 0 C after re-parse (Step 3A) |
 | Resolver ambiguous cases | **PASS** — all 6 investigated; no fix warranted (Step 3B) |
-| Corporate-action completeness | **PARTIAL** — 38.8% unparsed; one confirmed missing action |
-| News relevance | **Not established by this audit** |
-| **Overall data integrity** | **PARTIAL, not PASS** |
+| Corporate-action completeness | **PASS** — 94 recoverable actions found and stored (Step 3C) |
+| News relevance | **UNMEASURED** — not established by this audit |
+| Fundamentals point-in-time | **UNMEASURED** — no PIT fundamentals exist (Step 7) |
+| **Overall data integrity** | **PARTIAL** — two domains unmeasured, not failing |
 
-The distinction that matters most: the **identity layer** and the **adjustment
-mechanism** both hold up under direct evidence. **Corporate-action
-completeness** does not yet, and it is a separate thing. A correct mechanism fed
-an incomplete dataset still produces wrong adjusted prices, so the adjusted-price
-layer is not fully validated until the 12,778 unparsed actions are characterised.
+**Updated 2026-09-09 after Step 3C.** The corporate-action line moved from
+PARTIAL to PASS on evidence: the parser gaps are closed, 94 recoverable actions
+are stored, and the re-parse was verified additive-only against 20,186
+fingerprinted pre-existing rows. The ISIN-linkage line moved to PASS because the
+last indeterminate case (20MICRONS) resolved to A.
 
-Momentum / Low-Risk historical validation should not be called fully trustworthy
-before that work is done.
+The distinction that mattered held up all the way through: the **identity layer**
+and the **adjustment mechanism** were correct throughout, and the defect was in
+the **dataset feeding them**. Every error found along the way was in the
+measuring instruments, never in the mechanism being measured.
+
+**Overall stays PARTIAL**, and the reason has changed. It is no longer that
+something is broken — it is that two domains have never been measured:
+
+- **News relevance.** The 39.3% figure was retracted as an artifact of the
+  audit's own name lookup. Production relevance is unknown.
+- **Fundamentals PIT.** No point-in-time fundamentals exist at all, so no
+  value/quality backtest can claim to be point-in-time. This is Step 7.
+
+Momentum and Low-Risk historical validation now rest on a price and
+corporate-action layer that has been audited end to end. That is not the same as
+saying the model is validated — only that the data beneath it no longer carries
+a known defect.
 
 ## Does the evidence support "production data integrity audited"?
 
