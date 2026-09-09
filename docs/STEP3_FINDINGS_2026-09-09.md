@@ -19,7 +19,7 @@ places where the audit itself was wrong.
 | ISIN coverage | **PASS** — 100% of 6,598,053 rows |
 | Missing-data accounting | **PASS** — 0 unexplained of 70,576 |
 | ISIN -> corporate-action linkage | **Strong evidence, no defect found** (Step 3A) |
-| Resolver ambiguous cases | **6 investigated separately** — see Step 3B |
+| Resolver ambiguous cases | **PASS** — all 6 investigated; no fix warranted (Step 3B) |
 | Corporate-action completeness | **PARTIAL** — 38.8% unparsed; one confirmed missing action |
 | News relevance | **Not established by this audit** |
 | **Overall data integrity** | **PARTIAL, not PASS** |
