@@ -349,3 +349,211 @@ def diagnose(symbols: list = None, max_symbols: int = 12,
                  "transition is not automatically an error. D and E are real "
                  "answers, not failures to look."),
     }
+
+
+# ------------------------------------------------ the resolver's refusals
+
+def _issuer(isin: str):
+    """
+    The issuing company, read from the ISIN itself.
+
+    An Indian ISIN is IN | E/F/9 | 4-char company code | security-line digits |
+    check digit. Characters 0-6 therefore name the ISSUER and the tail names the
+    line: INE927D01010 and INE927D01028 are two securities of one company.
+
+    This is evidence about identity that depends on neither the resolver nor a
+    company-name lookup -- which matters here, because the production universe
+    table is empty and cannot supply a name at all.
+    """
+    s = str(isin or "").strip().upper()
+    return s[:7] if len(s) >= 12 and s.startswith("IN") else None
+
+
+def ambiguous_transitions(window_days: int = 120) -> dict:
+    """
+    Every transition the resolver REFUSED to link, examined one by one.
+
+    This is the population where a B-type failure can hide. Wherever the
+    resolver merged, an action filed under either ISIN reaches the prices --
+    that was Step 3A's result. Where it declined, an action on one side cannot
+    reach prices on the other, by construction. So these cases decide whether
+    "0 unlinked" survives contact with the rest of the archive.
+
+    The classification asks whether the two identities are the same economic
+    security, on evidence:
+
+        A  same security and correctly linkable
+        B  an action exists and is genuinely unlinked
+        C  evidence points to a DIFFERENT security; linking would be wrong
+        D  no adjustment required either way
+        E  genuinely indeterminate
+
+    E is not a failure to look. Forcing a merge to make E disappear would
+    manufacture a continuous history across an identity boundary the evidence
+    does not support, which is the one thing this project has refused to do
+    throughout.
+    """
+    from security_identity import (_pairs, _resolve_pairs,
+                                   LINK_MAX_GAP_DAYS, LINK_MAX_OVERLAP_DAYS)
+    import corporate_actions as CA
+    from datetime import date as _date
+
+    conn = get_conn()
+    t0 = time.time()
+    ph = _ph()
+    try:
+        pair_rows = _pairs(conn)
+        canonical, components, links, ambiguous = _resolve_pairs(pair_rows)
+
+        ranges = {}
+        for isin, sym, first, last, days in pair_rows:
+            ranges[(sym, isin)] = {"first": str(first)[:10],
+                                   "last": str(last)[:10],
+                                   "days": int(days or 0)}
+
+        out, counts = [], {"A": 0, "B": 0, "C": 0, "D": 0, "E": 0}
+        for amb in ambiguous:
+            sym = amb["symbol"]
+            a, b = amb["isin_a"], amb["isin_b"]
+            ra = ranges.get((sym, a), {})
+            rb = ranges.get((sym, b), {})
+            same_issuer = (_issuer(a) is not None and _issuer(a) == _issuer(b))
+
+            # Corporate actions on either ISIN, over a wide window -- wider than
+            # the linked case, because this boundary is by definition not tight.
+            acts = []
+            try:
+                lo = _d(min(ra.get("last", "9999-12-31"),
+                            rb.get("first", "9999-12-31"))).toordinal() - window_days
+                hi = _d(max(ra.get("last", "0001-01-01"),
+                            rb.get("first", "0001-01-01"))).toordinal() + window_days
+                for r in conn.execute(
+                    "SELECT isin, ex_date, kind, num, den, amount, parsed "
+                    f"FROM corporate_actions WHERE isin IN ({ph}, {ph}) "
+                    f"AND ex_date >= {ph} AND ex_date <= {ph} ORDER BY ex_date",
+                        (a, b, _date.fromordinal(lo).isoformat(),
+                         _date.fromordinal(hi).isoformat())).fetchall():
+                    m = None
+                    if int(r[6] or 0):
+                        try:
+                            m = CA.price_multiplier({"kind": r[2], "num": r[3],
+                                                     "den": r[4], "amount": r[5]})
+                        except Exception:
+                            m = None
+                    acts.append({"isin": r[0], "ex_date": str(r[1])[:10],
+                                 "kind": r[2], "num": r[3], "den": r[4],
+                                 "parsed": int(r[6] or 0),
+                                 "multiplier": (round(m, 6) if m else None)})
+            except Exception:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                acts = None
+
+            # Price continuity across the boundary.
+            last_a = first_b = None
+            sel = ("SELECT day, close FROM bhavcopy_eod WHERE symbol = {p} "
+                   "AND isin = {p} AND close > 0 ORDER BY day ").replace("{p}", ph)
+            try:
+                r = conn.execute(sel + "DESC LIMIT 1", (sym, a)).fetchone()
+                if r:
+                    last_a = {"day": str(r[0])[:10], "close": float(r[1])}
+                r = conn.execute(sel + "ASC LIMIT 1", (sym, b)).fetchone()
+                if r:
+                    first_b = {"day": str(r[0])[:10], "close": float(r[1])}
+            except Exception:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+
+            ratio = None
+            if last_a and first_b and last_a["close"]:
+                ratio = round(first_b["close"] / last_a["close"], 4)
+
+            price_affecting = [x for x in (acts or []) if x.get("multiplier")
+                               and abs(x["multiplier"] - 1.0) > 1e-9]
+            unparsed = [x for x in (acts or []) if not x["parsed"]]
+
+            # ---- classify on evidence, and leave E as E ---------------------
+            if acts is None:
+                v = "E"
+                why = "corporate_actions unreadable; nothing is claimed"
+            elif not same_issuer:
+                v = "C"
+                why = (f"different issuers: {_issuer(a)} vs {_issuer(b)}. The "
+                       f"ISIN itself says these are securities of two different "
+                       f"companies sharing a recycled ticker, so linking them "
+                       f"would splice two unrelated histories together.")
+            elif price_affecting:
+                v = "B"
+                why = (f"same issuer ({_issuer(a)}) and a price-affecting action "
+                       f"is on record, but the resolver declined to link "
+                       f"({amb.get('reason')}), so that action cannot reach the "
+                       f"prices on the other side of the boundary.")
+            elif unparsed:
+                v = "E"
+                why = (f"same issuer ({_issuer(a)}), and {len(unparsed)} "
+                       f"action(s) near the boundary are stored but unparsed, "
+                       f"so whether an adjustment is required cannot be "
+                       f"determined.")
+            else:
+                v = "D"
+                why = (f"same issuer ({_issuer(a)}) and no price-affecting "
+                       f"action on record at the boundary, so there is nothing "
+                       f"to adjust across it.")
+
+            counts[v] += 1
+            out.append({
+                "symbol": sym,
+                "company_name": None,
+                "company_name_note": ("unavailable: the production universe "
+                                      "table (nse_stocks) is empty, which is a "
+                                      "separately recorded defect"),
+                "isin_a": a, "isin_b": b,
+                "issuer_a": _issuer(a), "issuer_b": _issuer(b),
+                "same_issuer": same_issuer,
+                "isin_a_range": ra, "isin_b_range": rb,
+                "gap_days": amb.get("gap_days"),
+                "resolver_reason": amb.get("reason"),
+                "actions_near_boundary": acts,
+                "price_affecting_actions": price_affecting,
+                "unparsed_actions": (len(unparsed) if acts is not None else None),
+                "last_close_on_isin_a": last_a,
+                "first_close_on_isin_b": first_b,
+                "price_ratio_b_over_a": ratio,
+                "verdict": v,
+                "why": why,
+            })
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return {"diagnostic": "resolver_ambiguous", "status": "UNMEASURED",
+                "reason": f"{type(e).__name__}: {e}"}
+    finally:
+        conn.close()
+
+    return {
+        "diagnostic": "resolver_ambiguous",
+        "question": ("Where the resolver REFUSED to establish identity, is an "
+                     "adjustment silently going missing?"),
+        "read_only": True,
+        "seconds": round(time.time() - t0, 1),
+        "examined": {"ambiguous_transitions": len(out),
+                     "resolver_links_total": len(links),
+                     "link_window": f"gap in [-{LINK_MAX_OVERLAP_DAYS}, "
+                                    f"{LINK_MAX_GAP_DAYS}] days"},
+        "classification": {"A_same_security_linkable": counts["A"],
+                           "B_action_exists_genuinely_unlinked": counts["B"],
+                           "C_different_security": counts["C"],
+                           "D_no_adjustment_required": counts["D"],
+                           "E_indeterminate": counts["E"]},
+        "cases": out,
+        "note": ("The issuer is read from the ISIN itself (characters 0-6), "
+                 "which is evidence independent of the resolver and of any "
+                 "table this project maintains. E is left as E; no merge is "
+                 "forced to make it disappear."),
+    }

@@ -275,6 +275,86 @@ check("the five verdicts sum to the transitions examined",
       sum(r["classification"].values()) == r["examined"]["isin_transitions_examined"],
       f"{sum(r['classification'].values())}")
 
+
+
+print()
+print("=" * 74)
+print("THE RESOLVER'S REFUSALS — WHERE A B-TYPE FAILURE COULD HIDE")
+print("=" * 74)
+
+# The issuer discriminator, on real ISIN pairs from production.
+check("two ISINs of one company share the issuer prefix",
+      D._issuer("INE927D01010") == D._issuer("INE927D01028") == "INE927D")
+check("two different companies do not",
+      D._issuer("INE927D01010") != D._issuer("INE031B01015"))
+check("a malformed ISIN yields no issuer", D._issuer("GARBAGE") is None)
+check("a mutual-fund ISIN still yields its issuer",
+      D._issuer("INF109K012R6") == "INF109K")
+
+# C — the same ticker reused by a DIFFERENT company after a long gap. Linking
+# these would splice two unrelated histories into one price series.
+reuse_a = series("REUSED.NS", "INE111111111", D0, 40, 500.0)
+reuse_b = series("REUSED.NS", "INE222222222", D0 + timedelta(days=900), 40, 40.0)
+build(reuse_a + reuse_b,
+      [("INE222222222", (D0 + timedelta(days=900)).isoformat(),
+        "split", 10, 2, None, 1)])
+r = D.ambiguous_transitions()
+c = r["cases"][0] if r["cases"] else None
+print(f"  verdict {c['verdict']}: {c['why'][:92]}")
+check("a recycled ticker across two issuers is classified C",
+      c["verdict"] == "C", c["verdict"])
+check("  ...and the two issuers are named",
+      c["issuer_a"] == "INE111" [:6] + "1" or c["issuer_a"] != c["issuer_b"],
+      f"{c['issuer_a']} vs {c['issuer_b']}")
+check("  ...same_issuer is False", c["same_issuer"] is False)
+check("  ...and it is NOT merged into one identity",
+      c["gap_days"] > 45, f"{c['gap_days']}d")
+
+# B — the SAME issuer, refused for a long gap, with a real action stranded.
+# This is the shape that would mean an adjustment is genuinely going missing.
+same_a = series("SAMECO.NS", "INE333333333", D0, 40, 500.0)
+same_b = series("SAMECO.NS", "INE333333341", D0 + timedelta(days=900), 40, 100.0)
+build(same_a + same_b,
+      [("INE333333341", (D0 + timedelta(days=900)).isoformat(),
+        "split", 10, 2, None, 1)])
+c = D.ambiguous_transitions()["cases"][0]
+print(f"  verdict {c['verdict']}: {c['why'][:92]}")
+check("same issuer + stranded action is classified B", c["verdict"] == "B",
+      c["verdict"])
+check("  ...same_issuer is True", c["same_issuer"] is True,
+      f"{c['issuer_a']} == {c['issuer_b']}")
+check("  ...and the stranded action is named",
+      len(c["price_affecting_actions"]) == 1,
+      str(c["price_affecting_actions"])[:60])
+
+# E — same issuer, but the action near the boundary is unparsed. Indeterminate,
+# and it must NOT be flattened into D.
+build(same_a + same_b,
+      [("INE333333341", (D0 + timedelta(days=900)).isoformat(),
+        "split", None, None, None, 0)])
+c = D.ambiguous_transitions()["cases"][0]
+print(f"  verdict {c['verdict']}: {c['why'][:92]}")
+check("same issuer + unparsed action is E, not D", c["verdict"] == "E",
+      c["verdict"])
+check("  ...and the unparsed count is reported",
+      c["unparsed_actions"] == 1, str(c["unparsed_actions"]))
+
+# D — same issuer, refused, and nothing to adjust anyway.
+build(same_a + same_b, [])
+c = D.ambiguous_transitions()["cases"][0]
+print(f"  verdict {c['verdict']}: {c['why'][:92]}")
+check("same issuer + no action is D", c["verdict"] == "D", c["verdict"])
+
+# The report shape.
+r = D.ambiguous_transitions()
+check("the report declares itself read-only", r["read_only"] is True)
+check("the verdicts sum to the transitions examined",
+      sum(r["classification"].values()) == r["examined"]["ambiguous_transitions"],
+      str(r["examined"]["ambiguous_transitions"]))
+check("price continuity across the boundary is reported",
+      r["cases"][0]["price_ratio_b_over_a"] is not None,
+      str(r["cases"][0]["price_ratio_b_over_a"]))
+
 try:
     os.remove(DB)
 except Exception:

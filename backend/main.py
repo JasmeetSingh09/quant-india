@@ -2378,6 +2378,28 @@ def health_isin_split_diagnostic(symbols: str = Query(None),
     return ISD.diagnose(symbols=syms or None, max_symbols=max_symbols)
 
 
+@app.get("/health/resolver-ambiguous")
+def health_resolver_ambiguous():
+    """
+    Read-only. Every ISIN transition the resolver REFUSED to link.
+
+    Wherever it merged, Step 3A showed an action filed under either ISIN
+    reaches the prices. Where it declined, an action on one side cannot reach
+    prices on the other, by construction -- so this is the only population in
+    which a genuinely unlinked adjustment can hide.
+
+    Identity is judged on the ISIN itself: characters 0-6 name the issuing
+    company, so INE927D01010 and INE927D01028 are two securities of one issuer
+    while a different prefix means a different company sharing a recycled
+    ticker. That evidence depends on neither the resolver nor the (empty)
+    universe table.
+
+    E is returned as E. No merge is forced to make it disappear.
+    """
+    import isin_split_diagnostic as ISD
+    return ISD.ambiguous_transitions()
+
+
 @app.get("/health/nse-collection")
 def health_nse_collection():
     """
