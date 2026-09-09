@@ -2353,6 +2353,31 @@ def health_data_integrity(domain: str = Query(None)):
     return DIx.audit()
 
 
+@app.get("/health/isin-split-diagnostic")
+def health_isin_split_diagnostic(symbols: str = Query(None),
+                                 max_symbols: int = Query(12, ge=1, le=60)):
+    """
+    Read-only. One question and nothing else:
+
+    when a corporate action mints a new ISIN, does the adjustment layer still
+    reach the historical prices that need correcting?
+
+    It reproduces the resolver and the join exactly as
+    `pit_validation._apply_adjustment` performs them, and classifies each ISIN
+    transition A (correctly linked) / B (action exists, unlinked) / C (linked to
+    the wrong security) / D (no adjustment required) / E (cannot determine).
+
+    D and E are real answers. An ISIN can change without the price moving, and
+    an action that was stored but never parsed leaves the question genuinely
+    open. Neither is a defect and neither is a shrug.
+
+    Nothing here writes, recomputes a score, or changes the adjustment layer.
+    """
+    import isin_split_diagnostic as ISD
+    syms = [s.strip() for s in (symbols or "").split(",") if s.strip()]
+    return ISD.diagnose(symbols=syms or None, max_symbols=max_symbols)
+
+
 @app.get("/health/nse-collection")
 def health_nse_collection():
     """
