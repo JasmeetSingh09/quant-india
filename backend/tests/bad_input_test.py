@@ -113,6 +113,53 @@ check("explain_signal checks for the error before unpacking",
 
 print()
 print("=" * 72)
+print("THE UNIVERSE GUARD — RESOLVING IS NOT BELONGING")
+print("=" * 72)
+
+# The adversarial sweep tested symbols that do not resolve. It missed the worse
+# case: symbols that resolve perfectly and are not ours. The old guard asked
+# "does this have a marketCap", which AAPL, SPY and BTC-USD all do, so the app
+# scored them -- AAPL BUY +33, SPY BUY +27, BTC-USD NEUTRAL -13. Every number
+# meaningless: value compares against NSE sector peers, the benchmark is NIFTY,
+# USD prices are read as rupees, and Bitcoin has no fundamentals at all.
+# The guard has two layers and they must be tested separately, because a stub
+# that makes everything resolve disables the second one. That mistake was made
+# here first: with marketCap always present, "AAPL.NS" looked like a real NSE
+# stock and the test failed against correct code.
+#
+#   layer 1  an explicit foreign suffix is refused outright
+#   layer 2  a bare symbol becomes SYMBOL.NS, which then fails to resolve
+
+# --- layer 1: everything resolves, so only the suffix rule can act ---------
+A._ticker_info = lambda t: {"marketCap": 1e12}
+A._SCORE_CACHE.clear()
+
+for sym in ("RELIANCE.BO", "VOD.L", "7203.T", "BRK.B"):
+    r = A.compute_alpha_score(sym)
+    check(f"{sym:<12} (foreign suffix) refused on the suffix alone",
+          "error" in r and "NSE" in str(r.get("error")),
+          str(r.get("error"))[:52] if "error" in r else f"SCORED {r.get('alpha_score')}")
+
+for sym in ("AAPL", "SPY", "BTC-USD", "MSFT"):
+    r = A.compute_alpha_score(sym)
+    check(f"{sym:<12} is normalised to .NS before anything else",
+          r.get("ticker", "").endswith(".NS"),
+          f"became {r.get('ticker')}")
+
+# --- layer 2: nothing resolves, which is the truth for AAPL.NS ------------
+A._ticker_info = lambda t: {}
+A._SCORE_CACHE.clear()
+for sym in ("AAPL", "SPY", "BTC-USD", "MSFT", "TSLA", "AAAA"):
+    r = A.compute_alpha_score(sym)
+    check(f"{sym:<12} is refused once .NS fails to resolve", "error" in r,
+          f"scored {r.get('alpha_score')}" if "error" not in r else "")
+
+check("the guard is about the SUFFIX, not about resolving",
+      "endswith" in inspect.getsource(A.compute_alpha_score),
+      "marketCap was the wrong question — AAPL has one")
+
+print()
+print("=" * 72)
 print(f"passed {len(PASS)}, failed {len(FAIL)}")
 for f in FAIL:
     print(f"  FAILED: {f}")

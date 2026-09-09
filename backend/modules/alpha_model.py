@@ -774,6 +774,24 @@ def compute_alpha_score(
     if not ticker:
         return {"error": "Ticker is required"}
 
+    # This is an NSE platform, and the existing resolution guard asks the wrong
+    # question. It checks whether a symbol RESOLVES -- marketCap present --
+    # which AAPL, SPY and BTC-USD all satisfy. So the app was scoring them:
+    # AAPL BUY +33, SPY BUY +27, BTC-USD NEUTRAL -13. Every one of those numbers
+    # is meaningless here. Value compares against NSE sector peers, the
+    # benchmark is NIFTY, prices in USD are read as rupees, and Bitcoin has no
+    # fundamentals to score at all.
+    #
+    # A bare symbol is normalised to NSE rather than rejected, so "RELIANCE"
+    # works the way a user expects. Anything carrying a different suffix is
+    # refused outright: ".NS" is the universe, and a symbol from another
+    # exchange is not a stock this model has anything to say about.
+    if "." not in ticker:
+        ticker = f"{ticker}.NS"
+    if not ticker.endswith(".NS"):
+        return {"error": (f"{ticker} is not an NSE symbol. Quant India covers "
+                          f"NSE-listed equities only.")}
+
     # Custom weights or an explicit peer list are an experiment rather than the
     # frozen model, so they are never served from nor written to the cache.
     _cacheable = weights is None and peers is None
