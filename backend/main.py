@@ -2319,6 +2319,37 @@ def bhavcopy_coverage():
     return c
 
 
+@app.get("/health/data-integrity")
+def health_data_integrity(domain: str = Query(None)):
+    """
+    What is actually in the data, counted rather than assumed.
+
+    Read-only. Every finding reports what it EXAMINED next to what it found,
+    and both come from the same query, so a verdict cannot drift away from the
+    sample that produced it. "6.6M rows checked" has to be checkable, and the
+    only way to make it checkable is to print the row count beside the result.
+
+    There is deliberately no single "data health score". A duplicate row and an
+    undated article are not the same unit, and averaging them would invent a
+    number that hides which half is broken.
+
+    `domain` runs one of prices / identity / news / missing_data. Omit it for
+    all four. The price and identity domains each scan the whole archive, so
+    the full report is not instant.
+    """
+    import data_integrity as DIx
+    if domain:
+        fn = {"prices": DIx.price_integrity,
+              "identity": DIx.identity_integrity,
+              "news": DIx.news_integrity,
+              "missing_data": DIx.missing_data_audit}.get(domain)
+        if not fn:
+            return {"error": f"unknown domain {domain!r}",
+                    "domains": ["prices", "identity", "news", "missing_data"]}
+        return fn()
+    return DIx.audit()
+
+
 @app.get("/health/nse-collection")
 def health_nse_collection():
     """
