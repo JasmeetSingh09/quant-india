@@ -33,9 +33,17 @@ def forecast_vol(ticker: str, horizon: int = 5) -> dict:
     Fit GARCH(1,1) on a stock and forecast volatility for the next `horizon` days.
     Returns the annualised forecast and the current (latest) conditional vol.
     """
+    # A blank ticker reached the price fetch and raised there, so an empty
+    # search box returned a 500 instead of a message. Refused up front.
+    if not (ticker or "").strip():
+        return {"error": "Ticker is required"}
+
     from arch import arch_model
-    r = _returns_pct(ticker)
-    if len(r) < 250:
+    try:
+        r = _returns_pct(ticker)
+    except Exception as e:
+        return {"error": f"no price history for {ticker!r} ({type(e).__name__})"}
+    if r is None or len(r) < 250:
         return {"error": "not enough data"}
 
     # GJR-GARCH(1,1,1): the o=1 term captures the LEVERAGE EFFECT — markets

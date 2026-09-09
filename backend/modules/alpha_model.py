@@ -925,6 +925,15 @@ def explain_signal(ticker: str, run_factor_check: bool = True) -> dict:
     """
     alpha = compute_alpha_score(ticker)
 
+    # compute_alpha_score REFUSES a symbol nothing resolves for and returns
+    # {"error": ...}. That guard was added on purpose, after "ZZZQQQ123.NS"
+    # scored -5.27 NEUTRAL. Reading contributions off a refusal turned it into
+    # a KeyError, so the refusal surfaced as an HTTP 500 -- ten of fourteen
+    # adversarial inputs, including plain "RELIANCE" without the .NS suffix and
+    # the renamed ZOMATO.NS. A guard is only as good as its callers.
+    if "error" in alpha:
+        return alpha
+
     # ── Build human-readable reasons from factor contributions ───────────
     contribs = alpha["contributions"]
     factors  = alpha["factors"]
