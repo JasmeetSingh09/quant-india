@@ -104,6 +104,14 @@ for combo in np.linspace(-1, 1, 41):
     A._compute_momentum_factor  = mk(combo)
     A._compute_quality_factor   = mk(combo)
     A._compute_value_factor     = mk(combo)
+    # compute_alpha_score memoises per ticker (_SCORE_CACHE, 15-min TTL), which
+    # is correct in production and fatal here: without this clear, the first
+    # iteration's answer is returned for all 41, the patched factors are never
+    # read, and forty of these checks silently assert nothing while still
+    # counting themselves as passing. The cache was added after this test was
+    # written and the test was not updated, so it had been reporting a number
+    # rather than a result.
+    A._SCORE_CACHE.clear()
     r = A.compute_alpha_score("Z.NS")
     check(-100.01 <= r["alpha_score"] <= 100.01, "alpha_score_oob", f"{combo}->{r['alpha_score']}")
     # all factors equal `combo`, weights sum to 1 -> alpha == combo*100
