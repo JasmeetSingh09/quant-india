@@ -319,7 +319,7 @@ check("the repaired dataset PASSES again",
 
 print()
 print("=" * 74)
-print("MISSING DATA — FIVE STATES, NOT ONE")
+print("MISSING DATA — THE COUNTS THEMSELVES")
 print("=" * 74)
 
 build_clean()
@@ -328,15 +328,181 @@ print(f"  examined: {m.get('examined')}")
 check("the missing-data audit runs", m["status"] == "PASS", m["status"])
 by = {p["factor"]: p for p in m["per_factor"]}
 check("it reports per factor", set(by) == {"momentum", "value"}, str(set(by)))
-check("momentum has no missing inputs", by["momentum"]["inputs_missing"] == 0)
+check("momentum has no missing inputs", by["momentum"]["flagged_missing"] == 0)
 check("value's missing inputs are counted",
-      by["value"]["inputs_missing"] == 4, f"{by['value']['inputs_missing']}")
+      by["value"]["flagged_missing"] == 4, f"{by['value']['flagged_missing']}")
 check("a refusal is counted separately from a missing input",
       by["value"]["securities_that_refused"] == 1,
       "refusal, NULL, zero and unavailable are four different things")
 check("the input row count is real",
       m["examined"]["input_rows"] == N_SYMS * 4 + 1,
       f"{m['examined']['input_rows']}")
+
+print()
+print("=" * 74)
+print("CONTINUITY — A JUMP IS EITHER AN EVENT, A SPLIT, OR TWO COMPANIES")
+print("=" * 74)
+
+
+def seed_actions(rows):
+    """rows: (isin, ex_date, kind)"""
+    conn = sqlite3.connect(DB)
+    conn.execute("DROP TABLE IF EXISTS corporate_actions")
+    conn.execute("""CREATE TABLE corporate_actions (
+        isin TEXT NOT NULL, symbol TEXT, ex_date TEXT NOT NULL, kind TEXT NOT NULL,
+        num REAL, den REAL, amount REAL, subject TEXT, parsed INTEGER DEFAULT 0,
+        sig TEXT NOT NULL, fetched_at TEXT,
+        PRIMARY KEY (isin, ex_date, sig))""")
+    conn.executemany(
+        "INSERT INTO corporate_actions (isin, ex_date, kind, num, den, parsed,"
+        " sig) VALUES (?,?,?,2,1,1,?)",
+        [(i, d, k, f"{i}{d}") for i, d, k in rows])
+    conn.commit()
+    conn.close()
+
+
+build_clean()
+seed_actions([])
+r = DI.continuity_integrity()
+print(f"  examined: {r['examined']}")
+check("a flat clean series has no large moves", r["status"] == "PASS", r["status"])
+check("the step count is real (600 rows - 20 symbols = 580 steps)",
+      r["examined"]["day_over_day_steps"] == EXPECTED_ROWS - N_SYMS,
+      str(r["examined"]["day_over_day_steps"]))
+check("the day span is reported",
+      r["examined"].get("first_day") == "2026-01-01", str(r["examined"].get("first_day")))
+
+# A 2-for-1 split that was never applied: the close halves overnight.
+build_clean()
+seed_actions([])
+corrupt("UPDATE bhavcopy_eod SET close = close / 2.0, open = open / 2.0,"
+        " high = high / 2.0, low = low / 2.0 "
+        "WHERE symbol='S3.NS' AND day >= '2026-01-15'")
+r = DI.continuity_integrity()
+f = [x for x in r["findings"] if "corporate action" in x["check"]][0]
+check("an unexplained 50% overnight drop trips continuity",
+      f["status"] == "FAIL", f"bad={f['bad']} {f['offenders'][:2]}")
+
+# The SAME drop, with the split on record. Must NOT fail: this is the
+# adjustment layer working, and flagging it would punish correctness.
+build_clean()
+seed_actions([("INE000000003", "2026-01-15", "split")])
+corrupt("UPDATE bhavcopy_eod SET close = close / 2.0, open = open / 2.0,"
+        " high = high / 2.0, low = low / 2.0 "
+        "WHERE symbol='S3.NS' AND day >= '2026-01-15'")
+r = DI.continuity_integrity()
+f = [x for x in r["findings"] if "corporate action" in x["check"]][0]
+check("the same drop WITH a corporate action does NOT fail",
+      f["status"] == "PASS", f"bad={f['bad']} {f['offenders'][:2]}")
+check("  ...and the move is still counted, not hidden",
+      f["examined"] >= 1, f"examined={f['examined']}")
+
+# A calendar gap is listed, never failed -- a holiday and a hole look identical.
+build_clean()
+seed_actions([])
+corrupt("DELETE FROM bhavcopy_eod WHERE day >= '2026-01-10' AND day <= '2026-01-20'")
+r = DI.continuity_integrity()
+check("a 12-day hole is reported as a gap", r["calendar_gap_count"] >= 1,
+      str(r.get("calendar_gaps_over_5d"))[:60])
+check("  ...but does NOT fail the domain", r["status"] == "PASS",
+      "NSE holidays are not derivable from this table")
+
+print()
+print("=" * 74)
+print("IDENTITY — A MERGE IS SIMULTANEOUS, A RENAME IS SEQUENTIAL")
+print("=" * 74)
+
+# Two symbols sharing one ISIN ON THE SAME DAY. No rename can produce this.
+build_clean()
+corrupt("UPDATE bhavcopy_eod SET isin = 'INE000000001' WHERE symbol='S2.NS'")
+r = DI.identity_integrity()
+f = [x for x in r["findings"] if "on any given day" in x["check"]][0]
+check("a same-day ISIN collision trips the merge check", f["status"] == "FAIL",
+      f"bad={f['bad']} {f['offenders'][:2]}")
+
+# A sequential rename shares an ISIN but never on the same day.
+build_clean()
+corrupt("UPDATE bhavcopy_eod SET symbol = 'S1RENAMED.NS' "
+        "WHERE symbol='S1.NS' AND day > '2026-01-15'")
+r = DI.identity_integrity()
+f = [x for x in r["findings"] if "on any given day" in x["check"]][0]
+check("a sequential rename does NOT trip the merge check",
+      f["status"] == "PASS", f"bad={f['bad']}")
+
+print()
+print("=" * 74)
+print("FUNDAMENTALS / PIT — THE ABSENCE IS THE FINDING")
+print("=" * 74)
+
+build_clean()
+seed_actions([("INE000000003", "2026-01-15", "split")])
+r = DI.fundamentals_pit_integrity()
+print(f"  examined: {r['examined']}")
+check("the domain never reports PASS", r["status"] in ("PARTIAL", "FAIL"),
+      r["status"])
+check("it states outright that no fundamentals history is stored",
+      r["fundamentals_history"]["stored"] is False
+      and r["fundamentals_history"]["status"] == "UNMEASURED")
+check("  ...and says what that costs",
+      "point-in-time" in r["fundamentals_history"]["consequence"].lower())
+check("corporate actions ARE counted", r["examined"]["corporate_actions"] == 1,
+      str(r["examined"].get("corporate_actions")))
+check("factor input rows are counted",
+      r["examined"]["factor_inputs"] == N_SYMS * 4 + 1,
+      str(r["examined"].get("factor_inputs")))
+
+# An unparsed corporate action is stored, visible, and does nothing.
+build_clean()
+seed_actions([("INE000000003", "2026-01-15", "split")])
+corrupt("UPDATE corporate_actions SET parsed = 0")
+f = [x for x in DI.fundamentals_pit_integrity()["findings"]
+     if "parsed into a multiplier" in x["check"]][0]
+check("an unparsed corporate action trips its check", f["status"] == "FAIL",
+      f"bad={f['bad']}")
+
+# A factor input observed in the future.
+build_clean()
+seed_actions([])
+corrupt("UPDATE factor_inputs SET observed_at = '2099-01-01T00:00:00' "
+        "WHERE ticker='S1.NS'")
+f = [x for x in DI.fundamentals_pit_integrity()["findings"]
+     if "observed in the future" in x["check"]][0]
+check("a future observation time trips its check", f["status"] == "FAIL",
+      f"bad={f['bad']}")
+
+print()
+print("=" * 74)
+print("MISSING DATA — FIVE STATES, AND ONLY ONE IS A DEFECT")
+print("=" * 74)
+
+build_clean()
+m = DI.missing_data_audit()
+by = {p["factor"]: p for p in m["per_factor"]}
+check("clean inputs have nothing unexplained", m["status"] == "PASS", m["status"])
+check("the five states are reported separately",
+      all(k in by["value"] for k in
+          ("present", "genuine_zero", "flagged_missing",
+           "securities_that_refused", "unexplained")),
+      str(sorted(by["value"])))
+
+# A genuine zero is NOT missing. Zero debt is a fact.
+build_clean()
+corrupt("UPDATE factor_inputs SET value_num = 0 "
+        "WHERE ticker='S7.NS' AND input_name='pb_ratio'")
+by = {p["factor"]: p for p in DI.missing_data_audit()["per_factor"]}
+check("a genuine zero is counted as a value, not as missing",
+      by["value"]["genuine_zero"] == 1 and by["value"]["unexplained"] == 0,
+      f"zero={by['value']['genuine_zero']} unexplained={by['value']['unexplained']}")
+
+# A null that nobody flagged and nobody explained. The only real defect.
+build_clean()
+corrupt("UPDATE factor_inputs SET value_num = NULL, value_text = NULL, missing = 0 "
+        "WHERE ticker='S8.NS' AND input_name='pb_ratio'")
+m = DI.missing_data_audit()
+by = {p["factor"]: p for p in m["per_factor"]}
+check("an unflagged, unexplained null IS a defect",
+      by["value"]["unexplained"] == 1, str(by["value"]["unexplained"]))
+check("  ...and it fails the domain", m["status"] == "FAIL", m["status"])
 
 print()
 print("=" * 74)

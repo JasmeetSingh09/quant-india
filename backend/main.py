@@ -2340,12 +2340,15 @@ def health_data_integrity(domain: str = Query(None)):
     import data_integrity as DIx
     if domain:
         fn = {"prices": DIx.price_integrity,
+              "continuity": DIx.continuity_integrity,
               "identity": DIx.identity_integrity,
+              "fundamentals_pit": DIx.fundamentals_pit_integrity,
               "news": DIx.news_integrity,
               "missing_data": DIx.missing_data_audit}.get(domain)
         if not fn:
             return {"error": f"unknown domain {domain!r}",
-                    "domains": ["prices", "identity", "news", "missing_data"]}
+                    "domains": ["prices", "continuity", "identity",
+                                "fundamentals_pit", "news", "missing_data"]}
         return fn()
     return DIx.audit()
 
