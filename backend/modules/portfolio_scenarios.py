@@ -30,7 +30,10 @@ def _measure(holdings, initial_value, horizon_days):
                    horizon_days=horizon_days, n_simulations=N_SIMS,
                    method="bootstrap", seed=13)
     if "error" in sim:
-        return None
+        # Carry the reason. "Could not simulate this portfolio" told a user who
+        # typed RELIANC nothing; the simulator now says which holding it could
+        # not price, and that sentence is the useful part.
+        return {"error": sim["error"]}
     return {
         "median_value":  sim["median_value"],
         "p5_value":      sim["percentiles"]["p5"],
@@ -53,22 +56,6 @@ def _alpha_map(tickers):
     return out
 
 
-def _candidates_not_held(held, n=1):
-    """Highest-alpha names from the scan that the user does not already own."""
-    try:
-        from universe_scan import top_by_tier
-        d = top_by_tier(n=25, min_confidence=0.4)
-        pool = []
-        for k in ("large_cap", "mid_cap", "small_cap"):
-            pool.extend(d.get(k, {}).get("buys", []))
-        pool = [p for p in pool
-                if p["ticker"] not in held and (p.get("alpha_score") or 0) > 20]
-        pool.sort(key=lambda p: -(p["alpha_score"] or 0))
-        return pool[:n]
-    except Exception:
-        return []
-
-
 def scenarios(holdings: dict, initial_value: float = 100000,
               horizon_months: int = 12) -> dict:
     if not holdings or len(holdings) < 2:
@@ -77,8 +64,8 @@ def scenarios(holdings: dict, initial_value: float = 100000,
     base_w = _norm(holdings)
     horizon_days = max(21, horizon_months * 21)
     base = _measure(base_w, initial_value, horizon_days)
-    if not base:
-        return {"error": "Could not simulate this portfolio."}
+    if not base or "error" in base:
+        return {"error": (base or {}).get("error") or "Could not simulate this portfolio."}
 
     alphas = _alpha_map(list(base_w))
     out = []
@@ -88,7 +75,7 @@ def scenarios(holdings: dict, initial_value: float = 100000,
         if not new_w or new_w == base_w:
             return
         m = _measure(new_w, initial_value, horizon_days)
-        if not m:
+        if not m or "error" in m:
             return
         out.append({
             "name": name, "why": why, "weights": {k: round(v, 2) for k, v in new_w.items()},
@@ -124,27 +111,19 @@ def scenarios(holdings: dict, initial_value: float = 100000,
             for k in w:
                 w[k] += freed / len(w)
             add(f"Drop {worst.replace('.NS','')} (alpha {alphas[worst]:+.0f})",
-                "The model rates this the weakest name you hold. Its money is "
-                "redistributed across the rest.", w)
+                "The model rates this the weakest name you hold — a rating with "
+                "no demonstrated track record, so treat this as a test of what "
+                "the position does to the portfolio, not a signal to sell. Its "
+                "money is redistributed across the rest.", w)
 
-    # 4. add the strongest name you do not own
-    for c in _candidates_not_held(set(base_w), n=1):
-        w = {k: v * 0.85 for k, v in base_w.items()}
-        w[c["ticker"]] = 15.0
-        add(f"Add {c['ticker'].replace('.NS','')} at 15% (alpha {c['alpha_score']:+.0f})",
-            "A high-scoring name you do not currently hold, funded by trimming "
-            "everything else proportionally.", w)
-
-    # 5. spread wider
-    if len(base_w) < 8:
-        extra = _candidates_not_held(set(base_w), n=3)
-        if len(extra) >= 2:
-            w = {k: v * 0.7 for k, v in base_w.items()}
-            for c in extra:
-                w[c["ticker"]] = 30.0 / len(extra)
-            add(f"Diversify to {len(base_w) + len(extra)} stocks",
-                "More holdings means one company's bad news matters less. Most of "
-                "the benefit arrives by 8-12 names.", w)
+    # Stocks the user does not hold are no longer suggested. This section used
+    # to add the highest-alpha names from the scan and simulate them, and a name
+    # chosen FOR strong past returns, simulated by resampling those same past
+    # returns, looks like an improvement on both return and downside every time.
+    # That is the selection replayed, not a measurement. It also contradicted
+    # suggest-fix ("that would be a forecast") and the model's own validation
+    # (no demonstrated alpha). The advice to hold more names stays -- as a
+    # sentence, `more_names`, rather than as a simulated pick.
 
     # Rank by downside improvement, then return — risk reduction is the more
     # reliable of the two, and ordering by return alone would quietly turn this
@@ -156,6 +135,13 @@ def scenarios(holdings: dict, initial_value: float = 100000,
         "base_weights": {k: round(v, 2) for k, v in base_w.items()},
         "scenarios": out,
         "n_scenarios": len(out),
+        "more_names": (
+            "Holding more stocks is usually the largest single cut to risk: most of "
+            "the benefit arrives by 8-12 names, and adding sectors you do not "
+            "already hold does more than re-weighting these. This page does not "
+            "pick which. Choosing names by the model's score would be a forecast, "
+            "and the model has no demonstrated track record."
+        ) if len(base_w) < 8 else None,
         "how_to_read": ("Each option shows the change in BOTH typical outcome and worst "
                         "case. Most improvements are trades — a little expected return "
                         "given up for a smaller loss when things go wrong."),
@@ -191,8 +177,8 @@ def what_if(holdings: dict, initial_value: float = 100000,
     base_w = _norm(holdings)
     horizon_days = max(21, horizon_months * 21)
     base = _measure(base_w, initial_value, horizon_days)
-    if not base:
-        return {"error": "Could not simulate this portfolio."}
+    if not base or "error" in base:
+        return {"error": (base or {}).get("error") or "Could not simulate this portfolio."}
 
     # An explicit new_holdings wins: the user has edited weights directly, or
     # added/removed stocks, and that is a more specific instruction than a cap.
@@ -205,8 +191,9 @@ def what_if(holdings: dict, initial_value: float = 100000,
             return {"error": f"Unsupported ticker(s): {', '.join(bad[:3])}. Use NSE symbols ending .NS"}
         new_w = _norm(edited)
         after = _measure(new_w, initial_value, horizon_days)
-        if not after:
-            return {"error": "Could not simulate the edited portfolio. Check the tickers."}
+        if not after or "error" in after:
+            return {"error": (after or {}).get("error")
+                    or "Could not simulate the edited portfolio. Check the tickers."}
         added   = [t for t in new_w if t not in base_w]
         removed = [t for t in base_w if t not in new_w]
         applied = []
@@ -248,6 +235,8 @@ def what_if(holdings: dict, initial_value: float = 100000,
     new_w = _norm(new_w)
     changed = any(abs(new_w[k] - base_w[k]) > 0.01 for k in base_w)
     after = _measure(new_w, initial_value, horizon_days) if changed else base
+    if not after or "error" in after:
+        return {"error": (after or {}).get("error") or "Could not simulate this portfolio."}
 
     return {
         "base": base,

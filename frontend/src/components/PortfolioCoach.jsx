@@ -1006,6 +1006,10 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
             </table>
           </div>
 
+          {scen.data.more_names && (
+            <p className="text-[11px] text-gray-500 mt-3">{scen.data.more_names}</p>
+          )}
+
           {applied && (
             <p className="text-xs text-green-400 mt-3">
               Applied “{applied}” — run the simulation again to see it.

@@ -1009,6 +1009,13 @@ def scan_failures(cycle: str = None, sample: int = 10) -> dict:
                 f"WHERE cycle = {ph} AND alpha_score IS NULL",
                 (cycles[1],)).fetchall()}
             now = {str(r[0]) for r in rows}
+            # "Recovered" has to mean tried and scored. Since the no-market-data
+            # filter, a ticker can also leave the failure list by not being
+            # attempted at all, and counting that as recovery listed 3BBLACKBIO,
+            # AASTHA and the rest as fixed when they had only been skipped.
+            attempted = {str(r[0]) for r in conn.execute(
+                f"SELECT ticker FROM alpha_scan2 WHERE cycle = {ph}",
+                (cycle,)).fetchall()}
             if prev:
                 overlap = {
                     "previous_cycle": cycles[1],
@@ -1018,7 +1025,9 @@ def scan_failures(cycle: str = None, sample: int = 10) -> dict:
                     "pct_of_today_also_failed_yesterday":
                         round(100.0 * len(prev & now) / max(len(now), 1), 1),
                     "new_today": sorted(now - prev)[:sample],
-                    "recovered_today": sorted(prev - now)[:sample],
+                    "recovered_today": sorted((prev - now) & attempted)[:sample],
+                    "not_attempted_today": len(prev - attempted),
+                    "not_attempted_examples": sorted(prev - attempted)[:sample],
                 }
     except Exception as e:
         try:

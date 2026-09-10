@@ -228,6 +228,13 @@ for s in scen:
               f"return {dr:+}, downside {dd:+}; names the alpha selection={says_alpha}, "
               f"carries a track-record caveat={says_caveat}")
 note("scenarios_that_add_stocks_not_held", named)
+if scen:
+    check("scenarios: never adds a stock the user does not already hold",
+          not named, f"added: {named}" if named
+          else f"{len(scen)} scenarios, all built from current holdings")
+    more = str((sc or {}).get("more_names") or "")
+    check("scenarios: advises more names without picking them",
+          "forecast" in more.lower(), more[:80])
 if named and sf_text:
     check("suggest-fix and scenarios agree on whether naming a stock is a forecast",
           "forecast" not in sf_text,
@@ -278,8 +285,8 @@ def shown_is_simulated(label, holdings, bad, reference):
     st, j, raw = whatif(holdings)
     _, jr, _ = whatif(reference)
     if st != 200:
-        check(f"what-if: {label} — shown portfolio is the simulated one", True,
-              f"refused, HTTP {st}")
+        check(f"what-if: {label} — refused, and the refusal names the holding",
+              st == 400 and bad.replace(".NS", "") in raw, f"HTTP {st} {raw[:90]}")
         return
     j, jr = j or {}, jr or {}
     shown = j.get("weights") or {}

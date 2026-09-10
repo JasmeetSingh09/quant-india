@@ -63,10 +63,16 @@ _HIST_LOCK = threading.Lock()
 # compared against itself a month later. Callers may still pass their own.
 RANDOM_SEED = 42
 
-def _portfolio_daily_returns(holdings: dict, lookback_days: int = 504) -> pd.Series:
+def _portfolio_daily_returns(holdings: dict, lookback_days: int = 504) -> tuple:
     """
     Build the historical daily return series for a weighted portfolio.
     holdings: {ticker: allocation_pct} summing to 100.
+
+    Returns (series, unpriced). `unpriced` lists the holdings for which no price
+    history came back at all, and the series is only built when that list is
+    empty. A portfolio with a holding missing is not this portfolio: re-scaling
+    the rest to 100% used to simulate a different one while every caller went on
+    displaying the original.
 
     Cached and fetched in parallel: compare_methods runs three simulations off
     the SAME history, and this used to re-download every ticker sequentially for
@@ -84,7 +90,7 @@ def _portfolio_daily_returns(holdings: dict, lookback_days: int = 504) -> pd.Ser
     with _HIST_LOCK:
         hit = _HIST_CACHE.get(key)
         if hit and now - hit[0] < _HIST_TTL:
-            return hit[1]
+            return hit[1], []          # only fully-priced portfolios are cached
 
     end   = datetime.now().strftime("%Y-%m-%d")
     start = (datetime.now() - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
@@ -123,19 +129,28 @@ def _portfolio_daily_returns(holdings: dict, lookback_days: int = 504) -> pd.Ser
             if s is not None:
                 prices[t] = s
 
-    if not prices:
-        return pd.Series(dtype=float)
+    # A holding with no price history used to vanish at this point: only the
+    # tickers that came back were kept, their weights were re-scaled to 100%,
+    # and the caller displayed the portfolio it had been given. Typing RELIANC
+    # for RELIANCE showed a 50/50 split and simulated 100% of the other stock.
+    #
+    # It is reported instead, and the result is never cached: a symbol that
+    # failed once may be a network blip, and caching the failure would make the
+    # blip last as long as the cache does.
+    unpriced = [t for t in holdings if t not in prices]
+    if unpriced or not prices:
+        return pd.Series(dtype=float), unpriced
 
     df       = pd.DataFrame(prices).ffill().dropna()
-    valid    = [t for t in holdings if t in df.columns]
-    weights  = np.array([holdings[t] for t in valid])
+    tickers  = list(holdings)
+    weights  = np.array([holdings[t] for t in tickers])
     weights  = weights / weights.sum()
 
-    returns  = df[valid].pct_change().dropna()
+    returns  = df[tickers].pct_change().dropna()
     series   = pd.Series((returns.values * weights).sum(axis=1), index=returns.index)
     with _HIST_LOCK:
         _HIST_CACHE[key] = (time.time(), series)
-    return series
+    return series, []
 
 
 def drawdown_stats(paths, initial_value: float) -> dict:
@@ -359,7 +374,16 @@ def simulate(
     # run produced a +124% median and a 0.48% chance of loss over 3.5 years,
     # which is not a believable outcome for three Indian equities.
     lookback = max(1095, int(horizon_days / 252 * 365 * 2))
-    hist = _portfolio_daily_returns(holdings, lookback_days=lookback)
+    hist, unpriced = _portfolio_daily_returns(holdings, lookback_days=lookback)
+    if unpriced:
+        names = ", ".join(t.replace(".NS", "") for t in unpriced[:5])
+        return {
+            "error": (f"No price history could be fetched for {names}. Check the "
+                      f"symbol (NSE tickers end in .NS). Nothing was simulated: "
+                      f"leaving a holding out and re-scaling the rest would show "
+                      f"the risk of a different portfolio."),
+            "unpriced": unpriced,
+        }
     if len(hist) < 30:
         return {"error": "Insufficient historical data to fit the simulation."}
 

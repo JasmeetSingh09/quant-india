@@ -24,7 +24,7 @@ from stored market caps rather than baked in per row.
 import json
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from db import get_conn, IS_POSTGRES
 
@@ -191,6 +191,7 @@ def get_state() -> dict:
         return {"status": "never_run", "done": 0, "total": 0, "scored_total": scanned}
     cycle, started, finished, done, total, status, last_complete = row[:7]
     last_error = row[7] if len(row) > 7 else None
+    _excluded = _excluded_count()
     return {
         "status": status, "cycle": cycle, "started_at": started,
         "finished_at": finished, "done": done, "total": total,
@@ -199,7 +200,7 @@ def get_state() -> dict:
         "scored_total": scanned,
         "succeeded": ok_n,
         "failed": err_n,
-        "progress_note": _progress_note(done, total, ok_n, err_n, _excluded_count()),
+        "progress_note": _progress_note(done, total, ok_n, err_n, _excluded),
         # The universe grows between a scan starting and finishing — bhavcopy
         # adds symbols nightly — so `done` can exceed the `total` captured at
         # the start, and the bar reads over 100%. Clamped for display; the raw
@@ -210,20 +211,34 @@ def get_state() -> dict:
         # silently is how 188 daily "failures" went unexamined for months in
         # the first place, and a filter nobody can see is worse than the
         # failures it replaces.
-        "excluded_no_market_data": _excluded_count(),
+        "excluded_no_market_data": _excluded,
     }
 
 
+_EXCLUDED_CACHE = {"at": 0.0, "n": None}
+
+
 def _excluded_count():
-    """How many securities the universe filter is currently holding back."""
+    """
+    How many securities the universe filter is currently holding back.
+
+    Cached for ten minutes: it is a window query over two months of scan rows,
+    and the status endpoint that reports it is polled. The scan itself calls
+    _persistently_unscoreable directly, so what the scan acts on is never stale.
+    """
+    now = time.time()
+    if _EXCLUDED_CACHE["n"] is not None and now - _EXCLUDED_CACHE["at"] < 600:
+        return _EXCLUDED_CACHE["n"]
     try:
         conn = get_conn()
         try:
-            return len(_persistently_unscoreable(conn))
+            n = len(_persistently_unscoreable(conn))
         finally:
             conn.close()
     except Exception:
         return None
+    _EXCLUDED_CACHE.update(at=now, n=n)
+    return n
 
 
 def _set_state(**kw):
@@ -878,12 +893,23 @@ def stored_scores_for_today() -> dict:
 
 # --------------------------------------------- securities with no data at all
 
-# How many recent cycles to look at, and how many of them a ticker must have
-# failed in to be skipped. Three of three, not one of one: eight tickers
-# recovered between 2026-09-08 and 09-09, so a single bad cycle is not evidence
-# of anything and a snapshot would have excluded them permanently.
-UNSCOREABLE_LOOKBACK = 3
-UNSCOREABLE_MIN_FAILS = 3
+# How the filter decides. It judges each ticker by ITS OWN recent attempts, not
+# by the last few scan cycles.
+#
+# The first version counted failures across the last three cycles, and that
+# cannot work: an excluded ticker is not attempted, so it writes no row, so the
+# next cycle holds no failure for it, so it drops below three and is let back
+# in. It stayed excluded about one day in four -- 182 tickers on 2026-09-09,
+# 4 on 2026-09-10.
+#
+# Now a ticker is excluded when each of its last UNSCOREABLE_ATTEMPTS attempts
+# found no market data AND its latest attempt is at most
+# UNSCOREABLE_RECHECK_DAYS old. Once that attempt ages past the window the
+# ticker is tried again, so a dead ticker costs one attempt a week instead of
+# one a day, and one whose data comes back is re-admitted within a week.
+UNSCOREABLE_ATTEMPTS = 3
+UNSCOREABLE_RECHECK_DAYS = 7
+_UNSCOREABLE_HISTORY_DAYS = 60     # how far back to look for those attempts
 
 # Only THIS failure means "the data source has nothing for this symbol". A
 # timeout, a 429 or a parse error must never lead to a ticker being dropped
@@ -891,41 +917,53 @@ UNSCOREABLE_MIN_FAILS = 3
 _NO_DATA = "no market data found"
 
 
-def _persistently_unscoreable(conn) -> set:
+def _persistently_unscoreable(conn, today: str = None) -> set:
     """
-    Tickers that have had no market data for several cycles running.
+    Tickers the price source had nothing for, on each of their recent attempts.
 
     These are not scan failures. They are securities the price source cannot
     price at all -- illiquid microcaps, and instruments that are not equities
-    (SMALL250.NS is an index). Measured on the 2026-09-09 cycle: 188 of 2,892
-    attempted, 187 of which also failed the day before, one single cause, and
-    zero without a recorded reason. A 99.5% overlap is a property of the
-    universe, not of the scan.
+    (SMALL250.NS is an index). On the 2026-09-09 cycle: 188 of 2,892 attempted,
+    187 of which also failed the day before, one cause, none without a reason.
 
     Excluding them changes no output. Every consumer of alpha_scan2 already
     filters `alpha_score IS NOT NULL`, so a ticker that fails contributes
-    nothing to a ranking, a peer set or a top-picks list today. What changes is
-    that the scan stops spending time on securities it has no chance of
-    scoring, and stops reporting 188 daily failures that were never failures.
+    nothing to a ranking, a peer set or a top-picks list.
 
-    The rule is deliberately recoverable: a ticker that starts having data is
-    back in the universe within `UNSCOREABLE_LOOKBACK` cycles, because eight of
-    them did exactly that on 2026-09-09.
+    `today` defaults to the current cycle. Tests pass it explicitly to play the
+    scan forward one day at a time, which is the test the first version lacked.
     """
     ph = "%s" if IS_POSTGRES else "?"
+    today = str(today or _current_cycle())[:10]
     try:
-        cycles = [str(r[0]) for r in conn.execute(
-            "SELECT DISTINCT cycle FROM alpha_scan2 ORDER BY cycle DESC "
-            f"LIMIT {int(UNSCOREABLE_LOOKBACK)}").fetchall()]
-        if len(cycles) < UNSCOREABLE_MIN_FAILS:
-            return set()            # not enough history to judge anything
-        marks = ",".join([ph] * len(cycles))
-        rows = conn.execute(
-            "SELECT ticker, COUNT(*) FROM alpha_scan2 "
-            f"WHERE cycle IN ({marks}) AND alpha_score IS NULL "
-            f"AND LOWER(error) LIKE {ph} "
-            "GROUP BY ticker", tuple(cycles) + (f"%{_NO_DATA}%",)).fetchall()
-        return {str(t) for t, n in rows if (n or 0) >= UNSCOREABLE_MIN_FAILS}
+        t = datetime.strptime(today, "%Y-%m-%d")
+        since = (t - timedelta(days=_UNSCOREABLE_HISTORY_DAYS)).strftime("%Y-%m-%d")
+        recheck = (t - timedelta(days=UNSCOREABLE_RECHECK_DAYS)).strftime("%Y-%m-%d")
+        rows = conn.execute(f"""
+            WITH ranked AS (
+                SELECT ticker, cycle, alpha_score, error,
+                       ROW_NUMBER() OVER (PARTITION BY ticker
+                                          ORDER BY cycle DESC) AS rn
+                FROM alpha_scan2
+                WHERE cycle >= {ph} AND cycle <= {ph}
+            )
+            SELECT ticker,
+                   COUNT(*),
+                   SUM(CASE WHEN alpha_score IS NULL
+                             AND LOWER(COALESCE(error, '')) LIKE {ph}
+                            THEN 1 ELSE 0 END),
+                   MAX(cycle)
+            FROM ranked
+            WHERE rn <= {ph}
+            GROUP BY ticker
+        """, (since, today, f"%{_NO_DATA}%", UNSCOREABLE_ATTEMPTS)).fetchall()
+        out = set()
+        for ticker, n, nodata, last in rows:
+            if ((n or 0) >= UNSCOREABLE_ATTEMPTS
+                    and (nodata or 0) >= UNSCOREABLE_ATTEMPTS
+                    and str(last)[:10] >= recheck):
+                out.add(str(ticker))
+        return out
     except Exception:
         try:
             conn.rollback()
@@ -940,8 +978,9 @@ def unscoreable_report() -> dict:
     try:
         skipped = _persistently_unscoreable(conn)
         return {
-            "rule": (f"no market data in {UNSCOREABLE_MIN_FAILS} of the last "
-                     f"{UNSCOREABLE_LOOKBACK} cycles"),
+            "rule": (f"no market data on each of its last {UNSCOREABLE_ATTEMPTS} "
+                     f"attempts; tried again once its latest attempt is more than "
+                     f"{UNSCOREABLE_RECHECK_DAYS} days old"),
             "excluded": len(skipped),
             "examples": sorted(skipped)[:20],
             "recoverable": True,

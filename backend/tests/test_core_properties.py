@@ -164,7 +164,7 @@ def fake_returns(holdings, lookback_days=504):
     local = np.random.default_rng(abs(hash(tuple(sorted(holdings.items())))) % (2**32))
     base = local.normal(0.0004, 0.012, 500)
     base[local.integers(0, 500, 5)] = local.normal(-0.06, 0.02, 5)  # crash days
-    return pd.Series(base)
+    return pd.Series(base), []          # (series, unpriced)
 MC._portfolio_daily_returns = fake_returns
 
 methods = ["normal", "t", "bootstrap", "block"]
