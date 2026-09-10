@@ -1,5 +1,5 @@
 {
- "run_at_utc": "2026-09-10T12:49:11+00:00",
+ "run_at_utc": "2026-09-10T17:19:14+00:00",
  "base": "https://quant-india.onrender.com",
  "passed": [
   "build max_loss=5%: JSON a browser can parse (no bare NaN/Infinity)",
@@ -13,8 +13,8 @@
   "build max_loss=60%: JSON a browser can parse (no bare NaN/Infinity)",
   "build max_loss=60%: meets_loss_limit agrees with its own downside",
   "scenarios: JSON a browser can parse (no bare NaN/Infinity)",
-  "scenarios: all 6 outcome blocks are internally coherent",
-  "scenarios: every delta equals after minus base (5 scenarios)",
+  "scenarios: all 4 outcome blocks are internally coherent",
+  "scenarios: every delta equals after minus base (3 scenarios)",
   "shock -20% market: JSON a browser can parse (no bare NaN/Infinity)",
   "shock: a -20% market shock is not reported as a gain",
   "suggest-fix 95/5: JSON a browser can parse (no bare NaN/Infinity)",
@@ -22,12 +22,16 @@
   "suggest-fix: calls a 95/5 portfolio concentrated",
   "suggest-fix: reports both the typical outcome and the downside",
   "suggest-fix: says re-weighting cannot fix a two-stock portfolio",
+  "scenarios: never adds a stock the user does not already hold",
+  "scenarios: advises more names without picking them",
   "fit INFY: JSON a browser can parse (no bare NaN/Infinity)",
   "fit: a priceable stock is judged on correlation, not only weights",
   "fit SMALL250: JSON a browser can parse (no bare NaN/Infinity)",
   "what-if refuses an empty portfolio",
   "what-if refuses two nonexistent tickers",
   "what-if refuses a security the scan cannot price (SMALL250)",
+  "what-if: a nonexistent ticker beside a real one — refused, and the refusal names the holding",
+  "what-if: a typo (RELIANC.NS) beside a real one — refused, and the refusal names the holding",
   "what-if: a negative holding is not displayed while being ignored",
   "optimizer stability max_weight=1.0: JSON a browser can parse (no bare NaN/Infinity)",
   "stability: an unconstrained 100% corner is flagged, not praised",
@@ -35,12 +39,7 @@
   "optimizer stability max_weight=0.4: JSON a browser can parse (no bare NaN/Infinity)"
  ],
  "failed": [
-  "scenarios: 'Diversify to 6 stocks' discloses why adding DCBBANK, GAYAPROJ, SPARC improves BOTH axes",
-  "scenarios: 'Add GAYAPROJ at 15% (alpha +72)' discloses why adding GAYAPROJ improves BOTH axes",
-  "suggest-fix and scenarios agree on whether naming a stock is a forecast",
   "fit: never claims overlap without having measured correlation",
-  "what-if: a nonexistent ticker beside a real one — shown portfolio is the simulated one",
-  "what-if: a typo (RELIANC.NS) beside a real one — shown portfolio is the simulated one",
   "what-if: a negative holding is refused or explained",
   "stability max_weight=0.4: weights pinned at their bounds are not called stable"
  ],
@@ -63,22 +62,7 @@
   ],
   [
    "scenarios_that_add_stocks_not_held",
-   [
-    [
-     "Diversify to 6 stocks",
-     [
-      "DCBBANK",
-      "GAYAPROJ",
-      "SPARC"
-     ]
-    ],
-    [
-     "Add GAYAPROJ at 15% (alpha +72)",
-     [
-      "GAYAPROJ"
-     ]
-    ]
-   ]
+   []
   ],
   [
    "what_if_untweaked_95_5_mentions_concentration_outside_weights",

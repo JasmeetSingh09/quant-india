@@ -181,9 +181,47 @@ re-attempted and failing for three, then excluded again — about one day in fou
   existed.** It passed with the least-stable weight moving 0.0%, which turned out
   to be finding 3. Replaced before archiving.
 
+## Fixed the same day: findings 1, 2 and the universe filter
+
+Commit `0d92399`, deployed 2026-09-10 17:17 UTC while the scan was idle.
+
+- **Finding 1.** `simulate()` now refuses when any holding cannot be priced and
+  names it; what-if and scenarios pass the refusal through. A failed fetch is
+  never cached. Live: `{"RELIANCE.NS": 50000, "RELIANC.NS": 50000}` returns
+  HTTP 400, "No price history could be fetched for RELIANC ... Nothing was
+  simulated".
+- **Finding 2.** Scenarios no longer adds stocks at all. "Add X at 15%" and
+  "Diversify to N" are gone. For fewer than 8 holdings the page says more names
+  cut risk most and that choosing them by score would be a forecast. "Drop X"
+  now carries the no-track-record caveat. Live: 3 scenarios, all from current
+  holdings.
+- **Universe filter.** Each ticker is judged on its own last 3 attempts, so a
+  skipped cycle no longer erases its failures. An excluded ticker is retried
+  once its latest attempt is over 7 days old. Live exclusion count: **187**
+  (was 4 under the broken rule). A 60-day forward simulation in
+  `universe_filter_test.py` keeps a dead ticker out on 15 of 60 days under the
+  old rule and fails it; the new rule passes.
+- **Failure audit.** A ticker not attempted this cycle is counted as
+  `not_attempted_today`, not as recovered. Live, cycle 2026-09-10 vs 09-09:
+  182 not attempted, 2 recovered (APOORVA, LUMINO, both tried and scored),
+  4 failed in both. The old code would have called all 184 recovered.
+- **Not verified:** the full `/health/data-integrity` call (all domains) timed
+  out at 280 s right after the deploy; `?domain=scan_failures` answered in
+  2.7 s. Whether the full call is slow only when cold was not established.
+
+Every new check was run against the pre-fix code first and failed there.
+Offline suites after the fix: unpriced_holdings 18/0 (new), universe_filter
+24/0, data_integrity 109/0, core properties 81,215/0, stress 87,173/0.
+
+**Harness re-run after the fix: 35 passed, 3 failed.** The three failures are
+findings 3, 4 and 5, which were not in scope. The four checks that only apply
+when scenarios names a stock no longer run, because it names none. Two checks
+replace them: scenarios never adds an unheld stock, and it advises more names
+without picking them. Both pass.
+
 ## The audit harness
 
-**31 passed, 8 failed** on the 2026-09-10 run. Every failure is one of the
+**31 passed, 8 failed** on the first 2026-09-10 run, before the fixes above. Every failure is one of the
 findings above, and every check asserts on the response shape the endpoint
 actually returns rather than a guessed key name.
 
