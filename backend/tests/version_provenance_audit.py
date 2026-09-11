@@ -161,6 +161,11 @@ INVENTORY = {
         "LARGE_CAP_RANK_MAX": BEHAVIOURAL, "MID_CAP_RANK_MAX": BEHAVIOURAL,
         "LARGE_CAP_MIN": BEHAVIOURAL, "MID_CAP_MIN": BEHAVIOURAL,
         "MIN_COMPLETE_FRACTION": ALIAS, "IS_POSTGRES": ALIAS,
+        # Which tickers the scan bothers to attempt, not how any is scored: a
+        # ticker is skipped only after three "no market data" attempts in a
+        # row, and a skipped ticker had no score to lose. Added 2026-09-10
+        # (0d92399) without being registered here; the CI gate found it.
+        "UNSCOREABLE_ATTEMPTS": OPERATIONAL, "UNSCOREABLE_RECHECK_DAYS": OPERATIONAL,
     },
     "monte_carlo": {"RANDOM_SEED": ENVIRONMENT},
     "optimizer_stability": {"RANDOM_SEED": ENVIRONMENT,
