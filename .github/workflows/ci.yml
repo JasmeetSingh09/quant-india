@@ -1,0 +1,73 @@
+# Every push and pull request runs the offline test suites and the frontend
+# build. A red result means something a user would see is broken, or a suite
+# has quietly stopped checking what it used to. See backend/tests/run_ci.py for
+# exactly what fails the gate.
+#
+# The backend job installs what production installs (backend/requirements.txt
+# on the Python version in backend/Dockerfile), which is not necessarily what is
+# on a developer's laptop. Network-dependent suites are deliberately not here:
+# a slow day at Yahoo must not block a deploy.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend suites (offline, production dependencies)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"          # matches backend/Dockerfile
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install production dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Record the dependency versions this run tested
+        run: pip freeze | grep -iE '^(numpy|pandas|scipy|statsmodels|arch|xgboost|yfinance|fastapi|pydantic)==' | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: The gate can still fail
+        run: python tests/run_ci_selftest.py
+
+      - name: Offline suites
+        run: python tests/run_ci.py
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - run: npm run build

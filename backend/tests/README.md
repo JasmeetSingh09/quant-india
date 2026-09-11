@@ -9,11 +9,15 @@ model's correctness is caught.
 
 ```bash
 cd backend
+python tests/run_ci.py                       # the gate CI runs on every push: 41 offline suites
 python tests/test_core_properties.py        # ~81k checks: calculators, risk, Monte Carlo, alpha, optimizers
 python tests/test_new_algorithms_stress.py   # ~87k checks: Black-Scholes, Risk Parity, Max Diversification,
                                              #   risk decomposition, low-vol & momentum backtests, seasonality
 python tests/test_modules_integration.py     # import-safety of every module + signal/optimizer integration
+                                             #   (fetches live prices, so it is not in the gate)
 ```
+
+Which suites are in the gate, and why the rest are not, is in `CI_SUITES.md`.
 
 Each prints `TOTAL CHECKS`, `FAILURES`, and a category breakdown of any failures.
 
@@ -30,8 +34,10 @@ Each prints `TOTAL CHECKS`, `FAILURES`, and a category breakdown of any failures
 - **Calculators / risk sizing** — invariants over ~30k random inputs (SIP/lumpsum
   monotonicity, tax boundaries, Kelly/vol-target/position bounds).
 
-Network calls (yfinance) are monkeypatched with synthetic data so the suite is
-deterministic and offline. A notable "failure" caught during development —
+The first two suites run on synthetic data and make no network calls, and the
+gate enforces that by blocking the network while they run. The integration
+suite does fetch live prices; an earlier version of this README said all three
+were offline, which was not true of that one. A notable "failure" caught during development —
 deep-ITM European puts priced below undiscounted intrinsic — turned out to be
 *correct* option behavior and a naive test assertion, not a code bug; the test
 now uses the proper European lower bound.
