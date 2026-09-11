@@ -45,6 +45,34 @@ fake.get_conn = lambda: sqlite3.connect(DB)
 fake.IS_POSTGRES = False
 sys.modules["db"] = fake
 
+# The news audit looks company names up through stock_universe, which opens its
+# own SQLite file instead of going through `db`, so the stub above never reached
+# it. This suite passed on a laptop whose database held the NSE equity list and
+# failed 8 checks in a clean checkout, where that table is empty: "State Bank of
+# India" became "SBIN", and SBIN's own headline stopped matching. The names are
+# the NSE equity list's values for every symbol used below, copied as stored on
+# 2026-08-21, so the matcher is tested on real company names on any machine.
+NSE_NAMES = {
+    "SBIN": "State Bank of India",
+    "ONGC": "Oil & Natural Gas Corporation Limited",
+    "COALINDIA": "Coal India Limited",
+    "ITC": "ITC Limited",
+    "ADANIPORTS": "Adani Ports and Special Economic Zone Limited",
+    "AXISBANK": "Axis Bank Limited",
+    "TCS": "Tata Consultancy Services Limited",
+    "RELIANCE": "Reliance Industries Limited",
+}
+
+
+def _stock_by_symbol(symbol, exchange="NSE"):
+    s = str(symbol).upper().replace(".NS", "")
+    return {"symbol": s, "company_name": NSE_NAMES[s]} if s in NSE_NAMES else None
+
+
+names = types.ModuleType("stock_universe")
+names.get_stock_by_symbol = _stock_by_symbol
+sys.modules["stock_universe"] = names
+
 import data_integrity as DI  # noqa: E402
 
 PASS, FAIL = [], []
