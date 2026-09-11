@@ -53,6 +53,19 @@ def fit(ticker: str, holdings: dict, add_pct: float = 10.0) -> dict:
     stock's own alpha score.
     """
     ticker = (ticker or "").strip().upper()
+    negative = []
+    for t, v in (holdings or {}).items():
+        try:
+            if float(v) < 0:
+                negative.append(str(t).strip().upper())
+        except (TypeError, ValueError):
+            pass
+    if negative:
+        # Dropping it would judge fit against a portfolio the user did not enter.
+        shown = ", ".join(t.replace(".NS", "") for t in negative[:5])
+        return {"error": (f"{shown} {'has' if len(negative) == 1 else 'have'} a "
+                          f"negative amount. Enter each holding as zero or more. "
+                          f"Nothing was calculated.")}
     cur = {t.strip().upper(): float(v) for t, v in (holdings or {}).items() if v}
     if not cur:
         return {"error": "No current holdings to fit against."}
@@ -124,8 +137,20 @@ def fit(ticker: str, holdings: dict, add_pct: float = 10.0) -> dict:
     scored = [p["score"] for p in parts.values() if p.get("score") is not None]
     total = round(sum(scored) / len(scored), 1) if scored else None
 
+    not_measured = [k for k in ("sector", "correlation") if k not in parts]
     if total is None:
         verdict = "Not enough data to judge fit."
+    elif "correlation" in not_measured:
+        # The three verdicts below describe how this stock moves with the
+        # portfolio. Without a correlation that is a claim nobody measured,
+        # whichever band the remaining components put the score in.
+        covered = " and ".join(label for k, label in (("sector", "sector weight"),
+                                                      ("concentration", "position size"))
+                               if k in parts)
+        verdict = (f"Only partly judged. There is not enough price history to "
+                   f"measure how {ticker.replace('.NS', '')} moves with what you "
+                   f"hold, so this cannot say whether it would diversify your "
+                   f"portfolio. The score reflects {covered} only.")
     elif total >= 70:
         verdict = ("Fits well. It brings something your portfolio does not already "
                    "have.")
@@ -142,6 +167,7 @@ def fit(ticker: str, holdings: dict, add_pct: float = 10.0) -> dict:
         "ticker": ticker,
         "fit_score": total,
         "components": parts,
+        "not_measured": not_measured,
         "verdict": verdict,
         "main_reason": weakest[1]["detail"] if weakest else None,
         "means": ("Fit is about YOUR portfolio, not about the stock. A stock can "

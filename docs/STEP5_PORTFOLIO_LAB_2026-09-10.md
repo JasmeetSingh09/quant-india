@@ -205,19 +205,59 @@ Commit `0d92399`, deployed 2026-09-10 17:17 UTC while the scan was idle.
   `not_attempted_today`, not as recovered. Live, cycle 2026-09-10 vs 09-09:
   182 not attempted, 2 recovered (APOORVA, LUMINO, both tried and scored),
   4 failed in both. The old code would have called all 184 recovered.
-- **Not verified:** the full `/health/data-integrity` call (all domains) timed
-  out at 280 s right after the deploy; `?domain=scan_failures` answered in
-  2.7 s. Whether the full call is slow only when cold was not established.
+- **Why the full data-integrity call timed out.** Not a regression. Timed one
+  domain at a time on 2026-09-11: identity 162 s, continuity 74 s, prices 66 s,
+  missing_data 10 s, news 8 s, fundamentals_pit 2 s, scan_failures under 1 s.
+  That is about 5.4 minutes in all, and the client gave up at 280 s. Use
+  `?domain=` for anything interactive.
 
 Every new check was run against the pre-fix code first and failed there.
 Offline suites after the fix: unpriced_holdings 18/0 (new), universe_filter
 24/0, data_integrity 109/0, core properties 81,215/0, stress 87,173/0.
 
 **Harness re-run after the fix: 35 passed, 3 failed.** The three failures are
-findings 3, 4 and 5, which were not in scope. The four checks that only apply
-when scenarios names a stock no longer run, because it names none. Two checks
-replace them: scenarios never adds an unheld stock, and it advises more names
-without picking them. Both pass.
+findings 3, 4 and 5, which were not in scope. Three checks apply only when
+scenarios names a stock, and no longer run because it names none (an earlier
+version of this note said four: 31 + 8 = 39 checks, minus 3, plus 2 new, is
+38). The two new checks are that scenarios never adds an unheld stock and that
+it advises more names without picking them. Both pass.
+
+## Fixed 2026-09-11: findings 3, 4 and 5
+
+- **Finding 3, stability.** A weight on a limit (the cap, or zero) cannot move.
+  When every weight but one is on a limit and the mean shift is under 2
+  points, the verdict is now "Held in place by the limits, not by the data",
+  with `corner_solution` and `pinned_by_limits` true and the pinned tickers in
+  `at_limit`. Weights that are free to move and do not are still "Stable";
+  weights on limits that jump between corners are still "Unstable".
+- **Finding 4, fit.** Without a correlation, the verdict no longer uses the
+  three bands ("brings something", "overlaps", "doubling"), all of which
+  describe co-movement. It says the stock was only partly judged, that there
+  is not enough price history to measure how it moves with the holdings, and
+  which components the score covers. `not_measured` lists what is missing. A
+  priceable stock still gets a normal verdict.
+- **Finding 5, negative holdings.** what-if (including an edited portfolio),
+  scenarios and fit refuse a negative amount, name the holding, and simulate
+  nothing. A zero in an edit still removes a stock.
+
+`backend/tests/lab_findings_test.py` (new, offline): 20 of 28 checks failed on
+the pre-fix code and all 28 pass after. The 8 that passed before are the
+over-correction guards, which must pass both times.
+
+## The first scan under the corrected filter (cycle 2026-09-11)
+
+Started 00:09 UTC, finished 02:34. 187 tickers excluded, 2,709 attempted,
+2,634 scored, 72 failed. The 4 that failed on 09-10 were excluded and not
+attempted. One failure, INFRABEES, has no recorded reason.
+
+The other 71 failures are new, all "No market data found", for stocks that do
+trade. The five checked (ABANSENT, AKCAPIT, ALPINETEX, BI, BIRLAPREC) each
+scored on the four previous cycles, and Yahoo returned prices for ten of the 71
+at 05:05 UTC the same morning. This looks like a one-night source failure. The
+filter needs three consecutive no-data attempts, so none is excluded. If the
+same names fail again on 09-12 and 09-13 they would be excluded for a week, and
+the rule would need a guard against a source outage, such as making no
+exclusions from a cycle whose failure count jumps.
 
 ## The audit harness
 

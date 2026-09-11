@@ -105,6 +105,16 @@ def stability(tickers: list, target: str = "max_sharpe",
 
     top_weight = float(w_base.max()) * 100
 
+    # A weight sitting exactly on a limit cannot move, whatever the returns say.
+    # Weights must add to 100%, so once every holding but one is on a limit (the
+    # cap, or zero), the last is fixed too, and perturbation moves nothing
+    # because the constraints leave it nowhere to go. The Step 5 audit found
+    # 40/0/40/20 at a 40% cap, moving 0.0%, reported as "Stable".
+    _tol = 1e-3
+    _cap = float(max_weight)
+    at_limit = [t for t, w in zip(valid, w_base) if w <= _tol or w >= _cap - _tol]
+    pinned_by_limits = len(valid) - len(at_limit) <= 1 and mad < 2
+
     # A corner solution does not move, and calling that "stable" is the most
     # dangerous thing this function could say. An unconstrained max-Sharpe
     # optimiser routinely puts everything in one name; the weights then sit
@@ -118,6 +128,13 @@ def stability(tickers: list, target: str = "max_sharpe",
                    f"happened to favour and ignores the rest. Set a maximum weight "
                    f"per stock, or use HRP or risk parity, which do not depend on "
                    f"expected returns at all.")
+    elif pinned_by_limits:
+        verdict = (f"Held in place by the limits, not by the data. {len(at_limit)} of "
+                   f"{len(valid)} weights sit exactly on a limit (the {_cap * 100:.0f}% "
+                   f"cap, or zero), and the weights must add to 100%, so none of them "
+                   f"has room to move. That is why nothing moved under perturbation; "
+                   f"it says nothing about whether this allocation is robust. Loosen "
+                   f"the cap or add holdings, then test again.")
     elif mad < 2:
         verdict = ("Stable. Weights barely move when expected returns are jittered "
                    "within their own estimation error, so this allocation is being "
@@ -140,7 +157,9 @@ def stability(tickers: list, target: str = "max_sharpe",
         "weight_sd_pct": {t: round(float(sd), 2) for t, sd in zip(valid, per_asset_sd)},
         "mean_abs_shift_pct": round(mad, 2),
         "top_weight_pct": round(top_weight, 2),
-        "corner_solution": bool(top_weight > 90),
+        "corner_solution": bool(top_weight > 90 or pinned_by_limits),
+        "pinned_by_limits": bool(pinned_by_limits),
+        "at_limit": at_limit,
         "least_stable": valid[worst_i],
         "least_stable_sd_pct": round(float(per_asset_sd[worst_i]), 2),
         "verdict": verdict,

@@ -23,6 +23,30 @@ def _norm(h):
     return {k: v * 100.0 / tot for k, v in h.items() if v > 0}
 
 
+def _negative(*portfolios):
+    """
+    Holdings entered below zero. _norm drops them, so without this check a
+    result was shown for a portfolio the user did not enter, and nothing said
+    so (Step 5, finding 5). Portfolio Lab models what you own; it cannot short.
+    """
+    out = []
+    for h in portfolios:
+        for t, v in (h or {}).items():
+            try:
+                if float(v) < 0 and str(t) not in out:
+                    out.append(str(t))
+            except (TypeError, ValueError):
+                pass
+    return out
+
+
+def _negative_error(names):
+    shown = ", ".join(t.replace(".NS", "") for t in names[:5])
+    return (f"{shown} {'has' if len(names) == 1 else 'have'} a negative amount. "
+            f"Portfolio Lab models what you own, so enter each holding as zero or "
+            f"more. Nothing was simulated.")
+
+
 def _measure(holdings, initial_value, horizon_days):
     """Median outcome and worst-5% for one candidate portfolio."""
     from monte_carlo import simulate
@@ -60,6 +84,8 @@ def scenarios(holdings: dict, initial_value: float = 100000,
               horizon_months: int = 12) -> dict:
     if not holdings or len(holdings) < 2:
         return {"error": "Need at least 2 holdings to suggest changes."}
+    if _negative(holdings):
+        return {"error": _negative_error(_negative(holdings))}
 
     base_w = _norm(holdings)
     horizon_days = max(21, horizon_months * 21)
@@ -166,6 +192,8 @@ def what_if(holdings: dict, initial_value: float = 100000,
     """
     if not holdings or len(holdings) < 2:
         return {"error": "Need at least 2 holdings."}
+    if _negative(holdings, new_holdings):
+        return {"error": _negative_error(_negative(holdings, new_holdings))}
     try:
         horizon_months = int(horizon_months)
         initial_value = float(initial_value)
