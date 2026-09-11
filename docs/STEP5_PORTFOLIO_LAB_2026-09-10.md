@@ -242,7 +242,16 @@ it advises more names without picking them. Both pass.
 
 `backend/tests/lab_findings_test.py` (new, offline): 20 of 28 checks failed on
 the pre-fix code and all 28 pass after. The 8 that passed before are the
-over-correction guards, which must pass both times.
+over-correction guards, which must pass both times. Regression after the
+patch: core 81,215/0, stress 87,173/0, integration 1,613/0 (network),
+stress_new_modules 559/0, data_integrity 109/0, universe_filter 24/0,
+unpriced_holdings 18/0, sanity 24/0, verify_claims with no failed claim.
+
+Commit `62e2c02`, deployed 2026-09-11 05:26 UTC while the scan was idle.
+**Harness re-run against production: 38 passed, 0 failed.** Live: a negative
+RELIANCE holding returns HTTP 400 naming it; fit for SMALL250 says "Only
+partly judged"; stability at a 40% cap returns 40/0/40/20 with
+`corner_solution` true and no "Stable" verdict.
 
 ## The first scan under the corrected filter (cycle 2026-09-11)
 

@@ -1,5 +1,5 @@
 {
- "run_at_utc": "2026-09-10T17:19:14+00:00",
+ "run_at_utc": "2026-09-11T05:27:30+00:00",
  "base": "https://quant-india.onrender.com",
  "passed": [
   "build max_loss=5%: JSON a browser can parse (no bare NaN/Infinity)",
@@ -27,29 +27,28 @@
   "fit INFY: JSON a browser can parse (no bare NaN/Infinity)",
   "fit: a priceable stock is judged on correlation, not only weights",
   "fit SMALL250: JSON a browser can parse (no bare NaN/Infinity)",
+  "fit: never claims overlap without having measured correlation",
   "what-if refuses an empty portfolio",
   "what-if refuses two nonexistent tickers",
   "what-if refuses a security the scan cannot price (SMALL250)",
   "what-if: a nonexistent ticker beside a real one — refused, and the refusal names the holding",
   "what-if: a typo (RELIANC.NS) beside a real one — refused, and the refusal names the holding",
   "what-if: a negative holding is not displayed while being ignored",
+  "what-if: a negative holding is refused or explained",
   "optimizer stability max_weight=1.0: JSON a browser can parse (no bare NaN/Infinity)",
   "stability: an unconstrained 100% corner is flagged, not praised",
   "stability max_weight=1.0: weights pinned at their bounds are not called stable",
-  "optimizer stability max_weight=0.4: JSON a browser can parse (no bare NaN/Infinity)"
- ],
- "failed": [
-  "fit: never claims overlap without having measured correlation",
-  "what-if: a negative holding is refused or explained",
+  "optimizer stability max_weight=0.4: JSON a browser can parse (no bare NaN/Infinity)",
   "stability max_weight=0.4: weights pinned at their bounds are not called stable"
  ],
+ "failed": [],
  "notes": [
   [
    "build_downside_by_stated_loss_limit",
    {
-    "5": -10.09,
-    "20": -10.09,
-    "60": -10.09
+    "5": -7.76,
+    "20": -7.76,
+    "60": -7.76
    }
   ],
   [
