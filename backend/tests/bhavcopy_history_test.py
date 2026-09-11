@@ -9,9 +9,11 @@ writes a null open/high/low/volume rather than raising, so a mis-mapped column
 produces three thousand days that are present in the table, counted as stored,
 and useless to everything that reads them.
 
-So the load-bearing test here is not "does it fetch". It is: pull a REAL day
-from 2015 through the production parser and assert the OHLC and the ISIN are
-actually populated, against closes checked independently.
+So the load-bearing test here is not "does it fetch". It is: put a 2015 day
+through the production parser and assert the OHLC and the ISIN are actually
+populated. By default that day is a sample in the 2015 layout, because a test
+that downloads from NSE whenever it runs is automated use of the archive, and
+NSE collection is paused. NSE_LIVE_TEST=1 downloads the real file instead.
 
 The other half is the resume walk. With the floor at 2024-01-01, resuming by
 counting days back from today happened to work because one chunk covered the
@@ -99,20 +101,78 @@ check("prices and actions now start on the same day",
 
 print()
 print("=" * 72)
-print("A REAL 2015 FILE, THROUGH THE PRODUCTION PARSER")
+print("THE 2015 FILE FORMAT, THROUGH THE PRODUCTION PARSER")
 print("=" * 72)
+
+# This section used to download the real 2015 file from NSE on every run. NSE
+# collection is paused while automated use of the archive is unresolved, and a
+# test that fetches from the archive whenever anyone runs it is automated use.
+# So by default the download is replaced by a sample in the 2015 layout, and the
+# rest of fetch_day -- URL choice, unzip, column mapping, the EQ/BE filter, the
+# insert -- runs exactly as in production.
+#
+# What the sample can and cannot show. It catches a change to the parser that
+# breaks the 2015 layout, the silent null-column failure the docstring
+# describes. It cannot show that the layout matches what NSE actually serves:
+# its column names are the ones fetch_day documents for the pre-2024 file, and
+# of its numbers only RELIANCE's close (905.8) and ISIN were checked against
+# NSE's file for that date. RELIANCE's open, high, low and volume are
+# illustrative, and the two SAMPLE rows are made up. NSE_LIVE_TEST=1 runs the
+# real download instead, for when fetching from NSE is allowed.
+import io       # noqa: E402
+import zipfile  # noqa: E402
+
+LIVE = os.environ.get("NSE_LIVE_TEST") == "1"
+SAMPLE_CSV = (
+    "SYMBOL,SERIES,OPEN,HIGH,LOW,CLOSE,LAST,PREVCLOSE,TOTTRDQTY,TOTTRDVAL,"
+    "TIMESTAMP,TOTALTRADES,ISIN\n"
+    "RELIANCE,EQ,901.0,909.9,897.1,905.8,905.5,902.3,3100000,2800000000,"
+    "10-JUN-2015,95000,INE002A01018\n"
+    "SAMPLEBE,BE,10.0,10.5,9.8,10.2,10.2,10.0,5000,51000,10-JUN-2015,40,INE000FAKE01\n"
+    "SAMPLEBOND,N1,1000.0,1000.0,1000.0,1000.0,1000.0,1000.0,10,10000,"
+    "10-JUN-2015,1,INE000FAKE02\n")
+served = []
+
+
+class _Response:
+    def __init__(self, status, content=b""):
+        self.status_code, self.content = status, content
+
+
+def _archive(url, headers=None, timeout=None, **kw):
+    served.append(url)
+    if url.endswith("/historical/EQUITIES/2015/JUN/cm10JUN2015bhav.csv.zip"):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("cm10JUN2015bhav.csv", SAMPLE_CSV)
+        return _Response(200, buf.getvalue())
+    return _Response(404)
+
 
 BC._init_db(force=True)
 got = None
+real_get = BC.requests.get
+if not LIVE:
+    BC.requests.get = _archive
 try:
     got = BC.fetch_day(datetime(2015, 6, 10))
 except Exception as e:
     print(f"    fetch raised: {type(e).__name__}: {e}")
+finally:
+    BC.requests.get = real_get
+print("    source: " + ("NSE, live (NSE_LIVE_TEST=1)" if LIVE
+                        else "a sample in the 2015 layout; nothing was fetched"))
 
-if not got or not got.get("stored"):
+if LIVE and (not got or not got.get("stored")):
     skip("real 2015 day parses", f"NSE unreachable or empty ({got})")
 else:
-    check("a 2015 day stores rows", got.get("stored", 0) > 1000, f"{got}")
+    if LIVE:
+        check("a 2015 day stores rows", got.get("stored", 0) > 1000, f"{got}")
+    else:
+        check("the file is taken from the historical URL, as a 2015 day's is",
+              bool(served) and served[-1].endswith("cm10JUN2015bhav.csv.zip"),
+              f"requested {len(served)}: {served[-1][-48:] if served else None}")
+        check("the EQ and BE rows are stored", (got or {}).get("stored") == 2, f"{got}")
     conn = sqlite3.connect(DB)
     row = conn.execute(
         "SELECT symbol, day, open, high, low, close, volume, isin "
@@ -123,12 +183,18 @@ else:
     total = conn.execute("SELECT COUNT(*) FROM bhavcopy_eod").fetchone()[0]
     no_isin = conn.execute(
         "SELECT COUNT(*) FROM bhavcopy_eod WHERE isin IS NULL").fetchone()[0]
+    bond = conn.execute(
+        "SELECT COUNT(*) FROM bhavcopy_eod WHERE symbol = 'SAMPLEBOND.NS'").fetchone()[0]
     conn.close()
 
+    if not LIVE:
+        check("  ...and the bond-series row is filtered out", bond == 0, f"{bond} stored")
     check("RELIANCE is present", row is not None)
     if row:
-        # Independently checked against the file NSE serves for that date.
-        check("close matches the exchange's own number",
+        # Live: checked against the file NSE serves for that date. Sample: the
+        # same number, so this shows it is read from the CLOSE column.
+        check("close matches the exchange's own number" if LIVE
+              else "close is read from the CLOSE column",
               abs(row[5] - 905.8) < 0.01, f"close={row[5]} expected 905.8")
         check("open/high/low are populated, not silently null",
               all(v is not None for v in row[2:5]),

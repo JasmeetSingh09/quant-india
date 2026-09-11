@@ -48,6 +48,7 @@ SUITES = [
     ("test_new_algorithms_stress.py",    87173, 600),
     ("data_integrity_test.py",             109, 300),
     ("corporate_action_audit_test.py",      66, 120),
+    ("bhavcopy_history_test.py",            51, 120),
     ("pit_validation_e2e.py",               65, 300),
     ("corporate_actions_test.py",           55, 120),
     ("parse_subject_test.py",               54, 120),

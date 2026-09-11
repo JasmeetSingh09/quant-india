@@ -13,10 +13,16 @@ failure count above zero, prints fewer checks than its floor (or no count), or
 tries to reach the network. The network block covers Python sockets, DNS, and
 `curl_cffi`, the C library yfinance downloads through.
 
-## In the gate: 42 suites
+## In the gate: 43 suites
 
 Everything in `SUITES`. The two large property suites (81,215 and 87,173 checks)
-plus 40 focused suites, 169,766 checks in all.
+plus 41 focused suites, 169,817 checks in all.
+
+`bhavcopy_history_test.py` joined on 2026-09-11. It used to download a real
+2015 file from NSE on every run; it now parses a sample in the 2015 layout, and
+only `NSE_LIVE_TEST=1` makes it fetch from NSE. The sample catches a parser
+change that breaks the 2015 columns; it cannot show that NSE still serves that
+layout, which only the live run can.
 
 ## Not in the gate
 
@@ -37,13 +43,6 @@ offline, and a slow day at Yahoo must not block a deploy.
 | `optimizer_audit.py` | Fetches returns |
 | `data_failure_audit.py`, `factor_audit.py`, `full_audit.py`, `independent_recompute.py`, `stock_matrix_audit.py`, `test_alpha_audit.py` | Audits over live data |
 | `momentum_scrutiny.py`, `study_distress_flags.py` | Studies over live data; print no count |
-
-### It downloads from NSE
-
-`bhavcopy_history_test.py` deliberately fetches and parses a real 2015 bhavcopy
-through the production parser, and sets `NSE_COLLECTION=on` to do it. With NSE
-collection paused, that request must not run on every push. It still runs
-whenever someone runs it by hand.
 
 ### Not tests
 

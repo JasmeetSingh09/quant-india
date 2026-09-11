@@ -9,7 +9,7 @@ model's correctness is caught.
 
 ```bash
 cd backend
-python tests/run_ci.py                       # the gate CI runs on every push: 42 offline suites
+python tests/run_ci.py                       # the gate CI runs on every push: 43 offline suites
 python tests/test_core_properties.py        # ~81k checks: calculators, risk, Monte Carlo, alpha, optimizers
 python tests/test_new_algorithms_stress.py   # ~87k checks: Black-Scholes, Risk Parity, Max Diversification,
                                              #   risk decomposition, low-vol & momentum backtests, seasonality
