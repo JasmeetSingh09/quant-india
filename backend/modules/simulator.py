@@ -167,13 +167,17 @@ def _init_db_locked():
             conn.execute("ALTER TABLE simulations ADD COLUMN IF NOT EXISTS is_demo INTEGER DEFAULT 0")
             conn.execute("ALTER TABLE simulations ADD COLUMN IF NOT EXISTS cash REAL DEFAULT 0")
         else:
-            conn.execute("ALTER TABLE simulations ADD COLUMN is_demo INTEGER DEFAULT 0")
+            # One try per column. CREATE TABLE above already includes is_demo, so
+            # on every new database this ALTER fails with "duplicate column". It
+            # used to share a block with the cash ALTER, and that failure skipped
+            # cash: a fresh SQLite install had no cash column and deposits raised.
             try:
-
-                conn.execute("ALTER TABLE simulations ADD COLUMN cash REAL DEFAULT 0")
-
+                conn.execute("ALTER TABLE simulations ADD COLUMN is_demo INTEGER DEFAULT 0")
             except Exception:
-
+                pass          # already present
+            try:
+                conn.execute("ALTER TABLE simulations ADD COLUMN cash REAL DEFAULT 0")
+            except Exception:
                 pass          # already present
         conn.commit()
     except Exception:
@@ -810,27 +814,22 @@ def list_simulations(user_id: str = "public") -> list:
 
 def _ensure_cash_column():
     """
-    Add the cash balance to existing simulations.
+    Make sure the cash balance column exists.
 
-    Runs on its own connection: a failed ALTER poisons the whole transaction on
-    Postgres, which is what previously 500'd unrelated endpoints.
+    _init_db adds it, once per process, on both backends. This function used to
+    issue its own ALTER on every deposit, withdrawal and valuation, but it tested
+    IS_POSTGRES, a name this module never imported. The NameError was swallowed,
+    so that ALTER never ran on any backend: production got the column from
+    _init_db's Postgres branch, and a new SQLite database never got it at all.
+    Turning the per-call ALTER on now would put a DDL statement, and its table
+    lock, on every request, which is what _init_db's docstring says once made
+    reads time out. So this defers to _init_db, which is a no-op after start-up.
 
     Existing simulations get cash = 0, which is the honest migration. Under the
     old model every rupee deposited was immediately fully invested, so zero
-    uninvested cash is exactly what those portfolios held — nobody's recorded
-    position changes value because of this.
+    uninvested cash is exactly what those portfolios held.
     """
-    conn = get_conn()
-    try:
-        if IS_POSTGRES:
-            conn.execute("ALTER TABLE simulations ADD COLUMN IF NOT EXISTS cash REAL DEFAULT 0")
-        else:
-            conn.execute("ALTER TABLE simulations ADD COLUMN cash REAL DEFAULT 0")
-        conn.commit()
-    except Exception:
-        pass          # already present
-    finally:
-        conn.close()
+    _init_db()
 
 
 def _get_cash(conn, sim_name: str, user_id: str) -> float:
