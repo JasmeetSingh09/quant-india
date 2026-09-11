@@ -13,10 +13,10 @@ failure count above zero, prints fewer checks than its floor (or no count), or
 tries to reach the network. The network block covers Python sockets, DNS, and
 `curl_cffi`, the C library yfinance downloads through.
 
-## In the gate: 41 suites
+## In the gate: 42 suites
 
 Everything in `SUITES`. The two large property suites (81,215 and 87,173 checks)
-plus 39 focused suites, 169,731 checks in all.
+plus 40 focused suites, 169,766 checks in all.
 
 ## Not in the gate
 
@@ -50,6 +50,9 @@ whenever someone runs it by hand.
 - `audit_record.py`: a command-line helper that needs arguments.
 - `behavioural_fixtures.py`: fixtures imported by other suites.
 - `production_e2e.py`: tests the live site.
+- `nightly_production_check.py`: checks production after each night's scan.
+  `.github/workflows/nightly.yml` runs it at 03:30 UTC. Its judging logic is
+  tested offline by `nightly_production_check_test.py`, which is in the gate.
 
 ### Needs the local price archive
 

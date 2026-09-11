@@ -263,6 +263,96 @@ check("  ...it is counted as not attempted instead",
       and "SKIPPED.NS" in st.get("not_attempted_examples", []),
       str(st.get("not_attempted_examples")))
 
+print()
+print("=" * 74)
+print("7. ONE NIGHT SHORT — WHO THE FILTER WILL EXCLUDE TOMORROW")
+print("=" * 74)
+
+# On 2026-09-11, 71 stocks that had scored on four straight nights all failed
+# with "no market data", and Yahoo priced them again that morning. Two more
+# nights like that and the filter excludes all 71 for a week. The nightly check
+# needs to see that coming one night early, and to tell a source outage (names
+# that were scoring) from securities that were never priceable.
+AT = "2026-09-10"
+
+
+def at_risk():
+    conn = sqlite3.connect(DB)
+    try:
+        return U.at_risk_of_exclusion(conn, today=AT)
+    except AttributeError as e:
+        return {"missing": str(e)}
+    finally:
+        conn.close()
+
+
+build([("WASGOOD.NS", "2026-09-07", 12.0, None),
+       ("WASGOOD.NS", "2026-09-08", 12.5, None),
+       ("WASGOOD.NS", "2026-09-09", None, NO_DATA),
+       ("WASGOOD.NS", "2026-09-10", None, NO_DATA),
+       ("ONCE.NS", "2026-09-09", 7.0, None),
+       ("ONCE.NS", "2026-09-10", None, NO_DATA),
+       ("NEVER.NS", "2026-09-09", None, NO_DATA),
+       ("NEVER.NS", "2026-09-10", None, NO_DATA),
+       ("GONE.NS", "2026-09-08", None, NO_DATA),
+       ("GONE.NS", "2026-09-09", None, NO_DATA),
+       ("GONE.NS", "2026-09-10", None, NO_DATA),
+       ("SLOW.NS", "2026-09-08", 3.0, None),
+       ("SLOW.NS", "2026-09-09", None, NO_DATA),
+       ("SLOW.NS", "2026-09-10", None, "HTTPError 429 Too Many Requests"),
+       ("GOOD.NS", "2026-09-10", 5.0, None)])
+r = at_risk()
+check("the report exists", "missing" not in r and isinstance(r.get("at_risk"), int), str(r)[:90])
+if "missing" not in r:
+    both = set(r.get("examples_previously_scored", [])) | set(r.get("examples_never_scored", []))
+    check("two no-data nights in a row, after scoring, is at risk",
+          "WASGOOD.NS" in r.get("examples_previously_scored", []), str(r))
+    check("  ...and counted as a stock that was scoring",
+          r.get("previously_scored") == 1, str(r.get("previously_scored")))
+    check("one no-data night is not at risk", "ONCE.NS" not in both)
+    check("never-scored with two no-data nights is at risk, listed apart",
+          "NEVER.NS" in r.get("examples_never_scored", []), str(r))
+    check("a ticker already excluded is not 'at risk'", "GONE.NS" not in both,
+          "it is past the risk; it is excluded")
+    check("a 429 on the latest attempt does not count toward exclusion",
+          "SLOW.NS" not in both, "throttling is our problem, not the security's")
+    check("a scoring ticker is not at risk", "GOOD.NS" not in both)
+    check("the totals add up", r.get("at_risk") == 2, str(r.get("at_risk")))
+    check("the rule is stated", "last 2 attempts" in str(r.get("rule", "")),
+          str(r.get("rule")))
+
+# The nightly production check reads it through the scan-failure audit.
+sf_risk = (DI.scan_failures() or {}).get("at_risk_of_exclusion") or {}
+check("the scan-failure audit carries the early warning",
+      sf_risk.get("previously_scored") == 1
+      and "WASGOOD.NS" in sf_risk.get("examples_previously_scored", []),
+      str(sf_risk)[:90] or "field absent")
+
+# Played forward: warned tonight, excluded tomorrow if the source stays dark.
+build([("WASGOOD.NS", "2026-09-08", 12.5, None),
+       ("WASGOOD.NS", "2026-09-09", None, NO_DATA),
+       ("WASGOOD.NS", "2026-09-10", None, NO_DATA),
+       ("WASGOOD.NS", "2026-09-11", None, NO_DATA)])
+conn = sqlite3.connect(DB)
+try:
+    excluded_next = U._persistently_unscoreable(conn, today="2026-09-12")
+finally:
+    conn.close()
+check("a warned ticker that fails a third night IS then excluded",
+      "WASGOOD.NS" in excluded_next,
+      "so the warning really is one night ahead of the filter")
+
+if os.path.exists(DB):
+    os.remove(DB)
+c = sqlite3.connect(DB)
+c.execute("CREATE TABLE unrelated (x INTEGER)")
+c.commit()
+c.close()
+r = at_risk()
+check("with no scan table it reports UNMEASURED, never a count of zero",
+      "missing" not in r and r.get("status") == "UNMEASURED" and r.get("at_risk") is None,
+      str(r)[:90])
+
 try:
     os.remove(DB)
 except Exception:

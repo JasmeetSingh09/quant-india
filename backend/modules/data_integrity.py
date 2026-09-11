@@ -1052,6 +1052,22 @@ def scan_failures(cycle: str = None, sample: int = 10) -> dict:
     ordered = dict(sorted(causes.items(), key=lambda kv: -kv[1]["n"]))
     no_reason = sum(v["n"] for k, v in causes.items()
                     if k == "(no error recorded)")
+
+    # One night short of the universe filter. Stocks that were scoring and have
+    # now found no market data twice running are what a price-source outage looks
+    # like, and one more such night excludes them for a week. The nightly
+    # production check reads this; UNMEASURED if it cannot be computed.
+    try:
+        from universe_scan import at_risk_of_exclusion
+        _c = get_conn()
+        try:
+            at_risk = at_risk_of_exclusion(_c, today=str(cycle)[:10], sample=sample)
+        finally:
+            _c.close()
+    except Exception as e:
+        at_risk = {"status": "UNMEASURED", "reason": f"{type(e).__name__}: {e}",
+                   "at_risk": None}
+
     return {
         "audit": "scan_failures",
         "read_only": True,
@@ -1061,6 +1077,7 @@ def scan_failures(cycle: str = None, sample: int = 10) -> dict:
         "failed_without_a_recorded_reason": no_reason,
         "causes": ordered,
         "stability_vs_previous_cycle": overlap,
+        "at_risk_of_exclusion": at_risk,
         "note": ("A failure with no recorded reason is the only one that is a "
                  "defect in the scan itself; the rest are the scan correctly "
                  "reporting that a security cannot be scored."),

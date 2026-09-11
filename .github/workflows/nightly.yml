@@ -1,0 +1,38 @@
+# Every night, after the scan, check production itself: did the scan finish, did
+# failures jump, is the universe filter about to exclude stocks that were
+# scoring, and does the Portfolio Lab audit still pass. A red run emails the
+# person who last changed this schedule. Details in the run's summary and log.
+#
+# Read-only against production. See backend/tests/nightly_production_check.py.
+#
+# GitHub pauses scheduled workflows in a public repository after 60 days with
+# no commits. If the nightly emails stop, check the Actions tab first.
+
+name: Nightly production check
+
+on:
+  schedule:
+    - cron: "30 3 * * *"          # 03:30 UTC; the scan starts about 00:02 and takes about 2.5 hours
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-production
+  cancel-in-progress: false
+
+jobs:
+  production:
+    name: Last night's scan, and Portfolio Lab on production
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check production
+        run: python backend/tests/nightly_production_check.py

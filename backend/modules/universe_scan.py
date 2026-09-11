@@ -972,6 +972,73 @@ def _persistently_unscoreable(conn, today: str = None) -> set:
         return set()                # never let this break a scan
 
 
+def at_risk_of_exclusion(conn, today: str = None, sample: int = 20) -> dict:
+    """
+    Tickers one "no market data" attempt away from being excluded.
+
+    The filter needs UNSCOREABLE_ATTEMPTS such attempts in a row, so a ticker
+    whose last UNSCOREABLE_ATTEMPTS - 1 attempts all found nothing is excluded
+    if the next one does too. They are split by whether they scored at any point
+    in the history window. One that was never priceable is the filter doing its
+    job; many that WERE scoring is what a price-source outage looks like. On
+    2026-09-11, 71 stocks that had scored four nights running failed together,
+    and Yahoo priced them again that morning.
+
+    Read-only. Reports UNMEASURED, never a count of zero, when the scan table
+    cannot be read, so a nightly check cannot pass on a query that failed.
+    """
+    ph = "%s" if IS_POSTGRES else "?"
+    k = UNSCOREABLE_ATTEMPTS - 1
+    today = str(today or _current_cycle())[:10]
+    rule = (f"no market data on each of its last {k} attempts and not yet excluded; "
+            f"one more such attempt and the filter skips it for "
+            f"{UNSCOREABLE_RECHECK_DAYS} days")
+    try:
+        t = datetime.strptime(today, "%Y-%m-%d")
+        since = (t - timedelta(days=_UNSCOREABLE_HISTORY_DAYS)).strftime("%Y-%m-%d")
+        rows = conn.execute(f"""
+            WITH ranked AS (
+                SELECT ticker, cycle, alpha_score, error,
+                       ROW_NUMBER() OVER (PARTITION BY ticker
+                                          ORDER BY cycle DESC) AS rn
+                FROM alpha_scan2
+                WHERE cycle >= {ph} AND cycle <= {ph}
+            )
+            SELECT ticker,
+                   SUM(CASE WHEN rn <= {ph} THEN 1 ELSE 0 END),
+                   SUM(CASE WHEN rn <= {ph} AND alpha_score IS NULL
+                             AND LOWER(COALESCE(error, '')) LIKE {ph}
+                            THEN 1 ELSE 0 END),
+                   SUM(CASE WHEN alpha_score IS NOT NULL THEN 1 ELSE 0 END)
+            FROM ranked
+            GROUP BY ticker
+        """, (since, today, k, k, f"%{_NO_DATA}%")).fetchall()
+        excluded = _persistently_unscoreable(conn, today=today)
+        was_scoring, never = [], []
+        for ticker, n_recent, nodata_recent, n_scored in rows:
+            ticker = str(ticker)
+            if ticker in excluded:
+                continue                # past the risk: already excluded
+            if (n_recent or 0) >= k and (nodata_recent or 0) >= k:
+                (was_scoring if (n_scored or 0) > 0 else never).append(ticker)
+        return {
+            "rule": rule,
+            "as_of": today,
+            "at_risk": len(was_scoring) + len(never),
+            "previously_scored": len(was_scoring),
+            "never_scored": len(never),
+            "examples_previously_scored": sorted(was_scoring)[:sample],
+            "examples_never_scored": sorted(never)[:sample],
+        }
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return {"rule": rule, "as_of": today, "status": "UNMEASURED",
+                "reason": f"{type(e).__name__}: {e}", "at_risk": None}
+
+
 def unscoreable_report() -> dict:
     """What the filter is excluding, so it is never an invisible number."""
     conn = get_conn()
