@@ -86,9 +86,10 @@ check("  ...names the jump and some of the new failures",
 s, f = night(failure_changes={"at_risk_of_exclusion.previously_scored": 71,
                               "at_risk_of_exclusion.examples_previously_scored": ["ABANSENT.NS"]})
 r = N.judge_at_risk(f)
-check("71 stocks that were scoring, one night from exclusion", bool(r), str(r))
-check("  ...says they are one night away and names one", bool(r)
-      and "one night" in r[0] and "ABANSENT" in r[0], str(r))
+check("71 stocks that were scoring, failing two nights running", bool(r), str(r))
+check("  ...calls it a data problem on our side, not delisting, and names one", bool(r)
+      and "scored in the last 60 days" in r[0] and "our side" in r[0]
+      and "ABANSENT" in r[0], str(r))
 
 s, f = night({"cycle": "2026-09-11"})
 r = N.judge_scan(s, TODAY)

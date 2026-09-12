@@ -1053,10 +1053,11 @@ def scan_failures(cycle: str = None, sample: int = 10) -> dict:
     no_reason = sum(v["n"] for k, v in causes.items()
                     if k == "(no error recorded)")
 
-    # One night short of the universe filter. Stocks that were scoring and have
-    # now found no market data twice running are what a price-source outage looks
-    # like, and one more such night excludes them for a week. The nightly
-    # production check reads this; UNMEASURED if it cannot be computed.
+    # Stocks that found no market data twice running. Those that never scored
+    # are one night from the universe filter. Those that were scoring are
+    # protected from it, and dozens of them at once is a data problem on our side
+    # (the nights of 2026-09-11 and 12). The nightly production check reads both;
+    # UNMEASURED if it cannot be computed.
     try:
         from universe_scan import at_risk_of_exclusion
         _c = get_conn()

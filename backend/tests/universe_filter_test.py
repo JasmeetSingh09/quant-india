@@ -305,7 +305,7 @@ r = at_risk()
 check("the report exists", "missing" not in r and isinstance(r.get("at_risk"), int), str(r)[:90])
 if "missing" not in r:
     both = set(r.get("examples_previously_scored", [])) | set(r.get("examples_never_scored", []))
-    check("two no-data nights in a row, after scoring, is at risk",
+    check("two no-data nights in a row, after scoring, is reported",
           "WASGOOD.NS" in r.get("examples_previously_scored", []), str(r))
     check("  ...and counted as a stock that was scoring",
           r.get("previously_scored") == 1, str(r.get("previously_scored")))
@@ -317,7 +317,8 @@ if "missing" not in r:
     check("a 429 on the latest attempt does not count toward exclusion",
           "SLOW.NS" not in both, "throttling is our problem, not the security's")
     check("a scoring ticker is not at risk", "GOOD.NS" not in both)
-    check("the totals add up", r.get("at_risk") == 2, str(r.get("at_risk")))
+    check("only the never-scored ticker can actually be excluded tomorrow",
+          r.get("at_risk") == 1, f"at_risk={r.get('at_risk')}")
     check("the rule is stated", "last 2 attempts" in str(r.get("rule", "")),
           str(r.get("rule")))
 
@@ -327,20 +328,6 @@ check("the scan-failure audit carries the early warning",
       sf_risk.get("previously_scored") == 1
       and "WASGOOD.NS" in sf_risk.get("examples_previously_scored", []),
       str(sf_risk)[:90] or "field absent")
-
-# Played forward: warned tonight, excluded tomorrow if the source stays dark.
-build([("WASGOOD.NS", "2026-09-08", 12.5, None),
-       ("WASGOOD.NS", "2026-09-09", None, NO_DATA),
-       ("WASGOOD.NS", "2026-09-10", None, NO_DATA),
-       ("WASGOOD.NS", "2026-09-11", None, NO_DATA)])
-conn = sqlite3.connect(DB)
-try:
-    excluded_next = U._persistently_unscoreable(conn, today="2026-09-12")
-finally:
-    conn.close()
-check("a warned ticker that fails a third night IS then excluded",
-      "WASGOOD.NS" in excluded_next,
-      "so the warning really is one night ahead of the filter")
 
 if os.path.exists(DB):
     os.remove(DB)
@@ -352,6 +339,53 @@ r = at_risk()
 check("with no scan table it reports UNMEASURED, never a count of zero",
       "missing" not in r and r.get("status") == "UNMEASURED" and r.get("at_risk") is None,
       str(r)[:90])
+
+print()
+print("=" * 74)
+print("8. A STOCK THAT WAS SCORING IS NEVER EXCLUDED FOR A RUN OF FAILURES")
+print("=" * 74)
+
+# The nights of 2026-09-11 and 12. 71 stocks that had scored every night failed
+# twice running with "No market data found", and a third night would have had
+# the filter skip them for a week. Yahoo priced every one checked, from another
+# machine, the same morning. alpha_model writes that message when momentum has
+# too little price history AND Yahoo's info lookup returns no market cap, and
+# that lookup was failing on the server, not for the stock. A failure of ours
+# must never remove a security, so a ticker that scored at any point in the
+# history window is not excluded, however long its run of failures.
+build([("WASGOOD.NS", "2026-09-08", 12.5, None),
+       ("WASGOOD.NS", "2026-09-09", None, NO_DATA),
+       ("WASGOOD.NS", "2026-09-10", None, NO_DATA),
+       ("WASGOOD.NS", "2026-09-11", None, NO_DATA)])
+conn = sqlite3.connect(DB)
+try:
+    excluded_next = U._persistently_unscoreable(conn, today="2026-09-12")
+finally:
+    conn.close()
+check("scored four days ago, then three no-data nights: NOT excluded",
+      "WASGOOD.NS" not in excluded_next, str(sorted(excluded_next)))
+
+# ...but a ticker whose last score has aged out of the window is fair game.
+start = _date(2026, 7, 1)
+rows = [("FADED.NS", start.isoformat(), 4.0, None)]
+rows += [("FADED.NS", (start + _td(days=i)).isoformat(), None, NO_DATA)
+         for i in range(1, 73)]
+build(rows)
+conn = sqlite3.connect(DB)
+try:
+    excluded_late = U._persistently_unscoreable(conn, today="2026-09-12")
+finally:
+    conn.close()
+check("last scored more than 60 days ago, failing ever since: excluded",
+      "FADED.NS" in excluded_late,
+      "the guard protects recent scorers, not every ticker that ever scored")
+
+# The incident played forward: it scores for 20 days, then the lookup fails
+# every night for the rest of the run.
+att, exd = play(60, lambda day: day < 20)
+check("played forward 60 days, a stock that stopped scoring on day 20 is never skipped",
+      not exd and len(att) == 60,
+      f"excluded on {len(exd)} days (first {exd[:3]}); attempted {len(att)} of 60")
 
 try:
     os.remove(DB)

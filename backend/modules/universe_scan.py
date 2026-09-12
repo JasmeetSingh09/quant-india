@@ -921,14 +921,21 @@ def _persistently_unscoreable(conn, today: str = None) -> set:
     """
     Tickers the price source had nothing for, on each of their recent attempts.
 
-    These are not scan failures. They are securities the price source cannot
-    price at all -- illiquid microcaps, and instruments that are not equities
-    (SMALL250.NS is an index). On the 2026-09-09 cycle: 188 of 2,892 attempted,
-    187 of which also failed the day before, one cause, none without a reason.
+    Mostly these are securities the price source cannot price at all --
+    illiquid microcaps, and instruments that are not equities (SMALL250.NS is an
+    index). On the 2026-09-09 cycle: 188 of 2,892 attempted, 187 of which also
+    failed the day before, one cause, none without a reason.
 
     Excluding them changes no output. Every consumer of alpha_scan2 already
     filters `alpha_score IS NOT NULL`, so a ticker that fails contributes
     nothing to a ranking, a peer set or a top-picks list.
+
+    A ticker that scored at any point in the history window is never excluded.
+    The "no market data found" message is written by alpha_model when momentum
+    has too little price history AND Yahoo's info lookup returns no market cap,
+    and on 2026-09-11 and 12 that lookup failed on the server for 71 stocks that
+    had been scoring every night; Yahoo priced every one checked from another
+    machine that morning. A failure of ours must never remove a security.
 
     `today` defaults to the current cycle. Tests pass it explicitly to play the
     scan forward one day at a time, which is the test the first version lacked.
@@ -948,18 +955,20 @@ def _persistently_unscoreable(conn, today: str = None) -> set:
                 WHERE cycle >= {ph} AND cycle <= {ph}
             )
             SELECT ticker,
-                   COUNT(*),
-                   SUM(CASE WHEN alpha_score IS NULL
+                   SUM(CASE WHEN rn <= {ph} THEN 1 ELSE 0 END),
+                   SUM(CASE WHEN rn <= {ph} AND alpha_score IS NULL
                              AND LOWER(COALESCE(error, '')) LIKE {ph}
                             THEN 1 ELSE 0 END),
-                   MAX(cycle)
+                   MAX(cycle),
+                   SUM(CASE WHEN alpha_score IS NOT NULL THEN 1 ELSE 0 END)
             FROM ranked
-            WHERE rn <= {ph}
             GROUP BY ticker
-        """, (since, today, f"%{_NO_DATA}%", UNSCOREABLE_ATTEMPTS)).fetchall()
+        """, (since, today, UNSCOREABLE_ATTEMPTS, UNSCOREABLE_ATTEMPTS,
+              f"%{_NO_DATA}%")).fetchall()
         out = set()
-        for ticker, n, nodata, last in rows:
-            if ((n or 0) >= UNSCOREABLE_ATTEMPTS
+        for ticker, n, nodata, last, scored in rows:
+            if ((scored or 0) == 0          # scored recently: the failures are ours
+                    and (n or 0) >= UNSCOREABLE_ATTEMPTS
                     and (nodata or 0) >= UNSCOREABLE_ATTEMPTS
                     and str(last)[:10] >= recheck):
                 out.add(str(ticker))
@@ -974,15 +983,15 @@ def _persistently_unscoreable(conn, today: str = None) -> set:
 
 def at_risk_of_exclusion(conn, today: str = None, sample: int = 20) -> dict:
     """
-    Tickers one "no market data" attempt away from being excluded.
+    Tickers whose last UNSCOREABLE_ATTEMPTS - 1 attempts all found no market data.
 
-    The filter needs UNSCOREABLE_ATTEMPTS such attempts in a row, so a ticker
-    whose last UNSCOREABLE_ATTEMPTS - 1 attempts all found nothing is excluded
-    if the next one does too. They are split by whether they scored at any point
-    in the history window. One that was never priceable is the filter doing its
-    job; many that WERE scoring is what a price-source outage looks like. On
-    2026-09-11, 71 stocks that had scored four nights running failed together,
-    and Yahoo priced them again that morning.
+    Split by whether they scored at any point in the history window, because
+    the two mean different things. One that never scored is one such attempt
+    away from exclusion: that is `at_risk`, and it is the filter doing its job.
+    One that WAS scoring is never excluded (see _persistently_unscoreable), but
+    dozens of them at once is a data problem on our side: on 2026-09-11 and 12,
+    71 stocks that had scored every night failed together while Yahoo priced
+    them from another machine.
 
     Read-only. Reports UNMEASURED, never a count of zero, when the scan table
     cannot be read, so a nightly check cannot pass on a query that failed.
@@ -990,9 +999,9 @@ def at_risk_of_exclusion(conn, today: str = None, sample: int = 20) -> dict:
     ph = "%s" if IS_POSTGRES else "?"
     k = UNSCOREABLE_ATTEMPTS - 1
     today = str(today or _current_cycle())[:10]
-    rule = (f"no market data on each of its last {k} attempts and not yet excluded; "
-            f"one more such attempt and the filter skips it for "
-            f"{UNSCOREABLE_RECHECK_DAYS} days")
+    rule = (f"no score in the last {_UNSCOREABLE_HISTORY_DAYS} days and no market data "
+            f"on each of its last {k} attempts; one more such attempt and the filter "
+            f"skips it for {UNSCOREABLE_RECHECK_DAYS} days")
     try:
         t = datetime.strptime(today, "%Y-%m-%d")
         since = (t - timedelta(days=_UNSCOREABLE_HISTORY_DAYS)).strftime("%Y-%m-%d")
@@ -1024,11 +1033,15 @@ def at_risk_of_exclusion(conn, today: str = None, sample: int = 20) -> dict:
         return {
             "rule": rule,
             "as_of": today,
-            "at_risk": len(was_scoring) + len(never),
-            "previously_scored": len(was_scoring),
+            "at_risk": len(never),
             "never_scored": len(never),
-            "examples_previously_scored": sorted(was_scoring)[:sample],
             "examples_never_scored": sorted(never)[:sample],
+            "previously_scored": len(was_scoring),
+            "examples_previously_scored": sorted(was_scoring)[:sample],
+            "previously_scored_note": (
+                f"Scored in the last {_UNSCOREABLE_HISTORY_DAYS} days, so the filter "
+                f"will not exclude them. Many at once is a data problem on our side, "
+                f"not delisting."),
         }
     except Exception as e:
         try:
@@ -1046,7 +1059,8 @@ def unscoreable_report() -> dict:
         skipped = _persistently_unscoreable(conn)
         return {
             "rule": (f"no market data on each of its last {UNSCOREABLE_ATTEMPTS} "
-                     f"attempts; tried again once its latest attempt is more than "
+                     f"attempts and no score in the last {_UNSCOREABLE_HISTORY_DAYS} "
+                     f"days; tried again once its latest attempt is more than "
                      f"{UNSCOREABLE_RECHECK_DAYS} days old"),
             "excluded": len(skipped),
             "examples": sorted(skipped)[:20],

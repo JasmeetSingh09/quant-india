@@ -8,10 +8,12 @@ saying which and why:
   1. Did tonight's scan run and finish?
   2. Did the number of failures jump? 4 on 2026-09-10 became 72 on 2026-09-11,
      and nothing reported it.
-  3. Is the universe filter about to exclude stocks that were scoring? It skips
-     a ticker after 3 "no market data" nights in a row, so a price-source outage
-     lasting three nights would drop real stocks for a week. This warns after
-     the second night, while there is still a night to act.
+  3. Are dozens of stocks that were scoring failing night after night? The
+     scan's "no market data" error also fires when Yahoo's info lookup fails on
+     the server, which is our problem, not the stocks'. On 2026-09-11 and 12, 71
+     stocks that had scored every night failed together while Yahoo priced them
+     from another machine. The universe filter no longer excludes such stocks,
+     so without this check the problem would be silent.
   4. Does the Portfolio Lab audit still pass against production?
 
 Read-only. Questions 1-3 are GET requests. The Portfolio Lab audit sends
@@ -100,8 +102,10 @@ def judge_at_risk(failures):
         why = ar.get("reason") if isinstance(ar, dict) else "the field is absent"
         return [f"the early warning for the universe filter is unavailable: {why}"]
     if ar["previously_scored"] >= AT_RISK_ALERT:
-        return [f"{ar['previously_scored']} stocks that were scoring are one night from "
-                f"exclusion ({ar.get('rule')}); e.g. {_names(ar.get('examples_previously_scored'))}"]
+        return [f"{ar['previously_scored']} stocks that scored in the last 60 days found no "
+                f"market data on each of their last 2 attempts. The filter will not exclude "
+                f"them, but this many at once is a data problem on our side, not delisting; "
+                f"e.g. {_names(ar.get('examples_previously_scored'))}"]
     return []
 
 
@@ -151,7 +155,7 @@ def run_checks(get=fetch, portfolio_lab=run_portfolio_lab, today=None, out=print
 
     rows = [("Tonight's scan ran and finished", judge_scan(status, today)),
             ("Scan failures did not jump", judge_jump(failures)),
-            ("No outage one night from exclusion", judge_at_risk(failures))]
+            ("No run of failures among stocks that were scoring", judge_at_risk(failures))]
     if portfolio_lab is not None:
         out("\nPortfolio Lab audit against production:")
         rows.append(("Portfolio Lab audit passes on production",

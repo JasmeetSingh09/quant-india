@@ -16,7 +16,7 @@ tries to reach the network. The network block covers Python sockets, DNS, and
 ## In the gate: 43 suites
 
 Everything in `SUITES`. The two large property suites (81,215 and 87,173 checks)
-plus 41 focused suites, 169,817 checks in all.
+plus 41 focused suites, 169,819 checks in all.
 
 `bhavcopy_history_test.py` joined on 2026-09-11. It used to download a real
 2015 file from NSE on every run; it now parses a sample in the 2015 layout, and

@@ -1,6 +1,6 @@
 # Every night, after the scan, check production itself: did the scan finish, did
-# failures jump, is the universe filter about to exclude stocks that were
-# scoring, and does the Portfolio Lab audit still pass. A red run emails the
+# failures jump, are dozens of stocks that were scoring failing night after night
+# (a data problem on our side), and does the Portfolio Lab audit still pass. A red run emails the
 # person who last changed this schedule. Details in the run's summary and log.
 #
 # Read-only against production. See backend/tests/nightly_production_check.py.
