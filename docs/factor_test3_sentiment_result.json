@@ -1,0 +1,80 @@
+{
+ "rules": "docs/PREREG_FACTOR_TEST3_SENTIMENT_2026-09-13.md",
+ "data": {
+  "headlines_used": 7906,
+  "multi_entity_excluded": 2834,
+  "unreadable_excluded": 13,
+  "human_label_counts": {
+   "positive": 2837,
+   "negative": 2376,
+   "neutral": 2693
+  }
+ },
+ "model": {
+  "n": 7906,
+  "accuracy": 0.7314697697950924,
+  "macro_f1": 0.7339418517717361,
+  "kappa": 0.5964542953018181,
+  "per_label": {
+   "positive": {
+    "precision": 0.8191533086724209,
+    "recall": 0.7025026436376454,
+    "f1": 0.7563567362428842,
+    "support": 2837
+   },
+   "negative": {
+    "precision": 0.7681600695954763,
+    "recall": 0.7432659932659933,
+    "f1": 0.7555080213903744,
+    "support": 2376
+   },
+   "neutral": {
+    "precision": 0.6376811594202898,
+    "recall": 0.7515781656145563,
+    "f1": 0.6899607976819497,
+    "support": 2693
+   }
+  },
+  "confusion": {
+   "positive": {
+    "positive": 1993,
+    "negative": 192,
+    "neutral": 652
+   },
+   "negative": {
+    "positive": 112,
+    "negative": 1766,
+    "neutral": 498
+   },
+   "neutral": {
+    "positive": 328,
+    "negative": 341,
+    "neutral": 2024
+   }
+  },
+  "polarity_flips": 304,
+  "polar_headlines": 5213,
+  "polarity_flip_rate": 0.05831574908881642
+ },
+ "ci95": {
+  "macro_f1": [
+   0.7241350826743046,
+   0.7432400913367943
+  ],
+  "accuracy": [
+   0.7217303313938781,
+   0.7410827219833038
+  ]
+ },
+ "baseline": {
+  "always": "positive",
+  "accuracy": 0.3588413862888945,
+  "macro_f1": 0.17605262341369574
+ },
+ "verdict": "works",
+ "thresholds": {
+  "works_macro_f1_lower_bound": 0.6,
+  "fails_below": 0.4,
+  "accuracy_margin_over_baseline": 0.1
+ }
+}
