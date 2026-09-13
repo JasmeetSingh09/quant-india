@@ -117,6 +117,51 @@ finally:
 
 print()
 print("=" * 72)
+print("THE NSE EQUITY LIST DOWNLOAD STOPS TOO")
+print("=" * 72)
+
+# nse_access has always said the pause stops "the equity list download", and
+# nothing stopped it. stock_universe.refresh_nse_stocks visits nseindia.com and
+# downloads EQUITY_L.csv through a requests.Session, which the tripwire above
+# never saw because it only replaces requests.get. Production's log for
+# 2026-09-13 11:35 UTC shows that download running at startup during the pause.
+# This tripwire sits under every requests call, Session or not.
+import tempfile  # noqa: E402
+
+os.environ["QUANT_DATA_DIR"] = tempfile.mkdtemp()     # an empty list, so always stale
+import stock_universe  # noqa: E402
+
+importlib.reload(stock_universe)
+
+session_calls = []
+real_request = requests.Session.request
+
+
+def _session_tripwire(self, method, url, *a, **k):
+    session_calls.append(str(url))
+    if "nseindia.com" in str(url):
+        raise AssertionError("NSE contacted while collection is paused")
+    raise requests.ConnectionError("offline test: nothing is fetched")
+
+
+requests.Session.request = _session_tripwire
+try:
+    for force in (False, True):
+        session_calls.clear()
+        r = stock_universe.refresh_nse_stocks(force=force)
+        label = "forced, as /stock/universe/refresh does" if force else "stale list, as at startup"
+        check(f"refresh_nse_stocks is paused ({label})", r.get("paused") is True, f"{r}")
+        check(f"  ...and did not contact NSE ({'forced' if force else 'startup'})",
+              not [u for u in session_calls if "nseindia.com" in u], f"{session_calls[:3]}")
+    session_calls.clear()
+    stock_universe.refresh_bse_stocks(force=True)
+    check("the BSE list is not paused: the commitment was to NSE",
+          any("bseindia.com" in u for u in session_calls), f"{session_calls[:2]}")
+finally:
+    requests.Session.request = real_request
+
+print()
+print("=" * 72)
 print("STORED DATA IS STILL SERVED")
 print("=" * 72)
 

@@ -123,6 +123,18 @@ def refresh_nse_stocks(force: bool = False) -> dict:
         conn.close()
         return {"status": "cached", "count": count, "exchange": "NSE"}
 
+    # nse_access says the pause stops the equity list download. Until 2026-09-13
+    # this function never asked, and production downloaded EQUITY_L.csv at
+    # startup during the pause. While paused, keep the stored list (reading it is
+    # not collection) and fetch nothing, forced or not.
+    from nse_access import collection_paused, paused_result
+    if collection_paused():
+        conn = sqlite3.connect(DB_PATH)
+        count = conn.execute("SELECT COUNT(*) FROM nse_stocks").fetchone()[0]
+        conn.close()
+        return {**paused_result("NSE equity list"), "status": "paused",
+                "count": count, "exchange": "NSE"}
+
     # Start a session to get NSE cookies first
     session = requests.Session()
     session.headers.update(HEADERS)

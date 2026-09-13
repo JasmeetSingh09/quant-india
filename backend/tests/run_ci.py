@@ -64,7 +64,7 @@ SUITES = [
     ("bounded_cache_test.py",               34, 120),
     ("integrity_evidence_test.py",          34, 120),
     ("adjusted_prices_test.py",             33, 120),
-    ("nse_collection_pause_test.py",        31, 120),
+    ("nse_collection_pause_test.py",        36, 120),
     ("lab_findings_test.py",                28, 120),
     ("cycle_audit_test.py",                 27, 120),
     ("db_batch_insert_test.py",             27, 120),
