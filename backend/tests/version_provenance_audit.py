@@ -168,6 +168,10 @@ INVENTORY = {
         "UNSCOREABLE_ATTEMPTS": OPERATIONAL, "UNSCOREABLE_RECHECK_DAYS": OPERATIONAL,
     },
     "monte_carlo": {"RANDOM_SEED": ENVIRONMENT},
+    # How long the nightly scan waits before asking Yahoo again for company
+    # information that came back empty or truncated. Pacing, not scoring: it
+    # decides whether an input arrives, never what a present input is worth.
+    "lookup_context": {"RETRY_WAITS": OPERATIONAL},
     "optimizer_stability": {"RANDOM_SEED": ENVIRONMENT,
                             "DEFAULT_TRIALS": BEHAVIOURAL},
     "overfitting": {"RANDOM_SEED": ENVIRONMENT, "EULER_GAMMA": BEHAVIOURAL},

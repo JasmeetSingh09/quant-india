@@ -574,12 +574,24 @@ def get_info(ticker: str) -> dict:
     hit = _INFO_CACHE.get(ticker)
     if hit and now - hit[0] < _INFO_TTL:
         return hit[1]
-    try:
-        info = yf.Ticker(ticker).info or {}
-    except Exception:
-        info = {}
+    # Inside the nightly scan a truncated answer is asked for again after a
+    # pause, keeping the fullest one seen (see lookup_context). Outside it this
+    # asks once, as before.
+    from lookup_context import retry_waits
+    info = {}
+    for wait in (0.0,) + retry_waits():
+        if wait:
+            time.sleep(wait)
+        try:
+            got = yf.Ticker(ticker).info or {}
+        except Exception:
+            got = {}
+        if len(got) > len(info):
+            info = got
+        if _info_looks_complete(info):
+            break
     if _info_looks_complete(info):            # has the financial block → cache it
-        _INFO_CACHE[ticker] = (now, info)
+        _INFO_CACHE[ticker] = (time.time(), info)
         return info
     return hit[1] if hit else info            # throttled → last good beats truncated
 

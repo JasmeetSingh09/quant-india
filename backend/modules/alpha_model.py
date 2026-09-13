@@ -141,30 +141,53 @@ SIGNAL_COLOURS = {
 _INFO_CACHE = BoundedCache(512, "alpha_model._INFO_CACHE")   # ticker -> (fetched_at, info_dict)
 _INFO_TTL = 24 * 3600           # fundamentals are ~daily data
 _INFO_TIMEOUT = 6               # seconds; a slow fetch degrades to neutral
+# A truncated payload is kept only briefly. Caching it for _INFO_TTL is how a
+# throttled answer during a scan could stay for the rest of the day.
+_INFO_INCOMPLETE_TTL = 10 * 60
+
+
+def _fetch_info_once(ticker: str) -> dict:
+    import concurrent.futures as _cf
+    def _fetch():
+        return yf.Ticker(ticker).info or {}
+    try:
+        with _cf.ThreadPoolExecutor(max_workers=1) as ex:
+            return ex.submit(_fetch).result(timeout=_INFO_TIMEOUT) or {}
+    except Exception:
+        return {}
 
 
 def _ticker_info(ticker: str) -> dict:
     """Cached, timeout-guarded replacement for `yf.Ticker(ticker).info`.
-    Returns {} (never hangs) so factor code degrades gracefully."""
+    Returns {} (never hangs) so factor code degrades gracefully.
+
+    Inside the nightly scan (lookup_context.scan_lookups) an empty, truncated or
+    timed-out answer is asked for again after a pause, keeping the fullest one
+    seen. Outside it a person is waiting, so it asks once."""
     import time
+    from data_fetcher import _info_looks_complete
+    from lookup_context import retry_waits
     hit = _INFO_CACHE.get(ticker)
     now = time.time()
-    if hit and now - hit[0] < _INFO_TTL:
-        return hit[1]
+    if hit:
+        ttl = _INFO_TTL if _info_looks_complete(hit[1]) else _INFO_INCOMPLETE_TTL
+        if now - hit[0] < ttl:
+            return hit[1]
 
-    import concurrent.futures as _cf
-    def _fetch():
-        return yf.Ticker(ticker).info or {}
-    info = {}
-    try:
-        with _cf.ThreadPoolExecutor(max_workers=1) as ex:
-            info = ex.submit(_fetch).result(timeout=_INFO_TIMEOUT) or {}
-    except Exception:
-        # timeout or fetch error — serve stale if we have any, else empty
-        info = hit[1] if hit else {}
-    if info:
-        _INFO_CACHE[ticker] = (now, info)
-    return info
+    best = {}
+    for wait in (0.0,) + retry_waits():
+        if wait:
+            time.sleep(wait)
+        info = _fetch_info_once(ticker)
+        if len(info) > len(best):
+            best = info
+        if _info_looks_complete(best):
+            break
+    if best:
+        _INFO_CACHE[ticker] = (time.time(), best)
+        return best
+    # every attempt failed — serve stale if we have any, else empty
+    return hit[1] if hit else {}
 
 
 def _sanitize(obj):

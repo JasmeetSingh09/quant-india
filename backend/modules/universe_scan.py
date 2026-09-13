@@ -497,12 +497,17 @@ def _scan_loop_inner():
         if _STOP.is_set():
             return
         try:
-            r = compute_alpha_score(ticker)
-            if "error" not in r:
-                try:
-                    r["market_cap"] = (_ticker_info(ticker) or {}).get("marketCap")
-                except Exception:
-                    r["market_cap"] = None
+            # Company-info lookups made while scoring retry an empty or truncated
+            # answer. The scan has hours; a score built without the data does
+            # not help anyone (2026-09-11 to 13: see lookup_context).
+            from lookup_context import scan_lookups
+            with scan_lookups():
+                r = compute_alpha_score(ticker)
+                if "error" not in r:
+                    try:
+                        r["market_cap"] = (_ticker_info(ticker) or {}).get("marketCap")
+                    except Exception:
+                        r["market_cap"] = None
             _save_result(ticker, cycle, r)
             time.sleep(PAUSE_BETWEEN)
         except Exception as e:
