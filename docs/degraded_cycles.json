@@ -1,0 +1,16 @@
+{
+  "what_this_is": "Scan cycles whose published scores were built on much less company data than normal. The rows in `predictions` for these snapshot dates are sealed and have not been changed; this file is how an analysis of the track record finds them. See docs/DATA_INCIDENT_2026-09-11.md.",
+  "measured_from": "GET /scan/provenance-gap?cycle=<cycle> on production, read 2026-09-13",
+  "baseline": [
+    {"cycle": "2026-09-09", "observations": 2704, "value_factor_scored": 2575, "value_factor_scored_pct": 95.2, "roe_missing": 415, "roe_missing_pct": 15.4, "stocks_with_valuation_peers": 2318, "incomplete_inputs_pct": 27.0},
+    {"cycle": "2026-09-10", "observations": 2706, "value_factor_scored": 2577, "value_factor_scored_pct": 95.2, "roe_missing": 419, "roe_missing_pct": 15.5, "stocks_with_valuation_peers": 2320, "incomplete_inputs_pct": 27.0}
+  ],
+  "degraded": [
+    {"cycle": "2026-09-11", "observations": 2635, "value_factor_scored": 1365, "value_factor_scored_pct": 51.8, "roe_missing": 1400, "roe_missing_pct": 53.1, "stocks_with_valuation_peers": 1248, "incomplete_inputs_pct": 59.6, "no_market_data_failures": 72},
+    {"cycle": "2026-09-12", "observations": 2573, "value_factor_scored": 84, "value_factor_scored_pct": 3.3, "roe_missing": 2515, "roe_missing_pct": 97.7, "stocks_with_valuation_peers": 84, "incomplete_inputs_pct": 97.8, "no_market_data_failures": 135},
+    {"cycle": "2026-09-13", "observations": 2656, "value_factor_scored": 1533, "value_factor_scored_pct": 57.7, "roe_missing": 1272, "roe_missing_pct": 47.9, "stocks_with_valuation_peers": 1399, "incomplete_inputs_pct": 54.9, "no_market_data_failures": 107}
+  ],
+  "affected": "value and quality factor inputs (Yahoo company info), and so the composite alpha score, signal and cap tier. Momentum inputs were unaffected.",
+  "not_affected": "momentum (price history), and the Piotroski inputs, which come from financial statements rather than company info.",
+  "open": "Cycles after 2026-09-13 have not been assessed yet. Add each one the nightly check marks red on fundamentals coverage."
+}
