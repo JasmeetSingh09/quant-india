@@ -243,8 +243,13 @@ check("a future-dated observation trips the check",
 check("  ...and names it", bool(after["offenders"]))
 
 # The UTC/IST trap that has already produced one false alarm in this project.
+# "Tomorrow" is counted from the UTC date the boundary uses. Counted from this
+# machine's date it produced a second false alarm: run in India between midnight
+# and 05:30, the local date is already a day ahead of UTC, so local tomorrow is
+# two days past the server's today and the check rightly trips.
+from datetime import datetime as _dt, timezone as _tz  # noqa: E402
 build_clean()
-TOMORROW = (date.today() + timedelta(days=1)).isoformat()
+TOMORROW = (_dt.now(_tz.utc).date() + timedelta(days=1)).isoformat()
 corrupt(f"UPDATE bhavcopy_eod SET day = '{TOMORROW}' "
         f"WHERE symbol='S2.NS' AND day='2026-01-20'")
 check("a row dated TOMORROW does NOT trip it",
