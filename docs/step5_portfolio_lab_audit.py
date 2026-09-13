@@ -250,8 +250,14 @@ if st == 200 and isinstance(fg, dict):
     check("fit: a priceable stock is judged on correlation, not only weights",
           "correlation" in comps, str(sorted(comps)))
 
-st, fu, _ = call("fit SMALL250", "/portfolio/fit",
-                 {"ticker": "SMALL250.NS", "holdings": REAL3, "add_pct": 10.0})
+# The unpriceable example was SMALL250.NS until Yahoo began serving its prices
+# (31 days by 2026-09-13), which turned a correct answer into a failed check.
+# GENESYS-RE.NS is a rights entitlement: it trades for a few days and Yahoo holds
+# one day of history for it. If a check below starts failing, confirm this
+# example still has almost no history before calling it a regression.
+UNPRICEABLE = "GENESYS-RE.NS"
+st, fu, _ = call("fit GENESYS-RE", "/portfolio/fit",
+                 {"ticker": UNPRICEABLE, "holdings": REAL3, "add_pct": 10.0})
 if isinstance(fu, dict):
     comps = fu.get("components") or {}
     claims_overlap = "overlap" in str(fu.get("verdict", "")).lower()
@@ -273,8 +279,9 @@ st, _, raw = whatif({})
 check("what-if refuses an empty portfolio", st == 400, f"HTTP {st} {raw[:60]}")
 st, _, raw = whatif({"ZZZQQQ123.NS": 50000, "QQQZZZ456.NS": 50000})
 check("what-if refuses two nonexistent tickers", st == 400, f"HTTP {st} {raw[:60]}")
-st, _, raw = whatif({"RELIANCE.NS": 50000, "SMALL250.NS": 50000})
-check("what-if refuses a security the scan cannot price (SMALL250)",
+st, _, raw = whatif({"RELIANCE.NS": 50000, UNPRICEABLE: 50000})
+check(f"what-if refuses a security with no usable price history "
+      f"({UNPRICEABLE.replace('.NS', '')})",
       st == 400, f"HTTP {st} {raw[:60]}")
 
 DISCLOSE = ("dropped", "excluded", "skipped", "unpriced", "no price", "no data",
