@@ -75,6 +75,7 @@ SUITES = [
     ("universe_filter_test.py",             39, 120),
     ("nightly_production_check_test.py",    33, 120),
     ("company_info_retry_test.py",          15, 120),
+    ("statement_factors_test.py",           17, 120),
     ("bhavcopy_gap_test.py",                22, 120),
     ("score_cache_test.py",                 21, 120),
     ("identity_resolution_test.py",         18, 120),

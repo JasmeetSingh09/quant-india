@@ -13,10 +13,10 @@ failure count above zero, prints fewer checks than its floor (or no count), or
 tries to reach the network. The network block covers Python sockets, DNS, and
 `curl_cffi`, the C library yfinance downloads through.
 
-## In the gate: 44 suites
+## In the gate: 45 suites
 
 Everything in `SUITES`. The two large property suites (81,215 and 87,173 checks)
-plus 42 focused suites, 169,850 checks in all.
+plus 43 focused suites, 169,867 checks in all.
 
 `bhavcopy_history_test.py` joined on 2026-09-11. It used to download a real
 2015 file from NSE on every run; it now parses a sample in the 2015 layout, and
