@@ -120,11 +120,51 @@ check("the early warning UNMEASURED", bool(N.judge_at_risk(f)))
 s, f = night(failure_changes={"stability_vs_previous_cycle": None})
 check("no previous cycle to compare with", bool(N.judge_jump(f)))
 
+print("\n" + "=" * 74 + "\nFUNDAMENTALS — SCORES BUILT ON MISSING INPUTS ARE NOT A GOOD NIGHT\n"
+      + "=" * 74)
+
+# On 2026-09-12 the value factor scored for 84 of 2,573 stocks, and every check
+# above would have passed: the scan finished, failures did not jump, and each
+# missing input carried a recorded reason. The numbers below are the real ones
+# from /scan/provenance-gap for the nights either side of that.
+
+
+def coverage(value_scored, total, roe_missing_pct):
+    return {"available": True, "cycle": TODAY, "observations": {"total": total},
+            "factors": {"value": {"scored": value_scored,
+                                  "scored_pct": round(100.0 * value_scored / total, 2)},
+                        "quality": {"missing_by_input": [
+                            {"input": "roe", "stocks": 0, "pct_of_scored": roe_missing_pct}]}}}
+
+
+has = hasattr(N, "judge_fundamentals")
+check("the nightly check has a fundamentals test", has)
+judge = N.judge_fundamentals if has else (lambda pg: ["no fundamentals test"])
+r = judge(coverage(2577, 2706, 15.49))
+check("2026-09-10 (value 2,577 of 2,706; ROE missing 15%) is a good night", r == [], str(r))
+for day, args in (("2026-09-11", (1365, 2635, 53.13)), ("2026-09-12", (84, 2573, 97.75)),
+                  ("2026-09-13", (1533, 2656, 47.89))):
+    r = judge(coverage(*args))
+    check(f"{day} (value {args[0]:,} of {args[1]:,}) is a bad night, and says why",
+          has and bool(r) and "value" in " ".join(r).lower(), str(r)[:120])
+r = judge(coverage(2577, 2706, 47.0))
+check("value fine but ROE missing for 47% of stocks is still a bad night",
+      has and bool(r) and "roe" in " ".join(r).lower(), str(r)[:120])
+check("value 86% and ROE missing 24% is inside the line",
+      has and judge(coverage(2327, 2706, 24.0)) == [])
+for label, bad in (("unreachable", {"error": "HTTP 502"}),
+                   ("UNMEASURED", {"status": "UNMEASURED", "reason": "no scan cycle"}),
+                   ("not available", {"available": False, "reason": "no cycle"})):
+    check(f"the coverage report {label} is not good news", has and bool(judge(bad)))
+
 print("\n" + "=" * 74 + "\nTHE EXIT CODE THE WORKFLOW READS\n" + "=" * 74)
 
+GOOD_COVERAGE = coverage(2577, 2706, 15.49)
 
-def exit_for(s, f, lab_exit):
-    got = {"/alpha/universe/status": s, "/health/data-integrity?domain=scan_failures": f}
+
+def exit_for(s, f, lab_exit, pg=None):
+    got = {"/alpha/universe/status": s, "/health/data-integrity?domain=scan_failures": f,
+           f"/scan/provenance-gap?cycle={TODAY}": pg or GOOD_COVERAGE}
     return N.run_checks(get=lambda p: got[p], portfolio_lab=lambda: lab_exit,
                         today=TODAY, out=lambda *a: None)
 
@@ -134,13 +174,17 @@ check("a good night with Portfolio Lab passing -> exit 0", exit_for(s, f, 0) == 
 check("a good night with Portfolio Lab failing -> exit 1", exit_for(s, f, 1) == 1)
 s, f = night(failure_changes={"stability_vs_previous_cycle.failed_now": 72})
 check("a failure jump with everything else fine -> exit 1", exit_for(s, f, 0) == 1)
+s, f = night()
+check("collapsed fundamentals with everything else fine -> exit 1",
+      exit_for(s, f, 0, coverage(84, 2573, 97.75)) == 1)
 calls = []
 s, f = night()
-N.run_checks(get=lambda p: calls.append(p) or {"/alpha/universe/status": s}.get(p, f),
+reads = {"/alpha/universe/status": s, "/health/data-integrity?domain=scan_failures": f,
+         f"/scan/provenance-gap?cycle={TODAY}": GOOD_COVERAGE}
+N.run_checks(get=lambda p: calls.append(p) or reads.get(p, {}),
              portfolio_lab=None, today=TODAY, out=lambda *a: None)
-check("the scan checks are GET-only reads of the two public endpoints",
-      sorted(calls) == ["/alpha/universe/status", "/health/data-integrity?domain=scan_failures"],
-      str(calls))
+check("the scan checks are GET-only reads of three public endpoints",
+      sorted(calls) == sorted(reads), str(calls))
 
 print("\n" + "=" * 74)
 print(f"passed {len(PASS)}, failed {len(FAIL)}")
