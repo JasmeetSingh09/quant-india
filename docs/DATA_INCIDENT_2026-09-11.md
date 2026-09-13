@@ -61,9 +61,9 @@ on production.
 | | Change | Status |
 |---|---|---|
 | Filter guard | A stock that scored in the last 60 days is never excluded | Shipped 2026-09-12 (`4773fe7`) |
-| A | Nightly check goes red when value or ROE coverage collapses (value under 85% of stocks, or ROE missing for over 25%) | Built and tested; not yet deployed |
-| B | Inside the scan, retry company-info lookups that come back empty, truncated or timed out (waits of 2 s then 5 s); keep a truncated payload for 10 minutes, not 24 hours. Outside the scan a lookup still asks once | Built and tested; not yet deployed |
-| E | This record and `degraded_cycles.json` | This commit |
+| A | Nightly check goes red when value or ROE coverage collapses (value under 85% of stocks, or ROE missing for over 25%) | Live from 2026-09-13 (`93e5415`); the nightly check runs from the repo |
+| B | Inside the scan, retry company-info lookups that come back empty, truncated or timed out (waits of 2 s then 5 s); keep a truncated payload for 10 minutes, not 24 hours. Outside the scan a lookup still asks once | Live on Render from 2026-09-13 21:03 UTC (`eeb073a`, deployed as part of `7718754`). First scan using it: 2026-09-14. Effect not yet measured |
+| E | This record and `degraded_cycles.json` | Committed 2026-09-13 (`a8e70d0`) |
 | D | Don't publish a scan whose fundamentals coverage collapsed | Proposed; decide after B has run |
 
 ## Also found, not changed

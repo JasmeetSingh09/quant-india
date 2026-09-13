@@ -1,6 +1,10 @@
 # The NSE collection pause did not cover the equity list download
 
-**Found:** 2026-09-13. **Fixed:** in the commit that adds this record.
+**Found:** 2026-09-13. **Fixed:** `7718754`, live on Render from 2026-09-13
+21:03 UTC. **Verified on production** at 21:04 UTC:
+`POST /stock/universe/refresh?exchange=NSE` returned `"paused": true,
+"collected": 0` in 0.39 s, with no request made. It also reported `count: 0`:
+production's stored NSE list is empty.
 
 ## The commitment
 
@@ -60,8 +64,11 @@ production's `nse_stocks` table was found empty during Step 3.
 **Unknown.** Every server start since 2026-09-08 whose list was stale: each
 deploy and each restart Render made on its own. Render's logs are the only record
 and should be searched for `refresh_nse_stocks` or `NSE stock universe refreshed`.
-The deploy of `eeb073a` (pushed 2026-09-13 20:33 UTC, before this fix) may have
-added one more if its restart happened before this fix went live.
+An earlier version of this record guessed that the deploy of `eeb073a` (pushed
+2026-09-13 20:33 UTC, before this fix) might have added one more. It did not:
+that build was cancelled because the Render workspace had run out of build
+minutes, so the server went straight from `4773fe7` to `7718754`, whose startup
+is paused.
 
 ## The fix
 
