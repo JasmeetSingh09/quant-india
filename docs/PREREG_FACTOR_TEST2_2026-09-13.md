@@ -97,3 +97,24 @@ non-overlapping windows.
 - The saved statements and prices are kept with the result, so the test can be
   reproduced from exactly the data it used.
 - Sentiment, the composite score and the Buy/Sell labels are not tested here.
+
+## Amendments, committed before the run
+
+Written 2026-09-13 while building the test, before any result on real data.
+
+1. **A missing price at the end of a holding period is left out of that
+   holding period, not counted as −100%.** Test 1 counts it as −100% because its
+   archive includes delisted companies, so a missing price there means the
+   stock stopped trading. This test's Yahoo data contains only companies listed
+   today, so a missing price here is a gap in the data, not a failure.
+2. **Prices come from Yahoo as registered.** A 40-stock sample found 31 with
+   daily prices from 2022, 3 from 2023, 4 from 2024–25 and 2 only from August
+   2026. A stock without a price within a week of a month-end is not eligible
+   that month. The production archive has complete prices but no per-stock
+   endpoint, so it was not used.
+3. **Piotroski points F4 and F5 are always 0**, as they are live: the live code
+   reads total assets and equity only from Yahoo's summary, which never carries
+   them for NSE stocks. "Treating missing long-term debt as zero" above
+   therefore changes nothing.
+4. **Previous fiscal year** means the statement dated 300 to 430 days before the
+   one in use.
