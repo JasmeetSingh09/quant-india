@@ -20,13 +20,18 @@ minimum-holdings guard and the cost model are identical to the frozen v1.0
 backtest. This is a different UNIVERSE, not a different strategy. If the result
 is worse, that is the finding.
 
-Known limits, stated before any number is produced
---------------------------------------------------
-The archive starts in January 2024, and a 12-month lookback plus a skip month
-consumes the first thirteen. So roughly eighteen months of rebalances remain.
-That is a clean test of the implementation over that window and nothing more —
-eighteen monthly observations cannot establish a durable edge, and this module
-says so in its own output rather than leaving it to a footnote.
+Known limits
+------------
+The archive now starts in July 2011. When this module was written it started in
+January 2024, which left about eighteen rebalances after the 12-month lookback
+and skip month. However many there are, one market is one market, and the output
+says so rather than leaving it to a footnote.
+
+Closes are corrected for splits, bonuses and dividends before any return is
+computed (ADJUST_PRICES, from 2026-09-14), using pit_validation's correction.
+Before that a bonus issue inside a holding month was booked as a crash.
+identity_ab() still runs on printed closes, because it measures the identity
+bug, not the strategy.
 """
 
 from model_config import RISK_FREE_RATE as _RF
@@ -45,6 +50,50 @@ MIN_HOLDINGS = 5
 # any size that matters, and including it measures a price nobody could have
 # transacted at. 1 crore/day is already generous for a retail book.
 MIN_MONTHLY_TURNOVER = 1e7
+
+# Whether month-end closes are corrected for splits, bonuses and dividends
+# before returns are computed. Until 2026-09-14 this backtest ran on the closes
+# the exchange printed, so a 1:1 bonus inside a holding month booked -50% on a
+# company to which nothing had happened (docs/PHASE2_FINDINGS_2026-09-14.md,
+# section 3). The correction is pit_validation's own, so the two studies cannot
+# adjust differently.
+ADJUST_PRICES = True
+
+
+def _adjusted_prebuilt(conn):
+    """
+    Month-end panels keyed on resolved identity, from adjusted closes.
+
+    Returns (month_days, closes, values, to_resolved, resolved, prices), the
+    shape run() takes as _prebuilt, or None when identity cannot be resolved.
+    Values are traded value on the month-end day, as _panel computes them, and
+    stay as printed. Only resolved keying is built: the symbol- and ISIN-keyed
+    runs exist to measure the identity bug, and identity_ab keeps them on
+    printed closes.
+    """
+    import numpy as np
+    import pit_validation as PV
+    try:
+        from security_identity import _pairs, _resolve_pairs
+        pair_rows = _pairs(conn)
+        canonical, _components, links, amb = _resolve_pairs(pair_rows)
+    except Exception:
+        return None
+    resolved = {"linked_isins": len(links), "ambiguous_not_merged": len(amb)}
+    keys, days, C, V, adjustment = PV.load_adjusted(conn, canonical, pair_rows)
+    del pair_rows
+
+    month_days, closes, values, to_resolved = [], {}, {}, {}
+    for ym, col in PV._month_end_cols(days):
+        month_days.append((ym, days[col]))
+        c_col, v_col = C[:, col], V[:, col]
+        idx = np.where(np.isfinite(c_col) & (c_col > 0))[0]
+        closes[ym] = {keys[i]: float(c_col[i]) for i in idx}
+        values[ym] = {keys[i]: float(v_col[i]) for i in idx}
+        to_resolved[ym] = {keys[i]: keys[i] for i in idx}
+    prices = {"adjusted_for_corporate_actions": bool(adjustment.get("applied")),
+              "adjustment": adjustment}
+    return month_days, closes, values, to_resolved, resolved, prices
 
 
 def _month_end_days(conn) -> list:
@@ -197,8 +246,12 @@ def run(top_fraction: float = 0.2, min_turnover: float = MIN_MONTHLY_TURNOVER,
     Running the same strategy under each is the only way to attribute a
     difference in result to identity rather than to anything else.
     """
+    prices = {"adjusted_for_corporate_actions": False,
+              "reason": "closes as the exchange printed them"}
     if _prebuilt is not None:
-        month_days, closes, values, to_resolved, resolved = _prebuilt
+        month_days, closes, values, to_resolved, resolved = _prebuilt[:5]
+        if len(_prebuilt) > 5 and _prebuilt[5]:
+            prices = _prebuilt[5]
     else:
         try:
             from db import get_conn
@@ -212,17 +265,27 @@ def run(top_fraction: float = 0.2, min_turnover: float = MIN_MONTHLY_TURNOVER,
                 return {"error": (f"Only {len(month_days)} months of exchange "
                                   f"files. A 12-1 momentum test needs at least "
                                   f"{LOOKBACK_MONTHS + SKIP_MONTHS + 2}.")}
-            # Resolve identity BEFORE building the panel, so a company that
-            # changed ISIN mid-window is one column rather than two.
-            try:
-                from security_identity import _pairs, _resolve_pairs
-                canonical, _components, _links, _amb = _resolve_pairs(_pairs(conn))
-                resolved = {"linked_isins": len(_links),
-                            "ambiguous_not_merged": len(_amb)}
-            except Exception as e:
-                canonical, resolved = {}, {"error": type(e).__name__}
-            closes, values, to_resolved = _panel(conn, month_days, canonical,
-                                                 key_mode)
+            built = (_adjusted_prebuilt(conn)
+                     if ADJUST_PRICES and key_mode == "resolved" else None)
+            if built is not None:
+                month_days, closes, values, to_resolved, resolved, prices = built
+            else:
+                if ADJUST_PRICES:
+                    prices["reason"] = (
+                        "closes as printed: the correction is built for "
+                        "resolved identity only" if key_mode != "resolved" else
+                        "closes as printed: identity could not be resolved")
+                # Resolve identity BEFORE building the panel, so a company that
+                # changed ISIN mid-window is one column rather than two.
+                try:
+                    from security_identity import _pairs, _resolve_pairs
+                    canonical, _components, _links, _amb = _resolve_pairs(_pairs(conn))
+                    resolved = {"linked_isins": len(_links),
+                                "ambiguous_not_merged": len(_amb)}
+                except Exception as e:
+                    canonical, resolved = {}, {"error": type(e).__name__}
+                closes, values, to_resolved = _panel(conn, month_days, canonical,
+                                                     key_mode)
         finally:
             try:
                 conn.close()
@@ -404,13 +467,21 @@ def run(top_fraction: float = 0.2, min_turnover: float = MIN_MONTHLY_TURNOVER,
                   "note": ("Charged on realised turnover each month: the "
                            "symmetric difference between consecutive baskets, "
                            "halved, times the round-trip rate.")},
+        "prices": prices,
         "limits": (
-            f"{len(strat_rets)} monthly observations. That is a clean test of "
-            f"the implementation over this window and nothing more — eighteen "
-            f"or so months cannot establish a durable edge, whatever the "
-            f"number says. Prices are exchange closes, unadjusted for splits "
-            f"and dividends, so a corporate action inside the hold month "
-            f"distorts that month's return for that name."),
+            f"{len(strat_rets)} monthly observations, {eq_months[0]} to "
+            f"{eq_months[-1]}, in one market: a test of the implementation over "
+            f"this window, not proof of a durable edge, whatever the number "
+            f"says. "
+            + ("Closes are adjusted for splits, bonuses and dividends "
+               f"({(prices.get('adjustment') or {}).get('actions_applied')} "
+               f"corporate actions applied, "
+               f"{(prices.get('adjustment') or {}).get('actions_unapplied')} "
+               f"could not be); traded value is left as printed."
+               if prices.get("adjusted_for_corporate_actions") else
+               "Prices are exchange closes, unadjusted for splits and dividends, "
+               "so a corporate action inside the hold month distorts that "
+               "month's return for that name.")),
     }
 
 
@@ -566,9 +637,6 @@ def _stats(monthly: list) -> dict:
     mean = sum(monthly) / n
     var = sum((r - mean) ** 2 for r in monthly) / (n - 1)
     vol = (var ** 0.5) * math.sqrt(12)
-    down = [r for r in monthly if r < 0]
-    dvol = ((sum((r - 0) ** 2 for r in down) / len(down)) ** 0.5 * math.sqrt(12)
-            if len(down) > 1 else None)
 
     curve, peak, max_dd = 1.0, 1.0, 0.0
     for r in monthly:
@@ -576,13 +644,17 @@ def _stats(monthly: list) -> dict:
         peak = max(peak, curve)
         max_dd = min(max_dd, curve / peak - 1)
 
-    rf = _RF
+    # The app's one definition of each (risk_metrics). These were
+    # (CAGR - rf) / volatility and (CAGR - rf) / the root-mean-square of the
+    # losing months, averaged over the losing months only.
+    from risk_metrics import sharpe as _sharpe, sortino as _sortino
+    sharpe, sortino = _sharpe(monthly, 12, _RF), _sortino(monthly, 12, _RF)
     return {
         "cagr_pct": round(cagr * 100, 2),
         "total_return_pct": round((total - 1) * 100, 2),
         "vol_pct": round(vol * 100, 2),
-        "sharpe": round((cagr - rf) / vol, 3) if vol > 0 else None,
-        "sortino": round((cagr - rf) / dvol, 3) if dvol else None,
+        "sharpe": round(sharpe, 3) if sharpe is not None else None,
+        "sortino": round(sortino, 3) if sortino is not None else None,
         "max_drawdown_pct": round(max_dd * 100, 2),
         "hit_rate_pct": round(sum(1 for r in monthly if r > 0) / n * 100, 1),
         "n_months": n,
@@ -713,9 +785,10 @@ def identity_ab(top_fraction: float = 0.2) -> dict:
         },
         "caution": (
             "A difference between these columns is a measure of the bug, not "
-            "evidence about the strategy. The corrected column is the only one "
-            "worth interpreting as a result, and it is still eighteen-odd "
-            "monthly observations over a single market regime."),
+            "evidence about the strategy. All three runs use closes as the "
+            "exchange printed them, so compare the columns with each other "
+            "only; the strategy's result, on adjusted closes, is "
+            "/backtest/full-pit."),
     }
 
 
@@ -726,9 +799,24 @@ def compare(top_fraction: float = 0.2) -> dict:
     One run sees only the companies that survived to the final month. The other
     sees what was actually trading. The difference is survivorship and nothing
     else, because every other line is shared.
+
+    The panel is built once, from adjusted closes, and both runs read it, so the
+    two sides cannot differ by what they read.
     """
-    pit = run(top_fraction=top_fraction, survivor_only=False)
-    sur = run(top_fraction=top_fraction, survivor_only=True)
+    prebuilt = None
+    if ADJUST_PRICES:
+        try:
+            from db import get_conn
+            conn = get_conn()
+            try:
+                if len(_month_end_days(conn)) >= LOOKBACK_MONTHS + SKIP_MONTHS + 2:
+                    prebuilt = _adjusted_prebuilt(conn)
+            finally:
+                conn.close()
+        except Exception:
+            prebuilt = None
+    pit = run(top_fraction=top_fraction, survivor_only=False, _prebuilt=prebuilt)
+    sur = run(top_fraction=top_fraction, survivor_only=True, _prebuilt=prebuilt)
     if "error" in pit:
         return {"error": f"point-in-time run: {pit['error']}"}
     if "error" in sur:

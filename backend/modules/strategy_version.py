@@ -233,6 +233,11 @@ def current_spec() -> dict:
          lambda: __import__("pit_backtest").MIN_HOLDINGS)
     _cap(pit, "min_monthly_turnover",
          lambda: __import__("pit_backtest").MIN_MONTHLY_TURNOVER)
+    # Whether its closes are corrected for corporate actions. Added 2026-09-14,
+    # when the backtest stopped running on printed closes: a switch that changes
+    # every return it computes is part of the strategy's record.
+    _cap(pit, "adjust_prices",
+         lambda: __import__("pit_backtest").ADJUST_PRICES)
     spec["pit_backtest"] = pit
 
     # Factor internals. These were inline literals until the provenance audit
@@ -296,7 +301,7 @@ def current_spec() -> dict:
             "LR_VOL_REF", "LR_DD_REF", "LR_VOL_W", "LR_DD_W",
             "MIN_MONTHLY_TURNOVER", "COST_ROUNDTRIP_PCT", "RISK_FREE",
             "N_BUCKETS", "MIN_NONOVERLAPPING", "REGIME_TREND_PCT",
-            "REGIME_VOL_ANN"])
+            "REGIME_VOL_ANN", "ADJUST_PRICES"])
     _cap(val, "horizons", lambda: list(__import__("pit_validation").HORIZONS))
     _cap(val, "factors", lambda: list(__import__("pit_validation").FACTORS))
     _cap(val, "bucket_order",

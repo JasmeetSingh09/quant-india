@@ -150,8 +150,8 @@ def run(min_turnover: float = 1e7, n_buckets: int = 5) -> dict:
     """
     try:
         from db import get_conn
-        from pit_validation import (_load, _month_end_cols, _grade, _mean_test,
-                                    COST_ROUNDTRIP_PCT)
+        from pit_validation import (load_adjusted, _month_end_cols, _grade,
+                                    _mean_test, COST_ROUNDTRIP_PCT)
         from security_identity import _pairs, _resolve_pairs
     except Exception as e:
         return {"available": False, "reason": f"{type(e).__name__}: {e}"}
@@ -163,7 +163,10 @@ def run(min_turnover: float = 1e7, n_buckets: int = 5) -> dict:
     try:
         pair_rows = _pairs(conn)
         canonical, _c, _l, _amb = _resolve_pairs(pair_rows)
-        keys, days, C, V = _load(conn, canonical, pair_rows)
+        # Corrected for splits, bonuses and dividends, exactly as the factor
+        # validation is. This study used to read the closes as printed, so a
+        # bonus inside a window scored as a crash.
+        keys, days, C, V, adjustment = load_adjusted(conn, canonical, pair_rows)
     finally:
         try:
             conn.close()
@@ -340,11 +343,18 @@ def run(min_turnover: float = 1e7, n_buckets: int = 5) -> dict:
         "universe": {"securities": len(keys), "trading_days": len(days),
                      "months_available": len(me), "liquidity_floor": min_turnover,
                      "cost_roundtrip_pct": COST_ROUNDTRIP_PCT},
+        "prices": {"adjusted_for_corporate_actions": bool(adjustment.get("applied")),
+                   "adjustment": adjustment},
         "limits": (
-            "One market period, monthly rebalances, prices unadjusted for splits "
-            "and dividends. The archive cannot supply enough non-overlapping "
-            "windows beyond three months, so longer horizons are excluded rather "
-            "than reported weakly. Nothing here establishes a durable edge for "
-            "any variant, including the baseline."),
+            "One market period, monthly rebalances. "
+            + ("Closes are corrected for splits, bonuses and dividends; traded "
+               "value is left as printed. "
+               if adjustment.get("applied") else
+               "Closes are as the exchange printed them, not corrected for "
+               "splits or dividends. ")
+            + "Horizons beyond three months were left out when this study was "
+              "registered, because the archive then held too few "
+              "non-overlapping windows for them. Nothing here establishes a "
+              "durable edge for any variant, including the baseline."),
         "as_of": datetime.now().strftime("%Y-%m-%d %H:%M"),
     })

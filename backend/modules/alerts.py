@@ -304,6 +304,7 @@ def check_and_send_watchlist_alerts(watchlist_entries: list) -> list:
 # ---------------------------------------------------------------------------
 
 import sqlite3
+import sqlite_local
 from apscheduler.schedulers.background import BackgroundScheduler
 
 _DB_PATH = Path(os.environ.get("QUANT_DATA_DIR", str(Path(__file__).parent.parent))) / "quant_platform.db"
@@ -313,7 +314,7 @@ _alert_scheduler_started = False
 
 
 def _init_alert_log():
-    conn = sqlite3.connect(_DB_PATH)
+    conn = sqlite_local.connect(_DB_PATH)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS alert_log (
             ticker        TEXT PRIMARY KEY,
@@ -326,7 +327,7 @@ def _init_alert_log():
 
 def _recently_alerted(ticker: str) -> bool:
     """True if we already alerted this ticker within the cooldown window."""
-    conn = sqlite3.connect(_DB_PATH)
+    conn = sqlite_local.connect(_DB_PATH)
     row = conn.execute("SELECT last_sent_at FROM alert_log WHERE ticker = ?", (ticker,)).fetchone()
     conn.close()
     if not row:
@@ -336,7 +337,7 @@ def _recently_alerted(ticker: str) -> bool:
 
 
 def _mark_alerted(ticker: str):
-    conn = sqlite3.connect(_DB_PATH)
+    conn = sqlite_local.connect(_DB_PATH)
     conn.execute(
         "INSERT OR REPLACE INTO alert_log (ticker, last_sent_at) VALUES (?, ?)",
         (ticker, datetime.now().isoformat())

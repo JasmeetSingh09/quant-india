@@ -1178,22 +1178,22 @@ def delete_simulation(name: str, user_id: str = "public") -> dict:
 # ---------------------------------------------------------------------------
 
 def _compute_sharpe(returns: pd.Series, risk_free: float = _RF) -> float:
-    if len(returns) < 2 or returns.std() == 0:
-        return 0.0
-    daily_rf = risk_free / 252
-    return round(float((returns - daily_rf).mean() / returns.std() * (252 ** 0.5)), 4)
+    """Sharpe ratio from risk_metrics, the app's one definition. 0.0 when undefined, as before."""
+    from risk_metrics import sharpe
+    v = sharpe(returns, 252, risk_free)
+    return round(float(v), 4) if v is not None else 0.0
 
 
-def _compute_sortino(returns: pd.Series, risk_free: float = _RF) -> float:
-    """Sortino ratio — penalises only downside volatility, not upside."""
-    if len(returns) < 2:
-        return 0.0
-    daily_rf      = risk_free / 252
-    excess        = returns - daily_rf
-    downside_std  = returns[returns < 0].std()
-    if downside_std == 0:
-        return 0.0
-    return round(float(excess.mean() / downside_std * (252 ** 0.5)), 4)
+def _compute_sortino(returns: pd.Series, risk_free: float = _RF):
+    """
+    Sortino ratio from risk_metrics. None when no day fell below the target.
+
+    This used to divide by the spread of the losing days among themselves, so a
+    portfolio whose losing days all lost the same amount reported 0.00.
+    """
+    from risk_metrics import sortino
+    v = sortino(returns, 252, risk_free)
+    return round(float(v), 4) if v is not None else None
 
 
 def _compute_calmar(returns: pd.Series, cum: pd.Series, years: float) -> float:

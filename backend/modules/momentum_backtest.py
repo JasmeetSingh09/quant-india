@@ -72,11 +72,12 @@ def _annualised(monthly: pd.Series) -> dict:
     std_m  = float(monthly.std(ddof=1))
     ann_ret = (1 + mean_m) ** 12 - 1
     ann_vol = std_m * np.sqrt(12)
-    rf_m = _RF / 12
-    sharpe = ((mean_m - rf_m) / std_m * np.sqrt(12)) if std_m > 0 else 0.0
-    downside = monthly[monthly < 0]
-    dstd = float(downside.std(ddof=1)) if len(downside) > 1 else 0.0
-    sortino = ((mean_m - rf_m) / dstd * np.sqrt(12)) if dstd > 0 else 0.0
+    # The app's one definition of each (risk_metrics). Sharpe was already this;
+    # Sortino divided by the spread of the losing months among themselves.
+    from risk_metrics import sharpe as _sharpe, sortino as _sortino
+    sharpe = _sharpe(monthly, 12, _RF)
+    sharpe = sharpe if sharpe is not None else 0.0
+    sortino = _sortino(monthly, 12, _RF)
     # Prepend the starting value so a fall in the FIRST month counts. Without
     # it month one becomes its own peak and an opening loss is not a drawdown.
     cum = (1 + monthly).cumprod()
@@ -87,7 +88,7 @@ def _annualised(monthly: pd.Series) -> dict:
         "cagr_pct":      round(ann_ret * 100, 2),
         "vol_pct":       round(ann_vol * 100, 2),
         "sharpe":        round(sharpe, 3),
-        "sortino":       round(sortino, 3),
+        "sortino":       round(sortino, 3) if sortino is not None else None,
         "max_drawdown_pct": round(max_dd * 100, 2),
         "hit_rate_pct":  round(float((monthly > 0).mean()) * 100, 1),
         "n_months":      int(len(monthly)),

@@ -376,6 +376,33 @@ def _apply_adjustment(conn, keys, days, C, canonical):
     return F, out
 
 
+# Whether closes are corrected for splits, bonuses and dividends before any
+# return is computed. Every study that reads the archive goes through
+# load_adjusted below, so this one switch decides it for all of them.
+ADJUST_PRICES = True
+
+
+def load_adjusted(conn, canonical, pair_rows=None):
+    """
+    The archive as matrices, with closes corrected for corporate actions.
+
+    One path for every study that reads the archive -- validate() here,
+    momentum_variants and pit_backtest -- so none of them can run on printed
+    closes again without saying so. Returns (keys, days, C, V, adjustment).
+    V, traded value, stays as printed for the reason _apply_adjustment gives.
+    """
+    keys, days, C, V = _load(conn, canonical, pair_rows)
+    if not ADJUST_PRICES:
+        return keys, days, C, V, {
+            "applied": False,
+            "reason": "ADJUST_PRICES is off; closes are as the exchange printed them"}
+    F, adjustment = _apply_adjustment(conn, keys, days, C, canonical)
+    if adjustment.get("applied"):
+        C = C * F
+    del F
+    return keys, days, C, V, adjustment
+
+
 def _month_end_cols(days):
     """Last stored trading day of each month, as a column index."""
     last = {}
@@ -518,11 +545,14 @@ def _series_stats(monthly):
         curve *= (1 + r)
         peak = max(peak, curve)
         mdd = min(mdd, curve / peak - 1)
+    # The app's one Sharpe definition (risk_metrics); this was (CAGR - rf) / vol.
+    from risk_metrics import sharpe as _sharpe
+    sharpe = _sharpe(monthly, 12, RISK_FREE)
     return {
         "months": n,
         "cagr_pct": round(cagr * 100, 2),
         "vol_pct": round(vol * 100, 2),
-        "sharpe": round((cagr - RISK_FREE) / vol, 3) if vol > 0 else None,
+        "sharpe": round(sharpe, 3) if sharpe is not None else None,
         "max_drawdown_pct": round(mdd * 100, 2),
         "months_up_pct": round(sum(1 for r in monthly if r > 0) / n * 100, 1),
     }
@@ -632,16 +662,12 @@ def validate(min_turnover: float = MIN_MONTHLY_TURNOVER,
             del _c, links, amb
         except Exception as e:
             canonical, ident = {}, {"error": type(e).__name__}
-        keys, days, C, V = _load(conn, canonical, pair_rows)
-        del pair_rows
         # The archive stores what the exchange printed, which is unadjusted.
-        # Correcting it here rather than in _load keeps the raw read and the
-        # correction separable, so a test can hold one against the other. V is
-        # built from raw prices inside _load and is deliberately left that way.
-        adj_factors, adjustment = _apply_adjustment(conn, keys, days, C, canonical)
-        if adjustment.get("applied"):
-            C = C * adj_factors
-        del adj_factors
+        # load_adjusted reads it raw and then corrects the closes, keeping the
+        # two steps separable so a test can hold one against the other. V,
+        # traded value, is deliberately left as printed.
+        keys, days, C, V, adjustment = load_adjusted(conn, canonical, pair_rows)
+        del pair_rows
     finally:
         try:
             conn.close()
@@ -963,11 +989,17 @@ def validate(min_turnover: float = MIN_MONTHLY_TURNOVER,
                         f"conventions fixed in advance, not fitted."),
         },
         "limits": (
-            f"{n_form} formation months over a single market period. Prices are "
-            f"exchange closes, unadjusted for splits and dividends, so a "
-            f"corporate action inside a holding window distorts that window for "
-            f"that security. Nothing here establishes a durable edge, and a "
-            f"result that survives correction over {n_form} months would still "
-            f"need out-of-sample confirmation."),
+            f"{n_form} formation months over a single market period. "
+            + (f"Closes are corrected for splits, bonuses and dividends "
+               f"({adjustment.get('actions_applied')} corporate actions applied, "
+               f"{adjustment.get('actions_unapplied')} could not be; see "
+               f"'adjustment'), and traded value is left as printed. "
+               if adjustment.get("applied") else
+               "Closes are as the exchange printed them, not corrected for "
+               "splits or dividends, so a corporate action inside a holding "
+               "window distorts that window for that security. ")
+            + f"Nothing here establishes a durable edge, and a result that "
+              f"survives correction over {n_form} months would still need "
+              f"out-of-sample confirmation."),
         "as_of": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }

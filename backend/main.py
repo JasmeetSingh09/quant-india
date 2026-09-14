@@ -328,10 +328,21 @@ async def startup():
     except Exception as _e:
         print(f"[scan] WARNING: could not start universe scan: {_e}")
     import asyncio
-    # Load stock universe in background so startup is not blocked
+
+    # The stock lists, then the screener cache, in ONE background task. Started
+    # as two tasks they wrote the same SQLite file at once: the screener held
+    # the write lock while waiting on Yahoo, and the stock list refresh failed
+    # with "database is locked" (docs/PHASE2_FINDINGS_2026-09-14.md).
+    def _load_local_caches():
+        for step in (ensure_universe_loaded, ensure_screener_cache):
+            try:
+                step()
+            except Exception as _e:
+                print(f"[startup] {step.__name__} failed: {type(_e).__name__}: {_e}")
+
+    # In the background so startup is not blocked.
     loop = asyncio.get_event_loop()
-    loop.run_in_executor(None, ensure_universe_loaded)
-    loop.run_in_executor(None, ensure_screener_cache)   # build screener cache if empty
+    loop.run_in_executor(None, _load_local_caches)
     start_news_scheduler()
     start_alert_scheduler(interval_minutes=30)   # auto-check watchlists for alerts
     from prediction_tracker import start_prediction_scheduler, snapshot as _snap
@@ -1141,19 +1152,19 @@ def commodity_category(category: str):
 
 
 # ---------------------------------------------------------------------------
-# Alpha Model — proprietary four-factor scoring
+# Alpha Model — the four-factor score (V1)
 # ---------------------------------------------------------------------------
 
 @app.get("/alpha/score")
 def alpha_score(ticker: str = Query(..., description="NSE ticker e.g. HDFCBANK.NS")):
     """
-    Compute the proprietary alpha score for a stock.
+    Compute the four-factor alpha score (V1) for a stock.
 
     Combines four factors into a single -100 to +100 score:
       Sentiment (25%) — decay-weighted FinBERT on recent headlines
-      Momentum  (35%) — cross-sectional rank vs sector peers
+      Momentum  (35%) — the stock's own 12-1 return, volatility-adjusted
       Quality   (25%) — Piotroski F-Score + ROE + FCF yield
-      Value     (15%) — P/E and P/B Z-score vs sector
+      Value     (15%) — P/E and P/B Z-score vs sector peers
 
     Returns score, signal (BUY/SELL/NEUTRAL), per-factor breakdown,
     and factor contributions in points.

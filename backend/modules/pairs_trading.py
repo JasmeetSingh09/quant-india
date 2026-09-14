@@ -295,7 +295,12 @@ def backtest_pair(
 
     cum = (1 + strat_ret).cumprod()
     total_return = round(float(cum.iloc[-1] - 1) * 100, 2)
-    sharpe = round(float(strat_ret.mean() / strat_ret.std() * np.sqrt(252)), 3) if strat_ret.std() > 0 else 0
+    # The app's one Sharpe definition (risk_metrics), with a target of 0 rather
+    # than the risk-free rate: a long-short spread position is self-financing,
+    # so its return is already an excess return.
+    from risk_metrics import sharpe as _sharpe
+    _sh = _sharpe(strat_ret, 252, risk_free=0.0)
+    sharpe = round(float(_sh), 3) if _sh is not None else 0
     win_rate = round(float((strat_ret[strat_ret != 0] > 0).mean()) * 100, 1) if (strat_ret != 0).any() else 0
     roll_max = cum.cummax()
     max_dd = round(float(((cum - roll_max) / roll_max).min()) * 100, 2)

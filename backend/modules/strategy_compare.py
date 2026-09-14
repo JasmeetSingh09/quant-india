@@ -40,8 +40,6 @@ def _metrics(daily, initial_value: float, turnover: float, periods_per_year: int
     years = len(r) / periods_per_year
     cagr = float((1 + total) ** (1 / years) - 1) if years > 0 and total > -1 else None
     vol = float(r.std() * np.sqrt(periods_per_year))
-    downside = r[r < 0]
-    dvol = float(downside.std() * np.sqrt(periods_per_year)) if len(downside) > 1 else None
 
     # Prepend the starting value so a fall in the FIRST period counts. Without
     # it the opening point is its own peak and a first-period loss vanishes.
@@ -50,8 +48,14 @@ def _metrics(daily, initial_value: float, turnover: float, periods_per_year: int
 
     # 6.5% is the RBI repo proxy used elsewhere in the app.
     rf = _RF
-    sharpe = round((cagr - rf) / vol, 3) if (cagr is not None and vol > 0) else None
-    sortino = round((cagr - rf) / dvol, 3) if (cagr is not None and dvol) else None
+    # The app's one definition of each (risk_metrics), per period and
+    # annualised. These were (CAGR - rf) / volatility and (CAGR - rf) / the
+    # spread of the losing days, so the same portfolio got a different figure
+    # here than on the backtest page.
+    from risk_metrics import sharpe as _sharpe, sortino as _sortino
+    _sh, _so = _sharpe(r, periods_per_year, rf), _sortino(r, periods_per_year, rf)
+    sharpe = round(_sh, 3) if _sh is not None else None
+    sortino = round(_so, 3) if _so is not None else None
     calmar = round(cagr / abs(max_dd), 3) if (cagr is not None and max_dd < 0) else None
 
     cost = turnover * COST_PER_UNIT_TURNOVER

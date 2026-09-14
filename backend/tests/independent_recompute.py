@@ -93,11 +93,18 @@ total_return = p[-1] / p[0] - 1.0
 cagr = (p[-1] / p[0]) ** (1.0 / years) - 1.0
 vol_ann = simple.std(ddof=1) * math.sqrt(TRADING_DAYS)
 
-downside = simple[simple < 0]
-dvol_ann = downside.std(ddof=1) * math.sqrt(TRADING_DAYS) if len(downside) > 1 else None
+# The app's definition (risk_metrics), written out again here so this stays an
+# independent check: daily excess over the risk-free rate, annualised, with the
+# downside deviation taken over ALL days rather than the losing days only.
+# (This used to copy the old (CAGR - rf) / spread-of-losing-days form, so it
+# could not have caught that form being wrong.)
+rf_day = RF_ANNUAL / TRADING_DAYS
+excess_d = simple - rf_day
+dvol_ann = math.sqrt(float(np.mean(np.minimum(excess_d, 0.0) ** 2))) * math.sqrt(TRADING_DAYS)
 
-sharpe = (cagr - RF_ANNUAL) / vol_ann if vol_ann > 0 else None
-sortino = (cagr - RF_ANNUAL) / dvol_ann if dvol_ann else None
+sd_d = simple.std(ddof=1)
+sharpe = float(excess_d.mean() / sd_d * math.sqrt(TRADING_DAYS)) if sd_d > 0 else None
+sortino = float(excess_d.mean() * TRADING_DAYS / dvol_ann) if dvol_ann else None
 
 # Max drawdown, with the starting value included so a first-period fall counts.
 curve = np.concatenate([[1.0], np.cumprod(1.0 + simple)])

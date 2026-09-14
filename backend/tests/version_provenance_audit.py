@@ -113,6 +113,9 @@ INVENTORY = {
         "COST_ROUNDTRIP_PCT": BEHAVIOURAL, "LOOKBACK_MONTHS": BEHAVIOURAL,
         "SKIP_MONTHS": BEHAVIOURAL, "MIN_HOLDINGS": BEHAVIOURAL,
         "MIN_MONTHLY_TURNOVER": BEHAVIOURAL,
+        # Corporate-action correction of closes, added 2026-09-14. It changes
+        # every return the backtest computes.
+        "ADJUST_PRICES": BEHAVIOURAL,
     },
     "pit_validation": {
         "MOM_LOOKBACK": BEHAVIOURAL, "MOM_SKIP": BEHAVIOURAL,
@@ -124,6 +127,8 @@ INVENTORY = {
         "HORIZONS": BEHAVIOURAL, "MIN_NONOVERLAPPING": BEHAVIOURAL,
         "REGIME_TREND_PCT": BEHAVIOURAL, "REGIME_VOL_ANN": BEHAVIOURAL,
         "FACTORS": BEHAVIOURAL, "UNTESTABLE": METADATA,
+        # One switch for every study that reads the archive (load_adjusted).
+        "ADJUST_PRICES": BEHAVIOURAL,
     },
     "strategy_compare": {"COST_PER_UNIT_TURNOVER": BEHAVIOURAL},
     "market_validation": {
@@ -239,13 +244,13 @@ for name in ("RISK_FREE_RATE", "TRADING_DAYS_PER_YEAR", "MONTHS_PER_YEAR",
              "COST_EXCHANGE_PCT", "COST_GST_PCT", "BENCHMARK_INDEX"):
     SPEC_MAPPING[("model_config", name)] = (f"shared_config.{name.lower()}", None)
 for name in ("COST_ROUNDTRIP_PCT", "LOOKBACK_MONTHS", "SKIP_MONTHS",
-             "MIN_HOLDINGS", "MIN_MONTHLY_TURNOVER"):
+             "MIN_HOLDINGS", "MIN_MONTHLY_TURNOVER", "ADJUST_PRICES"):
     SPEC_MAPPING[("pit_backtest", name)] = (f"pit_backtest.{name.lower()}", None)
 for name in ("MOM_LOOKBACK", "MOM_SKIP", "MOM_TANH_DIV", "LR_WINDOW",
              "LR_VOL_REF", "LR_DD_REF", "LR_VOL_W", "LR_DD_W",
              "MIN_MONTHLY_TURNOVER", "COST_ROUNDTRIP_PCT", "RISK_FREE",
              "N_BUCKETS", "MIN_NONOVERLAPPING", "REGIME_TREND_PCT",
-             "REGIME_VOL_ANN"):
+             "REGIME_VOL_ANN", "ADJUST_PRICES"):
     SPEC_MAPPING[("pit_validation", name)] = (f"pit_validation.{name.lower()}", None)
 SPEC_MAPPING[("model_config", "SCAN_COMPLETE_FRACTION")] = ("shared_config.scan_complete_fraction", None)
 SPEC_MAPPING[("optimizer_stability", "DEFAULT_TRIALS")] = ("research_tools.stability_trials", None)

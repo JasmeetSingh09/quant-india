@@ -22,6 +22,8 @@ Key functions:
 
 import sqlite3
 import requests
+
+import sqlite_local
 import pandas as pd
 import io
 from pathlib import Path
@@ -59,7 +61,7 @@ HEADERS = {
 # ---------------------------------------------------------------------------
 
 def _init_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite_local.connect(DB_PATH)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS nse_stocks (
             symbol          TEXT PRIMARY KEY,
@@ -96,7 +98,7 @@ def _init_db():
 def _is_stale(exchange: str, max_hours: int = 24) -> bool:
     """Return True if the stock list hasn't been refreshed in max_hours."""
     table = "nse_stocks" if exchange == "NSE" else "bse_stocks"
-    conn  = sqlite3.connect(DB_PATH)
+    conn  = sqlite_local.connect(DB_PATH)
     row   = conn.execute(f"SELECT last_updated FROM {table} LIMIT 1").fetchone()
     conn.close()
     if not row or not row[0]:
@@ -118,7 +120,7 @@ def refresh_nse_stocks(force: bool = False) -> dict:
     """
     _init_db()
     if not force and not _is_stale("NSE"):
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite_local.connect(DB_PATH)
         count = conn.execute("SELECT COUNT(*) FROM nse_stocks").fetchone()[0]
         conn.close()
         return {"status": "cached", "count": count, "exchange": "NSE"}
@@ -129,7 +131,7 @@ def refresh_nse_stocks(force: bool = False) -> dict:
     # not collection) and fetch nothing, forced or not.
     from nse_access import collection_paused, paused_result
     if collection_paused():
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite_local.connect(DB_PATH)
         count = conn.execute("SELECT COUNT(*) FROM nse_stocks").fetchone()[0]
         conn.close()
         return {**paused_result("NSE equity list"), "status": "paused",
@@ -188,7 +190,7 @@ def refresh_nse_stocks(force: bool = False) -> dict:
             dol, None, f"{symbol}.NS", now
         ))
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite_local.connect(DB_PATH)
     conn.execute("DELETE FROM nse_stocks")
     conn.executemany("""
         INSERT OR REPLACE INTO nse_stocks
@@ -216,7 +218,7 @@ def refresh_bse_stocks(force: bool = False) -> dict:
     """
     _init_db()
     if not force and not _is_stale("BSE"):
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite_local.connect(DB_PATH)
         count = conn.execute("SELECT COUNT(*) FROM bse_stocks").fetchone()[0]
         conn.close()
         return {"status": "cached", "count": count, "exchange": "BSE"}
@@ -284,7 +286,7 @@ def refresh_bse_stocks(force: bool = False) -> dict:
             f"{code}.BO", now
         ))
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite_local.connect(DB_PATH)
     conn.execute("DELETE FROM bse_stocks")
     conn.executemany("""
         INSERT OR REPLACE INTO bse_stocks
@@ -352,7 +354,7 @@ def _insert_bse_fallback() -> dict:
     now = datetime.now().isoformat()
     rows = [(code, name, "Active", "A", None, None, None, None, f"{code}.BO", now)
             for code, name in bse_major]
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite_local.connect(DB_PATH)
     conn.execute("DELETE FROM bse_stocks")
     conn.executemany("""
         INSERT OR REPLACE INTO bse_stocks
@@ -426,7 +428,7 @@ def search_stocks(query: str, exchange: str = "NSE", limit: int = 30) -> list:
         return out[:limit]
 
     def _search_nse():
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite_local.connect(DB_PATH)
         rows = conn.execute("""
             SELECT symbol, company_name, series, isin, yf_ticker
             FROM nse_stocks
@@ -453,7 +455,7 @@ def search_stocks(query: str, exchange: str = "NSE", limit: int = 30) -> list:
         ]
 
     def _search_bse():
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite_local.connect(DB_PATH)
         rows = conn.execute("""
             SELECT bse_code, company_name, group_name, isin, yf_ticker
             FROM bse_stocks
@@ -500,7 +502,7 @@ def get_stock_by_symbol(symbol: str, exchange: str = "NSE") -> dict | None:
     """Exact symbol lookup. Returns None if not found."""
     _init_db()
     symbol = symbol.upper().replace(".NS", "").replace(".BO", "")
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite_local.connect(DB_PATH)
     if exchange.upper() == "NSE":
         row = conn.execute(
             "SELECT symbol, company_name, series, isin, yf_ticker FROM nse_stocks WHERE symbol = ?",
@@ -525,7 +527,7 @@ def get_stock_by_symbol(symbol: str, exchange: str = "NSE") -> dict | None:
 def get_all_symbols(exchange: str = "NSE") -> list:
     """Return all cached symbols for an exchange as a flat list."""
     _init_db()
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite_local.connect(DB_PATH)
     if exchange.upper() == "NSE":
         rows = conn.execute(
             "SELECT symbol, company_name, yf_ticker FROM nse_stocks ORDER BY symbol"
@@ -543,7 +545,7 @@ def get_all_symbols(exchange: str = "NSE") -> list:
 def get_universe_stats() -> dict:
     """Return count of cached stocks per exchange and when they were last refreshed."""
     _init_db()
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite_local.connect(DB_PATH)
     nse_count    = conn.execute("SELECT COUNT(*) FROM nse_stocks").fetchone()[0]
     bse_count    = conn.execute("SELECT COUNT(*) FROM bse_stocks").fetchone()[0]
     nse_updated  = conn.execute("SELECT MAX(last_updated) FROM nse_stocks").fetchone()[0]

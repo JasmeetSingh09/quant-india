@@ -24,9 +24,11 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 DB_PATH = Path(os.environ.get("QUANT_DATA_DIR", str(Path(__file__).parent.parent))) / "quant_platform.db"
 sys.path.insert(0, str(Path(__file__).parent))
 
+import sqlite_local  # noqa: E402
+
 
 def _init_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite_local.connect(DB_PATH)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS screener_metrics (
             ticker        TEXT PRIMARY KEY,
@@ -68,17 +70,34 @@ def build_screener_cache(limit: int = None) -> dict:
     if limit:
         uniq = uniq[:limit]
 
-    conn = sqlite3.connect(DB_PATH)
-    count = 0
-    for ticker, sector in uniq:
+    # Fetch a batch from Yahoo, THEN write it. The old loop inserted each stock
+    # as it was fetched and committed every 25, so the connection held SQLite's
+    # write lock through up to 25 Yahoo calls -- each of which can hang for
+    # 20-30 seconds -- and the stock list refresh starting at the same moment
+    # gave up with "database is locked" (docs/PHASE2_FINDINGS_2026-09-14.md).
+    batch_size = 25
+    count, batch = 0, []
+
+    def _flush():
+        if not batch:
+            return
+        conn = sqlite_local.connect(DB_PATH)
         try:
-            info = yf.Ticker(ticker).info
-            conn.execute("""
+            conn.executemany("""
                 INSERT OR REPLACE INTO screener_metrics
                   (ticker, company_name, sector, price, market_cap, pe_ratio, roe,
                    profit_margin, debt_to_equity, revenue_growth, dividend_yield, updated_at)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-            """, (
+            """, batch)
+            conn.commit()
+        finally:
+            conn.close()
+        batch.clear()
+
+    for ticker, sector in uniq:
+        try:
+            info = yf.Ticker(ticker).info
+            batch.append((
                 ticker,
                 info.get("shortName", ticker.replace(".NS", "")),
                 sector,
@@ -93,20 +112,19 @@ def build_screener_cache(limit: int = None) -> dict:
                 datetime.now().isoformat(),
             ))
             count += 1
-            if count % 25 == 0:
-                conn.commit()
-                print(f"  screener cache: {count}/{len(uniq)}")
         except Exception:
-            pass
-    conn.commit()
-    conn.close()
+            continue
+        if len(batch) >= batch_size:
+            _flush()
+            print(f"  screener cache: {count}/{len(uniq)}")
+    _flush()
     print(f"Screener cache built: {count} stocks")
     return {"status": "built", "count": count}
 
 
 def get_screener_status() -> dict:
     _init_db()
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite_local.connect(DB_PATH)
     n = conn.execute("SELECT COUNT(*) FROM screener_metrics").fetchone()[0]
     last = conn.execute("SELECT MAX(updated_at) FROM screener_metrics").fetchone()[0]
     conn.close()
@@ -164,7 +182,7 @@ def screen(filters: dict = None, sort_by: str = "market_cap",
     sql += f" ORDER BY {sort_col} {order} NULLS LAST LIMIT ?"
     params.append(limit)
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite_local.connect(DB_PATH)
     try:
         rows = conn.execute(sql, params).fetchall()
     except sqlite3.OperationalError:

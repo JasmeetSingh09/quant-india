@@ -1,43 +1,35 @@
 """
-alpha_model.py — Proprietary Multi-Factor Alpha Model for NSE stocks.
+alpha_model.py — the four-factor alpha model for NSE stocks (V1).
 
-THIS IS THE ORIGINAL ALGORITHM.
+ALPHA_SCORE = 100 x (0.25 SENTIMENT + 0.35 MOMENTUM + 0.25 QUALITY + 0.15 VALUE)
 
-Most platforms show you sentiment OR momentum OR fundamentals.
-This model combines all four into a single proprietary alpha score
-fitted specifically on Indian market data.
+Each factor is scored from -1 to +1, with a confidence from 0 to 1:
 
-The Four-Factor Model
-─────────────────────
-ALPHA_SCORE = w₁·SENTIMENT + w₂·MOMENTUM + w₃·QUALITY + w₄·VALUE
+  SENTIMENT  FinBERT on the stock's headlines from the last 14 days, weighted by
+             recency (3-day half-life) and shrunk toward 0 when news is thin.
 
-Where each factor is:
+  MOMENTUM   The stock's own 12-1 return (252 to 21 trading days ago) divided by
+             its annualised volatility, through tanh (Jegadeesh and Titman
+             1993). Not a rank against peers; _compute_momentum_factor says why
+             that version was replaced.
 
-  SENTIMENT  — FinBERT score on recent headlines, decay-weighted
-               (yesterday's news matters more than last week's)
+  QUALITY    Piotroski F-score, ROE and FCF yield, reweighted over the parts
+             available, with distress penalties.
 
-  MOMENTUM   — Cross-sectional momentum rank among NSE peers
-               using 1M, 3M, 6M returns with 1M reversal correction
-               (based on Jegadeesh & Titman 1993, adapted for NSE)
+  VALUE      P/E and P/B against up to three sector peers, or fixed market
+             averages when peers are missing. Cheaper scores higher.
 
-  QUALITY    — Piotroski F-Score + ROE + FCF yield composite
-               (Novy-Marx 2013 quality factor, Indian data)
+The weights are hand-set starting values. They have not changed since the
+repository's first commit (2026-06-22), and no refitted weights were ever
+adopted. An earlier version of this docstring said they were fitted by OLS on
+2019-2022 data and validated on 2023-2024; nothing in the repository supports
+that.
 
-  VALUE      — Z-score of P/E and P/B vs sector peers
-               (inverted: cheaper = higher score)
+Score range -100 to +100. Labels: above +40 STRONG BUY, above +15 BUY, below -40
+STRONG SELL, below -15 SELL, otherwise NEUTRAL. Each factor's confidence measures
+how complete its data was, not the chance the label is right.
 
-Factor weights are fitted using OLS regression on a training set
-of NSE stocks from 2019-2022, validated on 2023-2024 out-of-sample.
-
-Score range: -100 to +100
-  > +40  : Strong BUY signal
-  +15 to +40 : Mild BUY
-  -15 to +15 : NEUTRAL
-  -40 to -15 : Mild SELL / reduce
-  < -40  : Strong SELL / avoid
-
-Each factor also returns a confidence level based on data availability
-and signal strength.
+Every threshold is written out in docs/PHASE0_V1_METHODOLOGY_2026-09-14.md.
 
 IMPORTANT: This is a signal model, not financial advice.
 """
@@ -57,9 +49,8 @@ MODEL_VERSION = "alpha-v4-distress-coverage"
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 # ---------------------------------------------------------------------------
-# Factor weights — fitted on NSE 2019-2022 training period
-# Validated on 2023-2024 out-of-sample (see research.py for full study)
-# These are updated when retrain() is called
+# Factor weights — hand-set starting values, unchanged since the first commit.
+# retrain_weights() reports refitted weights; it never changes these.
 # ---------------------------------------------------------------------------
 
 FACTOR_WEIGHTS = {
@@ -508,10 +499,10 @@ def _compute_quality_factor(ticker: str) -> dict:
 
     Quality = 0.4·(F_score/9) + 0.4·ROE_zscore + 0.2·FCF_yield_zscore
 
-    We Z-score ROE and FCF yield against historical NSE averages
-    (derived from our research on NSE 2019-2024):
-      Median NSE ROE:       12%   std: 8%
-      Median NSE FCF yield: 3.5%  std: 4%
+    We Z-score ROE and FCF yield against fixed reference values, described as
+    NSE medians. The study they are said to come from is not in the repository:
+      ROE:       12%   std: 8%
+      FCF yield: 3.5%  std: 4%
 
     Maps to [-1, +1] via tanh.
 
@@ -788,11 +779,12 @@ def compute_alpha_score(
     peers:   list = None,
 ) -> dict:
     """
-    Compute the proprietary alpha score for an NSE stock.
+    Compute the four-factor alpha score (V1) for an NSE stock.
 
     ALPHA = w₁·SENTIMENT + w₂·MOMENTUM + w₃·QUALITY + w₄·VALUE
 
-    Weights default to FACTOR_WEIGHTS fitted on NSE 2019-2022 training data.
+    Weights default to FACTOR_WEIGHTS, hand-set starting values (see the
+    module docstring).
     Pass custom weights to experiment.
 
     Score range: -100 to +100
