@@ -211,17 +211,20 @@ def rank_value(rows):
 # ------------------------------------------------------------------ test
 
 def test_factor(panel, factor, h):
-    spreads, bucket_means = [], [[] for _ in range(N_BUCKETS)]
+    spreads, bucket_means, skipped = [], [[] for _ in range(N_BUCKETS)], []
     liq_top = {"Least liquid": [], "Mid liquidity": [], "Most liquid": []}
     for ym, rows in panel.items():
-        elig = [r for r in rows if h in r["fwd"]]
+        # The pre-registration's universe is the stocks with a usable score for
+        # THIS factor: a month with fewer than 50 of them is skipped, and returns
+        # are net of those same stocks' equal-weight return. Run 1 applied the 50
+        # before scoring and ranked growth on 14-36 stocks for 11 months.
+        elig = [r for r in rows if h in r["fwd"] and r["scores"].get(factor) is not None]
         if len(elig) < MIN_ELIGIBLE:
+            if any(h in r["fwd"] for r in rows):
+                skipped.append([ym, len(elig)])
             continue
         mkt = float(np.mean([r["fwd"][h] for r in elig]))
-        scored = [r for r in elig if r["scores"].get(factor) is not None]
-        if len(scored) < N_BUCKETS * 2:
-            continue
-        scored.sort(key=lambda r: r["scores"][factor])       # stable
+        scored = sorted(elig, key=lambda r: r["scores"][factor])   # stable
         nb = len(scored)
         groups = [[] for _ in range(N_BUCKETS)]
         for pos, r in enumerate(scored):
@@ -246,6 +249,7 @@ def test_factor(panel, factor, h):
                         and result["non_overlapping_windows"] >= MIN_NONOVERLAPPING)
     result["group_mean_excess_pct"] = [round(float(np.mean(v)) * 100, 3) if v else None
                                        for v in bucket_means]
+    result["months_skipped_too_few_scored"] = skipped
     out = {"top_minus_bottom": result}
     if h == 1:
         out["exploratory_top_group_by_liquidity"] = {k: mean_test(v) for k, v in liq_top.items()}

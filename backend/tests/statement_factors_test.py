@@ -124,6 +124,38 @@ check("a loss last year gives no earnings-growth leg; revenue alone is used",
 check("no prior year: growth cannot be scored", S.growth_score(CUR, None) is None,
       str(S.growth_score(CUR, None)))
 
+print("\n" + "=" * 74 + "\n6. A MONTH IS RANKED ONLY WITH 50 SCORED STOCKS\n" + "=" * 74)
+# Run 1 of factor test 2 applied the 50-stock minimum before scoring, then ranked
+# growth on as few as 14 stocks (top group: 3) for 11 months. The
+# pre-registration counts stocks with a usable score for the factor tested.
+import factor_test2_run as R
+
+
+def _row(i, score, fwd):
+    return {"ticker": f"T{i:03d}", "turnover": 1e8 + i, "fwd": {1: fwd},
+            "scores": {"growth": score}}
+
+
+# 200 priced stocks, only 49 with a growth score: skipped.
+thin = [_row(i, i / 100 if i < 49 else None, 0.10) for i in range(200)]
+# 50 scored stocks, returns 0%..4% by score fifth, plus 50 unscored stocks up 100%.
+# Net of the scored stocks' own average (2%) the fifths are -2, -1, 0, +1, +2%;
+# counting the unscored stocks in the market would shift every fifth by -50%.
+full = ([_row(i, i / 100, 0.01 * (i // 10)) for i in range(50)]
+        + [_row(100 + i, None, 1.0) for i in range(50)])
+res = R.test_factor({"2024-01": thin, "2024-02": full, "2024-03": full, "2024-04": full},
+                    "growth", 1)["top_minus_bottom"]
+check("a month with 49 scored stocks is not ranked, however many are priced",
+      res.get("n") == 3, str(res.get("n")))
+check("the skipped month and its scored count are recorded",
+      res.get("months_skipped_too_few_scored") == [["2024-01", 49]],
+      str(res.get("months_skipped_too_few_scored")))
+check("group returns are net of the scored stocks only",
+      res.get("group_mean_excess_pct") == [-2.0, -1.0, 0.0, 1.0, 2.0],
+      str(res.get("group_mean_excess_pct")))
+check("the spread is the top fifth minus the bottom fifth: +4%",
+      res.get("mean_pct") == 4.0, str(res.get("mean_pct")))
+
 print("\n" + "=" * 74)
 print(f"passed {len(PASS)}, failed {len(FAIL)}")
 for f in FAIL:

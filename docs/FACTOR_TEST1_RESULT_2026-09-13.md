@@ -117,3 +117,16 @@ The response's `limits` text says prices are "unadjusted for splits and
 dividends". The same response reports `adjusted_for_corporate_actions: true` with
 19,047 actions applied. The sentence predates the adjustment and should be
 corrected in `pit_validation.py`.
+
+## Found later, while checking factor test 2 (2026-09-14)
+
+- **The 3-, 6- and 12-month p-values are overstated.** The spread test treats
+  every formation month as independent, but neighbouring months share most of a
+  long holding period. Momentum's 1-month pass (170 separate months) does not
+  depend on this. The longer holding periods have not been rechecked with an
+  allowance for overlap.
+- **Low risk's 50-stock minimum has not been checked.** Test 1 skips a month
+  with fewer than 50 stocks that have a momentum score, then ranks low risk
+  among them with a minimum of only 10. Momentum cannot fall below 50; low risk
+  has not been checked. The same gap invalidated factor test 2's first run for
+  growth (`docs/FACTOR_TEST2_RESULT_2026-09-13.md`).
