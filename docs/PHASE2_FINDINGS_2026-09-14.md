@@ -6,8 +6,11 @@ changed.** Each section ends with a proposed fix that needs approval first.
 > **Status, later the same day.** Sections 1–4 were approved and fixed in
 > `9b2d764` (live on production 08:31 UTC). The benchmark question this raised
 > was decided (Benchmark A) and fixed in `a2418ba` (live 09:11 UTC). Results are
-> in `BACKTEST_RERUN_ADJUSTED_2026-09-14.md`. Section 1 item d, the Render disk
-> and `QUANT_DATA_DIR` check, is still open.
+> in `BACKTEST_RERUN_ADJUSTED_2026-09-14.md`. Section 1 item d was resolved the
+> same morning. A 1 GB Render disk was mounted at `/app/data` and
+> `QUANT_DATA_DIR` set to `/app/data`. Persistence was verified across the 09:38
+> UTC redeploy (commit `a2418ba` to `d2feee6`): the BSE list kept its 09:35:54
+> write and the screener cache kept 200 stocks written at 09:37:43.
 
 ## 1. "database is locked"
 
@@ -38,13 +41,18 @@ locked` at `stock_universe.py:180` (`DELETE FROM nse_stocks`) at 11:35:26 on
   (`alpha_model.py:137`).
 - **The screener build runs whenever its cache is empty,** which is every start
   if the file does not survive restarts.
-- **The file probably does not survive.** `DB_PATH` is
-  `QUANT_DATA_DIR/quant_platform.db`, falling back to the backend folder inside
-  the container. `render.yaml` attaches a disk at `/app/data` but never sets
-  `QUANT_DATA_DIR`. On 2026-09-09 production's NSE and BSE lists were both empty
-  (`STEP3_FINDINGS_2026-09-09.md`).
-- **Not verified:** whether the Render dashboard has a disk attached and
-  `QUANT_DATA_DIR` set.
+- **The file does not survive deploys or restarts.** On 2026-09-14 the Render
+  dashboard showed no disk mounted and `QUANT_DATA_DIR` not set. On 2026-09-09
+  production's NSE and BSE lists were both empty (`STEP3_FINDINGS_2026-09-09.md`).
+- **Correction to the first version of this section.** It said the file fell
+  back to the backend folder because `render.yaml` never sets `QUANT_DATA_DIR`.
+  That was wrong: `main.py` sets `QUANT_DATA_DIR` to `/app/data` by default
+  before any module reads it. The file is written to `/app/data` already; it is
+  lost only because no disk is mounted there.
+- **What the file holds:** `nse_stocks`, `bse_stocks`, `screener_metrics`,
+  `news_cache` and `alert_log`, all rebuildable caches or cooldowns. Watchlists,
+  portfolios, simulations, scan results and the track record use `db.get_conn`
+  and are in Postgres.
 
 **An explanation consistent with all of it:**
 1. A restart begins with an empty SQLite file.
