@@ -59,6 +59,13 @@ MIN_MONTHLY_TURNOVER = 1e7
 # adjust differently.
 ADJUST_PRICES = True
 
+# What the strategy's excess return is measured against. Approved 2026-09-14:
+# every eligible stock that month, equal-weighted, over the same hold month,
+# from the same closes. The Nifty 50 price index it replaced leaves out
+# dividends that the adjusted portfolio return includes, which overstated the
+# excess. Nifty is still reported, as a labelled price-only reference.
+EXCESS_BENCHMARK = "eligible_universe_equal_weight"
+
 
 def _adjusted_prebuilt(conn):
     """
@@ -306,7 +313,7 @@ def run(top_fraction: float = 0.2, min_turnover: float = MIN_MONTHLY_TURNOVER,
     bench = _benchmark(months)
 
     L, K = LOOKBACK_MONTHS, SKIP_MONTHS
-    strat_rets, bench_rets, eq_months = [], [], []
+    strat_rets, univ_rets, nifty_rets, eq_months = [], [], [], []
     prev_basket, eligible_log, holdings_log = set(), [], []
     delisted_held = []
     # Every -100% booking is checked against resolved identity. If the security
@@ -388,19 +395,56 @@ def run(top_fraction: float = 0.2, min_turnover: float = MIN_MONTHLY_TURNOVER,
         prev_basket = set(basket)
         eq_months.append(hold_m)
 
+        # The benchmark: every eligible stock, equal-weighted, over the same
+        # hold month and from the same closes, with the same -100% for a stock
+        # that stopped trading. It is charged no trading costs, so the excess
+        # is net of costs on the strategy side only.
+        u_rets = []
+        for sym, _ in pool:
+            u_now, u_next = now_px.get(sym), next_px.get(sym)
+            if u_now is None or u_now <= 0:
+                continue
+            u_rets.append(-1.0 if u_next is None else u_next / u_now - 1.0)
+        univ_rets.append(sum(u_rets) / len(u_rets))
+
+        # The Nifty reference. A month without Nifty data is left out of it;
+        # it used to count as a 0% month.
         b0, b1 = bench.get(form_m), bench.get(hold_m)
-        bench_rets.append((b1 / b0 - 1.0) if (b0 and b1) else 0.0)
+        nifty_rets.append((b1 / b0 - 1.0) if (b0 and b1) else None)
 
     if len(strat_rets) < 3:
         return {"error": f"Only {len(strat_rets)} rebalances survived the "
                          f"eligibility rules."}
 
-    excess = [s - b for s, b in zip(strat_rets, bench_rets)]
+    excess = [s - u for s, u in zip(strat_rets, univ_rets)]
+    nifty_pairs = [(s, n) for s, n in zip(strat_rets, nifty_rets) if n is not None]
+    nifty_reference = {
+        "index": "^NSEI, the Nifty 50 price index",
+        "available": len(nifty_pairs) >= 3,
+        "months": len(nifty_pairs),
+        "stats": _stats([n for _, n in nifty_pairs]) if len(nifty_pairs) >= 2 else None,
+        "strategy_minus_nifty": (_evidence([s - n for s, n in nifty_pairs])
+                                 if nifty_pairs else None),
+        "note": ("Price index: dividends excluded, while the portfolio's return "
+                 "includes them, so the two are not directly comparable. A "
+                 "reference only; not a measure of alpha."),
+    }
 
     return {
         "stats": _stats(strat_rets),
-        "benchmark_stats": _stats(bench_rets) if any(bench_rets) else None,
+        "benchmark": {
+            "primary": EXCESS_BENCHMARK,
+            "definition": ("Every eligible stock that month (trading at formation, "
+                           "with a full lookback and enough turnover), "
+                           "equal-weighted over the same hold month, from the same "
+                           "closes; a stock that stopped trading counts at -100%."),
+            "costs": ("The benchmark is charged no trading costs and the strategy "
+                      "is net of them, so the excess is understated rather than "
+                      "flattered."),
+        },
+        "benchmark_stats": _stats(univ_rets),
         "excess_stats": _evidence(excess),
+        "nifty_price_reference": nifty_reference,
         "monthly_evidence": _evidence(strat_rets),
         "holdings_stats": _holding_stats(all_holding_rets),
         "unique_securities_held": len(unique_held),
@@ -743,7 +787,7 @@ def identity_ab(top_fraction: float = 0.2) -> dict:
              lambda r: _g(r, "holdings_stats", "mean_pct")),
         _row("Median position return (%)",
              lambda r: _g(r, "holdings_stats", "median_pct")),
-        _row("Mean monthly excess vs Nifty (%)",
+        _row("Mean monthly excess vs eligible universe (%)",
              lambda r: _g(r, "excess_stats", "mean_pct")),
         _row("CAGR (%)", lambda r: _g(r, "stats", "cagr_pct")),
         _row("Volatility (%)", lambda r: _g(r, "stats", "vol_pct")),

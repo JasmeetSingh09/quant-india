@@ -78,7 +78,7 @@ SUITES = [
     ("statement_factors_test.py",           21, 120),
     ("unscoreable_reason_test.py",          13, 120),
     ("risk_metrics_test.py",                18, 120),
-    ("adjusted_backtest_test.py",           16, 120),
+    ("adjusted_backtest_test.py",           22, 120),
     ("sqlite_local_test.py",                10, 120),
     ("bhavcopy_gap_test.py",                22, 120),
     ("score_cache_test.py",                 21, 120),

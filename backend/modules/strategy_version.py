@@ -238,6 +238,8 @@ def current_spec() -> dict:
     # every return it computes is part of the strategy's record.
     _cap(pit, "adjust_prices",
          lambda: __import__("pit_backtest").ADJUST_PRICES)
+    _cap(pit, "excess_benchmark",
+         lambda: __import__("pit_backtest").EXCESS_BENCHMARK)
     spec["pit_backtest"] = pit
 
     # Factor internals. These were inline literals until the provenance audit

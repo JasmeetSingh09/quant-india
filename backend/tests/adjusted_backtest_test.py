@@ -152,6 +152,42 @@ check("the momentum variants study reads adjusted closes too",
 check("  ...and its limits text no longer calls them unadjusted",
       "unadjusted" not in (mv.get("limits") or ""), (mv.get("limits") or "")[:160])
 
+print("\n" + "=" * 74 + "\n5. THE BENCHMARK: EVERY ELIGIBLE STOCK, SAME CLOSES\n" + "=" * 74)
+bm = adj.get("benchmark") or {}
+check("the backtest's benchmark is the equal-weighted eligible universe",
+      bm.get("primary") == "eligible_universe_equal_weight", str(bm)[:120])
+if built and "error" not in adj:
+    # Every stock in this fixture is liquid with a full lookback from month 12,
+    # so the eligible universe is all 61 stocks in every tested month.
+    ms = [m for m, _ in built[0]]
+    univ = []
+    for i in range(12, len(ms) - 1):
+        now, nxt = built[1][ms[i]], built[1][ms[i + 1]]
+        r = [nxt[k] / now[k] - 1 for k in now]
+        univ.append(sum(r) / len(r))
+    want = adj["monthly_evidence"]["mean_pct"] - 100 * sum(univ) / len(univ)
+    got = (adj.get("excess_stats") or {}).get("mean_pct")
+    check("excess = strategy minus the eligible universe, worked out independently",
+          got is not None and abs(got - want) < 0.01, f"got {got}, want {want:.3f}")
+nref = adj.get("nifty_price_reference") or {}
+check("with no Nifty data the reference says so instead of counting 0% months",
+      nref.get("available") is False and nref.get("months") == 0, str(nref)[:120])
+check("  ...and the excess is not simply the strategy's own return",
+      (adj.get("excess_stats") or {}).get("mean_pct")
+      != (adj.get("monthly_evidence") or {}).get("mean_pct"))
+PB._benchmark = lambda months: {m: 1000.0 * (1.01 ** k) for k, m in enumerate(months)}
+with_nifty = PB.run(top_fraction=0.2)
+PB._benchmark = lambda months: {}
+wref = with_nifty.get("nifty_price_reference") or {}
+check("with Nifty data it is a labelled secondary reference: price-only, not alpha",
+      wref.get("available") is True and wref.get("months") == with_nifty.get("months_tested")
+      and "dividends excluded" in wref.get("note", "")
+      and "not a measure of alpha" in wref.get("note", ""), str(wref)[:160])
+rows = [t for t in (ab.get("table") or []) if "excess" in str(t.get("metric", "")).lower()]
+check("the identity comparison labels its excess as against the eligible universe",
+      bool(rows) and all("eligible universe" in t["metric"] for t in rows),
+      str([t.get("metric") for t in rows]))
+
 try:
     os.remove(PATH)
 except Exception:

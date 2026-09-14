@@ -116,6 +116,8 @@ INVENTORY = {
         # Corporate-action correction of closes, added 2026-09-14. It changes
         # every return the backtest computes.
         "ADJUST_PRICES": BEHAVIOURAL,
+        # What the excess return is measured against, approved 2026-09-14.
+        "EXCESS_BENCHMARK": BEHAVIOURAL,
     },
     "pit_validation": {
         "MOM_LOOKBACK": BEHAVIOURAL, "MOM_SKIP": BEHAVIOURAL,
@@ -244,7 +246,8 @@ for name in ("RISK_FREE_RATE", "TRADING_DAYS_PER_YEAR", "MONTHS_PER_YEAR",
              "COST_EXCHANGE_PCT", "COST_GST_PCT", "BENCHMARK_INDEX"):
     SPEC_MAPPING[("model_config", name)] = (f"shared_config.{name.lower()}", None)
 for name in ("COST_ROUNDTRIP_PCT", "LOOKBACK_MONTHS", "SKIP_MONTHS",
-             "MIN_HOLDINGS", "MIN_MONTHLY_TURNOVER", "ADJUST_PRICES"):
+             "MIN_HOLDINGS", "MIN_MONTHLY_TURNOVER", "ADJUST_PRICES",
+             "EXCESS_BENCHMARK"):
     SPEC_MAPPING[("pit_backtest", name)] = (f"pit_backtest.{name.lower()}", None)
 for name in ("MOM_LOOKBACK", "MOM_SKIP", "MOM_TANH_DIV", "LR_WINDOW",
              "LR_VOL_REF", "LR_DD_REF", "LR_VOL_W", "LR_DD_W",
