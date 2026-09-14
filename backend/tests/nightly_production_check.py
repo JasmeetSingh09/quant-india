@@ -110,11 +110,21 @@ def judge_at_risk(failures):
             or not isinstance(ar.get("previously_scored"), int)):
         why = ar.get("reason") if isinstance(ar, dict) else "the field is absent"
         return [f"the early warning for the universe filter is unavailable: {why}"]
-    if ar["previously_scored"] >= AT_RISK_ALERT:
-        return [f"{ar['previously_scored']} stocks that scored in the last 60 days found no "
-                f"market data on each of their last 2 attempts. The filter will not exclude "
-                f"them, but this many at once is a data problem on our side, not delisting; "
-                f"e.g. {_names(ar.get('examples_previously_scored'))}"]
+    # Stocks whose latest attempt found a short price history and no market cap
+    # are the source being short of a real company, not an outage: on 2026-09-14,
+    # 47 of them, Yahoo's history restarting 2026-08-17. Only the rest count.
+    n = ar.get("previously_scored_unexplained")
+    examples = ar.get("examples_previously_scored_unexplained")
+    if not isinstance(n, int):          # a deploy from before the split
+        n, examples = ar["previously_scored"], ar.get("examples_previously_scored")
+    if n >= AT_RISK_ALERT:
+        short = ar.get("previously_scored_short_history")
+        return [f"{n} stocks that scored in the last 60 days found no market data on each "
+                f"of their last 2 attempts"
+                + (f", not counting {short} with too little price history at the source"
+                   if isinstance(short, int) and short else "")
+                + f". The filter will not exclude them, but this many at once is a data "
+                  f"problem on our side, not delisting; e.g. {_names(examples)}"]
     return []
 
 
@@ -190,6 +200,9 @@ def run_checks(get=fetch, portfolio_lab=run_portfolio_lab, today=None, out=print
             names = _names(ar.get("examples_previously_scored"))
             out(f"  one night from exclusion: {ar['previously_scored']} that were scoring"
                 + (f" ({names})" if names else "")
+                + (f", of which {ar['previously_scored_short_history']} have too little "
+                   f"price history at the source"
+                   if isinstance(ar.get("previously_scored_short_history"), int) else "")
                 + f", {ar.get('never_scored')} never priceable")
     if isinstance(coverage, dict) and coverage.get("factors"):
         v = coverage["factors"].get("value") or {}

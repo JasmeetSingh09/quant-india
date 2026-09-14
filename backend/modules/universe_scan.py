@@ -921,6 +921,14 @@ _UNSCOREABLE_HISTORY_DAYS = 60     # how far back to look for those attempts
 # from the universe -- those are our problems, not the security's.
 _NO_DATA = "no market data found"
 
+# What alpha_model adds after that phrase when the source knows the company but
+# holds too little of its price history and no market cap. On 2026-09-14, 47
+# stocks that had been scoring failed this way two nights running: Yahoo's
+# history for them restarted on 2026-08-17. A real security the source is short
+# of, not a symbol it has never heard of and not an outage of ours. The filter
+# still counts it as no data; only the early warning tells the two apart.
+_SHORT_HISTORY = "days of prices and no market cap"
+
 
 def _persistently_unscoreable(conn, today: str = None) -> set:
     """
@@ -1023,18 +1031,25 @@ def at_risk_of_exclusion(conn, today: str = None, sample: int = 20) -> dict:
                    SUM(CASE WHEN rn <= {ph} AND alpha_score IS NULL
                              AND LOWER(COALESCE(error, '')) LIKE {ph}
                             THEN 1 ELSE 0 END),
-                   SUM(CASE WHEN alpha_score IS NOT NULL THEN 1 ELSE 0 END)
+                   SUM(CASE WHEN alpha_score IS NOT NULL THEN 1 ELSE 0 END),
+                   MAX(CASE WHEN rn = 1 THEN LOWER(COALESCE(error, '')) END)
             FROM ranked
             GROUP BY ticker
         """, (since, today, k, k, f"%{_NO_DATA}%")).fetchall()
         excluded = _persistently_unscoreable(conn, today=today)
-        was_scoring, never = [], []
-        for ticker, n_recent, nodata_recent, n_scored in rows:
+        was_scoring, never, short = [], [], []
+        for ticker, n_recent, nodata_recent, n_scored, latest_error in rows:
             ticker = str(ticker)
             if ticker in excluded:
                 continue                # past the risk: already excluded
             if (n_recent or 0) >= k and (nodata_recent or 0) >= k:
-                (was_scoring if (n_scored or 0) > 0 else never).append(ticker)
+                if (n_scored or 0) > 0:
+                    was_scoring.append(ticker)
+                    if _SHORT_HISTORY in (latest_error or ""):
+                        short.append(ticker)
+                else:
+                    never.append(ticker)
+        unexplained = sorted(set(was_scoring) - set(short))
         return {
             "rule": rule,
             "as_of": today,
@@ -1043,10 +1058,16 @@ def at_risk_of_exclusion(conn, today: str = None, sample: int = 20) -> dict:
             "examples_never_scored": sorted(never)[:sample],
             "previously_scored": len(was_scoring),
             "examples_previously_scored": sorted(was_scoring)[:sample],
+            "previously_scored_short_history": len(short),
+            "examples_previously_scored_short_history": sorted(short)[:sample],
+            "previously_scored_unexplained": len(unexplained),
+            "examples_previously_scored_unexplained": unexplained[:sample],
             "previously_scored_note": (
                 f"Scored in the last {_UNSCOREABLE_HISTORY_DAYS} days, so the filter "
-                f"will not exclude them. Many at once is a data problem on our side, "
-                f"not delisting."),
+                f"will not exclude them. Those whose latest attempt found a short "
+                f"price history and no market cap are the data source being short "
+                f"of a real company. The rest, many at once, is a data problem on "
+                f"our side, not delisting."),
         }
     except Exception as e:
         try:

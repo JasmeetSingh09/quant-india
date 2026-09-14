@@ -329,6 +329,36 @@ check("the scan-failure audit carries the early warning",
       and "WASGOOD.NS" in sf_risk.get("examples_previously_scored", []),
       str(sf_risk)[:90] or "field absent")
 
+# On 2026-09-14, 47 stocks that had been scoring failed twice because Yahoo held
+# too little of their price history, and the nightly check called it an outage.
+# alpha_model now says so in the error; the early warning must keep those apart
+# from unexplained failures, and the filter must go on treating both as no data.
+SHORT_MSG = "No market data found for 'X.NS': Yahoo has fewer than 60 days of prices and no market cap."
+build([("WASGOOD.NS", "2026-09-08", 12.0, None),
+       ("WASGOOD.NS", "2026-09-09", None, NO_DATA),
+       ("WASGOOD.NS", "2026-09-10", None, NO_DATA),
+       # the night the message changed: old text, then the new one
+       ("SHORT.NS", "2026-09-08", 9.0, None),
+       ("SHORT.NS", "2026-09-09", None, NO_DATA),
+       ("SHORT.NS", "2026-09-10", None, SHORT_MSG),
+       ("NEWSHORT.NS", "2026-09-08", None, SHORT_MSG),
+       ("NEWSHORT.NS", "2026-09-09", None, SHORT_MSG),
+       ("NEWSHORT.NS", "2026-09-10", None, SHORT_MSG)])
+r = at_risk()
+check("both stocks that were scoring are still counted",
+      r.get("previously_scored") == 2, str(r.get("previously_scored")))
+check("  ...the one whose latest attempt found a short history is listed as that",
+      r.get("previously_scored_short_history") == 1
+      and r.get("examples_previously_scored_short_history") == ["SHORT.NS"], str(r)[:200])
+check("  ...and only the other counts as unexplained",
+      r.get("previously_scored_unexplained") == 1
+      and r.get("examples_previously_scored_unexplained") == ["WASGOOD.NS"], str(r)[:200])
+check("a never-scored stock with three short-history failures is still excluded",
+      "NEWSHORT.NS" in excluded(), str(excluded()))
+sf_risk = (DI.scan_failures() or {}).get("at_risk_of_exclusion") or {}
+check("the scan-failure audit carries the split",
+      sf_risk.get("previously_scored_unexplained") == 1, str(sf_risk)[:120])
+
 if os.path.exists(DB):
     os.remove(DB)
 c = sqlite3.connect(DB)

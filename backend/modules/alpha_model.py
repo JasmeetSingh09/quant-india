@@ -348,6 +348,14 @@ def _compute_sentiment_factor(ticker: str, days_back: int = 14) -> dict:
 # Factor 2: Momentum Score (-1 to +1)
 # ---------------------------------------------------------------------------
 
+# The source has some prices for the stock, but fewer than momentum needs. Scored
+# exactly like no prices at all (no momentum); the reason differs so a refusal
+# can say the company exists. On 2026-09-14 Yahoo held 18-19 days of history for
+# 47 real stocks that had been scoring, and the refusal told users to check the
+# symbol.
+_SHORT_PRICE_HISTORY = "price history too short"
+
+
 def _compute_momentum_factor(ticker: str, peers: list = None) -> dict:
     """
     Absolute (time-series) 12-1 momentum, volatility-adjusted.
@@ -391,8 +399,10 @@ def _compute_momentum_factor(ticker: str, peers: list = None) -> dict:
         except Exception:
             s = None
 
-        if s is None or len(s) < MOMENTUM_MIN_OBSERVATIONS:
+        if s is None or len(s) == 0:
             return {"score": 0.0, "confidence": 0.0, "reason": "price data unavailable"}
+        if len(s) < MOMENTUM_MIN_OBSERVATIONS:
+            return {"score": 0.0, "confidence": 0.0, "reason": _SHORT_PRICE_HISTORY}
 
         n = len(s)
         start_idx = max(0, n - 1 - LOOKBACK)   # ~12 months ago (or as far back as we have)
@@ -849,6 +859,12 @@ def compute_alpha_score(
     has_price = momentum_f.get("confidence", 0) > 0
     has_fund  = bool((_ticker_info(ticker) or {}).get("marketCap"))
     if not has_price and not has_fund:
+        # A real company the source is short of is not a typo. Both messages
+        # keep "No market data found": the universe filter and the scan audits
+        # match on it, and it is still true.
+        if momentum_f.get("reason") == _SHORT_PRICE_HISTORY:
+            return {"error": f"No market data found for '{ticker}': Yahoo has fewer than "
+                             f"{MOMENTUM_MIN_OBSERVATIONS} days of prices and no market cap."}
         return {"error": f"No market data found for '{ticker}'. Check the symbol "
                          f"(NSE tickers end in .NS, e.g. RELIANCE.NS)."}
 

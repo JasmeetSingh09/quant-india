@@ -73,6 +73,13 @@ check("72 two nights running is not a jump", not N.judge_jump(f))
 s, f = night(failure_changes={"at_risk_of_exclusion.previously_scored": 3})
 check("3 previously-scoring stocks one night from exclusion is not an outage",
       not N.judge_at_risk(f))
+s, f = night(failure_changes={"at_risk_of_exclusion.previously_scored": 47,
+                              "at_risk_of_exclusion.previously_scored_short_history": 47,
+                              "at_risk_of_exclusion.previously_scored_unexplained": 0,
+                              "at_risk_of_exclusion.examples_previously_scored_unexplained": []})
+r = N.judge_at_risk(f)
+check("2026-09-14: 47 were scoring, every one short of price history at Yahoo, "
+      "is not an outage", not r, str(r))
 
 print("\n" + "=" * 74 + "\nNIGHTS IT MUST CALL BAD, AND SAY WHY\n" + "=" * 74)
 s, f = night(failure_changes={"stability_vs_previous_cycle.failed_then": 4,
@@ -90,6 +97,16 @@ check("71 stocks that were scoring, failing two nights running", bool(r), str(r)
 check("  ...calls it a data problem on our side, not delisting, and names one", bool(r)
       and "scored in the last 60 days" in r[0] and "our side" in r[0]
       and "ABANSENT" in r[0], str(r))
+
+s, f = night(failure_changes={"at_risk_of_exclusion.previously_scored": 59,
+                              "at_risk_of_exclusion.previously_scored_short_history": 47,
+                              "at_risk_of_exclusion.previously_scored_unexplained": 12,
+                              "at_risk_of_exclusion.examples_previously_scored_unexplained":
+                                  ["ABANSENT.NS"]})
+r = N.judge_at_risk(f)
+check("12 unexplained on top of 47 short histories still alarms, names the 12, "
+      "and says what it left out", bool(r) and r[0].startswith("12 stocks")
+      and "not counting 47" in r[0] and "ABANSENT" in r[0], str(r))
 
 s, f = night({"cycle": "2026-09-11"})
 r = N.judge_scan(s, TODAY)
