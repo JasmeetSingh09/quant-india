@@ -1,0 +1,371 @@
+{
+ "survivor_only": {
+  "stats": {
+   "cagr_pct": 18.94,
+   "total_return_pct": 1067.18,
+   "vol_pct": 23.95,
+   "sharpe": 0.519,
+   "sortino": 0.485,
+   "max_drawdown_pct": -46.44,
+   "hit_rate_pct": 62.9,
+   "n_months": 170
+  },
+  "benchmark_stats": {
+   "cagr_pct": 11.16,
+   "total_return_pct": 347.47,
+   "vol_pct": 15.6,
+   "sharpe": 0.298,
+   "sortino": 0.308,
+   "max_drawdown_pct": -29.34,
+   "hit_rate_pct": 57.6,
+   "n_months": 170
+  },
+  "excess_stats": {
+   "n": 170,
+   "mean_pct": 0.713,
+   "median_pct": 0.922,
+   "sd_pct": 4.81,
+   "t_stat": 1.932,
+   "p_value": 0.0551,
+   "p_method": "two-sided t-test",
+   "ci95_mean_pct": [
+    -0.016,
+    1.441
+   ],
+   "effect_size_d": 0.148,
+   "significant_at_5pct": false
+  },
+  "monthly_evidence": {
+   "n": 170,
+   "mean_pct": 1.701,
+   "median_pct": 1.778,
+   "sd_pct": 6.914,
+   "t_stat": 3.207,
+   "p_value": 0.0016,
+   "p_method": "two-sided t-test",
+   "ci95_mean_pct": [
+    0.654,
+    2.748
+   ],
+   "effect_size_d": 0.246,
+   "significant_at_5pct": true
+  },
+  "holdings_stats": {
+   "n": 25786,
+   "mean_pct": 1.838,
+   "median_pct": 0.648,
+   "sd_pct": 16.328,
+   "t_stat": 18.08,
+   "p_value": 0.0,
+   "p_method": "two-sided t-test",
+   "ci95_mean_pct": [
+    1.639,
+    2.038
+   ],
+   "effect_size_d": 0.113,
+   "significant_at_5pct": true,
+   "positions": 25786,
+   "hit_rate_pct": 52.2,
+   "effective_sample_size": 985.3,
+   "hit_rate_ci95": [
+    49.2,
+    55.4
+   ],
+   "hit_rate_p_value": 0.1609,
+   "hit_rate_p_method": "exact binomial, on the effective sample (515 of 985)",
+   "hit_rate_significant_at_5pct": false,
+   "unadjusted_if_positions_were_independent": {
+    "ci95": [
+     51.6,
+     52.9
+    ],
+    "p_value": 0.0,
+    "method": "exact binomial",
+    "warning": "These treat all 25786 position-months as independent draws. They are not. This pair is shown only so the size of the correction is visible; it is not evidence of anything."
+   },
+   "clustering": {
+    "deff": 26.17,
+    "rho": 0.167,
+    "mean_cluster_size": 151.68,
+    "n_clusters": 170,
+    "estimable": true,
+    "note": "Observations sharing a date share that day's market move. rho is the intra-date correlation of the hit indicator, estimated from these observations by ANOVA, not assumed."
+   },
+   "note": "Position-level figures. The headline interval and p-value are computed on the EFFECTIVE sample size \u2014 the raw count divided by a design effect estimated from these observations by ANOVA. Positions held in the same month are not independent observations, and at a design effect above 50 the difference decides whether a result looks significant."
+  },
+  "unique_securities_held": 1696,
+  "turnover": {
+   "avg_monthly_pct": 29.5,
+   "note": "Fraction of the book replaced each month, from the symmetric difference between consecutive baskets."
+  },
+  "months_tested": 170,
+  "period": "2012-08 to 2026-09",
+  "universe": {
+   "mode": "survivor-only (bias reproduced)",
+   "avg_eligible_per_rebalance": 758.4,
+   "min_eligible": 225,
+   "max_eligible": 1557,
+   "avg_holdings": 151.7,
+   "months_available": 183,
+   "first_month": "2011-07",
+   "last_month": "2026-09"
+  },
+  "identity": {
+   "key_mode": "resolved",
+   "keyed_on": "ISINs chained through shared tickers; symbol only where no ISIN exists",
+   "coverage": {
+    "available": true,
+    "days_total": 3744,
+    "days_with_isin": 3744,
+    "days_pct": 100.0,
+    "rows_total": 6598053,
+    "rows_with_isin": 6598053,
+    "complete": true,
+    "note": "Until this is complete the point-in-time backtest cannot tell a rename from a delisting, and its survivorship figure is an upper bound rather than a measurement.",
+    "as_of": "2026-09-14 08:20"
+   },
+   "resolution": {
+    "linked_isins": 584,
+    "ambiguous_not_merged": 6
+   },
+   "invalid_writeoffs": {
+    "count": 0,
+    "examples": [],
+    "meaning": "Positions booked at -100% that resolved identity shows were still trading that month. Under key_mode='resolved' this is zero by construction; under the other two it is the damage the identity bug did to the result."
+   },
+   "why": "Neither identifier survives every corporate event. Keyed on symbols, a rename looks like a delisting and gets booked as a total loss. Keyed on ISINs, a company that keeps its ticker through a restructuring looks like one too \u2014 and in this window that second case is the larger of the two. Chaining both is what makes a delisting here mean the security actually stopped trading."
+  },
+  "delistings_held": {
+   "count": 4,
+   "examples": [
+    {
+     "month": "2015-01",
+     "security": "INE871C01012",
+     "still_trading_as": null
+    },
+    {
+     "month": "2023-10",
+     "security": "INE451A01017",
+     "still_trading_as": null
+    },
+    {
+     "month": "2023-10",
+     "security": "INE266D01021",
+     "still_trading_as": null
+    },
+    {
+     "month": "2023-10",
+     "security": "INE884B01025",
+     "still_trading_as": null
+    }
+   ],
+   "treatment": "A holding with no month-end price is marked to -100%. That is the harshest defensible assumption; a real investor might have exited earlier or recovered something. It is stated rather than softened because the alternative \u2014 dropping the position \u2014 is exactly the survivorship this module exists to remove."
+  },
+  "costs": {
+   "round_trip_pct": 0.4,
+   "note": "Charged on realised turnover each month: the symmetric difference between consecutive baskets, halved, times the round-trip rate."
+  },
+  "limits": "170 monthly observations. That is a clean test of the implementation over this window and nothing more \u2014 eighteen or so months cannot establish a durable edge, whatever the number says. Prices are exchange closes, unadjusted for splits and dividends, so a corporate action inside the hold month distorts that month's return for that name."
+ },
+ "point_in_time": {
+  "stats": {
+   "cagr_pct": 15.7,
+   "total_return_pct": 689.25,
+   "vol_pct": 24.09,
+   "sharpe": 0.382,
+   "sortino": 0.356,
+   "max_drawdown_pct": -47.23,
+   "hit_rate_pct": 61.2,
+   "n_months": 170
+  },
+  "benchmark_stats": {
+   "cagr_pct": 11.16,
+   "total_return_pct": 347.47,
+   "vol_pct": 15.6,
+   "sharpe": 0.298,
+   "sortino": 0.308,
+   "max_drawdown_pct": -29.34,
+   "hit_rate_pct": 57.6,
+   "n_months": 170
+  },
+  "excess_stats": {
+   "n": 170,
+   "mean_pct": 0.483,
+   "median_pct": 0.577,
+   "sd_pct": 4.84,
+   "t_stat": 1.301,
+   "p_value": 0.1949,
+   "p_method": "two-sided t-test",
+   "ci95_mean_pct": [
+    -0.25,
+    1.216
+   ],
+   "effect_size_d": 0.1,
+   "significant_at_5pct": false
+  },
+  "monthly_evidence": {
+   "n": 170,
+   "mean_pct": 1.471,
+   "median_pct": 1.554,
+   "sd_pct": 6.954,
+   "t_stat": 2.758,
+   "p_value": 0.0065,
+   "p_method": "two-sided t-test",
+   "ci95_mean_pct": [
+    0.418,
+    2.524
+   ],
+   "effect_size_d": 0.212,
+   "significant_at_5pct": true
+  },
+  "holdings_stats": {
+   "n": 27851,
+   "mean_pct": 1.646,
+   "median_pct": 0.549,
+   "sd_pct": 16.684,
+   "t_stat": 16.462,
+   "p_value": 0.0,
+   "p_method": "two-sided t-test",
+   "ci95_mean_pct": [
+    1.45,
+    1.842
+   ],
+   "effect_size_d": 0.099,
+   "significant_at_5pct": true,
+   "positions": 27851,
+   "hit_rate_pct": 52.0,
+   "effective_sample_size": 1001.2,
+   "hit_rate_ci95": [
+    48.9,
+    55.0
+   ],
+   "hit_rate_p_value": 0.2297,
+   "hit_rate_p_method": "exact binomial, on the effective sample (520 of 1001)",
+   "hit_rate_significant_at_5pct": false,
+   "unadjusted_if_positions_were_independent": {
+    "ci95": [
+     51.4,
+     52.5
+    ],
+    "p_value": 0.0,
+    "method": "exact binomial",
+    "warning": "These treat all 27851 position-months as independent draws. They are not. This pair is shown only so the size of the correction is visible; it is not evidence of anything."
+   },
+   "clustering": {
+    "deff": 27.819,
+    "rho": 0.1647,
+    "mean_cluster_size": 163.83,
+    "n_clusters": 170,
+    "estimable": true,
+    "note": "Observations sharing a date share that day's market move. rho is the intra-date correlation of the hit indicator, estimated from these observations by ANOVA, not assumed."
+   },
+   "note": "Position-level figures. The headline interval and p-value are computed on the EFFECTIVE sample size \u2014 the raw count divided by a design effect estimated from these observations by ANOVA. Positions held in the same month are not independent observations, and at a design effect above 50 the difference decides whether a result looks significant."
+  },
+  "unique_securities_held": 1932,
+  "turnover": {
+   "avg_monthly_pct": 29.8,
+   "note": "Fraction of the book replaced each month, from the symmetric difference between consecutive baskets."
+  },
+  "months_tested": 170,
+  "period": "2012-08 to 2026-09",
+  "universe": {
+   "mode": "point-in-time",
+   "avg_eligible_per_rebalance": 819.0,
+   "min_eligible": 282,
+   "max_eligible": 1561,
+   "avg_holdings": 163.8,
+   "months_available": 183,
+   "first_month": "2011-07",
+   "last_month": "2026-09"
+  },
+  "identity": {
+   "key_mode": "resolved",
+   "keyed_on": "ISINs chained through shared tickers; symbol only where no ISIN exists",
+   "coverage": {
+    "available": true,
+    "days_total": 3744,
+    "days_with_isin": 3744,
+    "days_pct": 100.0,
+    "rows_total": 6598053,
+    "rows_with_isin": 6598053,
+    "complete": true,
+    "note": "Until this is complete the point-in-time backtest cannot tell a rename from a delisting, and its survivorship figure is an upper bound rather than a measurement.",
+    "as_of": "2026-09-14 08:19"
+   },
+   "resolution": {
+    "linked_isins": 584,
+    "ambiguous_not_merged": 6
+   },
+   "invalid_writeoffs": {
+    "count": 0,
+    "examples": [],
+    "meaning": "Positions booked at -100% that resolved identity shows were still trading that month. Under key_mode='resolved' this is zero by construction; under the other two it is the damage the identity bug did to the result."
+   },
+   "why": "Neither identifier survives every corporate event. Keyed on symbols, a rename looks like a delisting and gets booked as a total loss. Keyed on ISINs, a company that keeps its ticker through a restructuring looks like one too \u2014 and in this window that second case is the larger of the two. Chaining both is what makes a delisting here mean the security actually stopped trading."
+  },
+  "delistings_held": {
+   "count": 35,
+   "examples": [
+    {
+     "month": "2013-02",
+     "security": "INE542A01013",
+     "still_trading_as": null
+    },
+    {
+     "month": "2013-03",
+     "security": "INE894F01025",
+     "still_trading_as": null
+    },
+    {
+     "month": "2013-07",
+     "security": "INE275A01028",
+     "still_trading_as": null
+    },
+    {
+     "month": "2014-06",
+     "security": "INE077F01027",
+     "still_trading_as": null
+    },
+    {
+     "month": "2015-01",
+     "security": "INE871C01012",
+     "still_trading_as": null
+    },
+    {
+     "month": "2015-07",
+     "security": "INE218G01017",
+     "still_trading_as": null
+    },
+    {
+     "month": "2015-11",
+     "security": "INE317A01028",
+     "still_trading_as": null
+    },
+    {
+     "month": "2016-02",
+     "security": "INE011A01019",
+     "still_trading_as": null
+    }
+   ],
+   "treatment": "A holding with no month-end price is marked to -100%. That is the harshest defensible assumption; a real investor might have exited earlier or recovered something. It is stated rather than softened because the alternative \u2014 dropping the position \u2014 is exactly the survivorship this module exists to remove."
+  },
+  "costs": {
+   "round_trip_pct": 0.4,
+   "note": "Charged on realised turnover each month: the symmetric difference between consecutive baskets, halved, times the round-trip rate."
+  },
+  "limits": "170 monthly observations. That is a clean test of the implementation over this window and nothing more \u2014 eighteen or so months cannot establish a durable edge, whatever the number says. Prices are exchange closes, unadjusted for splits and dividends, so a corporate action inside the hold month distorts that month's return for that name."
+ },
+ "difference": {
+  "cagr_pct": -3.24,
+  "total_return_pct": -377.93,
+  "vol_pct": 0.14,
+  "sharpe": -0.137,
+  "sortino": -0.129,
+  "max_drawdown_pct": -0.79,
+  "hit_rate_pct": -1.7,
+  "n_months": 0
+ },
+ "survivorship_cost_cagr_pct": -3.24,
+ "verdict": "Holding the strategy and the code fixed, moving from a survivor-only universe to the universe that actually existed changes annual return by -3.24 points. The survivor-only run looks better, which is what survivorship bias does.",
+ "as_of": "2026-09-14 08:20"
+}

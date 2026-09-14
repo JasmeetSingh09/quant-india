@@ -3,6 +3,12 @@
 **Written 2026-09-14 from the code at `aa4d2f9`. Nothing described here has been
 changed.** Each section ends with a proposed fix that needs approval first.
 
+> **Status, later the same day.** Sections 1–4 were approved and fixed in
+> `9b2d764` (live on production 08:31 UTC). The benchmark question this raised
+> was decided (Benchmark A) and fixed in `a2418ba` (live 09:11 UTC). Results are
+> in `BACKTEST_RERUN_ADJUSTED_2026-09-14.md`. Section 1 item d, the Render disk
+> and `QUANT_DATA_DIR` check, is still open.
+
 ## 1. "database is locked"
 
 **What happened.** Production logged `sqlite3.OperationalError: database is

@@ -195,6 +195,20 @@ v1.4.1.
 | Quality, value | No lead, approximate test | `FACTOR_TEST2_RESULT_2026-09-13.md` |
 | Composite score and labels | Untested; needs the forward record | from 2026-12-27 |
 
+## Updates after this record (same day)
+
+- **Sharpe and Sortino now have one definition** (`risk_metrics.py`), since
+  `9b2d764`.
+- **The stale claims listed above were corrected in the code** in `9b2d764`. No
+  scoring behaviour changed.
+- **The point-in-time backtest and the momentum variants study now use adjusted
+  prices** (`9b2d764`).
+- **The backtest's excess return is now measured against the eligible universe**
+  (`a2418ba`).
+
+These are research and measurement changes, not changes to V1's scores. See
+`BACKTEST_RERUN_ADJUSTED_2026-09-14.md`.
+
 ## Rule for changing V1
 
 Any change to a behavioural parameter is a new specification version, with
