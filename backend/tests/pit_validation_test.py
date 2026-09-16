@@ -180,6 +180,40 @@ ok(set(pv.UNTESTABLE) >= {"quality", "value", "growth", "sentiment",
 ok(all(v.get("needs") and v.get("why_not") for v in pv.UNTESTABLE.values()),
    "each untestable component names the data it would require")
 
+print("\n7. The subperiod window only drops formation months")
+months7 = [f"{y}-{m:02d}" for y in (2011, 2012, 2013) for m in range(1, 13)]
+cols7 = [21 * (k + 1) for k in range(len(months7))]
+full7 = pv._formation_indices(cols7, months7)
+ok(full7 == [i for i in range(len(cols7)) if cols7[i] - pv.MOM_LOOKBACK >= 0],
+   "with no window, formation months are exactly the full-lookback rule")
+ok(pv._formation_indices(cols7, months7, None) == full7,
+   "from_month=None is identical to leaving it out")
+win7 = pv._formation_indices(cols7, months7, "2013-01")
+ok(win7 == [i for i in full7 if months7[i] >= "2013-01"] and win7,
+   "a window keeps only full-lookback months on or after it")
+ok(pv._formation_indices(cols7, months7, "2011-03") == full7,
+   "a window before the first full lookback cannot add months")
+ok(pv._formation_indices(cols7, months7, "2020-01") == [],
+   "a window after the archive leaves nothing, which validate reports as an error")
+
+print("\n8. The per-month spread is the series the primary test averages")
+by_month8, expected8 = {}, []
+for k, m in enumerate(["2019-02", "2019-01", "2019-03"]):
+    exc = rng.normal(0, 0.05, 40)
+    bucket = np.arange(40) * 5 // 40
+    idx = np.arange(40)
+    by_month8[m] = {"idx": idx, "bucket": bucket, "blk": {"excess": exc}}
+    expected8.append((m, float(np.mean(exc[bucket == 4])) - float(np.mean(exc[bucket == 0]))))
+by_month8["2019-04"] = {"idx": np.arange(3), "bucket": np.zeros(3, dtype=int),
+                        "blk": {"excess": np.zeros(3)}}   # no top bucket
+pairs8 = pv._spread_by_month(by_month8, 5)
+ok(pairs8 == expected8,
+   "spread per month matches top-minus-bottom computed by hand, in dict order")
+ok(all(m != "2019-04" for m, _ in pairs8),
+   "a month without both a top and a bottom bucket is left out, as before")
+ok(pv._mean_test([s for _, s in pairs8]) == pv._mean_test([s for _, s in expected8]),
+   "the primary statistic is unchanged by carrying the month alongside")
+
 print("\n" + "=" * 64)
 print(f"passed {len(PASS)}, failed {len(FAIL)}")
 for f in FAIL:

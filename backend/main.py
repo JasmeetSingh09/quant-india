@@ -1877,16 +1877,20 @@ def validation_a5_gate(required: int = Query(199, ge=1, le=5000)):
 
 @app.get("/validation/pit")
 def validation_pit(min_turnover: float = Query(1e7, ge=0),
-                   buckets: int = Query(5, ge=3, le=10)):
+                   buckets: int = Query(5, ge=3, le=10),
+                   from_month: Optional[str] = Query(None, pattern=r"^\d{4}-(0[1-9]|1[0-2])$")):
     """
     Track A: validation of the factors the point-in-time archive can actually
     reconstruct — momentum and low_risk — across horizons, regimes and
     liquidity, with Track B listing what cannot be tested and why.
 
+    from_month (YYYY-MM) restricts formation months to that month onward; omit
+    it for the full archive.
+
     This is price-observable validation, NOT full V1/V2 validation.
     """
     from pit_validation import validate
-    r = validate(min_turnover=min_turnover, n_buckets=buckets)
+    r = validate(min_turnover=min_turnover, n_buckets=buckets, from_month=from_month)
     if "error" in r:
         raise HTTPException(status_code=400, detail=r["error"])
     return r

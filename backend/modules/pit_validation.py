@@ -637,14 +637,47 @@ def _grade(obs, label, n_form, horizon, exploratory=False):
 
 # ------------------------------------------------------------------ main
 
+def _formation_indices(cols, months, from_month=None):
+    """
+    Month-end positions that can be formation dates: a full momentum lookback
+    behind them and, when from_month ("YYYY-MM") is given, on or after it.
+
+    The window only drops formation dates. Scores still read the whole archive
+    to their left, so a 2019-01 formation sees its full 2018 lookback.
+    """
+    return [i for i in range(len(cols))
+            if cols[i] - MOM_LOOKBACK >= 0
+            and (from_month is None or months[i] >= from_month)]
+
+
+def _spread_by_month(by_month, n_buckets):
+    """
+    [(month, top-minus-bottom excess)] in by_month's order, for every month
+    with both a top and a bottom bucket. The mean of these is the primary test.
+    """
+    out = []
+    for m, g in by_month.items():
+        exc = g["blk"]["excess"]
+        hi = exc[g["idx"][g["bucket"] == n_buckets - 1]]
+        lo = exc[g["idx"][g["bucket"] == 0]]
+        if len(hi) and len(lo):
+            out.append((m, float(np.mean(hi)) - float(np.mean(lo))))
+    return out
+
+
 def validate(min_turnover: float = MIN_MONTHLY_TURNOVER,
-             n_buckets: int = N_BUCKETS) -> dict:
+             n_buckets: int = N_BUCKETS,
+             from_month: str = None) -> dict:
     """
     Track A: everything the point-in-time archive can legitimately test.
 
     Returns per-factor, per-horizon quintile results with the top-minus-bottom
     spread as the declared primary hypothesis, plus exploratory cuts by regime
     and liquidity, and the Track B list of what cannot be tested and why.
+
+    from_month ("YYYY-MM") keeps only formation months on or after it, for the
+    pre-registered subperiod test (PREREG_MOMENTUM_ROBUSTNESS_2026-09-17). Left
+    as None, the months tested are exactly those tested before it existed.
     """
     try:
         from db import get_conn
@@ -682,9 +715,10 @@ def validate(min_turnover: float = MIN_MONTHLY_TURNOVER,
                          f"a 12-month lookback and measure anything after it."}
 
     # Formation months are those with a full momentum lookback behind them.
-    form_ix = [i for i in range(len(me)) if cols[i] - MOM_LOOKBACK >= 0]
+    form_ix = _formation_indices(cols, months, from_month)
     if not form_ix:
-        return {"error": "No month has a full 252-day lookback behind it."}
+        return {"error": "No month has a full 252-day lookback behind it"
+                         + (f" on or after {from_month}." if from_month else ".")}
 
     # Equal-weight market return per month, from the eligible universe itself.
     # Used for excess and for regimes, so the whole of Track A stays inside the
@@ -828,14 +862,16 @@ def validate(min_turnover: float = MIN_MONTHLY_TURNOVER,
 
             # The declared primary test: top quintile minus bottom, paired by
             # month so the market's move cancels.
-            spread = []
-            for m, g in by_month.items():
-                exc = g["blk"]["excess"]
-                hi = exc[g["idx"][g["bucket"] == n_buckets - 1]]
-                lo = exc[g["idx"][g["bucket"] == 0]]
-                if len(hi) and len(lo):
-                    spread.append(float(np.mean(hi)) - float(np.mean(lo)))
+            spread_pairs = _spread_by_month(by_month, n_buckets)
+            spread = [s for _, s in spread_pairs]
             spread_test = _mean_test(spread)
+            if h == 1:
+                # Each month's spread, so the series can be compared with an
+                # outside one (IIMA's WML) month by month. 1-month only: longer
+                # horizons overlap and are not a monthly series.
+                spread_test["monthly"] = [
+                    {"month": m, "spread_pct": round(s * 100, 4)}
+                    for m, s in sorted(spread_pairs)]
             non_overlap = len(spread) // max(h, 1)
             spread_test["non_overlapping_windows"] = non_overlap
             if non_overlap < MIN_NONOVERLAPPING:
@@ -958,6 +994,7 @@ def validate(min_turnover: float = MIN_MONTHLY_TURNOVER,
             "formation_months": n_form,
             "months_available": len(me),
             "first_month": months[0], "last_month": months[-1],
+            "formation_from_month": from_month,
             "liquidity_floor_rupees": min_turnover,
             "identity": ident,
         },
