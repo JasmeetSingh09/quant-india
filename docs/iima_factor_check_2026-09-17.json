@@ -1,0 +1,130 @@
+{
+  "preregistration": "docs/IIMA_FACTOR_CHECK_PREREG_2026-09-17.md",
+  "source": "Agarwalla, S. K., Jacob, J. and Varma, J. R. (2013), Four factor model in Indian equities market, W.P. No. 2013-09-05, IIM Ahmedabad",
+  "files": {
+    "2025-12_FourFactors_and_Market_Returns_Monthly_SurvivorshipBiasAdjusted.csv": "c07a12d1c04630c18a7f87a96c91db6a7c4ebfc1e37f888e41fe8469fe234c44",
+    "2025-12_FourFactors_and_Market_Returns_Monthly.csv": "3d54c27b20a133fdd210d988ce21a4dc5b1f525df9ac19ccd437dee0a78cc8e9"
+  },
+  "alpha_each": 0.025,
+  "primary": {
+    "P1_momentum_WML": {
+      "n": 386,
+      "mean_pct_per_month": 1.1174,
+      "nw_se": 0.3558,
+      "nw_lags": 6,
+      "t_stat": 3.14,
+      "p_two_sided": 0.001687,
+      "passes": true
+    },
+    "P2_value_HML": {
+      "n": 386,
+      "mean_pct_per_month": 0.7132,
+      "nw_se": 0.2921,
+      "nw_lags": 6,
+      "t_stat": 2.441,
+      "p_two_sided": 0.014628,
+      "passes": true
+    }
+  },
+  "secondary": {
+    "subperiods": {
+      "WML": {
+        "1993-10_to_2012-12": {
+          "n": 230,
+          "mean_pct_per_month": 1.1204,
+          "nw_se": 0.5445,
+          "nw_lags": 6,
+          "t_stat": 2.058,
+          "p_two_sided": 0.039635
+        },
+        "2013-01_to_2025-12": {
+          "n": 156,
+          "mean_pct_per_month": 1.1129,
+          "nw_se": 0.3657,
+          "nw_lags": 6,
+          "t_stat": 3.043,
+          "p_two_sided": 0.002343
+        }
+      },
+      "HML": {
+        "1993-10_to_2012-12": {
+          "n": 230,
+          "mean_pct_per_month": 0.6745,
+          "nw_se": 0.4061,
+          "nw_lags": 6,
+          "t_stat": 1.661,
+          "p_two_sided": 0.096717
+        },
+        "2013-01_to_2025-12": {
+          "n": 156,
+          "mean_pct_per_month": 0.7702,
+          "nw_se": 0.4105,
+          "nw_lags": 6,
+          "t_stat": 1.876,
+          "p_two_sided": 0.060605
+        }
+      }
+    },
+    "descriptive": {
+      "WML": {
+        "first_month": "1993-10",
+        "last_month": "2025-12",
+        "arithmetic_mean_annualised_pct": 13.41,
+        "compound_annual_pct": 10.93,
+        "full_calendar_years": 31,
+        "positive_years": 22,
+        "worst_drawdown_pct": -53.5
+      },
+      "HML": {
+        "first_month": "1993-10",
+        "last_month": "2025-12",
+        "arithmetic_mean_annualised_pct": 8.56,
+        "compound_annual_pct": 6.75,
+        "full_calendar_years": 31,
+        "positive_years": 21,
+        "worst_drawdown_pct": -58.8
+      }
+    },
+    "published_only": {
+      "SMB": {
+        "n": 386,
+        "mean_pct_per_month": -0.2348,
+        "nw_se": 0.2958,
+        "nw_lags": 6,
+        "t_stat": -0.794,
+        "p_two_sided": 0.427215,
+        "first_month": "1993-10",
+        "last_month": "2025-12",
+        "arithmetic_mean_annualised_pct": -2.82,
+        "compound_annual_pct": -4.14,
+        "full_calendar_years": 31,
+        "positive_years": 15,
+        "worst_drawdown_pct": -86.1
+      },
+      "MF": {
+        "n": 386,
+        "mean_pct_per_month": 0.7172,
+        "nw_se": 0.4195,
+        "nw_lags": 6,
+        "t_stat": 1.71,
+        "p_two_sided": 0.087323,
+        "first_month": "1993-11",
+        "last_month": "2025-12",
+        "arithmetic_mean_annualised_pct": 8.61,
+        "compound_annual_pct": 5.69,
+        "full_calendar_years": 32,
+        "positive_years": 18,
+        "worst_drawdown_pct": -75.1
+      }
+    },
+    "adjusted_minus_unadjusted_mean_pct": {
+      "WML": 0.0106,
+      "HML": 0.0112
+    }
+  },
+  "limits": [
+    "IIMA recomputes the library from each Prowess release; past accounts are today's view, not as first published.",
+    "Value-weighted, total returns with dividends, no trading costs: a different construction from every Quant India backtest.",
+    "Tests the ideas behind momentum and value, not Quant India's scoring."
+  ]
+}
