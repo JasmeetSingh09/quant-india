@@ -230,6 +230,15 @@ missing = [e for e in EXPECTED if e not in found]
 check(f"all {len(EXPECTED)} scan-path caches are bounded", not missing,
       f"unbounded={missing}")
 
+# Track-record grading reads every logged ticker in one pass. A ceiling below the
+# exchange turns each warm-up into a full rebuild; at 256 production thrashed
+# (243,197 misses in 19 hours) and hit its memory limit on 2026-09-16.
+_close = next((r for r in registry()
+               if f"{r['module']}.{r['attr']}" == "prediction_tracker._CLOSE_CACHE"), None)
+check("track-record close cache holds the whole exchange (>= 2,900 tickers)",
+      _close is not None and _close["maxsize"] >= 2900,
+      f"maxsize={_close and _close['maxsize']}")
+
 # The old guards must be gone. Left in place they fire at the same threshold the
 # LRU uses and clear the whole cache -- strictly worse than before this change.
 import glob  # noqa: E402

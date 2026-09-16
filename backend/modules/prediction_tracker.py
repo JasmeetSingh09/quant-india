@@ -249,7 +249,12 @@ def snapshot(universe: list = None, allow_fallback: bool = False) -> dict:
                      f"{excluded['error']} on error.")}
 
 
-_CLOSE_CACHE = BoundedCache(256, "prediction_tracker._CLOSE_CACHE")  # ticker -> (timestamp, Series of closes)
+# ticker -> (timestamp, Series of closes). Sized above the whole exchange, not a
+# scan's in-flight set: grading walks every logged ticker (~2,900 at peak), so at
+# 256 each warm-up evicted and rebuilt ~2,600 series. Production showed 243,197
+# misses in 19 hours with memory climbing while idle, then a restart at the
+# memory limit (2026-09-16). Holding all ~2,900 series measured ~22 MB.
+_CLOSE_CACHE = BoundedCache(4000, "prediction_tracker._CLOSE_CACHE")
 _CLOSE_TTL = 30 * 60             # 30 min; these are daily bars
 
 
