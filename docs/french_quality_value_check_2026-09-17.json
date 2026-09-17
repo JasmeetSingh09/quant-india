@@ -1,0 +1,128 @@
+{
+  "preregistration": "docs/PREREG_FRENCH_QUALITY_VALUE_2026-09-17.md",
+  "source": "Kenneth R. French Data Library, Tuck School of Business, Dartmouth",
+  "files": {
+    "Emerging_5_Factors_CSV.zip": "d68920020d8aedd63edcb9992f3cd778d87ec22bdb074a737ff0bbe2d80f3840",
+    "F-F_Research_Data_5_Factors_2x3_CSV.zip": "b8653b411cc5e28917e7ef643bb42f6d2d3703f84bc170eb6ae38d5267c65807"
+  },
+  "alpha_each": 0.025,
+  "months_read": {
+    "emerging": 445,
+    "us": 757
+  },
+  "primary": {
+    "Q1_emerging_RMW": {
+      "n": 421,
+      "mean_pct_per_month": 0.2347,
+      "nw_se": 0.0929,
+      "nw_lags": 6,
+      "t_stat": 2.526,
+      "p_two_sided": 0.01154,
+      "first_month": "1991-07",
+      "last_month": "2026-07",
+      "passes": true
+    },
+    "Q2_us_RMW": {
+      "n": 757,
+      "mean_pct_per_month": 0.2571,
+      "nw_se": 0.0899,
+      "nw_lags": 6,
+      "t_stat": 2.859,
+      "p_two_sided": 0.004251,
+      "first_month": "1963-07",
+      "last_month": "2026-07",
+      "passes": true
+    }
+  },
+  "secondary": {
+    "out_of_sample": {
+      "us_RMW": {
+        "n": 151,
+        "mean_pct_per_month": 0.2129,
+        "nw_se": 0.1673,
+        "nw_lags": 6,
+        "t_stat": 1.272,
+        "p_two_sided": 0.203246,
+        "first_month": "2014-01",
+        "last_month": "2026-07"
+      },
+      "us_HML": {
+        "n": 151,
+        "mean_pct_per_month": -0.0324,
+        "nw_se": 0.3415,
+        "nw_lags": 6,
+        "t_stat": -0.095,
+        "p_two_sided": 0.924452,
+        "first_month": "2014-01",
+        "last_month": "2026-07"
+      },
+      "emerging_RMW": {
+        "n": 127,
+        "mean_pct_per_month": 0.2684,
+        "nw_se": 0.1247,
+        "nw_lags": 6,
+        "t_stat": 2.153,
+        "p_two_sided": 0.031305,
+        "first_month": "2016-01",
+        "last_month": "2026-07"
+      },
+      "emerging_HML": {
+        "n": 127,
+        "mean_pct_per_month": 0.6547,
+        "nw_se": 0.2682,
+        "nw_lags": 6,
+        "t_stat": 2.441,
+        "p_two_sided": 0.014653,
+        "first_month": "2016-01",
+        "last_month": "2026-07"
+      }
+    },
+    "hml_full": {
+      "us": {
+        "n": 757,
+        "mean_pct_per_month": 0.299,
+        "nw_se": 0.1287,
+        "nw_lags": 6,
+        "t_stat": 2.323,
+        "p_two_sided": 0.020156,
+        "first_month": "1963-07",
+        "last_month": "2026-07"
+      },
+      "emerging": {
+        "n": 445,
+        "mean_pct_per_month": 0.6612,
+        "nw_se": 0.1558,
+        "nw_lags": 6,
+        "t_stat": 4.245,
+        "p_two_sided": 2.2e-05,
+        "first_month": "1989-07",
+        "last_month": "2026-07"
+      }
+    },
+    "descriptive": {
+      "us_RMW": {
+        "first_month": "1963-07",
+        "last_month": "2026-07",
+        "arithmetic_mean_annualised_pct": 3.08,
+        "compound_annual_pct": 2.81,
+        "full_calendar_years": 62,
+        "positive_years": 42,
+        "worst_drawdown_pct": -41.8
+      },
+      "emerging_RMW": {
+        "first_month": "1991-07",
+        "last_month": "2026-07",
+        "arithmetic_mean_annualised_pct": 2.82,
+        "compound_annual_pct": 2.66,
+        "full_calendar_years": 34,
+        "positive_years": 24,
+        "worst_drawdown_pct": -28.8
+      }
+    }
+  },
+  "limits": [
+    "Emerging markets are 24 countries including India; India's share is not published.",
+    "RMW is operating profitability, not Quant India's quality score.",
+    "US months to 2013 and emerging months to 2015 were in the samples that defined these factors; the out-of-sample rows are the honest test."
+  ]
+}
