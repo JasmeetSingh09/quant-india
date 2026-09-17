@@ -250,6 +250,49 @@ undocumented = [f"{f}.{k}" for f, ks in fp.CAPTURE_MAP.items() for k in ks
 ok(not undocumented,
    f"every captured input is documented ({undocumented})")
 
+print("\nL. Accounts are kept as values first seen, read from cache only")
+import time as _t  # noqa: E402
+
+_INFO = {"mostRecentQuarter": 1782777600, "lastFiscalYearEnd": 1774915200,
+         "totalRevenue": 5.2e10, "netIncomeToCommon": 4.1e9, "bookValue": 212.5,
+         "sharesOutstanding": 1.3e9, "totalDebt": 8.0e9,
+         "operatingCashflow": 6.0e9, "returnOnEquity": 0.184,
+         "freeCashflow": None, "trailingPE": 28.4, "priceToBook": "n/a"}
+am._INFO_CACHE["ACC.NS"] = (_t.time(), dict(_INFO))
+fetched = []
+_real_fetch = am._fetch_info_once
+am._fetch_info_once = lambda t: fetched.append(t) or {}
+r1 = fp.capture("ACC.NS", "2026-09-17", FACTORS)
+ok(r1.get("error") is None and r1["accounts"] == 10,
+   f"10 numeric account fields stored; None and text skipped ({r1.get('accounts')})")
+ok(fetched == [], "capturing accounts made no Yahoo request")
+r2 = fp.capture("ACC.NS", "2026-09-18", FACTORS)
+con = sqlite3.connect(DB)
+rows = con.execute("SELECT field, first_seen_cycle, last_seen_cycle FROM "
+                   "accounts_observed WHERE ticker='ACC.NS'").fetchall()
+ok(len(rows) == 10, f"an unchanged night adds no rows ({len(rows)})")
+ok(all(f == "2026-09-17" and l == "2026-09-18" for _, f, l in rows),
+   "an unchanged value keeps its first sighting and moves last_seen")
+_changed = dict(_INFO, mostRecentQuarter=1790640000, totalRevenue=5.6e10)
+am._INFO_CACHE["ACC.NS"] = (_t.time(), _changed)
+fp.capture("ACC.NS", "2026-10-30", FACTORS)
+new = con.execute("SELECT field, value_num FROM accounts_observed WHERE "
+                  "ticker='ACC.NS' AND first_seen_cycle='2026-10-30' "
+                  "ORDER BY field").fetchall()
+ok(new == [("most_recent_quarter", 1790640000.0), ("total_revenue", 5.6e10)],
+   f"new accounts add exactly the changed fields, dated by that scan ({new})")
+old = con.execute("SELECT COUNT(*) FROM accounts_observed WHERE ticker='ACC.NS' "
+                  "AND field='total_revenue'").fetchone()[0]
+ok(old == 2, "the earlier figure is kept beside the new one, not overwritten")
+con.close()
+ok(fp.capture("NOCACHE.NS", "2026-09-17", FACTORS).get("accounts") == 0,
+   "a stock with nothing cached stores no accounts and raises nothing")
+ok(r1["complete"] is True and r2["complete"] is True,
+   "accounts never change whether an observation counts as complete")
+ok(all(fp.FIELD_CATALOG[f"accounts.{n}"]["pit"] is False for n in fp.ACCOUNT_FIELDS),
+   "no account field claims to be point-in-time")
+am._fetch_info_once = _real_fetch
+
 try:
     os.remove(DB)
 except Exception:

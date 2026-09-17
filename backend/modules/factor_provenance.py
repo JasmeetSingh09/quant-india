@@ -249,6 +249,43 @@ FIELD_CATALOG = {
     },
 }
 
+# Company accounts as Yahoo reported them, kept as "the date we first saw each
+# value" rather than as a nightly copy. A row is added only when a value changes,
+# so the table grows with filings and restatements, not with the calendar.
+#
+# This is still not point-in-time accounts. first_seen is when OUR scan first
+# saw a figure, which is on or after the filing date, never before it; a gap in
+# scanning makes it later still. It is the honest version of that data we can
+# build ourselves, and it can never be backfilled, so it starts accumulating
+# only from the first scan that runs it.
+ACCOUNT_FIELDS = {
+    "most_recent_quarter": "mostRecentQuarter",
+    "last_fiscal_year_end": "lastFiscalYearEnd",
+    "total_revenue": "totalRevenue",
+    "net_income_to_common": "netIncomeToCommon",
+    "book_value_per_share": "bookValue",
+    "shares_outstanding": "sharesOutstanding",
+    "total_debt": "totalDebt",
+    "operating_cashflow": "operatingCashflow",
+    "return_on_equity": "returnOnEquity",
+    "free_cashflow": "freeCashflow",
+    "trailing_pe": "trailingPE",
+    "price_to_book": "priceToBook",
+}
+_ACCOUNT_DATES = {"most_recent_quarter", "last_fiscal_year_end"}
+for _name, _key in ACCOUNT_FIELDS.items():
+    FIELD_CATALOG[f"accounts.{_name}"] = {
+        "meaning": (f"Yahoo .info {_key}, stored with the scan cycle it was first "
+                    f"and last seen in."
+                    + (" A period-end date (epoch seconds); a change marks new "
+                       "accounts reaching Yahoo." if _name in _ACCOUNT_DATES else "")),
+        "source": f"Yahoo .info {_key}, read from alpha_model's cache (no fetch)",
+        "kind": "raw", "category": OBSERVATION_YAHOO, "pit": False,
+        "reproduces": False, "immutable": False,
+        "note": ("first_seen is when our scan first saw the value, on or after "
+                 "the filing date, never a filing date itself."),
+    }
+
 # Which returned keys to persist per factor, and under what catalogue name.
 # Read from the factor's own result dict — nothing here re-fetches, so storing
 # provenance cannot change what was scored.
@@ -316,6 +353,16 @@ def _init():
                weight       REAL,
                observed_at  TEXT,
                PRIMARY KEY (ticker, cycle_id, title_hash)
+           )""",
+        """CREATE TABLE IF NOT EXISTS accounts_observed (
+               ticker           TEXT NOT NULL,
+               field            TEXT NOT NULL,
+               value_key        TEXT NOT NULL,
+               value_num        REAL,
+               first_seen_cycle TEXT NOT NULL,
+               first_seen_at    TEXT NOT NULL,
+               last_seen_cycle  TEXT NOT NULL,
+               PRIMARY KEY (ticker, field, value_key)
            )""",
     ):
         conn = get_conn()
@@ -431,6 +478,9 @@ def capture(ticker: str, cycle_id: str, factors: dict, isin: str = None,
         out["factors"] = per_factor
         out["peers"] = _write_peers(ticker, cycle_id, factors, now)
         out["articles"] = _write_articles(ticker, cycle_id, factors, now)
+        # Recorded, never counted toward completeness: the accounts describe the
+        # company, not an input the four V1 factors consumed as declared.
+        out["accounts"] = _write_accounts(ticker, cycle_id, now)
 
         # Complete means: every factor that scored also has all of its declared
         # inputs present. A factor that could not score is not held against the
@@ -489,6 +539,55 @@ def _write(rows):
                 pass
         conn.commit()
         return ok, sum(1 for r in rows if r[10])
+    finally:
+        conn.close()
+
+
+def _account_values(ticker):
+    """{field: number} from the .info the factors just used. Reads the cache
+    only: fetching here would add Yahoo calls to the scan and could see a
+    different answer from the one that was scored."""
+    try:
+        import alpha_model as am
+        hit = am._INFO_CACHE.get(ticker)
+    except Exception:
+        return {}
+    if not hit or not isinstance(hit, tuple) or not isinstance(hit[1], dict):
+        return {}
+    info = hit[1]
+    out = {}
+    for name, key in ACCOUNT_FIELDS.items():
+        num = _num(info.get(key))
+        if num is not None:
+            out[name] = num
+    return out
+
+
+def _write_accounts(ticker, cycle_id, now):
+    """One row per distinct value per field; a repeat only moves last_seen."""
+    values = _account_values(ticker)
+    if not values:
+        return 0
+    stmt = ("INSERT INTO accounts_observed (ticker, field, value_key, value_num, "
+            "first_seen_cycle, first_seen_at, last_seen_cycle) "
+            "VALUES (?,?,?,?,?,?,?) "
+            "ON CONFLICT (ticker, field, value_key) DO UPDATE SET "
+            "last_seen_cycle = EXCLUDED.last_seen_cycle")
+    # repr of a float round-trips exactly, so the same reported figure maps to
+    # the same key night after night, and any change, however small, is kept.
+    rows = [(ticker, name, repr(v), v, cycle_id, now, cycle_id)
+            for name, v in sorted(values.items())]
+    conn = get_conn()
+    try:
+        conn.executemany(stmt, rows)
+        conn.commit()
+        return len(rows)
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return 0
     finally:
         conn.close()
 
