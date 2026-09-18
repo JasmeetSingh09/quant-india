@@ -7,9 +7,8 @@ import Explainer from '../components/Explainer'
 import CapTierPicks from '../components/CapTierPicks'
 import Leaderboard from '../components/Leaderboard'
 import EmailOptIn from '../components/EmailOptIn'
-import { ChevronDown, TrendingUp, TrendingDown, Sparkles, ArrowUpRight, ArrowDownRight, RefreshCw, History } from 'lucide-react'
+import { TrendingUp, TrendingDown, Sparkles, ArrowUpRight, ArrowDownRight, RefreshCw, History } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
-import usePersistentState from '../usePersistentState'
 import ErrorBoundary from '../components/ErrorBoundary'
 
 const NIFTY_STOCKS = ['RELIANCE.NS','TCS.NS','HDFCBANK.NS','INFY.NS','ICICIBANK.NS']
@@ -95,6 +94,33 @@ function PriceTag({ ticker }) {
       <p className={`text-xs font-medium flex items-center gap-1 mt-1 ${pos ? 'text-green-400' : 'text-red-400'}`}>
         {pos ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
         {pos ? '+' : ''}{data?.change_pct?.toFixed(2) ?? '0.00'}%
+      </p>
+    </div>
+  )
+}
+
+// The index itself, first in the row of its holdings. Index points, not rupees:
+// a ₹ sign on 23,346 would read as a price someone could pay.
+function NiftyIndexCard() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['price', '^NSEI'],
+    queryFn: () => getPrice('^NSEI'),
+    refetchInterval: q => (q.state.data?.feed_active ? 60000 : false),
+  })
+  if (isLoading) return (
+    <div className="card-sm h-[72px] animate-pulse bg-gray-800/40" />
+  )
+  const pos = (data?.change_pct ?? 0) >= 0
+  return (
+    <div className="card-sm border border-green-900/40">
+      <p className="text-xs text-gray-400 font-semibold">NIFTY 50</p>
+      <p className="text-lg font-bold font-mono leading-tight mt-0.5">
+        {data?.price != null ? data.price.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '—'}
+      </p>
+      <p className={`text-xs font-medium flex items-center gap-1 mt-1 ${pos ? 'text-green-400' : 'text-red-400'}`}>
+        {pos ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+        {data?.change != null && `${pos ? '+' : ''}${data.change.toFixed(2)} `}
+        ({pos ? '+' : ''}{data?.change_pct?.toFixed(2) ?? '0.00'}%)
       </p>
     </div>
   )
@@ -522,9 +548,11 @@ function NiftyLevel() {
   })
   if (!data || data.return_pct == null) return null
   const up = data.return_pct >= 0
+  // The endpoint reports how many trading days it actually covered; labelling
+  // it with the number requested showed "5d" over a ten-day window.
   return (
-    <span className="text-xs text-gray-400">
-      Nifty 50 (5d){' '}
+    <span className="text-xs text-gray-400" title={`${data.from} to ${data.to}`}>
+      Nifty 50 ({data.days ?? 5} trading days){' '}
       <span className={`font-mono font-semibold ${up ? 'text-green-400' : 'text-red-400'}`}>
         {up ? '+' : ''}{data.return_pct}%
       </span>
@@ -533,8 +561,6 @@ function NiftyLevel() {
 }
 
 export default function Dashboard() {
-  // Collapsed by default: the three questions come first, context follows.
-  const [showContext, setShowContext] = usePersistentState('dash.showContext', false)
   const { data: mcx,    isLoading: mcxLoading,    isError: mcxError    } = useQuery({ queryKey: ['mcx'],     queryFn: getMCX,        refetchInterval: 120000 })
   const { data: regime, isLoading: regimeLoading, isError: regimeError } = useQuery({ queryKey: ['regime'],  queryFn: getRegime,     staleTime: 300000 })
   const { data: news,   isLoading: newsLoading,   isError: newsError   } = useQuery({ queryKey: ['mktNews'], queryFn: getMarketNews, staleTime: 60000 })
@@ -567,11 +593,47 @@ export default function Dashboard() {
           questions follow directly underneath. */}
       <div>
         <div className="flex items-baseline justify-between gap-3 mb-3 flex-wrap">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Nifty 50 — Top Holdings</h2>
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Nifty 50 and top holdings</h2>
           <NiftyLevel />
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <NiftyIndexCard />
           {NIFTY_STOCKS.map(t => <PriceTag key={t} ticker={t} />)}
+        </div>
+      </div>
+
+      {/* Commodities and news sit directly under the market row: asked for on
+          the dashboard itself, not behind a "market context" toggle. */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="card col-span-1">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold">Commodities</h2>
+            <Link to="/markets" className="text-xs text-green-400 hover:text-green-300">View all →</Link>
+          </div>
+          {mcxLoading ? <Spinner size="sm" /> : mcxError ? (
+            <p className="text-xs text-red-400 py-4 text-center">Could not load commodity data.</p>
+          ) : (
+            <>
+              <p className="text-xs text-gray-500 mb-3">
+                USD/INR: <span className="text-gray-300 font-mono">{mcx?.usd_inr_rate}</span>
+              </p>
+              {mcx?.commodities?.map(c => <CommodityRow key={c.key} c={c} />)}
+            </>
+          )}
+        </div>
+
+        <div className="card lg:col-span-2">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold">Market News</h2>
+            <Link to="/markets" className="text-xs text-green-400 hover:text-green-300">View all →</Link>
+          </div>
+          {newsLoading ? <Spinner size="sm" /> : newsError ? (
+            <p className="text-xs text-red-400 py-4 text-center">Could not load news.</p>
+          ) : (
+            <div className="space-y-1">
+              {news?.articles?.slice(0, 6).map((a, i) => <NewsCard key={i} article={a} />)}
+            </div>
+          )}
         </div>
       </div>
 
@@ -589,54 +651,6 @@ export default function Dashboard() {
 
       {/* Asked once, then never again — see the component. */}
       <EmailOptIn />
-
-      {/* Market context, collapsed by default. Commodities, news and the regime
-          detail inform a decision rather than driving one, and leaving nine
-          sections expanded meant the three that matter competed with six that
-          did not. Nothing is removed — it opens in one click. */}
-      <button onClick={() => setShowContext(c => !c)}
-              aria-expanded={showContext}
-              className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors border-t border-gray-800 pt-3 w-full">
-        {showContext ? 'Hide' : 'Show'} market context — commodities, news, regime detail
-        <ChevronDown size={13} className={`transition-transform ${showContext ? 'rotate-180' : ''}`} />
-      </button>
-
-      {showContext && (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* MCX Commodities */}
-        <div className="card col-span-1">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold">MCX Commodities</h2>
-            <Link to="/markets" className="text-xs text-green-400 hover:text-green-300">View all →</Link>
-          </div>
-          {mcxLoading ? <Spinner size="sm" /> : mcxError ? (
-            <p className="text-xs text-red-400 py-4 text-center">Could not load commodity data.</p>
-          ) : (
-            <>
-              <p className="text-xs text-gray-500 mb-3">
-                USD/INR: <span className="text-gray-300 font-mono">{mcx?.usd_inr_rate}</span>
-              </p>
-              {mcx?.commodities?.map(c => <CommodityRow key={c.key} c={c} />)}
-            </>
-          )}
-        </div>
-
-        {/* Market News */}
-        <div className="card col-span-2">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold">Market News</h2>
-            <Link to="/markets" className="text-xs text-green-400 hover:text-green-300">View all →</Link>
-          </div>
-          {newsLoading ? <Spinner size="sm" /> : newsError ? (
-            <p className="text-xs text-red-400 py-4 text-center">Could not load news.</p>
-          ) : (
-            <div className="space-y-1">
-              {news?.articles?.slice(0, 6).map((a, i) => <NewsCard key={i} article={a} />)}
-            </div>
-          )}
-        </div>
-      </div>
-      )}
 
       {/* Regime detail */}
       {regimeError && (
