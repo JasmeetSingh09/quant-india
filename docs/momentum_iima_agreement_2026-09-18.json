@@ -1,0 +1,27 @@
+{
+  "preregistration": "docs/PREREG_MOMENTUM_ROBUSTNESS_2026-09-17.md (H3)",
+  "alignment": "our formation month m paired with IIMA month m+1 (the month both returns were earned)",
+  "months": 161,
+  "first_return_month": "2012-08",
+  "last_return_month": "2025-12",
+  "H3": {
+    "pearson_r": 0.8015,
+    "t": 16.9,
+    "p_two_sided": 0.0,
+    "alpha": 0.01667,
+    "passes": true
+  },
+  "secondary_regression_ours_on_wml": {
+    "intercept_pct_per_month": 0.5945,
+    "intercept_t": 2.489,
+    "intercept_p": 0.012809,
+    "slope": 0.8778,
+    "slope_t": 10.035,
+    "slope_p": 0.0,
+    "nw_lags": 6
+  },
+  "means_pct_per_month": {
+    "ours": 1.5599,
+    "iima_wml": 1.0998
+  }
+}
