@@ -12,7 +12,7 @@ Commodity tickers used:
   BZ=F   — Brent Crude (ICE, USD/barrel)
   NG=F   — Natural Gas (NYMEX, USD/MMBtu)
   HG=F   — Copper (COMEX, USD/lb)
-  ALI=F  — Aluminium (COMEX, USD/lb)
+  ALI=F  — Aluminium (COMEX, USD/metric ton)
   PA=F   — Palladium (COMEX, USD/troy oz)
   PL=F   — Platinum (COMEX, USD/troy oz)
   ZW=F   — Wheat (CBOT, USD/bushel)
@@ -49,7 +49,7 @@ COMMODITIES = {
     "natural_gas": {"ticker": "NG=F",  "name": "Natural Gas",   "unit": "USD/MMBtu",    "category": "energy"},
     # Base metals
     "copper":      {"ticker": "HG=F",  "name": "Copper",        "unit": "USD/lb",       "category": "base_metals"},
-    "aluminium":   {"ticker": "ALI=F", "name": "Aluminium",     "unit": "USD/lb",       "category": "base_metals"},
+    "aluminium":   {"ticker": "ALI=F", "name": "Aluminium",     "unit": "USD/tonne",    "category": "base_metals"},
     # Agricultural
     "wheat":       {"ticker": "ZW=F",  "name": "Wheat",         "unit": "USD/bushel",   "category": "agricultural"},
     "soybean":     {"ticker": "ZS=F",  "name": "Soybean",       "unit": "USD/bushel",   "category": "agricultural"},
@@ -103,6 +103,7 @@ def _fetch_commodity_price(ticker: str) -> dict:
 
 _GRAMS_PER_TROY_OZ = 31.1034768
 _KG_PER_LB         = 0.45359237
+_KG_PER_TONNE      = 1000.0
 
 
 def _to_indian_units(price_data: dict, unit: str):
@@ -120,6 +121,12 @@ def _to_indian_units(price_data: dict, unit: str):
     elif "/lb" in unit:
         factor  = 1.0 / _KG_PER_LB               # per pound -> per kg
         new_unit = unit.replace("lb", "kg")
+    elif "/tonne" in unit:
+        # COMEX aluminium (ALI=F) quotes per metric ton. It was catalogued as
+        # USD/lb, so a ~$3,470/t quote was scaled up as if per pound and shown
+        # as Rs 7.3 lakh per kg, about 1,000 times too high.
+        factor  = 1.0 / _KG_PER_TONNE            # per tonne -> per kg
+        new_unit = unit.replace("tonne", "kg")
     if factor == 1.0:
         return price_data, new_unit
     out = dict(price_data)

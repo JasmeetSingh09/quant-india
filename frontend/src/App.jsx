@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Menu, Zap } from 'lucide-react'
 import Sidebar from './components/Sidebar'
@@ -6,17 +6,30 @@ import ErrorBoundary from './components/ErrorBoundary'
 import useMediaQuery from './hooks/useMediaQuery'
 import usePersistentState from './usePersistentState'
 import Dashboard from './pages/Dashboard'
-import StockExplorer from './pages/StockExplorer'
-import Calculators from './pages/Calculators'
-import Simulator from './pages/Simulator'
-import MyStocks from './pages/MyStocks'
-import PortfolioLab from './pages/PortfolioLab'
-import Markets from './pages/Markets'
-import Advanced from './pages/Advanced'
+// Every page but the dashboard loads when it is first opened, not with the app.
+// They were all in one 583 kB bundle, so the first screen waited for pages the
+// visitor might never open.
+const StockExplorer = lazy(() => import('./pages/StockExplorer'))
+const Calculators   = lazy(() => import('./pages/Calculators'))
+const Simulator     = lazy(() => import('./pages/Simulator'))
+const MyStocks      = lazy(() => import('./pages/MyStocks'))
+const PortfolioLab  = lazy(() => import('./pages/PortfolioLab'))
+const Markets       = lazy(() => import('./pages/Markets'))
+const Advanced      = lazy(() => import('./pages/Advanced'))
 import Login from './pages/Login'
 import Landing from './pages/Landing'
-import SharedPortfolio from './pages/SharedPortfolio'
+const SharedPortfolio = lazy(() => import('./pages/SharedPortfolio'))
 import { useAuth } from './AuthContext'
+
+// Shown for the moment a page's code is being fetched the first time it opens.
+function PageLoading() {
+  return (
+    <div className="flex h-full min-h-[40vh] items-center justify-center" role="status" aria-live="polite">
+      <div className="h-6 w-6 rounded-full border-2 border-gray-700 border-t-green-400 animate-spin" />
+      <span className="sr-only">Loading page…</span>
+    </div>
+  )
+}
 
 function NotFound() {
   return (
@@ -55,6 +68,7 @@ export default function App() {
   if (!user) {
     return (
       <ErrorBoundary name="page">
+      <Suspense fallback={<PageLoading />}>
       <Routes>
         <Route path="/login" element={<Login />} />
         {/* A shared link must open for someone with no account — demanding a
@@ -63,6 +77,7 @@ export default function App() {
         <Route path="/s/:token" element={<SharedPortfolio />} />
         <Route path="*"      element={<Landing />} />
       </Routes>
+      </Suspense>
       </ErrorBoundary>
     )
   }
@@ -102,6 +117,7 @@ export default function App() {
         {/* Keyed on the path so navigating away from a broken page clears the
             error — otherwise one failure would follow the user everywhere. */}
         <ErrorBoundary name="page" key={location.pathname}>
+        <Suspense fallback={<PageLoading />}>
         <Routes>
           <Route path="/"            element={<Dashboard />} />
           <Route path="/stock"       element={<StockExplorer />} />
@@ -141,6 +157,7 @@ export default function App() {
           <Route path="/news"        element={<Navigate to="/markets" replace />} />
           <Route path="*"            element={<NotFound />} />
         </Routes>
+        </Suspense>
         </ErrorBoundary>
         </main>
       </div>

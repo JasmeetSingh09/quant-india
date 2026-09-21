@@ -2617,8 +2617,12 @@ def simulator_leaderboard(n: int = Query(5, ge=1, le=20)):
     Deliberately returns no names, no holdings and no identities — with a pilot
     of a few classmates, either would identify the person immediately.
     """
+    # Marks every active paper portfolio to market (~10.7 s on production).
+    # Anonymised and identical for every visitor, so it is served from memory
+    # and refreshed in the background at most every five minutes.
     from leaderboard import top_simulations
-    return top_simulations(n=n)
+    from swr_cache import cached
+    return cached(f"leaderboard:{n}", 300, lambda: top_simulations(n=n))
 
 
 class BuildPortfolioRequest(BaseModel):
@@ -2652,8 +2656,11 @@ def alpha_universe_top(n: int = Query(10, ge=1, le=50)):
     Always serves the last completed results. A scan in progress is invisible
     here by design — users should never see a "scanning" state.
     """
+    # Same answer for every visitor until the next scan completes, so it is
+    # served from memory and refreshed in the background (was ~3 s a load).
     from universe_scan import top_by_tier
-    return top_by_tier(n=n)
+    from swr_cache import cached
+    return cached(f"universe_top:{n}", 300, lambda: top_by_tier(n=n))
 
 
 @app.get("/alpha/universe/status")
