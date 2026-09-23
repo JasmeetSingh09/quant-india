@@ -1354,8 +1354,11 @@ ok("purely from prices" in _mom["why"],
    "momentum's row explains what makes it testable when others are not")
 
 _lr = [r for r in _rows if r["factor"] == "low_risk"][0]
-ok(_lr["status"] == "testable_now",
-   "low_risk is reconstructible from prices and is marked so")
+# low_risk was "testable_now" until factor test 1 (2026-09-13) tested it on the
+# point-in-time archive. It did not pass, and the row must say so.
+ok(_lr["status"] == "tested", "low_risk is marked tested")
+ok((_lr.get("result") or {}).get("significant_at_5pct") is False,
+   "low_risk's recorded result is a failure, not left blank")
 ok(bool(_lr.get("where")), "low_risk says where it is tested")
 
 for _r in _rows:
@@ -1366,13 +1369,34 @@ for _r in _rows:
     ok("look-ahead" in _r["why"] or "not stored" in _r["why"],
        f"{_r['factor']} names the data problem rather than blaming effort")
 
-# No factor may be quietly reported as validated.
-ok(_e["counts"]["passed"] == 0,
-   f"nothing claims to have passed, got {_e['counts']['passed']}")
-ok("cannot be tested" in _e["headline"],
+# Only factors with a recorded, pre-registered pass may be reported as passed:
+# momentum since factor test 1 and the robustness tests (2026-09-13/18).
+_passed = [r["factor"] for r in _rows
+           if (r.get("result") or {}).get("significant_at_5pct") is True]
+ok(_passed == ["momentum"], f"only momentum claims a pass, got {_passed}")
+ok(_e["counts"]["passed"] == 1 and _e["counts"]["failed"] == 1,
+   f"one pass and one failure are counted, got {_e['counts']}")
+ok(_mom["result"].get("caveat") and "most liquid" in _mom["result"]["caveat"],
+   "momentum's pass carries its large-stock caveat")
+ok(all(str(x).startswith("docs/") for x in _mom["result"]["source"]),
+   "momentum's result names the committed record it comes from")
+ok("cannot yet be tested" in _e["headline"],
    "the headline states plainly that much of the model cannot be tested")
-ok(str(int(_e["weight_untested_pct"])) in _e["headline"],
-   "the headline carries the untested weight as a number")
+ok(str(int(_e["weight_v1_untested_pct"])) in _e["headline"],
+   "the headline carries the live model's untested weight as a number")
+ok("not been tested" in _e["headline"] and "labels" in _e["headline"],
+   "the headline says the combined score and labels are untested")
+ok("not shown among the largest" in _e["headline"],
+   "the headline carries momentum's caveat, not only its pass")
+
+from alpha_model import FACTOR_WEIGHTS as _W1
+for _r in _rows:
+    ok(abs((_r["weight_v1_pct"] or 0) - _W1.get(_r["factor"], 0) * 100) < 0.05,
+       f"{_r['factor']} carries the live model's weight too")
+for _f in ("value", "quality"):
+    _row = [r for r in _rows if r["factor"] == _f][0]
+    ok("untested" in (_row.get("idea_evidence") or ""),
+       f"{_f}: support for the idea is not presented as a test of our score")
 
 ok("Saying nothing was the overclaim" in _e["why_this_table_exists"],
    "the page explains why silence was itself a claim")

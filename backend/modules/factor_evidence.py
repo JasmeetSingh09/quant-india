@@ -78,6 +78,66 @@ RECONSTRUCTIBLE_FROM_PRICES = {
                  "incorrect about the shipped code."),
 }
 
+# Results of the pre-registered tests, as recorded in docs/. These are fixed
+# records of runs that already happened, not recomputed here: each one was
+# committed with its rules before it ran, and re-running it on every page load
+# would take minutes. Update this table only from a new committed result.
+#
+# Until 2026-09-23 the default response (no walk-forward run) said momentum
+# "did not demonstrate a statistically significant edge", which was true of an
+# earlier Yahoo-price walk-forward and false after the point-in-time tests.
+RECORDED = {
+    "momentum": {
+        "significant_at_5pct": True,
+        "p_value": 0.0001,
+        "mean_spread_pct": 1.54,
+        "summary": ("Top fifth beat bottom fifth by 1.54% a month on point-in-time "
+                    "prices, 2011-2026, delisted stocks included (p = 0.0001). Held "
+                    "among stocks trading Rs 10 crore+ a month (+1.11%, p = 0.007), "
+                    "held from 2019 on (+1.49%, p = 0.007), and tracked IIMA's "
+                    "independent momentum factor (correlation 0.80)."),
+        "caveat": ("Not shown among the largest, most liquid stocks: +0.07% a month "
+                   "in the most liquid third (p = 0.82), and not significant at a "
+                   "Rs 50 crore floor (p = 0.063). No trading costs; signal only."),
+        "source": ["docs/FACTOR_TEST1_RESULT_2026-09-13.md",
+                   "docs/MOMENTUM_ROBUSTNESS_RESULT_2026-09-18.md"],
+    },
+    "low_risk": {
+        "significant_at_5pct": False,
+        "p_value": 0.091,
+        "mean_spread_pct": 0.96,
+        "summary": ("Tested on point-in-time prices at four holding periods; no "
+                    "period passed the pre-registered threshold (1-month spread "
+                    "+0.96%, p = 0.091)."),
+        "source": ["docs/FACTOR_TEST1_RESULT_2026-09-13.md"],
+    },
+}
+
+# What independent academic data says about the IDEA behind a factor we
+# cannot yet test as we compute it. Support for an idea is not a test of our
+# score, and the rows say so.
+IDEA_EVIDENCE = {
+    "value": ("The idea is supported: a book-to-market value premium of +0.71% a "
+              "month in India, 1993-2025 (IIMA factor library, p = 0.015), and "
+              "+0.66% a month across emerging markets including India (Fama-French "
+              "library). Our value score itself is untested."),
+    "quality": ("The idea is supported: a profitability premium of +0.23% a month "
+                "across emerging markets including India, 1991-2026 (Fama-French "
+                "library, p = 0.012). Our quality score uses a different measure "
+                "and is untested."),
+    "sentiment": ("Being tested: seven years of dated headlines (GDELT) are being "
+                  "collected so past news can be scored as it was published."),
+}
+
+
+def _v1_weights():
+    try:
+        from alpha_model import FACTOR_WEIGHTS
+        return dict(FACTOR_WEIGHTS)
+    except Exception:
+        return {}
+
+
 PLAIN = {
     "momentum":  "Recent price trend",
     "quality":   "Profitability and financial health",
@@ -89,7 +149,8 @@ PLAIN = {
 
 
 def _momentum_row(run_walk_forward: bool):
-    """The one factor with a real result. Cached upstream; slow when cold."""
+    """Momentum's recorded point-in-time result, plus the walk-forward on request."""
+    rec = RECORDED["momentum"]
     row = {
         "factor": "momentum",
         "plain": PLAIN["momentum"],
@@ -97,19 +158,22 @@ def _momentum_row(run_walk_forward: bool):
         "why": ("Computed purely from prices, so a past ranking can be rebuilt "
                 "exactly as it looked then. That is what makes it testable when "
                 "the others are not."),
+        "result": {k: rec[k] for k in ("significant_at_5pct", "p_value",
+                                       "mean_spread_pct", "summary", "caveat",
+                                       "source")},
     }
     if not run_walk_forward:
-        row["result"] = None
         return row
+    # The older walk-forward runs on Yahoo prices, which carry survivorship
+    # bias. Reported beside the point-in-time result, never instead of it.
     try:
         from walk_forward import run as wf
         r = wf()
         if "error" in r:
-            row["result"] = None
-            row["note"] = f"Test could not run: {r['error']}"
+            row["walk_forward_note"] = f"Walk-forward could not run: {r['error']}"
             return row
         sig = r.get("significance") or {}
-        row["result"] = {
+        row["walk_forward"] = {
             "windows": r.get("windows_tested"),
             "mean_spread_pct": r.get("mean_spread_pct"),
             "hit_rate_pct": r.get("hit_rate_pct"),
@@ -118,8 +182,7 @@ def _momentum_row(run_walk_forward: bool):
             "verdict": r.get("verdict"),
         }
     except Exception as e:
-        row["result"] = None
-        row["note"] = f"Test could not run: {type(e).__name__}"
+        row["walk_forward_note"] = f"Walk-forward could not run: {type(e).__name__}"
     return row
 
 
@@ -165,28 +228,37 @@ def evidence(run_walk_forward: bool = True) -> dict:
     w = _weights()
     rows = [_momentum_row(run_walk_forward)]
 
+    lr = RECORDED["low_risk"]
     rows.append({
         "factor": "low_risk",
         "plain": PLAIN.get("low_risk", "low_risk"),
-        "status": "testable_now",
+        "status": "tested",
         "why": RECONSTRUCTIBLE_FROM_PRICES["low_risk"],
         "where": ("Tested in the point-in-time validation at /validation/pit, "
                   "on the same archive and the same identity resolution as the "
                   "corrected backtest."),
-        "result": None,
+        "result": {k: lr[k] for k in ("significant_at_5pct", "p_value",
+                                      "mean_spread_pct", "summary", "source")},
     })
 
     for f in ("quality", "growth", "value", "sentiment"):
-        rows.append({
+        row = {
             "factor": f,
             "plain": PLAIN.get(f, f),
             "status": "cannot_test_yet",
             "why": CANNOT_TEST[f],
             "result": None,
-        })
+        }
+        if f in IDEA_EVIDENCE:
+            row["idea_evidence"] = IDEA_EVIDENCE[f]
+        rows.append(row)
 
+    # weight_pct is V2's weight (this table began as V2's). Every live score,
+    # label and Top Pick comes from V1, so its weight travels beside it.
+    v1 = _v1_weights()
     for r in rows:
         r["weight_pct"] = round(w.get(r["factor"], 0) * 100, 1) if w else None
+        r["weight_v1_pct"] = round(v1.get(r["factor"], 0) * 100, 1) if v1 else None
 
     tested = [r for r in rows if r["status"] == "tested"]
     testable = [r for r in rows if r["status"] == "testable_now"]
@@ -197,36 +269,41 @@ def evidence(run_walk_forward: bool = True) -> dict:
 
     passed = [r for r in tested
               if (r.get("result") or {}).get("significant_at_5pct") is True]
+    failed = [r for r in tested
+              if (r.get("result") or {}).get("significant_at_5pct") is False]
+
+    def _v1(names):
+        return sum(r["weight_v1_pct"] or 0 for r in rows if r["factor"] in names)
+
+    v1_passed = _v1({r["factor"] for r in passed})
+    v1_blocked = _v1({r["factor"] for r in blocked})
 
     return {
         "factors": rows,
         "counts": {"tested": len(tested), "testable_now": len(testable),
-                   "cannot_test_yet": len(blocked), "passed": len(passed)},
+                   "cannot_test_yet": len(blocked), "passed": len(passed),
+                   "failed": len(failed)},
         "weight_tested_pct": round(weight_tested, 1),
         "weight_testable_pct": round(weight_testable, 1),
         "weight_untested_pct": round(weight_blocked, 1),
-        # The single most important number on this page, and the one a reader
-        # would never guess: most of the score is carried by factors that have
-        # never been tested at all.
+        "weight_v1_passed_pct": round(v1_passed, 1),
+        "weight_v1_untested_pct": round(v1_blocked, 1),
+        # Built from the rows, so it cannot contradict them. Leads with the
+        # live model (V1), because that is what every signal on screen is.
         "headline": (
-            f"{weight_blocked:.0f}% of the model's weight sits in factors that "
-            f"cannot be tested on the data that exists, because scoring a past "
-            f"date would need fundamentals as filed and news as published, and "
-            f"neither is stored. A further {weight_testable:.0f}% is "
-            f"reconstructible from prices and is tested in the point-in-time "
-            f"validation. The {weight_tested:.0f}% tested here — momentum — did "
-            f"not demonstrate a statistically significant edge in our tested "
-            f"configurations."
-            if not passed else
-            f"{weight_tested:.0f}% of the model's weight has been tested, "
-            f"{weight_testable:.0f}% is testable from prices, and "
-            f"{weight_blocked:.0f}% cannot be tested on the data that exists."),
+            f"In the live model, momentum ({v1_passed:.0f}% of the score) has "
+            f"passed pre-registered point-in-time tests, but its edge was not "
+            f"shown among the largest, most liquid stocks. The other "
+            f"{v1_blocked:.0f}% (quality, value, sentiment) cannot yet be tested "
+            f"as we compute them; academic data supports the value and quality "
+            f"ideas. The combined score and its labels have not been tested."
+            + (" Low risk, used only in the six-factor model, was tested and "
+               "did not pass." if failed else "")),
         "why_this_table_exists": (
-            "The app said momentum was unproven and said nothing about the "
-            "other five. A reader who sees one factor honestly marked unproven "
-            "reasonably assumes the silent ones were checked and passed. They "
-            "were not. Saying nothing was the overclaim, so every factor now "
-            "has a row."),
+            "A reader who sees one factor marked as tested reasonably assumes "
+            "the silent ones were checked and passed. They were not. Saying "
+            "nothing was the overclaim, so every factor now has a row, "
+            "including the ones that failed or cannot be tested yet."),
         "unblocking": _earliest_testable(),
         "as_of": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }

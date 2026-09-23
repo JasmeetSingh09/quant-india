@@ -10,6 +10,7 @@ import EmailOptIn from '../components/EmailOptIn'
 import { TrendingUp, TrendingDown, Sparkles, ArrowUpRight, ArrowDownRight, RefreshCw, History } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import ErrorBoundary from '../components/ErrorBoundary'
+import { signalLabel, SIGNAL_TITLE } from '../signalLabel'
 
 const NIFTY_STOCKS = ['RELIANCE.NS','TCS.NS','HDFCBANK.NS','INFY.NS','ICICIBANK.NS']
 
@@ -44,7 +45,7 @@ function PickCard({ r, buy }) {
         </span>
       </div>
       <div className="flex items-center justify-between text-[11px] mb-2">
-        <span className={`badge-${buy ? 'green' : 'red'}`}>{r.signal}</span>
+        <span className={`badge-${buy ? 'green' : 'red'}`} title={SIGNAL_TITLE}>{signalLabel(r.signal)}</span>
         <span className="text-gray-500" title="How much of the model's input data was available for this stock — not the chance the signal is right.">{Math.round((r.confidence || 0) * 100)}% data</span>
       </div>
       <div className="space-y-1">
@@ -436,7 +437,7 @@ function TrackRecord() {
                         onClick={() => navigate(`/stock?ticker=${encodeURIComponent(r.ticker)}`)}
                         className="border-b border-gray-800 last:border-0 hover:bg-gray-800/50 cursor-pointer">
                       <td className="py-1.5 font-mono text-green-400 hover:underline">{r.ticker.replace('.NS','')}</td>
-                      <td><span className={`badge-${isBuy ? 'green' : isSell ? 'red' : 'yellow'}`}>{r.signal}</span></td>
+                      <td><span className={`badge-${isBuy ? 'green' : isSell ? 'red' : 'yellow'}`}>{signalLabel(r.signal)}</span></td>
                       <td className={`text-right font-mono ${col(r.forward_return_pct)}`}>{pct(r.forward_return_pct)}</td>
                       <td className={`text-right font-mono ${col(r.excess_pct)}`}>{pct(r.excess_pct)}</td>
                       <td className="text-right text-gray-400">{r.days_held}d</td>

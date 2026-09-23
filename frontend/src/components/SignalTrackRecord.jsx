@@ -27,11 +27,11 @@ import { getMarketValidation } from '../api'
  */
 
 const LABEL_MAP = {
-  'STRONG BUY': 'Strong Buy',
-  BUY: 'Buy',
-  NEUTRAL: 'Neutral',
-  SELL: 'Sell',
-  'STRONG SELL': 'Strong Sell',
+  'STRONG BUY': 'Top ranked',
+  BUY: 'Ranked high',
+  NEUTRAL: 'Middle',
+  SELL: 'Ranked low',
+  'STRONG SELL': 'Bottom ranked',
 }
 
 export default function SignalTrackRecord({ signal, compact = false }) {

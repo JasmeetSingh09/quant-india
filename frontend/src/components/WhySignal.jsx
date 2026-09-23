@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { getAlphaScore, getSignalHistory, getPredictionTrack } from '../api'
 import Spinner from './Spinner'
 import { EvidenceBadge } from './Evidence'
+import { signalLabel } from '../signalLabel'
 
 /**
  * WhySignal — everything behind a BUY or SELL badge, on one screen.
@@ -83,7 +84,7 @@ export default function WhySignal({ ticker }) {
         <span className={`px-2 py-0.5 rounded text-sm font-bold tracking-wide ${
           buy ? 'bg-green-900/40 text-green-300 border border-green-800'
               : 'bg-red-900/40 text-red-300 border border-red-800'}`}>
-          {alpha.signal}{!buy && (alpha.signal || '').includes('SELL') ? ' · avoid' : ''}
+          {signalLabel(alpha.signal)}
         </span>
         <span className="text-xs text-gray-500">over {horizon} trading days</span>
       </div>
@@ -91,10 +92,10 @@ export default function WhySignal({ ticker }) {
       {/* The same warning the six-factor panel carries. A signal shown without
           it reads as a tested recommendation, which this is not. */}
       <p className="text-[11px] text-amber-200/85 border-l-2 border-amber-700/70 pl-2.5 leading-relaxed">
-        <b>Experimental.</b> This model has not been shown to predict returns. Its
-        only tested factor has not demonstrated a statistically significant edge
-        across 12 walk-forward configurations after correcting for multiple
-        testing — a result about this implementation, not about the factor.
+        <b>Experimental.</b> The combined score has not been shown to predict
+        returns. Momentum, 35% of it, passed pre-registered point-in-time tests,
+        but not among the largest, most liquid stocks. Quality, value and
+        sentiment have not been tested as we compute them.
       </p>
 
       {/* What the score is, stated with what it is not. */}
@@ -188,7 +189,7 @@ export default function WhySignal({ ticker }) {
       {side && (
         <div>
           <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">
-            Historical track record — {buy ? 'BUY' : 'SELL'} signals
+            Historical track record — {buy ? 'higher-ranked' : 'lower-ranked'} stocks
           </p>
           {/* Labelled as history, deliberately. A hit rate sitting under a live
               badge is read as the odds for THIS call unless it is named as the

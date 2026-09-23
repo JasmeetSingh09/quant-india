@@ -4,10 +4,10 @@
 
 export const GLOSSARY = {
   // ── Alpha model ──
-  alpha_score:  "A single 0-to-100 style score (-100 to +100) summing up how attractive a stock looks right now. Positive = looks good to buy, negative = looks weak.",
-  signal:       "The plain recommendation the score turns into: Strong Buy, Buy, Neutral, Sell, or Strong Sell.",
-  confidence:   "How sure the model is, based on how much data it had. Higher = more trustworthy.",
-  momentum:     "Has the stock been going up lately compared to similar stocks? Winners often keep winning for a while.",
+  alpha_score:  "One score from -100 to +100 combining momentum, quality, value and news sentiment. Higher means the model ranks the stock higher. It is not a predicted return, and the combined score has not been tested against future returns.",
+  signal:       "Where the score ranks the stock: Top ranked, Ranked high, Middle, Ranked low or Bottom ranked. A ranking, not a recommendation.",
+  confidence:   "Data coverage: how much of the model's input data was available for this stock. It is not the chance the ranking is right.",
+  momentum:     "The stock's own return over the past year, skipping the latest month, adjusted for how bumpy the ride was. Tested on 2011-2026 prices, where it held except among the largest, most liquid stocks.",
   quality:      "Is this a financially healthy company? (good profits, low debt, strong cash flow).",
   value:        "Is the stock cheap or expensive compared to its peers? Cheaper can mean better value.",
   sentiment:    "Whether recent news headlines about the stock sound positive or negative (read by an AI model called FinBERT).",

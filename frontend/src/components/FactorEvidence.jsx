@@ -5,11 +5,10 @@ import Spinner from './Spinner'
 /**
  * FactorEvidence — one row per factor, saying what is actually known about it.
  *
- * The app has been careful to say momentum has not demonstrated a significant
- * edge in our tested configurations. Next to that careful sentence sat five
- * factors it said nothing about, and a reader who sees one factor honestly
- * marked unproven reasonably assumes the silent ones were checked and passed.
- * They were not. Saying nothing was the overclaim, and this table is the fix.
+ * A reader who sees one factor marked as tested reasonably assumes the silent
+ * ones were checked and passed. They were not. Saying nothing was the
+ * overclaim, and this table is the fix: every factor has a row, including the
+ * one that failed and the ones that cannot be tested yet.
  *
  * The number that matters is the weight, not the count: four of six factors
  * being untestable sounds survivable until you notice how much of the score
@@ -21,6 +20,8 @@ import Spinner from './Spinner'
  * been read, 'Cannot test yet' repeats the error that put it there.
  */
 const STATUS = {
+  passed: { label: 'Passed', cls: 'text-emerald-300 border-emerald-800/60 bg-emerald-950/25' },
+  failed: { label: 'Did not pass', cls: 'text-amber-300 border-amber-800/60 bg-amber-950/25' },
   tested: { label: 'Tested', cls: 'text-yellow-300 border-yellow-800/60 bg-yellow-950/20' },
   testable_now: { label: 'Testable from prices', cls: 'text-sky-300 border-sky-800/60 bg-sky-950/20' },
   cannot_test_yet: { label: 'Cannot test yet', cls: 'text-gray-400 border-gray-700 bg-gray-900/40' },
@@ -55,14 +56,16 @@ export default function FactorEvidence() {
           <thead>
             <tr className="text-[11px] uppercase tracking-wide text-gray-500">
               <th className="text-left py-1">Factor</th>
-              <th className="text-right py-1">Weight</th>
+              <th className="text-right py-1" title="Weight in the live four-factor model, which produces every score and ranking on the site; the six-factor model's weight in brackets.">Weight</th>
               <th className="text-left py-1 pl-3">Evidence</th>
               <th className="text-left py-1 pl-3">Result</th>
             </tr>
           </thead>
           <tbody>
             {data.factors.map(f => {
-              const st = STATUS[f.status] || STATUS.untested
+              const sig = f.result?.significant_at_5pct
+              const st = STATUS[sig === true ? 'passed' : sig === false ? 'failed' : f.status]
+                         || STATUS.untested
               return (
                 <tr key={f.factor} className="border-t border-gray-800 align-top">
                   <td className="py-2">
@@ -70,7 +73,10 @@ export default function FactorEvidence() {
                     <span className="block text-[11px] text-gray-500">{f.plain}</span>
                   </td>
                   <td className="py-2 text-right font-mono text-gray-300">
-                    {f.weight_pct == null ? '—' : `${f.weight_pct}%`}
+                    {f.weight_v1_pct == null ? '—' : `${f.weight_v1_pct}%`}
+                    {f.weight_pct != null && (
+                      <span className="block text-[10px] text-gray-600">({f.weight_pct}%)</span>
+                    )}
                   </td>
                   <td className="py-2 pl-3">
                     <span className={`text-[11px] px-1.5 py-0.5 rounded border ${st.cls}`}>
@@ -78,14 +84,17 @@ export default function FactorEvidence() {
                     </span>
                   </td>
                   <td className="py-2 pl-3 text-[11px] text-gray-400 leading-relaxed max-w-md">
-                    {f.result
+                    {f.result?.summary
                       ? <>
-                          {f.result.windows} windows, hit rate {f.result.hit_rate_pct}%,
-                          {' '}p = {f.result.p_value}
-                          {f.result.significant_at_5pct === false &&
-                            <span className="text-yellow-300/90"> — not significant</span>}
+                          {f.result.summary}
+                          {f.result.caveat &&
+                            <span className="block text-amber-200/80 mt-1">{f.result.caveat}</span>}
                         </>
-                      : f.why}
+                      : <>
+                          {f.why}
+                          {f.idea_evidence &&
+                            <span className="block text-gray-300/80 mt-1">{f.idea_evidence}</span>}
+                        </>}
                   </td>
                 </tr>
               )

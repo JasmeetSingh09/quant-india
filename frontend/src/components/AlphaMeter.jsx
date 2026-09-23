@@ -1,4 +1,5 @@
 import { SignalEvidenceNote } from './Evidence'
+import { signalLabel, SIGNAL_TITLE } from '../signalLabel'
 
 export default function AlphaMeter({ score, showEvidence = true }) {
   if (score == null) return null
@@ -15,9 +16,9 @@ export default function AlphaMeter({ score, showEvidence = true }) {
   return (
     <div>
       <div className="flex justify-between text-xs text-gray-600 mb-1.5">
-        <span>SELL</span>
-        <span style={{ color }} className="font-bold text-[11px]">{signal}</span>
-        <span>BUY</span>
+        <span>Lower</span>
+        <span style={{ color }} className="font-bold text-[11px]" title={SIGNAL_TITLE}>{signalLabel(signal)}</span>
+        <span>Higher</span>
       </div>
       <div className="h-2.5 bg-gray-800 rounded-full overflow-hidden">
         <div

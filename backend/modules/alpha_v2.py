@@ -71,10 +71,11 @@ WEIGHTS_V2 = {
 # what is known, which is a lower bar and the only one currently reachable.
 WEIGHT_NOTES = {
     "momentum": "Strongest published record elsewhere, and the only factor "
-                "computed purely from prices. It is also the only factor tested on "
-                "THIS universe, where it has not demonstrated a statistically "
-                "significant edge in our tested configurations — which is why its "
-                "weight was cut rather than raised.",
+                "computed purely from prices. When these weights were set, it had "
+                "not demonstrated a statistically significant edge on THIS "
+                "universe, which is why its weight was cut rather than raised. "
+                "Later point-in-time tests (2026-09-13 and 09-18) found an edge "
+                "outside the largest, most liquid stocks; the weight is unchanged.",
     "quality":  "Profitability and balance-sheet health. Also carries the distress "
                 "veto that stops a nearly-insolvent company scoring as cheap.",
     "growth":   "Revenue and earnings growth. Weighted moderately because fast "
@@ -289,13 +290,12 @@ def compute_v2(ticker: str, v1_result: dict = None) -> dict:
         "horizon_days": 21,
         "evidence_status": "experimental",
         "evidence_note": (
-            "This model has NOT been shown to predict returns. Its largest tested "
-            "factor, momentum, has not demonstrated a statistically significant "
-            "edge in our tested configurations — 12 walk-forward runs, none "
-            "surviving correction for multiple testing. This does not prove that "
-            "momentum cannot work; it means those configurations did not provide "
-            "sufficient evidence of predictive power. Treat every score as a "
-            "research output, not a recommendation."),
+            "This model has NOT been shown to predict returns. Momentum passed "
+            "pre-registered point-in-time tests on 2011-2026 prices, but not "
+            "among the largest, most liquid stocks. Low risk was tested and did "
+            "not pass. Quality, growth, value and sentiment cannot yet be tested "
+            "as we compute them, and the combined score has not been tested. "
+            "Treat every score as a research output, not a recommendation."),
         "score_scale": {"range": [-100, 100],
                         "means": "Model preference, not a predicted return."},
         # The comparison is the point of running both.

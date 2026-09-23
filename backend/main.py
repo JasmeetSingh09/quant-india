@@ -281,6 +281,28 @@ def _start_picks_scheduler():
                       id="scan_resume", replace_existing=True,
                       next_run_time=_dt.now() + _td(seconds=120))
 
+        # The dashboard's leaderboard and tiered picks are served from
+        # swr_cache, which only fills on first request. After a restart that
+        # first visitor waited 40-110 s (2026-09-21, measured on production).
+        # Fill both shortly after boot instead, with the same keys the
+        # dashboard asks for, so no visitor pays for the restart.
+        def _warm_dashboard():
+            from swr_cache import cached
+            try:
+                from universe_scan import top_by_tier
+                cached("universe_top:10", 300, lambda: top_by_tier(n=10))
+            except Exception as _e:
+                print(f"[warm] universe top: {type(_e).__name__}")
+            try:
+                from leaderboard import top_simulations
+                cached("leaderboard:5", 300, lambda: top_simulations(n=5))
+            except Exception as _e:
+                print(f"[warm] leaderboard: {type(_e).__name__}")
+
+        sched.add_job(_warm_dashboard, "date", id="warm_dashboard",
+                      replace_existing=True,
+                      run_date=_dt.now() + _td(seconds=100))
+
         sched.add_job(_ensure_screener, "interval", minutes=20,
                       id="screener_guard", replace_existing=True,
                       next_run_time=_dt.now() + _td(seconds=90))
@@ -1463,8 +1485,8 @@ def alpha_compare(ticker: str = Query(...)):
         "v2": {"model_version": v2.get("model_version"), "alpha_score": v2.get("alpha_score"),
                "signal": v2.get("signal"), "factors": list(v2.get("weights_used") or {})},
         "disagreement": v2.get("disagreement"),
-        "note": ("Neither model has demonstrated a statistically significant edge "
-                 "in our tested configurations. This comparison exists so the "
+        "note": ("Neither combined score has been tested against future returns; "
+                 "only momentum, one factor of each, has. This comparison exists so the "
                  "track record can eventually settle it, not to imply the "
                  "six-factor model is better. A difference between two scores is "
                  "not evidence that either one predicts anything."),

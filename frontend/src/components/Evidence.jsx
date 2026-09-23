@@ -11,8 +11,9 @@ import { getFactorEvidence } from '../api'
  *
  * So these pieces travel with the score wherever it is displayed. They do not
  * soften the signal or hide it — they state, in the same eyeline, how much
- * evidence stands behind it. Today that is: momentum is the only factor that
- * has been tested at all; the rest cannot be tested on the data that exists.
+ * evidence stands behind it. Since 2026-09-18: momentum passed pre-registered
+ * point-in-time tests (not among the largest stocks), low risk failed, and the
+ * rest cannot yet be tested as computed. The combined score is untested.
  *
  * The status comes from /factors/evidence, which computes it. Nothing here is
  * hard-coded prose about a p-value: if the backend later shows momentum IS
@@ -21,13 +22,13 @@ import { getFactorEvidence } from '../api'
 
 const STATUS = {
   tested_significant: {
-    short: 'Tested',
-    long: 'Tested and statistically significant',
+    short: 'Passed',
+    long: 'Passed a pre-registered point-in-time test',
     cls: 'text-emerald-300 border-emerald-800/60 bg-emerald-950/25',
   },
   tested_not_significant: {
-    short: 'Not significant',
-    long: 'Tested — no statistically significant edge found',
+    short: 'Did not pass',
+    long: 'Tested; no statistically significant edge found',
     cls: 'text-amber-300 border-amber-800/60 bg-amber-950/25',
   },
   tested_unknown: {
@@ -41,8 +42,8 @@ const STATUS = {
     cls: 'text-sky-300 border-sky-800/60 bg-sky-950/25',
   },
   cannot_test_yet: {
-    short: 'Not testable',
-    long: 'Cannot be tested on the data that exists',
+    short: 'Untested',
+    long: 'Not yet testable as we compute it (needs accounts or news as first published)',
     cls: 'text-gray-400 border-gray-700 bg-gray-900/50',
   },
 }
@@ -86,14 +87,16 @@ export function EvidenceBadge({ factor, long = false }) {
   if (!row) return null
   const s = STATUS[statusKey(row)]
   const p = row.result?.p_value
+  const pText = p == null ? null : p < 0.001 ? '<0.001' : Number(p).toFixed(3)
+  const caveat = row.result?.caveat ? ` ${row.result.caveat}` : ''
   return (
     <span
-      title={p != null ? `${s.long} (p = ${Number(p).toFixed(3)})` : s.long}
+      title={p != null ? `${s.long} (p = ${pText}).${caveat}` : s.long}
       className={`inline-block px-1.5 py-0.5 rounded border text-[10px]
                   font-medium leading-none whitespace-nowrap ${s.cls}`}
     >
       {long ? s.long : s.short}
-      {p != null && <span className="opacity-70"> p={Number(p).toFixed(2)}</span>}
+      {p != null && <span className="opacity-70"> p{p < 0.001 ? '<0.001' : `=${Number(p).toFixed(2)}`}</span>}
     </span>
   )
 }
@@ -105,19 +108,26 @@ export function EvidenceBadge({ factor, long = false }) {
 export function SignalEvidenceNote({ className = '' }) {
   const { data } = useEvidence()
   if (!data) return null
-  const rows = data.factors || []
-  const tested = rows.filter(f => f.status === 'tested').map(f => f.factor)
-  const blocked = rows.filter(f => f.status === 'cannot_test_yet').length
+  // Only the live model's factors (a V1 weight above zero) are named here:
+  // every signal on screen comes from V1.
+  const live = (data.factors || []).filter(f => (f.weight_v1_pct ?? 0) > 0)
+  const passed = live.filter(f => f.result?.significant_at_5pct === true)
+  const untested = live.filter(f => f.status === 'cannot_test_yet')
+  const pct = rows => rows.reduce((a, f) => a + (f.weight_v1_pct || 0), 0)
   return (
     <div className={`text-[11px] leading-snug text-gray-400 ${className}`}>
-      <span className="text-gray-300 font-medium">Model signal</span>
-      {' — historical validation: '}
-      <span className="text-amber-300/90">insufficient evidence</span>.
-      {tested.length > 0 && (
-        <> Only {tested.join(', ')} has been tested against future returns
-          {blocked > 0 && <>; {blocked} other factors cannot be tested on the
-            data that exists</>}.
+      <span className="text-gray-300 font-medium">Model ranking</span>
+      {' — the combined score is '}
+      <span className="text-amber-300/90">not yet tested</span>.
+      {passed.length > 0 && (
+        <> {passed.map(f => f.factor).join(', ')} ({pct(passed).toFixed(0)}% of
+          the score) passed point-in-time tests
+          {passed.some(f => f.result?.caveat) && ', but not among the largest, most liquid stocks'}.
         </>
+      )}
+      {untested.length > 0 && (
+        <> {untested.map(f => f.factor).join(', ')} ({pct(untested).toFixed(0)}%)
+          {' '}are untested as we compute them.</>
       )}
       {' '}A score is the model&apos;s output, not a validated prediction.
     </div>

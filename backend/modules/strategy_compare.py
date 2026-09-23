@@ -102,6 +102,12 @@ def compare(tickers: list, start: str = None, end: str = None,
         return {"error": f"Could not load returns: {type(e).__name__}"}
     if rets is None or rets.empty:
         return {"error": "No return history for this universe."}
+    # _get_returns gives LOG returns (the optimisers want those). A portfolio's
+    # daily return is the weighted sum of SIMPLE returns, and _metrics compounds
+    # simple returns, so convert first. Weighting and compounding log returns
+    # understated every strategy's return by roughly 3-9 points a year
+    # (found 2026-09-14, fixed 2026-09-23).
+    rets = np.expm1(rets)
 
     cols = [t for t in tickers if t in rets.columns]
     if len(cols) < 3:
@@ -191,7 +197,7 @@ def compare(tickers: list, start: str = None, end: str = None,
         from portfolio_optimizer import _get_returns as _gr
         nifty = _gr(["^NSEI"], start, end)
         if nifty is not None and "^NSEI" in nifty.columns and len(nifty) > 30:
-            nb = _metrics(nifty["^NSEI"].values, initial_value, 0.0)
+            nb = _metrics(np.expm1(nifty["^NSEI"].values), initial_value, 0.0)
             if nb:
                 bench = nb
                 for r in rows:

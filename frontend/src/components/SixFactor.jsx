@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getAlphaV2 } from '../api'
+import { signalLabel } from '../signalLabel'
 import Spinner from './Spinner'
 
 /**
@@ -52,7 +53,7 @@ export default function SixFactor({ ticker }) {
         <span className={`px-2 py-0.5 rounded text-sm font-bold tracking-wide ${
           buy ? 'bg-green-900/40 text-green-300 border border-green-800'
               : 'bg-red-900/40 text-red-300 border border-red-800'}`}>
-          {data.signal}
+          {signalLabel(data.signal)}
         </span>
         <span className="text-lg font-bold text-gray-100">
           {data.alpha_score > 0 ? '+' : ''}{data.alpha_score}
@@ -63,9 +64,8 @@ export default function SixFactor({ ticker }) {
         </span>
       </div>
 
-      {/* Beside the signal, not beneath the fold. A BUY badge on a model whose
-          only tested factor has not demonstrated a statistically significant edge
-          cannot be presented without this. */}
+      {/* Beside the signal, not beneath the fold. The combined score is
+          untested, so a ranking badge cannot be presented without this. */}
       {data.evidence_status === 'experimental' && (
         <div className="rounded-lg border border-amber-700/70 bg-amber-950/25 p-2.5">
           <p className="text-[11px] uppercase tracking-widest text-amber-400 mb-1">

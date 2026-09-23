@@ -185,11 +185,10 @@ TOOLS = {
             "probability the call is right.",
         ],
         "do_not_conclude": (
-            "That a high score predicts a return. Momentum — the only factor "
-            "tested on this universe — has not demonstrated a statistically "
-            "significant edge in our tested configurations. This does not prove "
-            "that momentum cannot work; it means those configurations did not "
-            "provide sufficient evidence of predictive power. The score expresses "
+            "That a high score predicts a return. Momentum passed "
+            "pre-registered point-in-time tests on this universe, but not among "
+            "the largest, most liquid stocks, and the other three factors and "
+            "the combined score have not been tested. The score expresses "
             "the model's preference; the track record is the only evidence about "
             "whether that preference is worth anything, and it is not yet "
             "conclusive either."),

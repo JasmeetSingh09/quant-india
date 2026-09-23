@@ -48,14 +48,15 @@ MODELS = {
 # more useful than three different shades of hedging.
 EVIDENCE = {
     "v1": ("NOT VALIDATED",
-           "No walk-forward record. Three of its four factors read current "
-           "fundamentals or current news, so a historical test would use "
-           "information that did not exist at the time."),
+           "Momentum, 35% of the score, passed point-in-time tests, but not "
+           "among the largest, most liquid stocks. The other three factors read "
+           "current fundamentals or news, so a historical test would use "
+           "information that did not exist at the time; the combined score is "
+           "untested."),
     "v2": ("NOT VALIDATED",
-           "Same limitation, plus two more factors with the same problem. Its "
-           "one testable factor, momentum, was tested on its own and did not "
-           "demonstrate a statistically significant edge in the configurations "
-           "tried."),
+           "Same limitation, plus growth, which has the same problem. Of its "
+           "two price-based factors, momentum passed point-in-time tests and "
+           "low risk did not; the combined score is untested."),
     "fit": ("NOT VALIDATED",
             "Measures relationships between holdings — correlation, overlap, "
             "concentration — rather than predicting returns. There is no "

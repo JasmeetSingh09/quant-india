@@ -7,14 +7,18 @@ python-dotenv
 requests
 # torch is installed separately in the Dockerfile with the CPU-only index URL
 # so it is intentionally omitted here to avoid downloading the 2 GB CUDA build.
-yfinance
-pandas
-numpy<2                 # many quant libs (arch, statsmodels) not yet numpy-2 stable
+# The five libraries the v1.4.1 specification records are pinned to the exact
+# versions it was frozen on (strategy/version/v1.4.1). Unpinned, a routine
+# rebuild moved pandas 3.0.5 -> 3.0.6 on 2026-09-21 and the drift check
+# reported an environment change nobody had made. Change these deliberately.
+yfinance==1.7.0
+pandas==3.0.5
+numpy==1.26.4           # many quant libs (arch, statsmodels) not yet numpy-2 stable
 transformers
 apscheduler
 quantstats
-scipy
-statsmodels
+scipy==1.17.1
+statsmodels==0.15.0
 feedparser
 arch
 xgboost

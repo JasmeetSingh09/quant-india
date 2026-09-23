@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { getSignalHistory } from '../api'
+import { signalLabel } from '../signalLabel'
 
 const sigClass = s =>
   s?.includes('BUY')  ? 'bg-green-900/50 text-green-400 border-green-800/70' :
@@ -47,7 +48,7 @@ export default function SignalHistory({ ticker }) {
       {/* Current call, stated plainly */}
       <div className="flex items-center gap-3 mb-4">
         <span className={`px-2.5 py-1 rounded-lg text-sm font-semibold border ${sigClass(latest.signal)}`}>
-          {latest.signal}
+          {signalLabel(latest.signal)}
         </span>
         <span className={`font-mono text-lg ${latest.alpha_score >= 0 ? 'text-green-400' : 'text-red-400'}`}>
           {latest.alpha_score > 0 ? '+' : ''}{latest.alpha_score}
@@ -74,7 +75,7 @@ export default function SignalHistory({ ticker }) {
                 <td className="py-1.5 text-gray-400">{daysAgoLabel(r.date)}</td>
                 <td>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded border ${sigClass(r.signal)}`}>
-                    {r.signal}
+                    {signalLabel(r.signal)}
                   </span>
                 </td>
                 <td className={`text-right font-mono ${r.alpha_score >= 0 ? 'text-green-400' : 'text-red-400'}`}>

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ScoreProvenance } from './Evidence'
 import { useNavigate } from 'react-router-dom'
 import { getUniverseTop } from '../api'
+import { signalLabel, SIGNAL_TITLE } from '../signalLabel'
 import Spinner from './Spinner'
 import { ArrowUpRight, ArrowDownRight, Sparkles } from 'lucide-react'
 
@@ -59,11 +60,9 @@ function PickCard({ r, buy, onOpen }) {
         {/* The decision, not the score, is the thing being communicated. The
             alpha number was set in bold at a larger size than the signal, so
             the secondary metric outweighed the call it produced. */}
-        <span title={buy
-                ? 'Model expects outperformance over roughly 21 trading days.'
-                : 'Model expects underperformance — read as avoid or reduce. The model does not model short selling.'}
+        <span title={SIGNAL_TITLE}
               className={`badge-${buy ? 'green' : 'red'} cursor-help text-xs font-bold tracking-wide`}>
-          {r.signal}{!buy && r.signal?.includes('SELL') ? ' · avoid' : ''}
+          {signalLabel(r.signal)}
         </span>
         <span className="text-gray-500 text-[10px]">21-day signal</span>
         <span className="text-gray-500" title="How much of the model's input data was available for this stock — not the chance the signal is right.">{Math.round((r.confidence || 0) * 100)}% data</span>
@@ -164,6 +163,17 @@ export default function CapTierPicks({ n = 10 }) {
       </div>
       <p className="text-[11px] text-gray-600 -mt-2">{active?.note}</p>
 
+      {/* Momentum carries 35% of the score and usually decides a large cap's
+          rank, and its tested edge did not show among the largest, most liquid
+          stocks (docs/MOMENTUM_ROBUSTNESS_RESULT_2026-09-18.md). */}
+      {tier === 'large_cap' && (
+        <p className="text-[11px] text-amber-200/85 border-l-2 border-amber-700/70 pl-2.5 leading-relaxed">
+          Large-cap rankings lean mostly on momentum, and momentum&apos;s tested edge
+          was not shown among the largest, most liquid stocks. Read these as the
+          model&apos;s ordering, not as evidence.
+        </p>
+      )}
+
       {block.scored === 0 ? (
         <p className="text-sm text-gray-500 py-4">
           No {active?.label.toLowerCase()} stocks scored yet — this tier fills as the
@@ -173,7 +183,7 @@ export default function CapTierPicks({ n = 10 }) {
         <>
           <div>
             <h3 className="section-title mb-2 text-green-400">
-              Top {Math.min(n, block.buys.length)} to consider
+              Top {Math.min(n, block.buys.length)} by model score
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
               {block.buys.map(r => <PickCard key={r.ticker} r={r} buy onOpen={open} />)}
@@ -183,7 +193,7 @@ export default function CapTierPicks({ n = 10 }) {
           {block.avoids.length > 0 && (
             <div>
               <h3 className="section-title mb-2 text-red-400">
-                Weakest {block.avoids.length} in this tier
+                Lowest {block.avoids.length} by model score
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
                 {block.avoids.map(r => <PickCard key={r.ticker} r={r} buy={false} onOpen={open} />)}
@@ -194,8 +204,10 @@ export default function CapTierPicks({ n = 10 }) {
       )}
 
       <p className="text-[11px] text-gray-600">
-        Ranked by alpha score within each tier. Tiers follow the SEBI convention —
-        by market-cap rank, not fixed rupee cut-offs. Not financial advice.
+        Ranked by alpha score within each tier. Only momentum, one of four
+        factors, has passed a historical test; the combined score has not been
+        tested. Tiers follow the SEBI convention, by market-cap rank. Not
+        financial advice.
       </p>
     </div>
   )
