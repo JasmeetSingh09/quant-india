@@ -8,6 +8,7 @@ import Research from './Research'
 import Backtest from './Backtest'
 import Validation from './Validation'
 import StrategyCompare from '../components/StrategyCompare'
+import CorrelationOverTime from '../components/CorrelationOverTime'
 
 /**
  * Advanced Centre — the quantitative tools, gathered in one place.
@@ -26,6 +27,8 @@ const TABS = [
   // Next to Validation for the same reason it is first: 'which method
   // should build this?' is a validation question, not a tooling one.
   { label: 'Methods',     Component: StrategyCompare },
+  // Diversification is judged in falling markets, not on average.
+  { label: 'Correlation', Component: CorrelationOverTime },
   { label: 'Risk',        Component: RiskLab },
   { label: 'Factors',     Component: Factors },
   { label: 'Signals',     Component: Research },

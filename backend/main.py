@@ -1551,6 +1551,11 @@ def events_check(ticker: str):
     return detect(ticker)
 
 
+class CorrelationOverTimeRequest(BaseModel):
+    tickers: list
+    months: int = 36
+
+
 class StrategyCompareRequest(BaseModel):
     tickers: list
     current_weights: dict = None
@@ -2185,6 +2190,28 @@ def portfolio_shock_presets(req: ShockRequest):
     """The scenarios that make sense for THIS portfolio."""
     from portfolio_shock import presets_for
     return {"presets": presets_for(req.holdings)}
+
+
+@app.post("/portfolio/correlation-over-time")
+def portfolio_correlation_over_time(req: CorrelationOverTimeRequest):
+    """
+    Does diversification hold up when the market falls? Rolling 12-month
+    correlation of the holdings, and calm months versus months the Nifty 50
+    fell 5% or more. Compute-only; writes nothing.
+
+    Spec: docs/PROPOSAL_PRODUCT_ADDITIONS_2026-09-23.md (#1).
+    """
+    from correlation_time import correlation_over_time
+    from swr_cache import cached
+    tickers = sorted({str(t).strip().upper() for t in (req.tickers or []) if str(t).strip()})
+    months = max(12, min(int(req.months or 36), 120))
+    # The same holdings and window give the same answer for everyone, and it
+    # changes at most once a day, so it is shared and refreshed in the background.
+    r = cached(f"corr_time:{','.join(tickers)}:{months}", 900,
+               lambda: correlation_over_time(tickers, months))
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
 
 
 @app.post("/strategy/compare")

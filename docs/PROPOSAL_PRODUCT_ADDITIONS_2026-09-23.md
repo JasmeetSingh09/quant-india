@@ -75,8 +75,11 @@ Each is a separate change, reviewed and deployed on its own.
 
 **Question it answers:** does diversification hold up when the market falls?
 
-**Endpoint:** `GET /portfolio/correlation-over-time?tickers=…&months=36`,
-read-only, 2 to 15 tickers.
+**Endpoint:** `POST /portfolio/correlation-over-time` with `{tickers, months}`,
+compute-only (writes nothing), 2 to 15 tickers. POST to match the existing
+`/research/correlation`. **Built 2026-09-23:** the page defaults to 10 years,
+because from 2021-10 to 2026-09 the Nifty fell 5% or more in only 3 months,
+fewer than the 6 needed; over 10 years there were 7.
 
 **Computes**, from monthly total returns via the existing adjusted Yahoo
 loader:

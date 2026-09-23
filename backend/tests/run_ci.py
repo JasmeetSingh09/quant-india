@@ -85,6 +85,7 @@ SUITES = [
     ("strategy_compare_returns_test.py",     5, 60),
     ("bse_collection_pause_test.py",        15, 60),
     ("glossary_test.py",                    23, 60),
+    ("correlation_over_time_test.py",       16, 60),
     ("bhavcopy_gap_test.py",                22, 120),
     ("score_cache_test.py",                 21, 120),
     ("identity_resolution_test.py",         18, 120),

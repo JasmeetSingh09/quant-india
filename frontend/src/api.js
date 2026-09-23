@@ -150,6 +150,7 @@ export const compareShock    = body => api.post('/portfolio/shock/compare', body
 export const shockPortfolio  = body => api.post('/portfolio/shock', body, { timeout: 180000 })
 export const shockPresets    = body => api.post('/portfolio/shock/presets', body, { timeout: 60000 })
 export const compareStrategies = body => api.post('/strategy/compare', body, { timeout: 240000 })
+export const getCorrelationOverTime = body => api.post('/portfolio/correlation-over-time', body, { timeout: 120000 })
 export const getMethodology    = tool => api.get(`/methodology/${tool}`)
 export const getBenchmark      = (days = 365) => api.get('/benchmark', { params: { days } })
 export const advisePortfolio   = body => api.post('/portfolio/advise', body, { timeout: 120000 })
