@@ -153,10 +153,13 @@ try:
         check(f"refresh_nse_stocks is paused ({label})", r.get("paused") is True, f"{r}")
         check(f"  ...and did not contact NSE ({'forced' if force else 'startup'})",
               not [u for u in session_calls if "nseindia.com" in u], f"{session_calls[:3]}")
+    # BSE is paused too since 2026-09-23, under BSE's own terms (bse_access),
+    # not the NSE commitment. bse_collection_pause_test covers it in full.
     session_calls.clear()
-    stock_universe.refresh_bse_stocks(force=True)
-    check("the BSE list is not paused: the commitment was to NSE",
-          any("bseindia.com" in u for u in session_calls), f"{session_calls[:2]}")
+    rb = stock_universe.refresh_bse_stocks(force=True)
+    check("the BSE list is paused as well (BSE's terms), and BSE is not contacted",
+          rb.get("paused") is True
+          and not any("bseindia.com" in u for u in session_calls), f"{session_calls[:2]}")
 finally:
     requests.Session.request = real_request
 

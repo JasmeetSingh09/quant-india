@@ -223,6 +223,20 @@ def refresh_bse_stocks(force: bool = False) -> dict:
         conn.close()
         return {"status": "cached", "count": count, "exchange": "BSE"}
 
+    # BSE's terms forbid automated collection without its written consent.
+    # Until 2026-09-23 this contacted bseindia.com at every server start. While
+    # paused, keep the stored list; if there is none, use the built-in list,
+    # which needs no network.
+    from bse_access import collection_paused as _bse_paused, paused_result as _bse_paused_result
+    if _bse_paused():
+        conn = sqlite_local.connect(DB_PATH)
+        count = conn.execute("SELECT COUNT(*) FROM bse_stocks").fetchone()[0]
+        conn.close()
+        if count == 0:
+            count = (_insert_bse_fallback() or {}).get("count", 0)
+        return {**_bse_paused_result("BSE equity list"), "status": "paused",
+                "count": count, "exchange": "BSE"}
+
     # BSE provides a downloadable list at this URL
     bse_url = (
         "https://www.bseindia.com/corporates/List_Scrips.aspx"

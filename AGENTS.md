@@ -26,7 +26,8 @@ An NSE quant research platform.
    nseindia.com, and never use third-party copies of NSE data.
 2. **No automated downloading from BSE** (bseindia.com). Its terms forbid it
    without BSE's written consent, which has not been given. People may
-   download by hand.
+   download by hand. The code enforces this with `modules/bse_access.py`
+   (paused unless `BSE_COLLECTION=on`), as `nse_access.py` does for NSE.
 3. **The v1.4.1 model is frozen** (frozen 2026-09-14; spec hash
    `ab840c874bbd7923`). Do not change factor formulas, weights, thresholds,
    signal cut-offs, portfolio construction or validation gates. Any
