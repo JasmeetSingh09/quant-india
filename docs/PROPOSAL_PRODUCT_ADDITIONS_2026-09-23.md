@@ -121,34 +121,77 @@ only that month.
 
 ## #2 Stock comparer
 
-**What it adds:** a side-by-side view of 2 to 6 stocks, with metrics as rows
-and stocks as columns. It is reached from the Stocks page ("Compare") and
-from the dashboard picks.
+**What it adds:** a side-by-side view of 2 to 6 stocks, reached from the
+Stocks page ("Compare") and from the dashboard picks. The owner asked
+(2026-09-23) for metrics, value, charts and risk. It has five parts.
 
-**Rows,** each only from data already produced:
-- price, 1-year return, volatility, maximum drawdown (`/stock/metrics`);
-- alpha score, rank label (from `signalLabel`), data coverage (nightly scan);
-- each factor's contribution, each with its evidence badge (`EvidenceBadge`);
-- P/E, P/B, ROE and debt (the stored factor inputs, labelled "as reported by
-  Yahoo on <date>, not point-in-time").
+**1. Charts** (period selectable: 6 months, 1 year, 3 years, 5 years)
+- **Growth of Rs 100:** each stock's adjusted price, rebased to 100 at the
+  start of the period, on one chart. The Nifty 50 is shown as a dashed line
+  and labelled "price index, excludes dividends".
+- **Drawdown chart:** how far each stock sat below its own previous peak on
+  every day of the period.
 
-**Highlights:** for each row, the highest and lowest value may be shaded,
-labelled as "highest" or "lowest", never "best". Higher is not better for
-every row (volatility, P/E), so no row declares a winner.
+**2. Value** (from `/stock/metrics`, "as reported by Yahoo on <date>, not
+point-in-time"):
+- P/E, forward P/E, P/B, P/S, EV/EBITDA and dividend yield;
+- market cap and sector, so the comparison is not quietly across different
+  industries. If the stocks are in different sectors, a note says multiples
+  are not directly comparable.
+
+**3. Quality and business** (same source and label):
+- ROE, ROA, operating and profit margins, revenue and earnings growth;
+- debt-to-equity and current ratio;
+- free cash flow;
+- the Piotroski F-score (0–9), with how many of its 9 tests could be run.
+
+**4. Risk** (computed from adjusted daily prices over the chosen period, by
+one new read-only endpoint):
+- volatility (annualised) and maximum drawdown with its dates;
+- the worst single month;
+- 95% CVaR of daily returns: the average loss on the worst 5% of days;
+- **beta against the Nifty 50,** computed by us from prices. Yahoo's own
+  `beta` field is not used: its benchmark and window are not stated;
+- a correlation matrix of the compared stocks;
+- Sharpe and Sortino, defined as in `risk_metrics.py`.
+
+**5. Model view:**
+- alpha score, rank label (`signalLabel`) and data coverage from the nightly
+  scan;
+- each factor's contribution, with its evidence badge (`EvidenceBadge`), so
+  momentum shows "Passed" and the others "Untested".
+
+**Highlights:** in each row the highest and lowest value may be shaded and
+labelled "highest" or "lowest", never "best". Higher is not better for every
+row (volatility, P/E, drawdown), so no row declares a winner.
+
+**New endpoint:** `GET /stock/compare?tickers=…&period=1y`
+- **Read-only**, 2–6 tickers.
+- **Returns** the rebased and drawdown series (weekly points for periods of 3
+  years or more, to keep the response small) and the risk figures.
+- **Cached** per ticker set and period with `swr_cache` for 15 minutes.
+- **Reuses** `download_close` and `risk_metrics`; no new data source.
 
 **Must never claim:**
-- a winner, a recommended stock, or an overall comparative verdict;
+- a winner, a recommended stock or an overall verdict;
+- that past risk or return predicts future risk or return;
 - the untested factors' values as evidence.
 
-**Tests:**
-- the comparer builds only from existing endpoints, so no new backend logic is
-  needed;
-- a frontend test checks that no rendered label contains "best", "buy" or
-  "winner", and that a missing value shows "not available";
-- 7 stocks are refused with a message.
+**Must say, beside the numbers:**
+- risk figures are "measured over <period>; past only";
+- the value and quality figures are Yahoo's current view, not point-in-time.
 
-**Size:** 1–2 days. Frontend only, unless one small endpoint is needed to
-batch the requests. If so, it is read-only and cached.
+**Tests** (`stock_compare_test`, offline, synthetic prices):
+- **Hand-worked figures:** rebasing starts every series at exactly 100;
+  maximum drawdown and its dates, CVaR, beta (a series built as 1.5 × the
+  index plus noise gives about 1.5) and the correlation matrix all match
+  hand-worked values; Sharpe and Sortino equal `risk_metrics` exactly.
+- **Missing data:** a ticker with missing history is reported as excluded,
+  never filled; a missing metric shows "not available".
+- **Limits:** 1 or 7 tickers are refused with a message.
+- **Frontend check:** no rendered label contains "best", "buy" or "winner".
+
+**Size:** 2–3 days. One backend deploy, plus the frontend.
 
 ---
 
