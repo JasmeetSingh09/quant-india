@@ -1,4 +1,4 @@
-import { GLOSSARY } from '../glossary'
+import { GLOSSARY, LIMITS } from '../glossary'
 
 /**
  * Term — jargon word with dotted underline. Hover to see a plain-English definition.
@@ -33,6 +33,20 @@ const tooltipCls = `
   shadow-xl
 `
 
+// The definition, then what the number cannot tell you, in the same tooltip.
+function TipBody({ k }) {
+  return (
+    <>
+      {GLOSSARY[k]}
+      {LIMITS[k] && (
+        <span className="block mt-1.5 pt-1.5 border-t border-gray-700 text-amber-200/90">
+          Can&apos;t tell you: {LIMITS[k]}
+        </span>
+      )}
+    </>
+  )
+}
+
 export function Term({ k, children, className = '' }) {
   const def  = GLOSSARY[k]
   const text = children || LABELS[k] || k
@@ -40,7 +54,7 @@ export function Term({ k, children, className = '' }) {
   return (
     <span className={`relative group inline-block ${className}`}>
       <span className="border-b border-dotted border-gray-500 cursor-help">{text}</span>
-      <span className={tooltipCls}>{def}</span>
+      <span className={tooltipCls}><TipBody k={k} /></span>
     </span>
   )
 }
@@ -53,7 +67,7 @@ export function InfoTip({ k }) {
       <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full
                        bg-gray-700 hover:bg-gray-600 text-gray-400 hover:text-gray-200
                        text-[9px] cursor-help leading-none transition-colors">?</span>
-      <span className={tooltipCls}>{def}</span>
+      <span className={tooltipCls}><TipBody k={k} /></span>
     </span>
   )
 }

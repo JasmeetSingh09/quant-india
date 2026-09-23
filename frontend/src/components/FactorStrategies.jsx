@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { getFactorStrategies } from '../api'
 import Spinner from './Spinner'
+import { InfoTip } from './Term'
 
 /**
  * FactorStrategies — the factor strategies that can honestly be backtested,
@@ -62,10 +63,10 @@ export default function FactorStrategies() {
               <thead>
                 <tr className="text-[11px] uppercase tracking-wide text-gray-500">
                   <th className="text-left py-1">Strategy</th>
-                  <th className="text-right py-1">CAGR</th>
-                  <th className="text-right py-1">Vol</th>
-                  <th className="text-right py-1">Sharpe</th>
-                  <th className="text-right py-1">Max fall</th>
+                  <th className="text-right py-1">CAGR<InfoTip k="cagr" /></th>
+                  <th className="text-right py-1">Vol<InfoTip k="volatility" /></th>
+                  <th className="text-right py-1">Sharpe<InfoTip k="sharpe" /></th>
+                  <th className="text-right py-1">Max fall<InfoTip k="max_drawdown" /></th>
                   <th className="text-right py-1">vs Nifty</th>
                 </tr>
               </thead>

@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { compareStrategies, getPortfolio } from '../api'
 import Spinner from './Spinner'
+import { InfoTip } from './Term'
 
 /**
  * StrategyCompare — three construction methods, no winner named.
@@ -84,11 +85,11 @@ export default function StrategyCompare({ tickers: propTickers, currentWeights: 
               <thead>
                 <tr className="text-[11px] uppercase tracking-wide text-gray-500">
                   <th className="text-left py-1">Method</th>
-                  <th className="text-right py-1">CAGR</th>
-                  <th className="text-right py-1">Vol</th>
-                  <th className="text-right py-1">Sharpe</th>
-                  <th className="text-right py-1">Sortino</th>
-                  <th className="text-right py-1">Max fall</th>
+                  <th className="text-right py-1">CAGR<InfoTip k="cagr" /></th>
+                  <th className="text-right py-1">Vol<InfoTip k="volatility" /></th>
+                  <th className="text-right py-1">Sharpe<InfoTip k="sharpe" /></th>
+                  <th className="text-right py-1">Sortino<InfoTip k="sortino" /></th>
+                  <th className="text-right py-1">Max fall<InfoTip k="max_drawdown" /></th>
                   <th className="text-right py-1">Turnover</th>
                   <th className="text-right py-1">Cost</th>
                   <th className="text-right py-1">vs Nifty</th>

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { shockPortfolio, shockPresets, multiShock } from '../api'
 import Spinner from './Spinner'
+import { InfoTip } from './Term'
 
 /**
  * ShockLab — "what happens to me if X falls 20%?"
@@ -211,7 +212,7 @@ export default function ShockLab({ holdings, initialValue = 100000 }) {
                 <tr className="text-[11px] uppercase tracking-wide text-gray-500">
                   <th className="text-left py-1">Holding</th>
                   <th className="text-right py-1">Weight</th>
-                  <th className="text-right py-1">Beta</th>
+                  <th className="text-right py-1">Beta<InfoTip k="beta" /></th>
                   <th className="text-right py-1">Moves</th>
                   <th className="text-right py-1">Costs you</th>
                 </tr>

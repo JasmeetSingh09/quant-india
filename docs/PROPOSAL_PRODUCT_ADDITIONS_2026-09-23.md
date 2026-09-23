@@ -39,8 +39,10 @@ Each is a separate change, reviewed and deployed on its own.
 **What exists.**
 - `frontend/src/glossary.js`: 63 terms.
 - `frontend/src/components/Term.jsx`: tooltip component.
-- **Checked 2026-09-23: no page uses `<Term>` at all.** The glossary is built
-  but invisible.
+- **Correction (same day):** the first draft said no page used the glossary.
+  The underlined `<Term>` form is unused, but the "?" form (`<InfoTip>`) was
+  already on 9 pages. The real problems were wrong definitions (p-value,
+  Sharpe, confidence, pairs trading) and no limits line; 4 tables lacked tips.
 
 **What it adds.**
 1. **Terms on screen:** use `<Term>` on the first appearance of each defined term
