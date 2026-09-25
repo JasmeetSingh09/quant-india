@@ -120,6 +120,7 @@ def find_statements(pages):
     come as a block (DHFL FY2016's summary page 46, HUL FY2018's page 9).
     """
     cand = {"bs": [], "pl": [], "cf": []}
+    titled_pl = []
     for i, text in enumerate(pages):
         head = "\n".join(text.splitlines()[:12])
         if SKIP_HEAD.search(head) or len(re.findall(r"\d[\d,]{3,}", text)) < 15:
@@ -130,6 +131,13 @@ def find_statements(pages):
         for key in cand:
             if TITLE[key].search(head) and NEED[key].search(both):
                 cand[key].append(i)
+        if TITLE["pl"].search(head):
+            titled_pl.append(i)
+    # An abridged P&L prints no EPS (Infosys FY2012): a titled P&L right next
+    # to a balance sheet is accepted when no P&L with EPS is near one.
+    for b in cand["bs"]:
+        if not any(abs(p - b) <= 4 for p in cand["pl"]):
+            cand["pl"] += [p for p in titled_pl if 0 < p - b <= 2]
     for need_cf in (True, False):
         for b in cand["bs"]:
             pl = [p for p in cand["pl"] if abs(p - b) <= 4]
@@ -261,6 +269,58 @@ def balancing_total(text):
     return {"current": c, "previous": p, "line": bare[(c, p)][0][:150] + " (bare row)", "balanced": True}
 
 
+def old_layout_gross(text):
+    """Total assets from an old "Sources / Application of funds" balance sheet.
+
+    Before FY2012 the balance sheet total is capital employed: current
+    liabilities and provisions are subtracted from current assets ("Less:
+    Current Liabilities and Provisions ... Net Current Assets"). Total assets
+    = that total + current liabilities and provisions. Accepted only when
+    current assets - (liabilities + provisions) = the printed net current
+    assets, in both years.
+    """
+    lines = [clean(l) for l in text.splitlines()]
+    less = next((i for i, l in enumerate(lines)
+                 if re.match(r"^less\s*:?\s*current\s+liabilities", strip_label(l), re.I)), None)
+    if less is None:
+        return None
+    nca = next((i for i in range(less + 1, min(less + 12, len(lines)))
+                if re.match(r"^net\s+current\s+assets", strip_label(lines[i]), re.I)), None)
+    if nca is None:
+        return None
+    items = [line_value(lines, i) for i in range(less + 1, nca) if re.search(r"[A-Za-z]{3,}", lines[i])]
+    items = [v for v in items if v[0] is not None and v[1] is not None]
+    net = line_value(lines, nca)
+    # current assets: the bare subtotal row just above the "Less:" line
+    ca = next((row_values(lines[i]) for i in range(less - 1, max(less - 3, -1), -1)
+               if not re.search(r"[A-Za-z]", lines[i]) and len(row_values(lines[i])) == 2), None)
+    if not items or net[0] is None or net[1] is None or not ca:
+        return None
+    cl = (sum(v[0] for v in items), sum(v[1] for v in items))
+    ok = all(abs(ca[j] - cl[j] - net[j]) <= 0.001 * abs(ca[j]) + 1 for j in (0, 1))
+    return {"cl_current": cl[0], "cl_previous": cl[1], "checked": ok}
+
+
+def face_check(profit, eps, caps, k_cr, exact_any=False):
+    """(implied face value, passes) from profit / EPS = share count, capital / count = face.
+
+    EPS uses the weighted average share count, so when shares were issued
+    during the year the face value may lie between what opening and closing
+    capital imply. A bonus issue doubles capital but restates the share count,
+    so the closing capital alone may also match (Infosys FY2016, FY2019).
+    """
+    caps = [c for c in caps if c]
+    if not (profit and eps and caps and k_cr):
+        return None, False
+    shares = profit * k_cr * 1e7 / eps
+    faces = [c * k_cr * 1e7 / shares for c in caps]
+    tol = 0.04 + 0.005 / abs(eps)               # EPS is printed to 2 decimals
+    exact = any(abs(fc - fv) / fv < tol for fc in (faces if exact_any else faces[:1]) for fv in FACES)
+    lo, hi = min(faces), max(faces)
+    between = 0 < lo and hi / lo < 1.6 and any(lo * (1 - tol) <= fv <= hi * (1 + tol) for fv in FACES)
+    return faces[0], exact or between
+
+
 def extract_pages(pages, name):
     out = {"file": name, "pages": len(pages)}
     pages = [LIGATURE.sub(r"\1", p) for p in pages]
@@ -271,6 +331,9 @@ def extract_pages(pages, name):
         return out
     span = lambda k, n=2: [(i, pages[i]) for i in range(st[k], min(st[k] + n, len(pages)))] if k in st else []
     unit = unit_of("\n".join(pages[i][:1500] for i in st.values()))
+    years = re.findall(r"(?:31(?:st)?\s+march|march\s+31|31\.03\.)[,\s]*(20\d\d)", pages[st["bs"]][:1500], re.I) \
+        if "bs" in st else []
+    out["fy"] = max(int(y) for y in years) if years else None
     out["unit"] = unit
     f = {}
     bs, pl, cf = span("bs"), span("pl"), span("cf", 3)
@@ -285,6 +348,19 @@ def extract_pages(pages, name):
             if ta:
                 ta["balanced"] = bool(tel and abs(tel["current"] - ta["current"]) <= 0.01 * abs(ta["current"]) + 1)
             tb = ta
+        old = re.search(r"sources\s+of\s+funds", bs[0][1], re.I) and re.search(r"application\s+of\s+funds", bs[0][1], re.I)
+        out["layout"] = "sources_and_application" if old else "equity_and_liabilities"
+        if tb and old:
+            # The printed total is capital employed, not total assets.
+            tb["net_of_current_liabilities"] = True
+            g = old_layout_gross(bs[0][1])
+            if g and g["checked"]:
+                tb["capital_employed"] = (tb["current"], tb["previous"])
+                tb["current"] += g["cl_current"]
+                tb["previous"] += g["cl_previous"]
+                tb["line"] = "capital employed + current liabilities and provisions: " + tb["line"][:80]
+            else:
+                tb["balanced"] = False      # no checked total assets: do not pass
         f["total_assets"] = tb
         f["share_capital"] = first_match(bs, [r"^equity\s+share\s+capital", r"^share\s+capital",
                                                r"^equity\s+([a-z]\s+)?[\d(]"])   # DHFL FY2019: "Equity 24 31,382"
@@ -363,23 +439,19 @@ def extract_pages(pages, name):
     if ta and te:
         chk["equity_lt_assets"] = te["current"] < ta["current"]
     pr, eps, sc = f["profit_for_year"], f["eps_basic"], f["share_capital"]
-    if pr and eps and sc and k_cr and eps["current"] and pr["current"] and sc["current"]:
-        # EPS uses the weighted average share count, so when shares were issued
-        # during the year the average of opening and closing capital is fairer.
-        shares = pr["current"] * k_cr * 1e7 / eps["current"]
-        caps = [sc["current"]] + ([sc["previous"]] if sc["previous"] else [])
-        faces = [c * k_cr * 1e7 / shares for c in caps] if shares else []
-        tol = 0.04 + 0.005 / abs(eps["current"])        # EPS is printed to 2 decimals
-        out["implied_face_value"] = round(faces[0], 3) if faces else None
-        # With shares issued during the year the weighted count lies between
-        # opening and closing capital, so the face value may too.
-        # A bonus issue doubles capital but restates the share count, so the
-        # closing capital alone must also be allowed to match (Infosys FY2016, FY2019).
-        lo, hi = (min(faces), max(faces)) if faces else (0, 0)
-        exact = bool(faces) and any(abs(faces[0] - fv) / fv < tol for fv in FACES)
-        between = bool(faces) and 0 < lo and hi / lo < 1.6 and \
-            any(lo * (1 - tol) <= fv <= hi * (1 + tol) for fv in FACES)
-        chk["face_value"] = exact or between
+    if pr and eps and sc and k_cr:
+        implied, ok = face_check(pr["current"], eps["current"], [sc["current"], sc["previous"]], k_cr)
+        if implied is not None:
+            out["implied_face_value"] = round(implied, 3)
+            chk["face_value"] = ok
+        # The previous-year column, for information only: it needs capital at
+        # the START of last year, which this report does not print. On the
+        # pilot all 7 misses were shares issued last year or restated EPS
+        # (Jet, Suzlon, Tata Steel, DHFL, RCOM), none a misread.
+        implied, ok = face_check(pr["previous"], eps["previous"], [sc["previous"], sc["current"]], k_cr,
+                                 exact_any=True)
+        if implied is not None:
+            out["info_face_value_prev"] = ok
     out["checks"] = chk
     out["found"] = sum(1 for v in f.values() if v)
     out["verified"] = chk.get("balance", False) and chk.get("face_value", False)
@@ -397,6 +469,38 @@ def load_pages(path, cache):
         return [(p.extract_text() or "") for p in pdf.pages]
 
 
+CONTINUITY_FIELDS = ("revenue", "profit_for_year", "share_capital", "total_equity", "total_assets", "eps_basic")
+
+
+def continuity(results):
+    """Last year's column in one report against the current column of the report before.
+
+    The two reports are separate documents, so this is an independent read of
+    the same number. A figure taken from the wrong column (RCOM equity before
+    v8) fails it. Genuine restatements (Ind AS transition, mergers) fail it
+    too, so a mismatch is flagged for review, never corrected automatically.
+    """
+    by_co = {}
+    for r in results:
+        if r.get("figures") and r.get("fy"):
+            by_co.setdefault(os.path.dirname(r["file"]), {})[r["fy"]] = r
+    for reps in by_co.values():
+        for fy, r in reps.items():
+            prior = reps.get(fy - 1)
+            if not prior:
+                continue
+            res = {}
+            for k in CONTINUITY_FIELDS:
+                a, b = r["figures"].get(k), prior["figures"].get(k)
+                if not (a and b) or a.get("previous") is None:
+                    continue
+                ka = 1 if k == "eps_basic" else TO_CRORE.get(r.get("unit"), 0)
+                kb = 1 if k == "eps_basic" else TO_CRORE.get(prior.get("unit"), 0)
+                va, vb = a["previous"] * ka, b["current"] * kb
+                res[k] = abs(va - vb) <= 0.02 * abs(vb) + (0.011 if k == "eps_basic" else 0.5)
+            r["continuity"] = res
+
+
 def main():
     root, out_path = sys.argv[1], sys.argv[2]
     cache = sys.argv[sys.argv.index("--cache") + 1] if "--cache" in sys.argv else None
@@ -412,10 +516,17 @@ def main():
         print(f"{path[:55]:55} found {r.get('found', 0)}/8 unit {str(r.get('unit')):7} "
               f"balance {'Y' if c.get('balance') else '-'} face {'Y' if c.get('face_value') else '-'} "
               f"{r.get('implied_face_value', '')} {r.get('error', '')}", flush=True)
+    continuity(results)
     json.dump(results, open(out_path, "w"), indent=1)
     ok = [r for r in results if r.get("figures")]
     print(f"\n{len(ok)} reports with statements; verified (balance AND face value): "
           f"{sum(1 for r in ok if r.get('verified'))}")
+    pairs = [(r["file"], k, v) for r in ok for k, v in r.get("continuity", {}).items()]
+    print(f"continuity, last year's column vs the prior report: {sum(1 for p in pairs if p[2])} of "
+          f"{len(pairs)} figures agree")
+    for name, k, v in pairs:
+        if not v:
+            print(f"   differs: {name} {k}")
 
 
 if __name__ == "__main__":
