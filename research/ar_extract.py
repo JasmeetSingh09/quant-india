@@ -18,6 +18,16 @@ v1 (2026-09-25) found 5-8 of 9 figures in most reports but read some wrong
 lines (Tata Steel FY2016 "total assets" was a micro-enterprise dues line).
 A figure is never filled in: not found is None.
 
+Pilot results (27 readable reports, 10 companies, FY2011-FY2019):
+  v1 12 verified, v4 16, v8 26. The one failure is Infosys FY2012, an
+  abridged report with an uncaptioned profit line (enter by hand).
+  These rules were tuned on the same 27 reports, so 26/27 is in-sample;
+  the first batch of new reports must be scored before any tuning on it.
+  borrowings is NOT covered by either check and reads low for lenders and
+  for old layouts ("Long Term Liabilities", current maturities of debt in
+  "Other current liabilities"); leverage should use total assets minus
+  total equity, which the balance check does cover.
+
     python research/ar_extract.py <reports_dir> <out.json> [--cache DIR]
 """
 
@@ -42,7 +52,7 @@ TITLE = {
 }
 NEED = {
     "bs": re.compile(r"assets", re.I),
-    "pl": re.compile(r"(earnings?\s+per|\beps\b|per\s+equity\s+share)", re.I),
+    "pl": re.compile(r"(earnings?[\s/()a-z]{0,15}\s+per\s+(equity\s+)?share|\beps\b|per\s+equity\s+share)", re.I),
     "cf": re.compile(r"operating\s+activities", re.I),
 }
 SKIP_HEAD = re.compile(r"consolidated|auditor|report\s+on|notes?\s+(to|forming)|significant\s+accounting|"
@@ -61,12 +71,28 @@ def num(tok):
     return -v if neg else v
 
 
-ENUM = re.compile(r"^\s*[\(\[]?(?:[0-9]{1,2}|[ivxIVX]{1,4}|[a-hA-H])[\)\]\.]\s+")
+ENUM = re.compile(r"^\s*(?:[\(\[]?(?:[0-9]{1,2}|[ivxIVX]{1,4}|[a-hA-H])[\)\]\.]|[0-9]{1,2}(?=\s+[A-Za-z])|"
+                  r"[IVX]{1,4}(?=\s+[A-Z]))\s+")
+FORMULA = re.compile(r"\((?:\s*[IVXivx\d]+\s*[-+–/]\s*)+[IVXivx\d]+\s*\)")
+# "of face value of Rs 5 each", "par value 5/- each", "Nominal value of share Rs 2/-":
+# the 5 or 2 is not a figure (RCOM FY2019, Suzlon FY2012).
+FACE_TEXT = re.compile(r"(face|par|nominal)\s+value\s*(of\s+(each\s+)?(equity\s+)?shares?)?\s*(of)?\s*(rs\.?|₹|`)?\s*"
+                       r"\d+(\.\d+)?\s*(/-)?\s*(each)?", re.I)
+# Some PDFs split the fi and fl ligatures off the word: "Profi t", "Cash fl ow" (L&T FY2011).
+LIGATURE = re.compile(r"(fi|fl) (?=[a-z])")
+# Note and page references before a caption: "2 148 (a) Share Capital" (Tata Steel FY2012).
+NOTE_REF = re.compile(r"^\s*(?:\d{1,3}\s+){1,2}(?=[\(\[]?[A-Za-z])")
+
+
+def strip_label(line):
+    """The caption without its note references and list number, for matching patterns."""
+    return ENUM.sub("", NOTE_REF.sub("", line)).strip()
 
 
 def values(line):
-    """Numbers on a line, after removing a leading list number like (1) or (ii)."""
-    line = ENUM.sub("", line)
+    """Numbers on a line, without list numbers like (1) and formulas like (VII-VIII)."""
+    line = FORMULA.sub(" ", ENUM.sub("", line))
+    line = FACE_TEXT.sub(" ", line)
     vals = [num(t) for t in NUM.findall(line)]
     vals = [v for v in vals if v is not None]
     return vals
@@ -98,8 +124,11 @@ def find_statements(pages):
         head = "\n".join(text.splitlines()[:12])
         if SKIP_HEAD.search(head) or len(re.findall(r"\d[\d,]{3,}", text)) < 15:
             continue
+        # A statement can run onto the next page (HUL FY2018 prints its EPS on
+        # the P&L's second page), so the required caption may be on either.
+        both = text + "\n" + (pages[i + 1] if i + 1 < len(pages) else "")
         for key in cand:
-            if TITLE[key].search(head) and NEED[key].search(text):
+            if TITLE[key].search(head) and NEED[key].search(both):
                 cand[key].append(i)
     for need_cf in (True, False):
         for b in cand["bs"]:
@@ -123,12 +152,44 @@ def columns_of(text):
     return 3 if len(dates) >= 3 else 2
 
 
+REF_TOKEN = re.compile(r"^\d{1,3}(\.\d{1,2})?$")
+
+
+def row_values(line):
+    """values(), plus: a lone dash is a zero, and note/page references are dropped.
+
+    "(i) Borrowings 2.18 - 9,359" is 0 this year, 9,359 last year (RCOM FY2019);
+    without the dash the note number 2.18 was read as this year's figure.
+    """
+    line = re.sub(r"(?<=\s)[-–](?=\s|$)", " 0 ", line)
+    toks = [t for t in NUM.findall(FACE_TEXT.sub(" ", FORMULA.sub(" ", ENUM.sub("", line))))]
+    vals = [(t, num(t)) for t in toks if num(t) is not None]
+    while len(vals) > NCOLS[0] and REF_TOKEN.match(vals[0][0]):
+        vals = vals[1:]
+    return [v for _, v in vals]
+
+
+def item_subtotal(v):
+    """RCOM prints an item and its subtotal side by side for each year:
+    "Other Equity 11,003 12,386 7,933 9,316" is 11,003 now, 7,933 last year
+    (12,386 and 9,316 are total equity). Recognised only when both years'
+    subtotal-minus-item gaps agree, as they do when share capital is unchanged."""
+    if len(v) != 4 or min(abs(x) for x in v) < 100:
+        return None
+    g1, g2 = v[1] - v[0], v[3] - v[2]
+    if g1 and g2 and 0.5 <= g1 / g2 <= 2:
+        return v[0], v[2]
+    return None
+
+
 def line_value(lines, idx):
     """(current, previous) from a matching line, or the next line if it holds only numbers."""
     n = NCOLS[0]
-    v = values(lines[idx])
+    v = row_values(lines[idx])
     if len(v) < 2 and idx + 1 < len(lines) and not re.search(r"[A-Za-z]{3,}", lines[idx + 1]):
-        v = v + values(lines[idx + 1])
+        v = v + row_values(lines[idx + 1])
+    if n == 2 and item_subtotal(v):
+        return item_subtotal(v)
     if len(v) >= n:
         return v[-n], v[-n + 1]
     if len(v) >= 2:
@@ -138,19 +199,29 @@ def line_value(lines, idx):
     return None, None
 
 
-def first_match(page_texts, patterns, exclude=None, prefer=None):
+def first_match(page_texts, patterns, exclude=None, last=False, max_abs=None):
+    """The first (or, with last=True, the final) line matching a pattern, in pattern order.
+
+    max_abs drops implausible values: an EPS line reading 2,29,69,44,664 is a
+    share count (Infosys prints "Basic" for both).
+    """
     for pat in patterns:
         rx = re.compile(pat, re.I)
+        hits = []
         for pno, text in page_texts:
             lines = [clean(l) for l in text.splitlines()]
             for i, l in enumerate(lines):
-                head = re.sub(r"^[\(\)\[\]ivxIVX\d\.\s\-–•]{0,8}(?=[A-Za-z])", "", l)
+                head = strip_label(re.sub(r"^[\-–•\s]+", "", l))
                 if not rx.search(head) or (exclude and re.search(exclude, head, re.I)):
                     continue
                 cur, prev = line_value(lines, i)
-                if cur is None:
+                if cur is None or (max_abs and abs(cur) > max_abs):
                     continue
-                return {"current": cur, "previous": prev, "page": pno + 1, "line": l[:150]}
+                hits.append({"current": cur, "previous": prev, "page": pno + 1, "line": l[:150]})
+                if not last:
+                    return hits[0]
+        if hits:
+            return hits[-1]
     return None
 
 
@@ -168,14 +239,31 @@ def balancing_total(text):
     for c, p, l in rows:
         counts.setdefault((round(c, 2), round(p, 2)), []).append(l)
     twice = [k for k, ls in counts.items() if len(ls) >= 2 and k[0] > 0]
+    if twice:
+        c, p = max(twice)
+        return {"current": c, "previous": p, "line": counts[(c, p)][0][:150], "balanced": True}
+    # Infosys and Tata Steel FY2016 print their totals as bare figure rows with
+    # no "Total" caption. Accept a bare row only if it appears twice AND is the
+    # largest figure on the page, as the grand total must be.
+    bare = {}
+    for l in (clean(x) for x in text.splitlines()):
+        if re.search(r"[A-Za-z]", l):
+            continue
+        v = values(l)
+        if len(v) == NCOLS[0]:
+            bare.setdefault((round(v[0], 2), round(v[1], 2)), []).append(l)
+    twice = [k for k, ls in bare.items() if len(ls) >= 2 and k[0] > 0]
     if not twice:
         return None
     c, p = max(twice)
-    return {"current": c, "previous": p, "line": counts[(c, p)][0][:150], "balanced": True}
+    if c < max(k[0] for k in bare):
+        return None
+    return {"current": c, "previous": p, "line": bare[(c, p)][0][:150] + " (bare row)", "balanced": True}
 
 
 def extract_pages(pages, name):
     out = {"file": name, "pages": len(pages)}
+    pages = [LIGATURE.sub(r"\1", p) for p in pages]
     st = find_statements(pages)
     out["statement_pages"] = {k: v + 1 for k, v in st.items()}
     if not st:
@@ -189,8 +277,17 @@ def extract_pages(pages, name):
     if bs:
         NCOLS[0] = columns_of(bs[0][1])
         tb = balancing_total(bs[0][1]) or (balancing_total(bs[1][1]) if len(bs) > 1 else None)
-        f["total_assets"] = tb or first_match(bs, [r"^total\s+assets\b"])
-        f["share_capital"] = first_match(bs, [r"^equity\s+share\s+capital", r"^share\s+capital"])
+        if not tb:
+            # Ind AS layout: "Total assets" and "Total equity and liabilities"
+            # are separate captions, often on separate pages.
+            ta = first_match(bs, [r"^total\s+assets\b"])
+            tel = first_match(bs, [r"^total\s+equity\s+(and|&)\s+liabilities", r"^total\s+liabilities\s+(and|&)\s+equity"])
+            if ta:
+                ta["balanced"] = bool(tel and abs(tel["current"] - ta["current"]) <= 0.01 * abs(ta["current"]) + 1)
+            tb = ta
+        f["total_assets"] = tb
+        f["share_capital"] = first_match(bs, [r"^equity\s+share\s+capital", r"^share\s+capital",
+                                               r"^equity\s+([a-z]\s+)?[\d(]"])   # DHFL FY2019: "Equity 24 31,382"
         f["total_equity"] = first_match(bs, [r"^total\s+equity(?!\s+and)", r"^total\s+shareholders.?\s*funds",
                                              r"^shareholders.?\s*funds"])
         res = first_match(bs, [r"^other\s+equity", r"^reserves\s+(and|&)\s+surplus"])
@@ -217,15 +314,31 @@ def extract_pages(pages, name):
     if pl:
         NCOLS[0] = columns_of(pl[0][1])
         f["revenue"] = first_match(pl, [r"^revenue\s+from\s+operations", r"^income\s+from\s+operations",
-                                        r"^net\s+sales", r"^total\s+revenue", r"^total\s+income", r"^interest\s+earned"],
+                                        r"^net\s+sales", r"^sales.{0,25}\(net\)", r"^operating\s+revenue", r"^total\s+revenue", r"^total\s+income", r"^interest\s+earned"],
                                    exclude=r"other\s+income")
         f["profit_for_year"] = first_match(pl, [
             r"^(net\s+)?(\(loss\)\s*/\s*)?profit\s*(/\s*\(loss\))?\s+for\s+the\s+(year|period)(?!.*before)",
             r"^(net\s+)?(profit|loss)\s+for\s+the\s+(year|period)(?!.*before)",
             r"^(net\s+)?[\(\)/\s]*(profit|loss)[\(\)/\sa-z]{0,20}for\s+the\s+(year|period)",
-            r"^(net\s+)?profit\s*(/\s*\(loss\))?\s+after\s+tax", r"^net\s+profit\b(?!.*before)"],
-            exclude=r"before|comprehensive|attributable|discontinued")
-        f["eps_basic"] = first_match(pl, [r"^basic\b", r"basic\s*(and|&|/)\s*diluted", r"^\W*\(?[a-z]\)?\s*basic"])
+            r"^(net\s+)?profit\s*(/\s*\(loss\))?\s+after\s+tax", r"^(net\s+)?[\(\)/\s]*(profit|loss)[\(\)/\sa-z]{0,20}after\s+tax",
+            r"^net\s+profit\b(?!.*before)"],
+            exclude=r"before|comprehensive|attributable|discontinued|account|statement|ended")
+        # With discontinued operations and no "profit for the year" line, the
+        # year's profit is continuing plus discontinued (RCOM FY2019: 5,099 - 2,252).
+        disc = first_match(pl, [r"(profit|loss).{0,20}after\s+tax.{0,10}from\s+discontinued"], exclude=r"before")
+        pr0 = f["profit_for_year"]
+        if disc and pr0 and not re.search(r"for\s+the\s+(year|period)", pr0["line"], re.I):
+            f["profit_for_year"] = {
+                "current": pr0["current"] + disc["current"],
+                "previous": (pr0["previous"] + disc["previous"]) if (pr0["previous"] is not None and disc["previous"] is not None) else None,
+                "page": pr0["page"], "line": pr0["line"][:70] + " + " + disc["line"][:70], "derived": True}
+        # The last "Basic" line: Infosys FY2016 prints EPS before and after an
+        # exceptional item, and the second (68.73) is the year's EPS.
+        f["eps_basic"] = first_match(pl, [r"^continuing\s+(operations\s+)?(and|&)\s+discontinued",
+                                          r"^basic\b", r"basic\s*(and|&|/)\s*diluted",
+                                          r"basic\s+earnings\s+per", r"earnings\s+per\s+share.*basic"],
+                                     exclude=r"before\s+exceptional|weighted|number\s+of", last=True,
+                                     max_abs=20000)
     if cf:
         NCOLS[0] = columns_of(cf[0][1])
         f["operating_cash_flow"] = first_match(cf, [
@@ -254,13 +367,19 @@ def extract_pages(pages, name):
         # EPS uses the weighted average share count, so when shares were issued
         # during the year the average of opening and closing capital is fairer.
         shares = pr["current"] * k_cr * 1e7 / eps["current"]
-        caps = [sc["current"]]
-        if sc["previous"]:
-            caps.append((sc["current"] + sc["previous"]) / 2)
+        caps = [sc["current"]] + ([sc["previous"]] if sc["previous"] else [])
         faces = [c * k_cr * 1e7 / shares for c in caps] if shares else []
         tol = 0.04 + 0.005 / abs(eps["current"])        # EPS is printed to 2 decimals
         out["implied_face_value"] = round(faces[0], 3) if faces else None
-        chk["face_value"] = any(abs(fc - fv) / fv < tol for fc in faces for fv in FACES)
+        # With shares issued during the year the weighted count lies between
+        # opening and closing capital, so the face value may too.
+        # A bonus issue doubles capital but restates the share count, so the
+        # closing capital alone must also be allowed to match (Infosys FY2016, FY2019).
+        lo, hi = (min(faces), max(faces)) if faces else (0, 0)
+        exact = bool(faces) and any(abs(faces[0] - fv) / fv < tol for fv in FACES)
+        between = bool(faces) and 0 < lo and hi / lo < 1.6 and \
+            any(lo * (1 - tol) <= fv <= hi * (1 + tol) for fv in FACES)
+        chk["face_value"] = exact or between
     out["checks"] = chk
     out["found"] = sum(1 for v in f.values() if v)
     out["verified"] = chk.get("balance", False) and chk.get("face_value", False)
