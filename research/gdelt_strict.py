@@ -29,6 +29,24 @@ list above (BSE 1,873 matches, mostly the exchange; also TITAN, TRENT,
 SIEMENS, ACC, CUPID). Fixed to apply the list as documented; the rules are
 unchanged. Only match counts had been seen.
 
+Attempt 2, labelled (days 6/16/26, seed 20260928): FAILED. 235 of 300
+correct (78.3%, 95% CI 73.3-82.6%). Errors: 22 list headlines ("Stocks to
+watch: A, B, C..."), 21 separately incorporated relatives (Reliance Jio, HDFC
+Securities, ONGC Videsh, L&T Technology Services...), 8 other entities or
+plain words ("self-reliance", Indigo Paints, RRB NTPC, MCX commodity prices),
+14 not about the business (SBI Research forecasts, a chess event).
+Labels: quant_data/gdelt_match/strict_label_300_days6-16-26_seed20260928_labelled.tsv
+
+Attempt 3 rule changes (made after attempt 2; the labelling guide is unchanged):
+  - a headline with a list cue ("stocks to watch", "in focus", "buzzing
+    stocks"...) or naming 3 or more of our companies is not used;
+  - a term followed by a relative's word (securities, mutual fund, life,
+    videsh, biologics, retail, jio, infotech, technology, mining, paints,
+    research, report, arm...) does not count; "RRB NTPC" does not count;
+  - RELIANCE no longer matches the bare word "reliance", only "Reliance
+    Industries" and "RIL"; MCX only as "MCX shares", "MCX Ltd" or the full name.
+  Checked on new days (3/13/23), seed 20260929.
+
 Labelling guide, fixed before labelling. "Y" if the headline is about the
 listed company or a business it runs directly (its brands, plants, divisions,
 results, shares, management acting for it). "N" if it is about a separately
@@ -96,7 +114,7 @@ ALIASES = {
     "LICI": ["lic", "life insurance corporation"], "LT": ["l&t", "larsen & toubro", "larsen and toubro"],
     "LTF": ["l&t finance"], "LTM": ["ltimindtree", "lti mindtree", "ltim"], "M&M": ["mahindra & mahindra", "mahindra and mahindra", "m&m"],
     "M&MFIN": ["mahindra finance", "mahindra & mahindra financial"], "MARUTI": ["maruti suzuki", "maruti"],
-    "MAXHEALTH": ["max healthcare"], "MAZDOCK": ["mazagon dock"], "MCX": ["multi commodity exchange"],
+    "MAXHEALTH": ["max healthcare"], "MAZDOCK": ["mazagon dock"], "MCX": ["multi commodity exchange", "mcx shares", "mcx share", "mcx ltd", "mcx limited"],
     "MOTHERSON": ["samvardhana motherson", "motherson sumi", "motherson"], "MTARTECH": ["mtar technologies", "mtar"],
     "MUTHOOTFIN": ["muthoot finance"], "NATIONALUM": ["nalco", "national aluminium"], "NAUKRI": ["info edge", "naukri"],
     "NESTLEIND": ["nestle india"], "NETWEB": ["netweb technologies", "netweb"], "NYKAA": ["nykaa", "fsn e-commerce"],
@@ -121,11 +139,22 @@ ALIASES = {
 # Replaces the Yahoo name where Yahoo's is today's name for a different company.
 NAME_OVERRIDE = {"TMCV": None, "TMPV": "Tata Motors"}
 # Tickers that are ordinary words or mean something else in the news.
-DROP_TICKER = {"oil", "idea", "ioc", "titan", "trent", "sail", "ncc", "bse", "mcx", "iex", "ltm", "acc", "cupid",
+DROP_TICKER = {"reliance", "oil", "idea", "ioc", "titan", "trent", "sail", "ncc", "bse", "mcx", "iex", "ltm", "acc", "cupid",
                "amber", "apollo", "escorts", "eternal", "siemens", "abb", "dixon", "persistent", "patanjali",
                "bel", "hal", "pel", "upl"}
 # Acronyms that count only when printed in capitals (not in an all-capitals headline).
-UPPER_ONLY = {"SAIL": "SAIL", "BEL": "BEL", "HAL": "HAL", "IEX": "IEX", "MCX": "MCX", "UPL": "UPL", "IOC": "IOCL"}
+UPPER_ONLY = {"SAIL": "SAIL", "BEL": "BEL", "HAL": "HAL", "IEX": "IEX", "UPL": "UPL", "IOC": "IOCL"}
+
+# Attempt 3: words that, right after a company's name, make it a relative or
+# something else (from attempt 2's errors).
+FOLLOW_ONE = {"securities", "mutual", "mf", "amc", "life", "general", "metlife", "videsh", "biologics",
+              "retail", "jio", "home", "infra", "infrastructure", "infotech", "technology", "tech", "mining",
+              "paints", "research", "report", "economists", "ecowrap", "shiksha", "foundation", "arm",
+              "subsidiary", "international", "zinc", "payments", "hotels", "chess", "rapid"}
+PRECEDE_ONE = {"rrb", "self"}
+LIST_CUE = re.compile(r"stocks?\s+(to\s+(watch|buy|track)|in\s+(the\s+)?news|in\s+focus)|buzzing\s+stocks|"
+                      r"in\s+(focus|limelight)|brokerage\s+calls|corporate\s+radar|results\s+today|"
+                      r"to\s+report\s+earnings|trading\s+strateg", re.I)
 
 
 def norm(s):
@@ -179,6 +208,10 @@ def match(title, orgs, rx, confirm, require_org=False):
     for sym, pats in rx.items():
         for x, p in pats:
             for m in p.finditer(t):
+                after = t[m.end():].split()[:1]
+                before = t[:m.start()].split()[-1:]
+                if (after and re.sub(r"'s$", "", after[0]) in FOLLOW_ONE) or (before and before[0] in PRECEDE_ONE):
+                    continue
                 spans.append((m.start(), m.end(), sym))
     shouting = sum(ch.isupper() for ch in title) > 0.6 * max(1, sum(ch.isalpha() for ch in title))
     if not shouting:
@@ -191,6 +224,8 @@ def match(title, orgs, rx, confirm, require_org=False):
         if s >= 0 and any(s2 <= s and e <= e2 and (e2 - s2) > (e - s) and sym2 != sym for s2, e2, sym2 in spans if s2 >= 0):
             continue
         keep.add(sym)
+    if len(keep) >= 3 or LIST_CUE.search(title):
+        return []                                      # a list, not news about one company
     if not keep or not require_org:
         return sorted(keep)
     org_names = {core(o.rsplit(",", 1)[0]) for o in (orgs or "").split(";") if o}
