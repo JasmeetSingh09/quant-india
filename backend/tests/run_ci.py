@@ -99,6 +99,7 @@ SUITES = [
     ("simulator_fresh_db_test.py",          11, 120),
     ("shadowed_import_test.py",              7, 120),
     ("market_validation_audit.py",          99, 120),
+    ("market_risk_test.py",                 17, 60),
 ]
 # run_ci_selftest.py is not listed: the workflow runs it as its own step first,
 # so a gate that can no longer fail is reported before any suite is trusted.

@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getMCX, getRegime, getMarketNews, getPrice, getPredictionTrack, getBenchmark } from '../api'
+import { getMCX, getMarketRisk, getMarketNews, getPrice, getPredictionTrack, getBenchmark } from '../api'
 import Spinner from '../components/Spinner'
-import RegimeBadge from '../components/RegimeBadge'
 import Explainer from '../components/Explainer'
 import CapTierPicks from '../components/CapTierPicks'
 import Leaderboard from '../components/Leaderboard'
@@ -10,6 +9,7 @@ import EmailOptIn from '../components/EmailOptIn'
 import { TrendingUp, TrendingDown, Sparkles, ArrowUpRight, ArrowDownRight, RefreshCw, History } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import ErrorBoundary from '../components/ErrorBoundary'
+import Term from '../components/Term'
 import { signalLabel, SIGNAL_TITLE } from '../signalLabel'
 
 const NIFTY_STOCKS = ['RELIANCE.NS','TCS.NS','HDFCBANK.NS','INFY.NS','ICICIBANK.NS']
@@ -492,43 +492,53 @@ function TrackRecord() {
 }
 
 /**
- * RegimeBanner — what the market is doing, readable at a glance.
+ * MarketRiskBanner — how bumpy the market has been, readable at a glance.
  *
- * The regime was previously a grid of statistics near the bottom of the page,
- * which buried the one thing a user wants before looking at any signal. The
- * probability is shown as the model's own words rather than a bare percentage:
- * a filtered HMM posterior saturates, and printing "100%" reads as "the market
- * cannot turn", which no model can claim.
+ * Replaced the Bull / Bear / Sideways banner (owner approval 2026-09-28). A
+ * pre-registered test found that label followed single days: a median run of
+ * one day, and 99% of "Bull" days were simply up days, so on 28 Sep 2026 it
+ * read "Bull" on a day the Nifty fell 1.56%. This reading was confirmed on
+ * four other markets: elevated volatility has tended to stay elevated over the
+ * next month. It says nothing about direction, and the banner says so.
  */
-function RegimeBanner({ regime, loading }) {
-  if (loading || !regime?.current_regime) return null
-  const label = regime.current_regime
-  const tone = label === 'Bull' ? 'green' : label === 'Bear' ? 'red' : 'yellow'
-  const ring = { green: 'border-green-800/60 bg-green-900/15',
-                 red: 'border-red-800/60 bg-red-900/15',
-                 yellow: 'border-yellow-800/60 bg-yellow-900/15' }[tone]
-  const text = { green: 'text-green-400', red: 'text-red-400', yellow: 'text-yellow-400' }[tone]
-  const prob = regime.current_proba_display
-    ?? (regime.current_proba?.[label] != null
-        ? `${(regime.current_proba[label] * 100).toFixed(1)}%` : null)
+export function MarketRiskBanner({ risk, loading, error }) {
+  if (loading) return null
+  if (error || !risk?.state) {
+    return <p className="text-xs text-gray-500 text-center py-2">The market-risk reading is unavailable right now.</p>
+  }
+  const elevated = risk.state === 'Elevated'
+  const ring = elevated ? 'border-amber-700/60 bg-amber-900/15' : 'border-slate-700/60 bg-slate-800/30'
+  const text = elevated ? 'text-amber-400' : 'text-slate-300'
+  const hist = risk.history || []
 
   return (
     <div className={`card border ${ring} flex flex-col gap-2`}>
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-baseline gap-3">
-          <span className={`text-xl font-bold tracking-tight ${text}`}>{label.toUpperCase()} REGIME</span>
-          {prob && <span className="text-sm text-gray-400 font-mono">{prob} model probability</span>}
+        <div className="flex items-baseline gap-3 flex-wrap">
+          <span className={`text-xl font-bold tracking-tight ${text}`}>
+            <Term k="market_risk">Market risk</Term>: {risk.state.toUpperCase()}
+          </span>
+          <span className="text-sm text-gray-400 font-mono">
+            20-day volatility {risk.volatility_20d_pct}% · typical {risk.typical_volatility_pct}%
+          </span>
         </div>
         <span className="text-[11px] text-gray-500 uppercase tracking-wide">
-          3-state Gaussian HMM · Nifty 50
+          Nifty 50 · as of {risk.as_of} · {risk.days_in_state} day{risk.days_in_state === 1 ? '' : 's'} in this state
         </span>
       </div>
-      {regime.current_proba_note && (
-        <p className="text-xs text-gray-400 leading-relaxed">{regime.current_proba_note}</p>
+      <p className="text-xs text-gray-300 leading-relaxed">{risk.meaning}</p>
+      {hist.length > 0 && (
+        <div className="flex items-end gap-px h-6" aria-label="Market risk over the last 90 trading days">
+          {hist.map(h => (
+            <span key={h.date} title={`${h.date}: ${h.state}, ${h.volatility_20d_pct}%`}
+                  className={`flex-1 rounded-sm ${h.state === 'Elevated' ? 'bg-amber-500/70 h-6' : 'bg-slate-600/60 h-3'}`} />
+          ))}
+        </div>
       )}
-      <p className="text-[11px] text-gray-600">
-        Describes which regime best explains recent returns. It is not a forecast,
-        and it is not a reason on its own to buy or sell anything.
+      <p className="text-[11px] text-gray-600 leading-relaxed">
+        Last 90 trading days, oldest on the left. This replaced the Bull / Bear / Sideways label, which a
+        test over 2008-2026 found followed single days rather than market phases. Not a reason on its own
+        to buy or sell anything.
       </p>
     </div>
   )
@@ -563,7 +573,7 @@ function NiftyLevel() {
 
 export default function Dashboard() {
   const { data: mcx,    isLoading: mcxLoading,    isError: mcxError    } = useQuery({ queryKey: ['mcx'],     queryFn: getMCX,        refetchInterval: 120000 })
-  const { data: regime, isLoading: regimeLoading, isError: regimeError } = useQuery({ queryKey: ['regime'],  queryFn: getRegime,     staleTime: 300000 })
+  const { data: risk,   isLoading: riskLoading,   isError: riskError   } = useQuery({ queryKey: ['marketRisk'], queryFn: getMarketRisk, staleTime: 300000 })
   const { data: news,   isLoading: newsLoading,   isError: newsError   } = useQuery({ queryKey: ['mktNews'], queryFn: getMarketNews, staleTime: 60000 })
 
   return (
@@ -576,10 +586,14 @@ export default function Dashboard() {
             {new Date().toLocaleDateString('en-IN', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}
           </p>
         </div>
-        {regime && !regimeLoading && (
+        {risk?.state && !riskLoading && (
           <div className="text-right">
-            <p className="text-xs text-gray-500 mb-1">Market Regime</p>
-            <RegimeBadge regime={regime.current_regime} proba={regime.current_proba} />
+            <p className="text-xs text-gray-500 mb-1">Market risk</p>
+            <span className={`inline-block px-2.5 py-1 rounded-full border text-sm font-semibold ${
+              risk.state === 'Elevated' ? 'border-amber-700 text-amber-400 bg-amber-900/20'
+                                        : 'border-slate-600 text-slate-300 bg-slate-800/40'}`}>
+              {risk.state}
+            </span>
           </div>
         )}
       </div>
@@ -641,7 +655,7 @@ export default function Dashboard() {
       <ErrorBoundary name="section"><Leaderboard n={5} /></ErrorBoundary>
 
       {/* 1. What is the market doing? */}
-      <RegimeBanner regime={regime} loading={regimeLoading} />
+      <MarketRiskBanner risk={risk} loading={riskLoading} error={riskError} />
 
       {/* 2. What should I look at? */}
       <ErrorBoundary name="section"><CapTierPicks n={10} /></ErrorBoundary>
@@ -653,43 +667,6 @@ export default function Dashboard() {
       {/* Asked once, then never again — see the component. */}
       <EmailOptIn />
 
-      {/* Regime detail */}
-      {regimeError && (
-        <p className="text-xs text-red-400 text-center py-2">Could not load market regime data.</p>
-      )}
-      {regime && !regimeLoading && (
-        <div className="card">
-          <h2 className="font-semibold mb-4">Market Regime Analysis <span className="text-xs text-gray-500 font-normal ml-2">3-State Gaussian HMM on Nifty 50</span></h2>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {Object.entries(regime.regime_stats || {}).map(([label, stats]) => (
-              <div key={label} className={`card-sm border ${
-                label==='Bull'?'border-green-800/50':label==='Bear'?'border-red-800/50':'border-yellow-800/50'
-              }`}>
-                <p className={`font-semibold text-sm ${
-                  label==='Bull'?'text-green-400':label==='Bear'?'text-red-400':'text-yellow-400'
-                }`}>{label}</p>
-                <p className="text-xs text-gray-500 mt-1">{stats.pct_of_time}% of time · {stats.n_days}d</p>
-                {/* Lead with the daily figure. Annualising a 34-day regime is an
-                    extrapolation, not a CAGR the market ever delivered, so it is
-                    shown as a conditional and clearly de-emphasised. */}
-                <p className={`text-sm font-mono mt-1 ${stats.avg_daily_ret>=0?'text-green-400':'text-red-400'}`}>
-                  {stats.avg_daily_ret>0?'+':''}{stats.avg_daily_ret}%<span className="text-gray-500">/day</span>
-                </p>
-                <p className="text-[11px] text-gray-500 mt-0.5 font-mono">
-                  vol {stats.avg_daily_vol}%/day
-                </p>
-                <p className="text-[11px] text-gray-600 mt-1 leading-snug">
-                  if sustained 1y: {stats.annualised_ret>0?'+':''}{Math.round(stats.annualised_ret)}%
-                </p>
-              </div>
-            ))}
-            <div className="card-sm">
-              <p className="text-xs text-gray-500">Interpretation</p>
-              <p className="text-xs text-gray-300 mt-1 leading-relaxed">{regime.interpretation}</p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

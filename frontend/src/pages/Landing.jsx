@@ -67,7 +67,7 @@ export default function Landing() {
         <p className="mt-5 text-lg text-gray-400">
           A four-factor alpha model scoring thousands of NSE stocks daily. Nine portfolio
           optimisers — Markowitz, Black-Litterman, HRP, Min-CVaR. Monte Carlo,
-          GARCH volatility, Fama-French factors and a three-state regime model.
+          GARCH volatility, Fama-French factors and a tested market-risk reading.
           Build a portfolio with them, see exactly what could go wrong, and
           paper-trade it before risking a rupee.
         </p>
@@ -131,7 +131,7 @@ export default function Landing() {
             ['Alpha model', 'Momentum (12-1, volatility-adjusted), quality (Piotroski F-score, ROE, FCF yield), value (P/E and P/B z-scores vs peers) and FinBERT news sentiment — combined into one score with every contribution shown.'],
             ['Portfolio optimisation', 'Markowitz mean-variance with Ledoit-Wolf shrinkage, Black-Litterman with He-Litterman equilibrium, Hierarchical Risk Parity, Equal Risk Contribution, Maximum Diversification and Min-CVaR via linear programming.'],
             ['Risk & simulation', 'Monte Carlo by normal, Student-t, i.i.d. and block bootstrap. VaR and CVaR, GARCH(1,1) volatility forecasting, risk decomposition by contribution, and Kelly-based position sizing.'],
-            ['Factor research', 'Fama-French three-factor regressions with t-stats, cointegration testing for pairs, seasonality studies and a three-state Gaussian HMM for market regime.'],
+            ['Factor research', 'Fama-French three-factor regressions with t-stats, cointegration testing for pairs, seasonality studies, and a market-risk reading tested on five markets (it replaced a regime model that a test found followed single days).'],
             ['Options', 'Black-Scholes-Merton pricing with the full Greeks and risk-neutral probabilities — verified against the textbook case at 10.4506 versus 10.45.'],
             ['Honesty by construction', 'Momentum tested point-in-time on 2011-2026 prices, delisted stocks included, with the rules written down before the run: the top fifth beat the bottom fifth by 1.5% a month. Its edge did not show among the largest, most liquid stocks, and our other factors are not yet tested. We publish all of it.'],
           ].map(([title, desc]) => (

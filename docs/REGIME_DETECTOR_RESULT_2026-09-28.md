@@ -47,3 +47,9 @@
 - **Main stock scores:** use fixed weights and are not affected. `/alpha/regime-adjusted` and the weights proposal would be.
 
 The frozen model is not changed by this result. Fixes go to the owner as a proposal.
+
+## Correction (same day)
+
+- **The issue:** the volatility benchmark counted the first months as "Normal" (lower risk), before a full year of volatility history existed. It should have left them out.
+- **Effect:** about 90 of 4,477 days. It is a benchmark, not a hypothesis, and does not change the HMM verdict.
+- **Confirmation run:** `docs/market_risk_confirm_2026-09-28.json` leaves those days out. On the Nifty it gives +4.5 points, p = 0.00001.

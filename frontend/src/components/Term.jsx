@@ -17,7 +17,7 @@ const LABELS = {
   market_beta: 'Market beta', r_squared: 'R²', significant: 'Significant',
   hrp: 'HRP', markowitz: 'Markowitz', black_litterman: 'Black-Litterman',
   efficient_frontier: 'Efficient frontier', monte_carlo: 'Monte Carlo',
-  bootstrap: 'Bootstrap', fat_tails: 'Fat tails', regime: 'Regime',
+  bootstrap: 'Bootstrap', fat_tails: 'Fat tails', regime: 'Regime', market_risk: 'Market risk',
   alpha_score: 'Alpha score', pe_ratio: 'P/E ratio', roe: 'ROE',
 }
 

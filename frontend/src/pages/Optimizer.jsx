@@ -134,7 +134,7 @@ export default function Optimizer() {
                 ['riskparity','Risk Parity (ERC)',      'Each holding contributes equal RISK, not equal money (2010)'],
                 ['maxdiv',   'Max Diversification',     'Maximises the diversification ratio (Choueifaty 2008)'],
                 ['mincvar',  'Min Tail-Risk (CVaR)',    'Minimises loss in the worst 5% of days, not just variance'],
-                ['regime',   'Regime-Adaptive',         'Reads the market regime, then picks the fitting optimiser'],
+                ['regime',   'Risk-Aware (HRP)',        'HRP, with the current market-risk reading shown alongside'],
                 ['frontier', 'Risk-vs-Return Map',      'Shows every best risk/return combo on a curve'],
                 ['auto',     'AI-Guided Mix',           'Uses news sentiment to tilt the portfolio'],
               ].map(([v, l, d]) => (
@@ -418,18 +418,25 @@ export default function Optimizer() {
             </div>
           )}
 
-          {/* Regime-Adaptive result */}
+          {/* Risk-aware (HRP) result. This tab used to switch optimiser on the
+              regime label; a test found that label followed single days, so it
+              now always uses HRP and shows market risk for information only. */}
           {regimeResult && !regimeResult.error && (
             <div className="space-y-4">
               <div className="card-sm flex items-center justify-between">
                 <div>
-                  <p className="stat-label">Detected market regime</p>
-                  <p className={`text-lg font-bold ${regimeResult.regime === 'Bull' ? 'text-green-400' : regimeResult.regime === 'Bear' ? 'text-red-400' : 'text-yellow-400'}`}>
-                    {regimeResult.regime}{regimeResult.regime_probability != null && <span className="text-xs text-gray-500 font-normal ml-2">{Math.round(regimeResult.regime_probability*100)}% conf.</span>}
-                  </p>
+                  <p className="stat-label">Market risk now</p>
+                  {regimeResult.market_risk ? (
+                    <p className={`text-lg font-bold ${regimeResult.market_risk.state === 'Elevated' ? 'text-amber-400' : 'text-slate-300'}`}>
+                      {regimeResult.market_risk.state}
+                      <span className="text-xs text-gray-500 font-normal ml-2">
+                        20-day volatility {regimeResult.market_risk.volatility_20d_pct}% vs typical {regimeResult.market_risk.typical_volatility_pct}%
+                      </span>
+                    </p>
+                  ) : <p className="text-sm text-gray-500">unavailable</p>}
                 </div>
                 <div className="text-right">
-                  <p className="stat-label">Chosen optimiser</p>
+                  <p className="stat-label">Optimiser</p>
                   <p className="text-sm font-semibold text-white">{regimeResult.chosen_optimizer}</p>
                 </div>
               </div>

@@ -286,7 +286,11 @@ def _detect_regime_uncached(
       transition_matrix — how likely is a regime shift?
       regime_stats    — mean return and volatility per regime
     """
-    end   = datetime.now().strftime("%Y-%m-%d")
+    # end is EXCLUSIVE in yf.download, so end=today left out today's close: after
+    # the market shut, the label still described the previous day (28 Sep 2026:
+    # Nifty -1.56%, label "Bull" from Friday's +0.34%). Tomorrow includes today.
+    # Owner approval 2026-09-28; docs/REGIME_DETECTOR_RESULT_2026-09-28.md (D4).
+    end   = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
     start = (datetime.now() - timedelta(days=lookback_days + 30)).strftime("%Y-%m-%d")
 
     try:

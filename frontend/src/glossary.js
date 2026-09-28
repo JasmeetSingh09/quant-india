@@ -77,8 +77,9 @@ export const GLOSSARY = {
   factor_exposure:"Return that comes from being a certain type of stock (small, cheap, market-following).",
 
   // ── Regime ──
-  regime:       "The market's mood as the regime model labels it: Bull (rising), Bear (falling) or Sideways.",
+  regime:       "The label the old regime model gave the market: Bull, Bear or Sideways. The dashboard now shows market risk instead.",
   hmm:          "Hidden Markov Model: a statistical model that infers hidden states, here the market's mood, from daily returns.",
+  market_risk:  "Whether the Nifty's volatility over the last 20 trading days is above (Elevated) or at or below (Normal) its typical level over the past year.",
 
   // ── Fundamentals ──
   pe_ratio:     "Price-to-earnings: rupees paid for each rupee of yearly profit.",
@@ -154,8 +155,9 @@ export const LIMITS = {
   significant:  "Not the same as large or useful, and not proof the effect will continue.",
   factor_exposure:"Exposure can change as a stock or portfolio changes.",
 
-  regime:       "The model is fitted on the full history, so past labels use later data; treat them as a description, not a signal.",
+  regime:       "Tested over 2008-2026: a label lasted a median of 1 day, mostly echoing that day's own move, and did not predict the next month.",
   hmm:          "The states are statistical groupings, not official market phases.",
+  market_risk:  "Says how bumpy the market has been and has tended to stay over the next month. It says nothing about the direction of prices.",
 
   pe_ratio:     "Yahoo's current figure. Profits can be one-off or about to fall, and a low P/E can be a warning.",
   ev_ebitda:    "Ignores capital spending and tax, which differ a lot between industries.",

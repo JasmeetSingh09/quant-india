@@ -2878,42 +2878,41 @@ def optimizer_hrp(req: FrontierRequest):
 @app.post("/optimizer/regime-adaptive")
 def optimizer_regime_adaptive(req: FrontierRequest):
     """
-    Regime-adaptive optimiser: read the current market regime from the HMM,
-    then pick the optimiser that suits it.
+    Uses Hierarchical Risk Parity, and shows the current market-risk reading.
 
-      Bull / stable  → Markowitz max-Sharpe (chase risk-adjusted return)
-      Bear / stressed→ Minimum-CVaR         (protect the crash tail)
-      Sideways/mixed → Hierarchical Risk Parity (robust, no return estimates)
-
-    Uses the existing Gaussian-HMM regime detector; the portfolio engine simply
-    reacts to the state instead of using one fixed model through all conditions.
+    This used to pick Markowitz, Min-CVaR or HRP from the HMM regime label. A
+    pre-registered test (docs/REGIME_DETECTOR_RESULT_2026-09-28.md) found that
+    label tracked single days (median run 1 day), so the chosen optimiser could
+    change every day for no reason. By owner decision (2026-09-28) it uses HRP,
+    which needs no return forecast, until a test shows that switching on a
+    measured signal helps. The market-risk reading is shown for information; it
+    does not choose anything. Path kept so saved links keep working.
     """
-    regime_info = detect_regime("^NSEI", lookback_days=252)
-    regime = (regime_info.get("current_regime") or "Sideways") if "error" not in regime_info else "Sideways"
-
-    if regime == "Bull":
-        chosen, why = "Markowitz (max Sharpe)", "stable/bull regime — chase risk-adjusted return"
-        result = mean_variance_optimize(req.tickers, period_months=req.period_months,
-                                        target="max_sharpe", max_weight=0.35,
-                                        risk_free_pct=req.risk_free_pct)
-    elif regime == "Bear":
-        chosen, why = "Minimum-CVaR", "high-stress/bear regime — protect the crash tail"
-        result = min_cvar_optimize(req.tickers, period_months=req.period_months,
-                                   max_weight=0.35, risk_free_pct=req.risk_free_pct)
-    else:
-        chosen, why = "Hierarchical Risk Parity", "mixed/sideways regime — robust, no return forecast"
-        result = hierarchical_risk_parity(req.tickers, period_months=req.period_months,
-                                          risk_free_pct=req.risk_free_pct)
-
+    from market_risk import market_risk
+    result = hierarchical_risk_parity(req.tickers, period_months=req.period_months,
+                                      risk_free_pct=req.risk_free_pct)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
-    result["regime"] = regime
-    result["regime_probability"] = regime_info.get("current_proba")
-    result["chosen_optimizer"] = chosen
+    risk = market_risk()
+    result["market_risk"] = None if "error" in risk else {
+        k: risk.get(k) for k in ("state", "as_of", "volatility_20d_pct", "typical_volatility_pct", "meaning")}
+    result["chosen_optimizer"] = "Hierarchical Risk Parity"
     result["regime_rationale"] = (
-        f"Market regime detected as {regime}. Using {chosen}: {why}."
-    )
+        "Uses Hierarchical Risk Parity, which needs no return forecast. This page used to switch "
+        "optimiser on a market-regime label, but a test found that label followed single days, so "
+        "the choice changed for no reason. The market-risk reading is shown for information only.")
     return result
+
+
+@app.get("/market-risk")
+def market_risk_current():
+    """Is the Nifty's recent volatility above or below its one-year typical level?
+    A tested risk reading, not a forecast of direction."""
+    from market_risk import market_risk
+    r = market_risk()
+    if "error" in r:
+        raise HTTPException(status_code=503, detail=r["error"])
+    return r
 
 
 @app.post("/optimizer/risk-parity")

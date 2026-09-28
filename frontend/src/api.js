@@ -184,6 +184,7 @@ export const runRegimeAdaptive = body => api.post('/optimizer/regime-adaptive', 
 
 // Regime
 export const getRegime      = () => api.get('/regime')
+export const getMarketRisk  = () => api.get('/market-risk')
 
 // Monte Carlo
 export const runMonteCarlo  = body => api.post('/montecarlo/simulate', body)
