@@ -23,6 +23,12 @@ mangling names ("Larsen Toubro Ltd", "Reddy Laboratories", "Why Is Yes Bank").
 would bias the test by company. The requirement was removed. Only match counts
 from the check days had been seen; no check-day headline had been labelled.
 
+Attempt 1, withdrawn before any labelling (2026-09-28): a coding error added
+a company's one-word name whenever it equalled its ticker, bypassing the drop
+list above (BSE 1,873 matches, mostly the exchange; also TITAN, TRENT,
+SIEMENS, ACC, CUPID). Fixed to apply the list as documented; the rules are
+unchanged. Only match counts had been seen.
+
 Labelling guide, fixed before labelling. "Y" if the headline is about the
 listed company or a business it runs directly (its brands, plants, divisions,
 results, shares, management acting for it). "N" if it is about a separately
@@ -150,6 +156,7 @@ def build(names_path):
             t.add(tick)
         if len(c.split()) == 1 and c and c not in DROP_TICKER:
             t.add(c)                                     # single-word names: infosys, wipro, cipla
+        t = {x for x in t if x not in DROP_TICKER}      # the drop list applies to every one-word term
         terms[sym] = t
         confirm[sym] = {core(x) for x in t if core(x)} | ({c} if c else set())
     # A term claimed by two companies identifies neither.
