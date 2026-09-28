@@ -47,6 +47,25 @@ Attempt 3 rule changes (made after attempt 2; the labelling guide is unchanged):
     Industries" and "RIL"; MCX only as "MCX shares", "MCX Ltd" or the full name.
   Checked on new days (3/13/23), seed 20260929.
 
+Attempt 3, labelled (days 3/13/23, seed 20260929): FAILED. 264 of 300
+correct (88.0%, 95% CI 83.8-91.2%). Errors: 9 other entities or plain words
+("Indian oil imports", "TDS, TCS rates", "crude oil India", a broker named
+only as the source), 7 relatives, 6 about a person, 6 not about the business,
+5 lists, 3 bank economists on the economy. Coding error found: the "in
+focus / in limelight" cue held a control character and never fired (1 of the
+36 errors; 88.3% without it, still a fail).
+Labels: quant_data/gdelt_match/strict_label_300_days3-13-23_seed20260929_labelled.tsv
+
+Attempt 4 rule changes (after attempt 3; labelling guide unchanged): the list
+cue fixed and widened (ex-dividend, "N other stocks", "in spotlight", "top
+stocks"); person cues ("Who is", former CEO, co-founder, salary); a bank with
+macro words (GDP, fiscal, inflation, crude oil, yields) is its economists,
+not the bank; more relative words (advanced, money, resources, prize,
+venture, promoter...); "crude"/"TDS" before a name and "on"/"at" before an
+exchange do not count; a name standing only as the source at the end of a
+headline does not count; IOC needs "Indian Oil Corporation"/"IOCL".
+Checked on new days 9/19/29, seed 20260930.
+
 Labelling guide, fixed before labelling. "Y" if the headline is about the
 listed company or a business it runs directly (its brands, plants, divisions,
 results, shares, management acting for it). "N" if it is about a separately
@@ -107,7 +126,7 @@ ALIASES = {
     "HINDUNILVR": ["hindustan unilever", "hul"], "HSCL": ["himadri speciality", "himadri"],
     "ICICIGI": ["icici lombard"], "ICICIPRULI": ["icici prudential life", "icici pru life"],
     "IDEA": ["vodafone idea"], "IEX": ["indian energy exchange"], "INDHOTEL": ["indian hotels", "ihcl"],
-    "INDIGO": ["interglobe aviation", "indigo"], "IOC": ["indian oil", "iocl"], "JINDALSTEL": ["jindal steel", "jspl"],
+    "INDIGO": ["interglobe aviation", "indigo"], "IOC": ["indian oil corporation", "indian oil corp", "indianoil", "iocl"], "JINDALSTEL": ["jindal steel", "jspl"],
     "JIOFIN": ["jio financial"], "JUBLFOOD": ["jubilant foodworks"], "KALYANKJIL": ["kalyan jewellers"],
     "KAYNES": ["kaynes technology", "kaynes"], "KOTAKBANK": ["kotak mahindra bank", "kotak bank"],
     "LAURUSLABS": ["laurus labs"], "LENSKART": ["lenskart"], "LICHSGFIN": ["lic housing finance"],
@@ -137,7 +156,9 @@ ALIASES = {
     "ZYDUSLIFE": ["zydus lifesciences", "zydus", "cadila healthcare"],
 }
 # Replaces the Yahoo name where Yahoo's is today's name for a different company.
-NAME_OVERRIDE = {"TMCV": None, "TMPV": "Tata Motors"}
+NAME_OVERRIDE = {"TMCV": None, "TMPV": "Tata Motors",
+                 # attempt 4: "Indian Oil Corporation" minus the legal word is "indian oil", a plain phrase
+                 "IOC": None}
 # Tickers that are ordinary words or mean something else in the news.
 DROP_TICKER = {"reliance", "oil", "idea", "ioc", "titan", "trent", "sail", "ncc", "bse", "mcx", "iex", "ltm", "acc", "cupid",
                "amber", "apollo", "escorts", "eternal", "siemens", "abb", "dixon", "persistent", "patanjali",
@@ -150,11 +171,24 @@ UPPER_ONLY = {"SAIL": "SAIL", "BEL": "BEL", "HAL": "HAL", "IEX": "IEX", "UPL": "
 FOLLOW_ONE = {"securities", "mutual", "mf", "amc", "life", "general", "metlife", "videsh", "biologics",
               "retail", "jio", "home", "infra", "infrastructure", "infotech", "technology", "tech", "mining",
               "paints", "research", "report", "economists", "ecowrap", "shiksha", "foundation", "arm",
-              "subsidiary", "international", "zinc", "payments", "hotels", "chess", "rapid"}
-PRECEDE_ONE = {"rrb", "self"}
+              "subsidiary", "international", "zinc", "payments", "hotels", "chess", "rapid",
+              # attempt 4, from attempt 3's errors
+              "advanced", "toyotsu", "money", "resources", "prize", "venture", "ventures", "promoter",
+              "youth", "rates", "rate", "marathon"}
+PRECEDE_ONE = {"rrb", "self", "crude", "tds"}
+# "on MCX", "at IEX": the exchange's prices, not the company (attempt 4).
+PRECEDE_EXCHANGE = {"on", "at"}
+EXCHANGES = {"IEX", "MCX", "BSE"}
 LIST_CUE = re.compile(r"stocks?\s+(to\s+(watch|buy|track)|in\s+(the\s+)?news|in\s+focus)|buzzing\s+stocks|"
-                      r"in\s+(focus|limelight)|brokerage\s+calls|corporate\s+radar|results\s+today|"
-                      r"to\s+report\s+earnings|trading\s+strateg", re.I)
+                      r"\bin\s+(focus|limelight|spotlight)\b|brokerage\s+calls|corporate\s+radar|results\s+today|"
+                      r"to\s+report\s+earnings|trading\s+strateg|ex-?dividend|\d+\s+other\s+(large\s*cap\s+)?stocks|"
+                      r"among\s+\d+\s+stocks|stocks\s+that\s+look|top\s+stocks|stocks\s+on\s+d-street", re.I)
+# A headline about a person, not the company (attempt 4).
+PERSON_CUE = re.compile(r"^who\s+is\b|\bformer\s+(ceo|chairman|md|cfo)\b|\bco-?founder\b|\bsalary\b|offer\s+letter", re.I)
+# A bank's economists on the economy, not the bank (attempt 4).
+MACRO_CUE = re.compile(r"\bgdp\b|\bfiscal\b|\binflation\b|crude\s+oil|balance\s+of\s+payments|\byields?\b|economic\s+growth", re.I)
+BANKS = {"SBIN", "BANKBARODA", "ICICIBANK", "HDFCBANK", "KOTAKBANK", "AXISBANK", "PNB", "CANBK", "UNIONBANK",
+         "INDUSINDBK", "YESBANK", "IDFCFIRSTB", "FEDERALBNK", "BANDHANBNK", "RBLBANK", "AUBANK"}
 
 
 def norm(s):
@@ -162,6 +196,11 @@ def norm(s):
     s = re.sub(r"\([^)]*\)", " ", s)                  # "(India)"
     s = re.sub(r"[^a-z0-9&' ]+", " ", s)
     return " ".join(s.split())
+
+
+def norm_keep_punct(s):
+    """Lower case with separators kept, for the end-of-headline source test."""
+    return " ".join((s or "").lower().replace("’", "'").split())
 
 
 def core(name):
@@ -212,11 +251,18 @@ def match(title, orgs, rx, confirm, require_org=False):
                 before = t[:m.start()].split()[-1:]
                 if (after and re.sub(r"'s$", "", after[0]) in FOLLOW_ONE) or (before and before[0] in PRECEDE_ONE):
                     continue
+                if sym in EXCHANGES and before and before[0] in PRECEDE_EXCHANGE:
+                    continue
+                # Named only as the source at the end ("...: Angel Broking"): not news about it.
+                if re.search(r"[:|\-–]\s*(the\s+)?" + re.escape(x) + r"(\s+(ltd|limited))?\.?\s*$", norm_keep_punct(title)):
+                    continue
                 spans.append((m.start(), m.end(), sym))
     shouting = sum(ch.isupper() for ch in title) > 0.6 * max(1, sum(ch.isalpha() for ch in title))
     if not shouting:
         for sym, word in UPPER_ONLY.items():
             if sym in rx and re.search(r"(?<![A-Za-z])" + word + r"(?![A-Za-z])", title):
+                if sym in EXCHANGES and re.search(r"\b(on|at)\s+" + word + r"\b", title, re.I):
+                    continue
                 spans.append((-1, -1, sym))
     # longest term wins where two companies' terms overlap
     keep = set()
@@ -224,8 +270,10 @@ def match(title, orgs, rx, confirm, require_org=False):
         if s >= 0 and any(s2 <= s and e <= e2 and (e2 - s2) > (e - s) and sym2 != sym for s2, e2, sym2 in spans if s2 >= 0):
             continue
         keep.add(sym)
-    if len(keep) >= 3 or LIST_CUE.search(title):
-        return []                                      # a list, not news about one company
+    if len(keep) >= 3 or LIST_CUE.search(title) or PERSON_CUE.search(title):
+        return []                                      # a list or a person, not news about one company
+    if keep and keep <= BANKS and MACRO_CUE.search(title):
+        return []                                      # a bank's economists on the economy
     if not keep or not require_org:
         return sorted(keep)
     org_names = {core(o.rsplit(",", 1)[0]) for o in (orgs or "").split(";") if o}
