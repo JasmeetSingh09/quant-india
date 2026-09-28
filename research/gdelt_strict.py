@@ -6,16 +6,31 @@ general-news headlines (research/gdelt_match.py), so the historical test uses a
 stricter matcher, and runs only if a fresh hand-labelled sample shows it is
 right often enough. The app is not changed (v1.4.1 is frozen).
 
-A headline is assigned to a company only if BOTH hold:
-  1. the headline names it: its full name, a hand-listed short name (SBI, L&T,
-     Zomato...) or a distinctive ticker. A single ordinary word never counts;
-     tickers that are ordinary words or other things (OIL, IDEA, IOC, NCC...)
-     are dropped, and a few acronyms (SAIL, BEL, HAL...) count only in capitals.
-  2. GDELT's own organisation list for the article (read from the full text,
-     independently of our rules) contains that company.
-When one company's term sits inside another's at the same place ("HDFC" in
-"HDFC Bank"), only the longer one counts. A term claimed by two companies is
-dropped for both.
+A headline is assigned to a company only if it names the company: its full
+name, a hand-listed short name (SBI, L&T, Zomato...) or a distinctive ticker.
+A single ordinary word never counts; tickers that are ordinary words or mean
+other things (OIL, IDEA, IOC, NCC...) are dropped, and a few acronyms (SAIL,
+BEL, HAL...) count only in capitals. When one company's term sits inside
+another's at the same place ("HDFC" in "HDFC Bank"), only the longer counts.
+A term claimed by two companies is dropped for both.
+
+Attempt 0, withdrawn before any labelling (2026-09-28): the first version also
+required GDELT's organisation list to contain the company. On the development
+days (1st/11th/21st, already examined) that list proved unreliable: often
+empty, missing companies the article is about (Hindustan Unilever), and
+mangling names ("Larsen Toubro Ltd", "Reddy Laboratories", "Why Is Yes Bank").
+35 of 204 companies were never matched on the check days, a recall defect that
+would bias the test by company. The requirement was removed. Only match counts
+from the check days had been seen; no check-day headline had been labelled.
+
+Labelling guide, fixed before labelling. "Y" if the headline is about the
+listed company or a business it runs directly (its brands, plants, divisions,
+results, shares, management acting for it). "N" if it is about a separately
+listed or separately incorporated relative (ICICI Securities for ICICI Bank,
+SBI Mutual Fund for SBI, Kotak Life for Kotak Bank), a different company with
+a similar name, or the company only as a passing word in a list of 3 or more
+companies with no news about it ("Sensex: HDFC Bank, ITC, TCS among gainers"
+is Y for each named mover, because a price move is news about the stock).
 
 Acceptance rule, fixed before any labelling (this file is committed first):
   a fresh random 300 matches from days never looked at (the 6th, 16th and 26th
@@ -29,6 +44,7 @@ Acceptance rule, fixed before any labelling (this file is committed first):
 """
 
 import csv
+import html
 import glob
 import gzip
 import json
@@ -149,7 +165,8 @@ def build(names_path):
     return rx, confirm, sorted(clash)
 
 
-def match(title, orgs, rx, confirm):
+def match(title, orgs, rx, confirm, require_org=False):
+    title = html.unescape(title or "")
     t = norm(title)
     spans = []
     for sym, pats in rx.items():
@@ -167,8 +184,8 @@ def match(title, orgs, rx, confirm):
         if s >= 0 and any(s2 <= s and e <= e2 and (e2 - s2) > (e - s) and sym2 != sym for s2, e2, sym2 in spans if s2 >= 0):
             continue
         keep.add(sym)
-    if not keep:
-        return []
+    if not keep or not require_org:
+        return sorted(keep)
     org_names = {core(o.rsplit(",", 1)[0]) for o in (orgs or "").split(";") if o}
     return sorted(sym for sym in keep if org_names & confirm[sym])
 
