@@ -66,6 +66,16 @@ exchange do not count; a name standing only as the source at the end of a
 headline does not count; IOC needs "Indian Oil Corporation"/"IOCL".
 Checked on new days 9/19/29, seed 20260930.
 
+Attempt 4, labelled (days 9/19/29, seed 20260930): FAILED. 268 of 300
+correct (89.3%, 95% CI 85.3-92.3%): the lower bound passes, the 90% point
+estimate does not. Errors: 12 clear rule gaps (a truncated "Vedanta Resou...",
+"ex-SAIL chairman", "SBI's credit card arm", "Paytm banking arm", "SBI-ETF",
+"HDFC ... Fund", "ITC" meaning input tax credit, one-word REC matching
+"Rec[overy]", lists without cue words), 5 relatives, 6 judgement calls
+(a passing mention, an executive's view of the industry), 9 not about the
+business (crimes against staff, old-bike stories, a sponsored festival).
+Labels: quant_data/gdelt_match/strict_label_300_days9-19-29_seed20260930_labelled.tsv
+
 Labelling guide, fixed before labelling. "Y" if the headline is about the
 listed company or a business it runs directly (its brands, plants, divisions,
 results, shares, management acting for it). "N" if it is about a separately
