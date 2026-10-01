@@ -10,7 +10,7 @@ import { TrendingUp, TrendingDown, Sparkles, ArrowUpRight, ArrowDownRight, Refre
 import { Link, useNavigate } from 'react-router-dom'
 import ErrorBoundary from '../components/ErrorBoundary'
 import Term from '../components/Term'
-import { signalLabel, SIGNAL_TITLE } from '../signalLabel'
+import { signalLabel, SIGNAL_TITLE, rankBadgeClass, scoreTextClass } from '../signalLabel'
 
 const NIFTY_STOCKS = ['RELIANCE.NS','TCS.NS','HDFCBANK.NS','INFY.NS','ICICIBANK.NS']
 
@@ -32,20 +32,20 @@ function PickCard({ r, buy }) {
   const score = r.alpha_score
   const dom = dominant(r.contributions)
   return (
-    <div className={`rounded-xl border p-3.5 bg-gray-900/60 ${buy ? 'border-green-700/40' : 'border-red-700/40'}`}>
+    <div className={`rounded-xl border p-3.5 bg-gray-900/60 ${buy ? 'border-sky-800/40' : 'border-slate-700/40'}`}>
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-1.5">
           {buy
-            ? <ArrowUpRight className="text-green-400 shrink-0" size={15} />
-            : <ArrowDownRight className="text-red-400 shrink-0" size={15} />}
+            ? <ArrowUpRight className="text-sky-400 shrink-0" size={15} />
+            : <ArrowDownRight className="text-slate-500 shrink-0" size={15} />}
           <span className="font-mono font-bold text-sm">{name}</span>
         </div>
-        <span className={`text-base font-bold font-mono ${buy ? 'text-green-400' : 'text-red-400'}`}>
+        <span className={`text-base font-bold font-mono ${scoreTextClass(score)}`}>
           {score > 0 ? '+' : ''}{score?.toFixed(0)}
         </span>
       </div>
       <div className="flex items-center justify-between text-[11px] mb-2">
-        <span className={`badge-${buy ? 'green' : 'red'}`} title={SIGNAL_TITLE}>{signalLabel(r.signal)}</span>
+        <span className={rankBadgeClass(r.signal)} title={SIGNAL_TITLE}>{signalLabel(r.signal)}</span>
         <span className="text-gray-500" title="How much of the model's input data was available for this stock — not the chance the signal is right.">{Math.round((r.confidence || 0) * 100)}% data</span>
       </div>
       <div className="space-y-1">
@@ -263,7 +263,7 @@ function TrackRecord() {
               ([side, d, want]) => !d ? null : (
               <div key={side} className="card-sm">
                 <div className="flex items-baseline justify-between gap-2">
-                  <p className="stat-label">{side} signals</p>
+                  <p className="stat-label">{signalLabel(side)} signals</p>
                   <span className="text-[11px] text-gray-500">{d.signals} signals</span>
                 </div>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
@@ -350,7 +350,7 @@ function TrackRecord() {
                   ['SELL', sc.independent_sample.by_signal.sell, 'fell']].map(
                   ([side, d, want]) => !d ? null : (
                   <div key={side}>
-                    <p className="text-[11px] text-gray-500">{side} · {d.signals} signals</p>
+                    <p className="text-[11px] text-gray-500">{signalLabel(side)} · {d.signals} signals</p>
                     <p className={`text-lg font-semibold ${
                       d.hit_rate_pct >= 55 ? 'text-green-400'
                       : d.hit_rate_pct >= 45 ? 'text-gray-200' : 'text-red-400'}`}>
@@ -437,7 +437,7 @@ function TrackRecord() {
                         onClick={() => navigate(`/stock?ticker=${encodeURIComponent(r.ticker)}`)}
                         className="border-b border-gray-800 last:border-0 hover:bg-gray-800/50 cursor-pointer">
                       <td className="py-1.5 font-mono text-green-400 hover:underline">{r.ticker.replace('.NS','')}</td>
-                      <td><span className={`badge-${isBuy ? 'green' : isSell ? 'red' : 'yellow'}`}>{signalLabel(r.signal)}</span></td>
+                      <td><span className={rankBadgeClass(r.signal)} title={SIGNAL_TITLE}>{signalLabel(r.signal)}</span></td>
                       <td className={`text-right font-mono ${col(r.forward_return_pct)}`}>{pct(r.forward_return_pct)}</td>
                       <td className={`text-right font-mono ${col(r.excess_pct)}`}>{pct(r.excess_pct)}</td>
                       <td className="text-right text-gray-400">{r.days_held}d</td>

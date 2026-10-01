@@ -5,8 +5,9 @@ export default function AlphaMeter({ score, showEvidence = true }) {
   if (score == null) return null
   const clamped = Math.max(-100, Math.min(100, score))
   const pct     = ((clamped + 100) / 200) * 100
-  const color   = clamped > 40  ? '#22c55e' : clamped > 15  ? '#86efac'
-                : clamped < -40 ? '#ef4444' : clamped < -15 ? '#fca5a5'
+  // One cool hue for rank, not buy-green / sell-red (see signalLabel.js).
+  const color   = clamped > 40  ? '#7dd3fc' : clamped > 15  ? '#38bdf8'
+                : clamped < -40 ? '#64748b' : clamped < -15 ? '#94a3b8'
                 : '#6b7280'
   const signal  = clamped > 40  ? 'STRONG BUY' : clamped > 15  ? 'BUY'
                 : clamped < -40 ? 'STRONG SELL' : clamped < -15 ? 'SELL'

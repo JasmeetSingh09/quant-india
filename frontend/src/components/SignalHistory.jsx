@@ -1,11 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { getSignalHistory } from '../api'
-import { signalLabel } from '../signalLabel'
+import { signalLabel, rankColorClass } from '../signalLabel'
 
-const sigClass = s =>
-  s?.includes('BUY')  ? 'bg-green-900/50 text-green-400 border-green-800/70' :
-  s?.includes('SELL') ? 'bg-red-900/50 text-red-400 border-red-800/70'
-                      : 'bg-gray-800 text-gray-400 border-gray-700'
+// Ranks are coloured by rank, not as buy-green / sell-red (see signalLabel.js).
+const sigClass = s => rankColorClass(s)
 
 function daysAgoLabel(iso) {
   if (!iso) return ''

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { EvidenceBadge, ScoreProvenance, SignalEvidenceNote } from '../components/Evidence'
 import { getTopPicks } from '../api'
+import { signalLabel, SIGNAL_TITLE, rankBadgeClass, scoreTextClass } from '../signalLabel'
 import Spinner from '../components/Spinner'
 import Explainer from '../components/Explainer'
 import { Sparkles, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight } from 'lucide-react'
@@ -23,19 +24,19 @@ function PickCard({ r, buy }) {
   const score = r.alpha_score
   const dom = dominant(r.contributions)
   return (
-    <div className={`card-sm border ${buy ? 'border-green-700/50' : 'border-red-700/50'}`}>
+    <div className={`card-sm border ${buy ? 'border-sky-800/50' : 'border-slate-700/50'}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {buy ? <ArrowUpRight className="text-green-400" size={18} />
-               : <ArrowDownRight className="text-red-400" size={18} />}
+          {buy ? <ArrowUpRight className="text-sky-400" size={18} />
+               : <ArrowDownRight className="text-slate-500" size={18} />}
           <span className="font-mono font-bold">{name}</span>
         </div>
-        <span className={`text-xl font-bold font-mono ${buy ? 'text-green-400' : 'text-red-400'}`}>
+        <span className={`text-xl font-bold font-mono ${scoreTextClass(score)}`}>
           {score > 0 ? '+' : ''}{score?.toFixed(0)}
         </span>
       </div>
       <div className="mt-1 flex items-center justify-between text-xs">
-        <span className={`badge-${buy ? 'green' : 'red'}`}>{r.signal}</span>
+        <span className={rankBadgeClass(r.signal)} title={SIGNAL_TITLE}>{signalLabel(r.signal)}</span>
         <span className="text-gray-500" title="How much of the model's input data was available for this stock — not the chance the signal is right.">{Math.round((r.confidence || 0) * 100)}% data coverage</span>
       </div>
       {/* factor breakdown */}
