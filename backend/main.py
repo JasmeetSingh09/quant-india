@@ -569,6 +569,21 @@ def stock_volatility_forecast(
     return result
 
 
+@app.get("/stock/compare")
+def stock_compare(
+    tickers: str = Query(..., description="2 to 6 comma-separated tickers, e.g. TCS.NS,INFY.NS"),
+    period: str = Query("1y", description="6m, 1y, 3y or 5y"),
+):
+    """Stocks side by side: growth of Rs 100, drawdowns, value, quality, risk
+    and the model's view. Read-only. Past risk only; fundamentals are Yahoo's
+    current view. Approved: docs/PROPOSAL_PRODUCT_ADDITIONS_2026-09-23.md (#2)."""
+    from stock_compare import compare_cached
+    r = compare_cached([t for t in tickers.split(",")], period)
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+
 @app.get("/stock/metrics")
 def stock_metrics(ticker: str = Query(..., description="NSE ticker e.g. RELIANCE.NS")):
     """

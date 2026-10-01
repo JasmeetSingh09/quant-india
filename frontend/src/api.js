@@ -67,6 +67,8 @@ export const getIntraday    = (ticker, interval='5m', period='1d') => api.get(`/
 export const getVolForecast = ticker => api.get(`/stock/volatility-forecast?ticker=${ticker}`)
 export const getSentiment   = ticker => api.get(`/stock/sentiment?ticker=${ticker}`)
 export const searchStocks   = (q, exchange='NSE') => api.get(`/stock/search?q=${q}&exchange=${exchange}`)
+export const compareStocks  = (tickers, period = '1y') =>
+  api.get(`/stock/compare?tickers=${encodeURIComponent(tickers.join(','))}&period=${period}`)
 
 // Commodities
 export const getMCX         = () => api.get('/commodities/mcx')

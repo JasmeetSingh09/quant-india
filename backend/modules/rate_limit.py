@@ -50,7 +50,8 @@ _ROUTES = {
               "/bhavcopy/fetch", "/overfitting", "/digest/send"),
     "medium": ("/portfolio/advise", "/portfolio/scenarios", "/portfolio/what-if",
                "/optimize", "/montecarlo", "/monte-carlo", "/simulate",
-               "/alpha", "/options", "/pairs", "/regime", "/factors"),
+               "/alpha", "/options", "/pairs", "/regime", "/factors",
+               "/stock/compare"),
 }
 
 _hits: dict = defaultdict(deque)
