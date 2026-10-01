@@ -377,6 +377,20 @@ def current_spec() -> dict:
     except Exception:
         pass
 
+    # Which headlines count as news about a company. Sentiment is 25% of the V1
+    # score, so the matching rules are part of the model, but no version before
+    # v1.4.2 recorded them: the v1.4.2 fix (one ordinary word from a name no
+    # longer counts) would otherwise freeze with v1.4.1's hash and be
+    # indistinguishable from it. Read from rss_news, never restated here.
+    nm = {}
+    _cap(nm, "rules_version", lambda: __import__("rss_news").MATCHER_RULES_VERSION)
+    _cap(nm, "min_token_len", lambda: __import__("rss_news")._MIN_TOKEN_LEN)
+    _cap(nm, "phrase_stem", lambda: __import__("rss_news")._PHRASE_STEM)
+    _cap(nm, "generic_tokens", lambda: sorted(__import__("rss_news")._GENERIC_TOKENS))
+    _cap(nm, "group_tokens", lambda: sorted(__import__("rss_news")._GROUP_TOKENS))
+    _cap(nm, "connectors", lambda: sorted(__import__("rss_news")._CONNECTORS))
+    spec["news_matching"] = nm
+
     # Environment. A version-controlled model is not a reproducible one: the
     # same code on a different numpy can return a different last decimal, and a
     # result attributed to a strategy is really attributed to a strategy AND

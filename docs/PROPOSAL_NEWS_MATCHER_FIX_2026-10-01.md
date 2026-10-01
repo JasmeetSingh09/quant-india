@@ -1,6 +1,6 @@
 # Proposal: stop the sentiment factor reading other companies' news
 
-**Status: PROPOSAL, awaiting the owner's approval.** It changes v1.4.1 behaviour, so it needs approval and a new version, v1.4.2 (AGENTS.md rule 3). No code has been changed.
+**Status: APPROVED by the owner 2026-10-01 ("yes to A and B"). Implemented in rss_news._identity_terms; the matching rules are now recorded in the frozen spec (news_matching) so v1.4.2 is distinguishable from v1.4.1.**
 
 ## The problem
 

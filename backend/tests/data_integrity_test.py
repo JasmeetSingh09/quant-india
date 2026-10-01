@@ -720,33 +720,22 @@ print("  rss_news._identity_terms; the alternative lost 17 of its own articles."
 
 print()
 print("-" * 74)
-print("KNOWN DEFECT — found by this audit, not fixed here")
+print("FORMER DEFECT — fixed in v1.4.2, and kept fixed")
 print("-" * 74)
 
-# Declared, not asserted away. `_identity_terms` shortens a multi-word name to
-# its first two tokens so "Adani Ports and Special Economic Zone Limited" can be
-# found as "Adani Ports". For State Bank of India those two tokens are "state
-# bank", which matches every state bank on earth.
-#
-# This is NOT silently fixed here. Changing the matcher changes which articles
-# feed the sentiment factor, which changes scores -- a model input change, and
-# the model is frozen. It is reported for a decision instead.
-#
-# The test asserts the defect STILL EXISTS. If someone fixes it, this line goes
-# red and tells them to delete it, which is the opposite of a warning nobody
-# reads.
+# Found by this audit on 2026-09-09: the two-token shortening turned State Bank
+# of India into "state bank", which matched every state bank on earth. It was
+# left in place while v1.4.1 was frozen, with a check that went red only if
+# someone fixed it silently. The owner approved the fix as v1.4.2 on 2026-10-01
+# (docs/PROPOSAL_NEWS_MATCHER_FIX_2026-10-01.md): a leading pair made only of
+# generic words, with no group name to anchor it, no longer counts. This check
+# now guards the other way: the leak must not come back.
 build_clean()
 seed_articles([("SBIN.NS", "State Bank of Mauritius opens Mumbai branch", TODAY)])
 leaks = DI.news_integrity().get("relevance_pct") == 100.0
-KNOWN = [("SBIN matches 'State Bank of <anywhere>'",
-          "the two-token name shortening yields the phrase 'state bank'")]
-print(f"  [{'still present' if leaks else 'FIXED - remove this block'}] "
-      f"{KNOWN[0][0]}")
-print(f"      {KNOWN[0][1]}")
-print("      mechanism: CONFIRMED.  live incidence: UNMEASURED -- the article")
-print("      provenance tables live in production Postgres, not locally.")
-check("the known defect is still where the audit says it is", leaks,
-      "if this fails the defect is fixed; delete the block")
+print(f"  [{'LEAK IS BACK' if leaks else 'fixed'}] SBIN matches 'State Bank of <anywhere>'")
+check("State Bank of Mauritius is not SBIN news", not leaks,
+      "the 'state bank' leak fixed in v1.4.2 has returned")
 
 print()
 print("=" * 74)

@@ -125,6 +125,51 @@ w_rel, _ = _identity_terms(*REL)
 ok(len(w_rel) > 0,
    f"a company whose whole name is a group name still has terms ({sorted(w_rel)})")
 
+print("\n6. v1.4.2: one ordinary word from a longer name is never enough")
+# docs/PROPOSAL_NEWS_MATCHER_FIX_2026-10-01.md. Each headline is a real kind of
+# false match measured on general news before the fix.
+OIL = ("Oil India Limited", "OIL.NS")
+GREEN = ("Adani Green Energy Limited", "ADANIGREEN.NS")
+IDFC = ("IDFC First Bank Limited", "IDFCFIRSTB.NS")
+BHEL = ("Bharat Heavy Electricals Limited", "BHEL.NS")
+JUST = ("Just Dial Limited", "JUSTDIAL.NS")
+LIC = ("Life Insurance Corporation of India", "LICI.NS")
+IRFC = ("Indian Railway Finance Corporation Limited", "IRFC.NS")
+BOB = ("Bank of Baroda", "BANKBARODA.NS")
+TPOWER = ("The Tata Power Company Limited", "TATAPOWER.NS")
+INFY = ("Infosys Limited", "INFY.NS")
+for name, tk, head in [
+    (*OIL, "COVID-19: India sets new record of cases"),
+    (*GREEN, "Sensex closes in green, Nifty above 11,900"),
+    (*IDFC, "First batch of Covid-19 vaccines en route from India"),
+    (*BHEL, "IMD issues orange alert: heavy rains expected"),
+    (*JUST, "Apple just delayed these iPhone features"),
+    (*LIC, "HDFC Life Insurance raises Rs 1,000 crore"),
+    (*IRFC, "Indian Railways cancels 277 trains due to fog"),
+    (*BOB, "Bank of Ceylon takes the lead in economic revival"),
+    (*SBIN, "State Bank of Mauritius opens Mumbai branch"),
+]:
+    ok(not matches(name, tk, head), f"{tk.replace('.NS',''):<11} rejects: {head[:58]}")
+for name, tk, head in [
+    (*OIL, "Oil India Q2 profit jumps 40%"),
+    (*GREEN, "Adani Green Energy Q4 net profit declines"),
+    (*IDFC, "IDFC First Bank board approves fund raising"),
+    (*BHEL, "BHEL bags 2,400 MW order from NLC India"),
+    (*JUST, "Just Dial shares hit upper circuit"),
+    (*BOB, "Bank of Baroda Q2 profit doubles"),
+    (*TPOWER, "Tata Power signs agreement with SJVNL"),
+    (*INFY, "Infosys wins $1.5 billion deal"),
+    (*ADANI, "Adani Ports Q1 results: cargo volumes up 11% year on year"),
+    (*TATAMOT, "Tata Motors sales jump 15% in August"),
+]:
+    ok(matches(name, tk, head), f"{tk.replace('.NS',''):<11} accepts: {head[:58]}")
+w_oil, _ = _identity_terms(*OIL)
+ok("india" not in w_oil, f"'india' alone never identifies Oil India ({sorted(w_oil)})")
+w_infy, _ = _identity_terms(*INFY)
+ok("infosys" in w_infy, "a one-word name still identifies itself")
+_, p_tp = _identity_terms(*TPOWER)
+ok(all(not x.pattern.startswith(r"\bthe") for x in p_tp), "a leading 'the' is dropped from the name")
+
 print("\n5. Degenerate inputs do not crash or match everything")
 for nm, tk, label in [("", "", "empty name and ticker"),
                       ("", "XYZ.NS", "empty name"),

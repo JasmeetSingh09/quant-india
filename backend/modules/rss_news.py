@@ -167,11 +167,21 @@ investment infrastructure projects construction engineering electric
 electricals electronics foods food agro seeds fertilisers fertilizers labs
 laboratories healthcare hospital hospitals hotels resorts media
 entertainment communications networks systems solutions trading exports
-imports overseas india indian bharat
+imports overseas india indian bharat railway railways
 tata adani bajaj birla aditya mahindra godrej reliance hero hindustan
 """.split())
 
 _GENERIC_TOKENS = _STOPWORDS | _SECTOR_TOKENS
+
+# Recorded in the frozen strategy spec (strategy_version.current_spec), so a
+# change to how headlines are matched to companies changes the version hash.
+MATCHER_RULES_VERSION = "v1.4.2: no single word from a multi-word name; pair needs no connector and an anchor"
+
+# Group names: generic alone, but they anchor a pair ("tata motors",
+# "adani ports"), unlike "state bank" or "life insurance" (v1.4.2).
+_GROUP_TOKENS = frozenset("tata adani bajaj birla aditya mahindra godrej reliance hero hindustan".split())
+# A pair containing one of these is a fragment of a name, not a name.
+_CONNECTORS = frozenset({"and", "of", "&", "the"})
 
 # Legal-form words only. " india" is deliberately NOT stripped: it is part of
 # the name in Coal India and Nestle India, and removing it turned the first into
@@ -214,30 +224,43 @@ def _identity_terms(company_name: str, ticker: str):
     generic is identified by its full name or its ticker, never by "bank".
     """
     tokens = _clean_tokens(company_name)
+    # v1.4.2: "The Tata Power Company" is "tata power", not "the tata ...".
+    while tokens and tokens[0] == "the":
+        tokens = tokens[1:]
     while tokens and tokens[-1] in _STOPWORDS:
         tokens.pop()
 
-    words = {w for w in tokens
-             if len(w) >= _MIN_TOKEN_LEN and w not in _GENERIC_TOKENS}
+    # v1.4.2 (owner approval 2026-10-01, docs/PROPOSAL_NEWS_MATCHER_FIX_2026-10-01.md):
+    # a single word taken from a multi-word name is never enough on its own.
+    # It was: Oil India matched every headline containing "india", Adani Green
+    # "green", IDFC First "first", BHEL "heavy", Just Dial "just". On 300
+    # hand-labelled matches only 30 were about the right company; with this rule
+    # 29 of those 30 are kept and 264 of the 270 wrong ones go. A multi-word
+    # name is found by its full name, its leading pair, or its ticker.
+    words = set()
     bare = re.sub(r"[^a-z0-9]", "", (ticker or "").replace(".NS", "").lower())
     if bare and bare not in _GENERIC_TOKENS and len(bare) >= 3:
         words.add(bare)
 
-    # A company whose whole name is a group name has nothing else to be called.
-    # Reliance Industries is "Reliance" everywhere, and blocking the group token
-    # outright left it with no identifying term at all — 17 of its own articles
-    # went unmatched. The block still holds for Reliance Power and Reliance
-    # Infrastructure, which have a second token and so are matched on the phrase
-    # "reliance power" instead. Only the company that IS the group name falls
-    # back to it.
-    if not words:
-        words = {w for w in tokens if len(w) >= _MIN_TOKEN_LEN}
+    # A company whose whole name is one word has nothing else to be called:
+    # Infosys, Wipro, and Reliance Industries, which is "Reliance" everywhere
+    # (blocking the group token left it with no term and 17 of its own articles
+    # unmatched). Reliance Power keeps its own phrase, "reliance power".
+    if len(tokens) == 1 and len(tokens[0]) >= _MIN_TOKEN_LEN:
+        words.add(tokens[0])
 
     candidates = []
     if len(tokens) >= 2:
         candidates.append(tokens)                       # the full name
-        if not any(t in _STOPWORDS for t in tokens[:2]):
-            candidates.append(tokens[:2])               # "adani ports", "coal india"
+        pair = tokens[:2]
+        # The leading pair finds "Adani Ports" and "Tata Motors", but not when
+        # it is a fragment ("oil and", "bank of") or made only of generic words
+        # that no group name anchors: "state bank" matched State Bank of
+        # Mauritius, "life insurance" every insurer (v1.4.2).
+        fragment = any(t in _CONNECTORS for t in pair)
+        all_generic = all(t in _GENERIC_TOKENS for t in pair) and pair[0] not in _GROUP_TOKENS
+        if not fragment and not all_generic:
+            candidates.append(pair)                     # "adani ports", "coal india"
     patterns, seen_pat = [], set()
     for toks in candidates:
         if tuple(toks) in seen_pat:
