@@ -1,6 +1,6 @@
 # Proposal: check the Google News results too (v1.4.3)
 
-**Status: PROPOSAL, awaiting the owner's approval.** It changes model behaviour (the sentiment input), so it needs approval and a new version, v1.4.3. No code has been changed.
+**Status: APPROVED by the owner 2026-10-02 ("DO IT"). Implemented in rss_news (SHORT_NAMES, _keep_search_item, _keep_market_item, _LIST_CUE). The list rule was narrowed after measuring it on this sample: "in focus", "buzzing stocks" and "among N stocks" dropped real news, so only "stocks to watch / to buy / to track / in news" and "top stocks" count. Implemented result on the 150: 129 kept, 120 right (93%), 120 of 121 real articles kept. Re-check on fresh news before relying on it.**
 
 ## The problem
 

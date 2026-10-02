@@ -175,7 +175,8 @@ _GENERIC_TOKENS = _STOPWORDS | _SECTOR_TOKENS
 
 # Recorded in the frozen strategy spec (strategy_version.current_spec), so a
 # change to how headlines are matched to companies changes the version hash.
-MATCHER_RULES_VERSION = "v1.4.2: no single word from a multi-word name; pair needs no connector and an anchor"
+MATCHER_RULES_VERSION = ("v1.4.3: no single word from a multi-word name; pair needs no connector and an anchor; "
+                         "Google results filtered with short names; list headlines dropped")
 
 # Group names: generic alone, but they anchor a pair ("tata motors",
 # "adani ports"), unlike "state bank" or "life insurance" (v1.4.2).
@@ -290,6 +291,187 @@ def _mentions(text: str, words, patterns) -> bool:
     return False
 
 
+# v1.4.3 (owner approval 2026-10-02, docs/PROPOSAL_STEP1_NEWS_FILTER_2026-10-02.md).
+# Short names the press uses, hand-checked for the ~200 most-traded companies.
+# Copied from research/gdelt_strict.ALIASES. Used ONLY to check the Google News
+# results (step 1), where they were measured: v1.4.2 rules alone kept 111 of 121
+# real company articles; with these, 120 of 121.
+SHORT_NAMES = {'ABB': ['abb india'],
+ 'ACC': ['acc cement', 'acc cements', 'acc ltd', 'acc limited'],
+ 'ADANIENSOL': ['adani energy solutions', 'adani transmission'],
+ 'ADANIGREEN': ['adani green'],
+ 'ADANIPORTS': ['adani ports'],
+ 'AMBER': ['amber enterprises'],
+ 'AMBUJACEM': ['ambuja cement', 'ambuja cements'],
+ 'ANGELONE': ['angel one', 'angel broking'],
+ 'APOLLO': ['apollo micro systems', 'apollo micro'],
+ 'APOLLOHOSP': ['apollo hospitals'],
+ 'AUBANK': ['au small finance bank', 'au bank', 'au sfb'],
+ 'AUROPHARMA': ['aurobindo pharma', 'aurobindo'],
+ 'AWL': ['adani wilmar', 'awl agri'],
+ 'BAJAJ-AUTO': ['bajaj auto'],
+ 'BAJAJFINSV': ['bajaj finserv'],
+ 'BATAINDIA': ['bata india'],
+ 'BDL': ['bharat dynamics'],
+ 'BEL': ['bharat electronics'],
+ 'BHARTIARTL': ['bharti airtel', 'airtel'],
+ 'BHEL': ['bharat heavy electricals'],
+ 'BPCL': ['bharat petroleum'],
+ 'BRITANNIA': ['britannia'],
+ 'BSE': ['bse ltd', 'bse limited'],
+ 'CGPOWER': ['cg power'],
+ 'CHOLAFIN': ['cholamandalam investment', 'chola finance'],
+ 'COFORGE': ['coforge', 'niit technologies'],
+ 'CUPID': ['cupid ltd', 'cupid limited'],
+ 'DABUR': ['dabur'],
+ 'DATAPATTNS': ['data patterns'],
+ 'DHFL': ['dewan housing'],
+ 'DIVISLAB': ["divi's laboratories", "divi's labs", 'divis labs'],
+ 'DIXON': ['dixon technologies', 'dixon tech'],
+ 'DMART': ['d-mart', 'avenue supermarts'],
+ 'DRREDDY': ["dr reddy's", "dr. reddy's", 'dr reddys'],
+ 'EICHERMOT': ['eicher motors', 'royal enfield'],
+ 'EMBDL': ['embassy developments', 'indiabulls real estate', 'equinox india'],
+ 'ESCORTS': ['escorts kubota', 'escorts ltd'],
+ 'ETERNAL': ['zomato', 'eternal ltd', 'eternal limited'],
+ 'FEDERALBNK': ['federal bank'],
+ 'GLENMARK': ['glenmark'],
+ 'GMDCLTD': ['gmdc'],
+ 'GODFRYPHLP': ['godfrey phillips'],
+ 'GRSE': ['garden reach shipbuilders'],
+ 'GVT&D': ['ge vernova t&d', 'ge t&d india'],
+ 'HAL': ['hindustan aeronautics'],
+ 'HAVELLS': ['havells'],
+ 'HCLTECH': ['hcl technologies', 'hcl tech', 'hcltech'],
+ 'HDFC': ['hdfc ltd', 'hdfc limited', 'housing development finance'],
+ 'HDFCAMC': ['hdfc amc', 'hdfc asset management'],
+ 'HDFCLIFE': ['hdfc life'],
+ 'HINDALCO': ['hindalco'],
+ 'HINDPETRO': ['hindustan petroleum', 'hpcl'],
+ 'HINDUNILVR': ['hindustan unilever', 'hul'],
+ 'HSCL': ['himadri speciality', 'himadri'],
+ 'ICICIGI': ['icici lombard'],
+ 'ICICIPRULI': ['icici prudential life', 'icici pru life'],
+ 'IDEA': ['vodafone idea'],
+ 'IEX': ['indian energy exchange'],
+ 'INDHOTEL': ['indian hotels', 'ihcl'],
+ 'INDIGO': ['interglobe aviation', 'indigo'],
+ 'IOC': ['indian oil corporation', 'indian oil corp', 'indianoil', 'iocl'],
+ 'JINDALSTEL': ['jindal steel', 'jspl'],
+ 'JIOFIN': ['jio financial'],
+ 'JUBLFOOD': ['jubilant foodworks'],
+ 'KALYANKJIL': ['kalyan jewellers'],
+ 'KAYNES': ['kaynes technology', 'kaynes'],
+ 'KOTAKBANK': ['kotak mahindra bank', 'kotak bank'],
+ 'LAURUSLABS': ['laurus labs'],
+ 'LENSKART': ['lenskart'],
+ 'LICHSGFIN': ['lic housing finance'],
+ 'LICI': ['lic', 'life insurance corporation'],
+ 'LT': ['l&t', 'larsen & toubro', 'larsen and toubro'],
+ 'LTF': ['l&t finance'],
+ 'LTM': ['ltimindtree', 'lti mindtree', 'ltim'],
+ 'M&M': ['mahindra & mahindra', 'mahindra and mahindra', 'm&m'],
+ 'M&MFIN': ['mahindra finance', 'mahindra & mahindra financial'],
+ 'MARUTI': ['maruti suzuki', 'maruti'],
+ 'MAXHEALTH': ['max healthcare'],
+ 'MAZDOCK': ['mazagon dock'],
+ 'MCX': ['multi commodity exchange', 'mcx shares', 'mcx share', 'mcx ltd', 'mcx limited'],
+ 'MOTHERSON': ['samvardhana motherson', 'motherson sumi', 'motherson'],
+ 'MTARTECH': ['mtar technologies', 'mtar'],
+ 'MUTHOOTFIN': ['muthoot finance'],
+ 'NATIONALUM': ['nalco', 'national aluminium'],
+ 'NAUKRI': ['info edge', 'naukri'],
+ 'NESTLEIND': ['nestle india'],
+ 'NETWEB': ['netweb technologies', 'netweb'],
+ 'NYKAA': ['nykaa', 'fsn e-commerce'],
+ 'OFSS': ['oracle financial services'],
+ 'OLAELEC': ['ola electric'],
+ 'ONGC': ['oil and natural gas'],
+ 'PATANJALI': ['patanjali foods', 'ruchi soya'],
+ 'PAYTM': ['paytm', 'one97', 'one 97'],
+ 'PCJEWELLER': ['pc jeweller'],
+ 'PEL': ['piramal enterprises'],
+ 'PERSISTENT': ['persistent systems'],
+ 'PFC': ['power finance corporation'],
+ 'PNB': ['punjab national bank'],
+ 'POLICYBZR': ['policybazaar', 'pb fintech'],
+ 'POLYCAB': ['polycab'],
+ 'POWERGRID': ['power grid corporation', 'powergrid'],
+ 'POWERINDIA': ['hitachi energy india'],
+ 'PVRINOX': ['pvr inox', 'pvr'],
+ 'RECLTD': ['rec ltd', 'rec limited', 'rural electrification corporation'],
+ 'RELIANCE': ['reliance industries', 'ril'],
+ 'RVNL': ['rail vikas nigam'],
+ 'SAIL': ['steel authority of india'],
+ 'SAMMAANCAP': ['sammaan capital', 'indiabulls housing finance'],
+ 'SBICARD': ['sbi card', 'sbi cards'],
+ 'SBILIFE': ['sbi life'],
+ 'SBIN': ['sbi', 'state bank of india'],
+ 'SHRIRAMFIN': ['shriram finance', 'shriram transport finance'],
+ 'SIEMENS': ['siemens ltd', 'siemens limited', 'siemens india'],
+ 'SUNPHARMA': ['sun pharma', 'sun pharmaceutical'],
+ 'SUNTV': ['sun tv'],
+ 'TATACONSUM': ['tata consumer'],
+ 'TATAPOWER': ['tata power'],
+ 'TCS': ['tata consultancy services', 'tcs'],
+ 'TECHM': ['tech mahindra'],
+ 'TEJASNET': ['tejas networks'],
+ 'TITAN': ['titan company', 'titan ltd'],
+ 'TMCV': ['tata motors commercial vehicles', 'tmcv'],
+ 'TMPV': ['tata motors'],
+ 'TORNTPHARM': ['torrent pharma', 'torrent pharmaceuticals'],
+ 'TRENT': ['trent ltd', 'trent limited'],
+ 'TVSMOTOR': ['tvs motor'],
+ 'ULTRACEMCO': ['ultratech cement', 'ultratech'],
+ 'UNIONBANK': ['union bank of india'],
+ 'UNITDSPR': ['united spirits'],
+ 'VBL': ['varun beverages'],
+ 'VMM': ['vishal mega mart'],
+ 'WAAREEENER': ['waaree energies'],
+ 'WOCKPHARMA': ['wockhardt'],
+ 'YESBANK': ['yes bank'],
+ 'ZEEL': ['zee entertainment', 'zeel'],
+ 'ZYDUSLIFE': ['zydus lifesciences', 'zydus', 'cadila healthcare']}
+
+# A headline that lists several stocks ("Stocks to watch: A, B, C") names a
+# company without saying anything about it. Dropped from both steps (v1.4.3).
+# Only unambiguous cues: "in focus", "buzzing stocks" and "among N stocks" also
+# head real company news ("Canara Bank shares in focus as board approves...").
+_LIST_CUE = re.compile(r"stocks?\s+(to\s+(watch|buy|track)|in\s+(the\s+)?news)|\btop\s+stocks\b", re.I)
+
+
+def _norm_text(text):
+    return " ".join(re.sub(r"[^a-z0-9& ]+", " ", (text or "").lower()).split())
+
+
+def _short_name_patterns(ticker):
+    bare = (ticker or "").replace(".NS", "").upper()
+    return [re.compile(r"(?<![a-z0-9&])" + re.escape(_norm_text(a)) + r"(?![a-z0-9&])")
+            for a in SHORT_NAMES.get(bare, []) if _norm_text(a)]
+
+
+def _is_list_headline(title):
+    return bool(_LIST_CUE.search(title or ""))
+
+
+def _keep_market_item(item, words, phrases):
+    """Step 2: a market-feed article is kept if it names the company (v1.4.2
+    rules) and is not a list of stocks."""
+    title = item.get("title", "")
+    return (not _is_list_headline(title)
+            and _mentions(title + " " + item.get("description", ""), words, phrases))
+
+
+def _keep_search_item(item, words, phrases, short_names):
+    """Step 1: a Google News result is kept only if it names the company by the
+    v1.4.2 rules or its hand-checked short name, and is not a list of stocks.
+    Before v1.4.3 every result was kept: for Oil India 15 of 20 were general
+    market news ("Indian shares fall as oil spikes")."""
+    title = item.get("title", "")
+    return (not _is_list_headline(title)
+            and _mentions(title + " " + item.get("description", ""), words, phrases + short_names))
+
+
 def get_rss_stock_news(company_name: str, ticker: str = "", limit: int = 20) -> list:
     """
     Company-specific news, combining:
@@ -320,7 +502,9 @@ def get_rss_stock_news(company_name: str, ticker: str = "", limit: int = 20) -> 
     # 1) Google News search for this company (primary)
     try:
         query = f"{base or bare} stock NSE"
-        combined.extend(_fetch_google_news(query, limit=limit))
+        short_names = _short_name_patterns(ticker)
+        combined.extend(item for item in _fetch_google_news(query, limit=limit)
+                        if _keep_search_item(item, words, phrases, short_names))
     except Exception:
         pass
 
@@ -328,8 +512,7 @@ def get_rss_stock_news(company_name: str, ticker: str = "", limit: int = 20) -> 
     try:
         market = get_rss_market_news(limit=120)
         for item in market:
-            if _mentions(item.get("title", "") + " " + item.get("description", ""),
-                         words, phrases):
+            if _keep_market_item(item, words, phrases):
                 combined.append(item)
     except Exception:
         pass

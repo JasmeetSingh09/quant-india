@@ -389,6 +389,10 @@ def current_spec() -> dict:
     _cap(nm, "generic_tokens", lambda: sorted(__import__("rss_news")._GENERIC_TOKENS))
     _cap(nm, "group_tokens", lambda: sorted(__import__("rss_news")._GROUP_TOKENS))
     _cap(nm, "connectors", lambda: sorted(__import__("rss_news")._CONNECTORS))
+    # v1.4.3: the Google results are checked too, with the hand-checked short
+    # names, and list headlines are dropped from both steps.
+    _cap(nm, "short_names", lambda: {k: list(v) for k, v in sorted(__import__("rss_news").SHORT_NAMES.items())})
+    _cap(nm, "list_cue", lambda: __import__("rss_news")._LIST_CUE.pattern)
     spec["news_matching"] = nm
 
     # Environment. A version-controlled model is not a reproducible one: the

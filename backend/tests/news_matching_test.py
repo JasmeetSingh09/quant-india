@@ -170,6 +170,50 @@ ok("infosys" in w_infy, "a one-word name still identifies itself")
 _, p_tp = _identity_terms(*TPOWER)
 ok(all(not x.pattern.startswith(r"\bthe") for x in p_tp), "a leading 'the' is dropped from the name")
 
+print("\n7. v1.4.3: Google results are checked, with hand-checked short names")
+# docs/PROPOSAL_STEP1_NEWS_FILTER_2026-10-02.md. Headlines are from the live
+# app's news on 2026-10-01.
+from rss_news import _keep_search_item, _keep_market_item, _short_name_patterns, _is_list_headline
+
+
+def kept_search(name, tk, title):
+    w, p = _identity_terms(name, tk)
+    return _keep_search_item({"title": title, "description": ""}, w, p, _short_name_patterns(tk))
+
+
+HUL = ("Hindustan Unilever Limited", "HINDUNILVR.NS")
+HCL = ("HCL Technologies Limited", "HCLTECH.NS")
+for name, tk, head in [
+    (*SBIN, "SBI, MS Strategic, BoB and insurers may cut stake sale in NSE IPO"),
+    (*HUL, "HUL Q1 results: Net profit falls 4% to Rs 2,631 crore, shares decline 7%"),
+    (*HCL, "HCL Tech stock crashes over 10% after Q4 miss"),
+    (*OIL, "Oil India is beating ONGC. Can its production edge last?"),
+    (*INFY, "Infosys Shares Fall 2.02% in Midday Trade"),
+]:
+    ok(kept_search(name, tk, head), f"{tk.replace('.NS',''):<11} keeps: {head[:58]}")
+for name, tk, head in [
+    (*OIL, "Indian shares post worst day in 10 weeks on oil spike, proposed insurance curbs"),
+    (*OIL, "India stocks log fifth weekly loss as oil fears grip markets"),
+    (*SBIN, "Top 12 Bank Stocks To Buy In India October 2026"),
+    (*INFY, "Indian Stock Market Weekly Round-Up: Bears Take Charge as Nifty Slides 2%"),
+]:
+    ok(not kept_search(name, tk, head), f"{tk.replace('.NS',''):<11} drops: {head[:58]}")
+
+print("\n8. v1.4.3: list headlines are dropped, real news headed like a list is not")
+ok(_is_list_headline("Stocks to Watch Today: Astra Microwave, Navin Fluorine, Tata Steel"), "'Stocks to watch' is a list")
+ok(_is_list_headline("Stocks in news: UltraTech Cement, Tata Motors PV, Axis Bank"), "'Stocks in news' is a list")
+ok(not _is_list_headline("Canara Bank shares in focus as its board approves plan to raise capital"),
+   "'in focus as the board approves...' is real news, not a list")
+ok(not _is_list_headline("Buzzing Stocks: EMS shares surge 9%; Hero MotoCorp slips 2% as exports decline"),
+   "a 'buzzing stocks' round-up with a reason is kept")
+w_ts, p_ts = _identity_terms("Tata Steel Limited", "TATASTEEL.NS")
+ok(not _keep_market_item({"title": "Stocks to Watch Today: Astra Microwave, Tata Steel, Swiggy", "description": ""}, w_ts, p_ts),
+   "a market-feed list is dropped in step 2 too")
+ok(_keep_market_item({"title": "Tata Steel Q1 net profit rises 40%", "description": ""}, w_ts, p_ts),
+   "real market-feed news is still kept")
+ok(not any(p.search("sbi") for p in _short_name_patterns("TCS.NS")) and _short_name_patterns("UNKNOWN.NS") == [],
+   "short names belong only to their own company; unknown tickers have none")
+
 print("\n5. Degenerate inputs do not crash or match everything")
 for nm, tk, label in [("", "", "empty name and ticker"),
                       ("", "XYZ.NS", "empty name"),

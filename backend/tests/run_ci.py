@@ -58,7 +58,7 @@ SUITES = [
     ("a5_gate_test.py",                     41, 120),
     ("a5_adjusted_series_test.py",          40, 120),
     ("factor_provenance_test.py",           39, 120),
-    ("news_matching_test.py",               61, 120),
+    ("news_matching_test.py",               77, 120),
     ("piotroski_availability_test.py",      39, 120),
     ("false_zero_recording_test.py",        35, 120),
     ("bounded_cache_test.py",               34, 120),
