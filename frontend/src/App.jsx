@@ -11,6 +11,7 @@ import Dashboard from './pages/Dashboard'
 // visitor might never open.
 const StockExplorer = lazy(() => import('./pages/StockExplorer'))
 const Compare       = lazy(() => import('./pages/Compare'))
+const Theses        = lazy(() => import('./pages/Theses'))
 const Calculators   = lazy(() => import('./pages/Calculators'))
 const Simulator     = lazy(() => import('./pages/Simulator'))
 const MyStocks      = lazy(() => import('./pages/MyStocks'))
@@ -123,6 +124,7 @@ export default function App() {
           <Route path="/"            element={<Dashboard />} />
           <Route path="/stock"       element={<StockExplorer />} />
           <Route path="/compare"     element={<Compare />} />
+          <Route path="/theses"      element={<Theses />} />
           <Route path="/top-picks"   element={<Navigate to="/" replace />} />
           <Route path="/screener"    element={<Navigate to="/stock" replace />} />
           <Route path="/my-stocks"   element={<MyStocks />} />

@@ -569,6 +569,72 @@ def stock_volatility_forecast(
     return result
 
 
+# ---------------------------------------------------------------------------
+# Thesis records (#4 in docs/PROPOSAL_PRODUCT_ADDITIONS_2026-09-23.md): the
+# signed-in user's own reasoning. Every route refuses anonymous visitors, and a
+# thesis belonging to someone else reads as "not found".
+# ---------------------------------------------------------------------------
+
+def _thesis_user(user_id: str) -> str:
+    from auth import PUBLIC_USER
+    if not user_id or user_id == PUBLIC_USER:
+        raise HTTPException(status_code=401, detail="Sign in to keep thesis records.")
+    return user_id
+
+
+def _thesis_call(fn, *args):
+    from thesis_records import ThesisError, NotFound
+    try:
+        return fn(*args)
+    except ThesisError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except NotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.post("/theses")
+def thesis_create(body: dict, user_id: str = Depends(current_user_id)):
+    """Open a thesis: stance, horizon, reasons, bear case and at least one
+    'what would make me wrong' trigger."""
+    from thesis_records import create
+    return _thesis_call(create, _thesis_user(user_id), body)
+
+
+@app.get("/theses")
+def thesis_list(user_id: str = Depends(current_user_id)):
+    from thesis_records import list_for
+    return {"theses": _thesis_call(list_for, _thesis_user(user_id))}
+
+
+@app.get("/theses/{thesis_id}")
+def thesis_get(thesis_id: int, user_id: str = Depends(current_user_id)):
+    """A thesis with every revision and whether its measurable triggers have
+    been met. Flags only; nothing is closed automatically."""
+    from thesis_records import get
+    return _thesis_call(get, _thesis_user(user_id), thesis_id)
+
+
+@app.post("/theses/{thesis_id}/revisions")
+def thesis_revise(thesis_id: int, body: dict, user_id: str = Depends(current_user_id)):
+    """Change the view by adding a revision, which must say what changed.
+    Earlier revisions are never edited."""
+    from thesis_records import revise
+    return _thesis_call(revise, _thesis_user(user_id), thesis_id, body)
+
+
+@app.post("/theses/{thesis_id}/close")
+def thesis_close(thesis_id: int, body: dict, user_id: str = Depends(current_user_id)):
+    from thesis_records import close
+    return _thesis_call(close, _thesis_user(user_id), thesis_id, (body or {}).get("reason"))
+
+
+@app.delete("/theses/{thesis_id}")
+def thesis_delete(thesis_id: int, user_id: str = Depends(current_user_id)):
+    """The user's own data: deletes the thesis and all its revisions."""
+    from thesis_records import delete
+    return _thesis_call(delete, _thesis_user(user_id), thesis_id)
+
+
 @app.get("/stock/compare")
 def stock_compare(
     tickers: str = Query(..., description="2 to 6 comma-separated tickers, e.g. TCS.NS,INFY.NS"),

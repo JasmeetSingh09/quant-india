@@ -279,7 +279,7 @@ export default function Compare() {
       {typed.length > 6 && <p className="text-xs text-amber-400">Up to six stocks at a time.</p>}
 
       {isFetching && <div className="card flex items-center gap-3"><Spinner /><span className="text-sm text-gray-400">Fetching prices and figures…</span></div>}
-      {error && <p className="text-sm text-red-400">{error?.response?.data?.detail || 'The comparison could not be loaded.'}</p>}
+      {error && <p className="text-sm text-red-400">{typeof error === 'string' ? error : 'The comparison could not be loaded.'}</p>}
       {!ready && !isFetching && <p className="text-sm text-gray-500">Enter two to six tickers to start.</p>}
 
       {data && !isFetching && (

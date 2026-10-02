@@ -247,3 +247,11 @@ export const runCorrelation     = body => api.post('/research/correlation', body
 export const sendTestAlert  = () => api.post('/alerts/test')
 
 
+
+// Thesis records: the signed-in user's own reasoning (#4, docs/PROPOSAL_PRODUCT_ADDITIONS_2026-09-23.md)
+export const listTheses    = () => api.get('/theses')
+export const getThesis     = id => api.get(`/theses/${id}`)
+export const createThesis  = body => api.post('/theses', body)
+export const reviseThesis  = ({ id, body }) => api.post(`/theses/${id}/revisions`, body)
+export const closeThesis   = ({ id, reason }) => api.post(`/theses/${id}/close`, { reason })
+export const deleteThesis  = id => api.delete(`/theses/${id}`)
