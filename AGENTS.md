@@ -28,12 +28,12 @@ An NSE quant research platform.
    without BSE's written consent, which has not been given. People may
    download by hand. The code enforces this with `modules/bse_access.py`
    (paused unless `BSE_COLLECTION=on`), as `nse_access.py` does for NSE.
-3. **The v1.4.2 model is frozen** (frozen 2026-10-01; spec hash
-   `6e6c32729c3c852e`; v1.4.2 = v1.4.1 plus the approved news-matching fix,
-   and the first hash that covers the news-matching rules). Do not change factor formulas, weights, thresholds,
+3. **The v1.4.3 model is frozen** (frozen 2026-10-02; spec hash
+   `6af261fa45ad9ce4`; v1.4.3 = v1.4.2 plus the approved filter on Google News
+   search results; factor scoring is unchanged since v1.4.1). Do not change factor formulas, weights, thresholds,
    signal cut-offs, portfolio construction or validation gates. Any
    behavioural change needs a written proposal, the owner's approval and a new
-   version. `GET /strategy/drift/v1.4.2` must keep reporting
+   version. `GET /strategy/drift/v1.4.3` must keep reporting
    `behavioural_drift: false`.
 4. **Pushing to `main` deploys to production** (Render for the backend, Vercel
    for the frontend). Only push or merge to `main` with the owner's explicit
@@ -81,7 +81,7 @@ Signals are shown as ranks ("Top ranked" … "Bottom ranked", in
 - **Frontend:** `cd frontend && npx vite build` must succeed.
 - **Production, read-only, after a deploy:**
   - `GET /strategy/drift/v1.4` gives the live commit;
-  - `GET /strategy/drift/v1.4.2` must show no behavioural drift;
+  - `GET /strategy/drift/v1.4.3` must show no behavioural drift;
   - `GET /health/caches` gives memory (the plan is 2 GB; keep it under about
     1.6 GB at idle).
 - **Server memory:** the backend runs FinBERT (about 800 MB) plus nightly
