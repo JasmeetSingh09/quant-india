@@ -650,6 +650,43 @@ def stock_compare(
     return r
 
 
+@app.get("/stock/fundamentals-history")
+def stock_fundamentals_history(ticker: str = Query(..., description="NSE ticker e.g. TCS.NS")):
+    """A stock's last four or five years of results, plus recent quarters: revenue,
+    profit, margins, return on equity, debt and cash flow. Read-only. Yahoo's
+    latest figures, not point-in-time; a figure Yahoo lacks is null, never 0."""
+    from stock_analysis import fundamentals_history_cached
+    from stock_compare import normalise
+    t = normalise([ticker])
+    if not t:
+        raise HTTPException(status_code=400, detail="Give a ticker, e.g. TCS.NS")
+    r = fundamentals_history_cached(t[0])
+    if "error" in r:
+        raise HTTPException(status_code=404, detail=r["error"])
+    return r
+
+
+@app.get("/stock/technicals")
+def stock_technicals(
+    ticker: str = Query(..., description="NSE ticker e.g. TCS.NS"),
+    period: str = Query("1y", description="3m, 6m, 1y or 2y"),
+):
+    """Daily candles with standard indicators (moving averages, Bollinger bands,
+    RSI, MACD, ATR, volume) and plain readings of the latest bar. Read-only.
+    Descriptive: none of these indicators has been tested by this project, so
+    nothing here is a buy or sell signal."""
+    from stock_analysis import technicals_cached
+    from stock_compare import normalise
+    t = normalise([ticker])
+    if not t:
+        raise HTTPException(status_code=400, detail="Give a ticker, e.g. TCS.NS")
+    r = technicals_cached(t[0], period)
+    if "error" in r:
+        code = 400 if r["error"].startswith("Period") else 404
+        raise HTTPException(status_code=code, detail=r["error"])
+    return r
+
+
 @app.get("/stock/metrics")
 def stock_metrics(ticker: str = Query(..., description="NSE ticker e.g. RELIANCE.NS")):
     """

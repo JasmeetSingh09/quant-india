@@ -20,6 +20,7 @@ import EvidencePanel from '../components/EvidencePanel'
 import SignalTrackRecord from '../components/SignalTrackRecord'
 import StockContext from '../components/StockContext'
 import StatCard from '../components/StatCard'
+import StockAnalysis from '../components/StockAnalysis'
 import { Search, TrendingUp, TrendingDown, ArrowLeft, ExternalLink, Filter, LayoutList, LayoutGrid } from 'lucide-react'
 import { InfoTip } from '../components/Term'
 import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts'
@@ -686,6 +687,10 @@ function StockDetail({ ticker, onBack }) {
               </ResponsiveContainer>
             </div>
           )}
+
+          {/* Results over the years, and price indicators. Both describe;
+              neither recommends. */}
+          <ErrorBoundary name="fundamentals and technicals"><StockAnalysis ticker={ticker} /></ErrorBoundary>
 
           {/* Balance sheet strip */}
           {(m.total_revenue_fmt || m.ebitda_fmt || m.total_debt_fmt || m.cash_fmt || m.free_cashflow_fmt) && (

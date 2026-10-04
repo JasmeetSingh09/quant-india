@@ -51,7 +51,7 @@ _ROUTES = {
     "medium": ("/portfolio/advise", "/portfolio/scenarios", "/portfolio/what-if",
                "/optimize", "/montecarlo", "/monte-carlo", "/simulate",
                "/alpha", "/options", "/pairs", "/regime", "/factors",
-               "/stock/compare"),
+               "/stock/compare", "/stock/fundamentals-history", "/stock/technicals"),
 }
 
 _hits: dict = defaultdict(deque)

@@ -69,6 +69,10 @@ export const getSentiment   = ticker => api.get(`/stock/sentiment?ticker=${ticke
 export const searchStocks   = (q, exchange='NSE') => api.get(`/stock/search?q=${q}&exchange=${exchange}`)
 export const compareStocks  = (tickers, period = '1y') =>
   api.get(`/stock/compare?tickers=${encodeURIComponent(tickers.join(','))}&period=${period}`)
+export const getFundamentalsHistory = ticker =>
+  api.get(`/stock/fundamentals-history?ticker=${encodeURIComponent(ticker)}`)
+export const getTechnicals = (ticker, period = '1y') =>
+  api.get(`/stock/technicals?ticker=${encodeURIComponent(ticker)}&period=${period}`)
 
 // Commodities
 export const getMCX         = () => api.get('/commodities/mcx')
