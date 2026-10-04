@@ -425,10 +425,10 @@ export default function Optimizer() {
             <div className="space-y-4">
               <div className="card-sm flex items-center justify-between">
                 <div>
-                  <p className="stat-label">Market risk now</p>
+                  <p className="stat-label">Market regime now</p>
                   {regimeResult.market_risk ? (
                     <p className={`text-lg font-bold ${regimeResult.market_risk.state === 'Elevated' ? 'text-amber-400' : 'text-slate-300'}`}>
-                      {regimeResult.market_risk.state}
+                      {regimeResult.market_risk.state === 'Elevated' ? 'Volatile' : 'Calm'}
                       <span className="text-xs text-gray-500 font-normal ml-2">
                         20-day volatility {regimeResult.market_risk.volatility_20d_pct}% vs typical {regimeResult.market_risk.typical_volatility_pct}%
                       </span>

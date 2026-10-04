@@ -135,7 +135,6 @@ export const getAnomaly        = t => api.get(`/anomaly/${encodeURIComponent(t)}
 export const getEvents         = t => api.get(`/events/${encodeURIComponent(t)}`)
 export const getPortfolioFit   = body => api.post('/portfolio/fit', body, { timeout: 120000 })
 export const getWalkForward    = () => api.get('/validation/walk-forward', { timeout: 240000 })
-export const getRegimeWeights  = () => api.get('/regime/weights')
 export const getScenarios = (ticker, params = {}) =>
   api.get('/stock/scenarios', { params: { ticker, ...params }, timeout: 120000 })
 export const getMarketValidation = (days=21) =>
@@ -169,7 +168,6 @@ export const getScanStatus   = () => api.get('/alpha/universe/status')
 // This stock's own signal over time — today, yesterday, 5 days ago
 export const getSignalHistory = (ticker, limit = 30) =>
   api.get(`/alpha/signal-history?ticker=${encodeURIComponent(ticker)}&limit=${limit}`)
-export const getRegimeAlpha = ticker => api.get(`/alpha/regime-adjusted?ticker=${ticker}`)
 export const explainAlpha   = ticker => api.get(`/alpha/explain?ticker=${ticker}`)
 export const getPredictionTrack = (minDays = 7) => api.get(`/predictions/track?min_days=${minDays}`)
 
@@ -189,7 +187,6 @@ export const runMinCVaR      = body => api.post('/optimizer/min-cvar', body)
 export const runRegimeAdaptive = body => api.post('/optimizer/regime-adaptive', body)
 
 // Regime
-export const getRegime      = () => api.get('/regime')
 export const getMarketRisk  = () => api.get('/market-risk')
 
 // Monte Carlo

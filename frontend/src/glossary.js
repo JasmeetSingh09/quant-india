@@ -79,7 +79,7 @@ export const GLOSSARY = {
   // ── Regime ──
   regime:       "The label the old regime model gave the market: Bull, Bear or Sideways. The dashboard now shows market risk instead.",
   hmm:          "Hidden Markov Model: a statistical model that infers hidden states, here the market's mood, from daily returns.",
-  market_risk:  "Whether the Nifty's volatility over the last 20 trading days is above (Elevated) or at or below (Normal) its typical level over the past year.",
+  market_risk:  "The market regime: whether the Nifty's volatility over the last 20 trading days is above (Volatile) or at or below (Calm) its typical level over the past year.",
 
   // ── Fundamentals ──
   pe_ratio:     "Price-to-earnings: rupees paid for each rupee of yearly profit.",

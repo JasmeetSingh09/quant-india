@@ -414,21 +414,15 @@ def _detect_regime_uncached(
         "factor_weight_adjustments": weight_adjustments,
         "history":         history[-90:],   # last 90 days for chart
         "model_log_ll":    round(float(hmm.log_ll), 2),
+        # The trading advice that used to follow ("In bear regimes, prioritise capital
+        # preservation...") was removed 2026-10-05: it rested on a label that failed its test.
         "interpretation": (
-            f"Current regime: {current_label} "
-            f"({current_proba_display} model probability — the state that best "
-            f"explains recent returns, not a forecast). "
-            + (
-                "In bull regimes, momentum signals are more reliable. "
-                "Increase position sizes gradually."
-                if current_label == "Bull" else
-                "In bear regimes, prioritise capital preservation. "
-                "Weight quality and sentiment signals more heavily."
-                if current_label == "Bear" else
-                "Sideways/volatile regime. No strong directional bias. "
-                "Range-trading and mean-reversion strategies work better."
-            )
+            f"Model label: {current_label} ({current_proba_display} model probability). "
+            "Research record only: this model failed its pre-registered test because its labels follow "
+            "single days (docs/REGIME_DETECTOR_RESULT_2026-09-28.md). It is not a forecast and not advice. "
+            "The app's tested regime signal is the market-risk reading (/market-risk)."
         ),
+        "status": "retired: research record only",
         "computed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
 

@@ -516,7 +516,7 @@ export function MarketRiskBanner({ risk, loading, error }) {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-baseline gap-3 flex-wrap">
           <span className={`text-xl font-bold tracking-tight ${text}`}>
-            <Term k="market_risk">Market risk</Term>: {risk.state.toUpperCase()}
+            <Term k="market_risk">Market regime</Term>: {elevated ? 'VOLATILE' : 'CALM'}
           </span>
           <span className="text-sm text-gray-400 font-mono">
             20-day volatility {risk.volatility_20d_pct}% · typical {risk.typical_volatility_pct}%
@@ -528,17 +528,20 @@ export function MarketRiskBanner({ risk, loading, error }) {
       </div>
       <p className="text-xs text-gray-300 leading-relaxed">{risk.meaning}</p>
       {hist.length > 0 && (
-        <div className="flex items-end gap-px h-6" aria-label="Market risk over the last 90 trading days">
+        <div className="flex items-end gap-px h-6" aria-label="Market regime over the last 90 trading days">
           {hist.map(h => (
-            <span key={h.date} title={`${h.date}: ${h.state}, ${h.volatility_20d_pct}%`}
+            <span key={h.date} title={`${h.date}: ${h.state === 'Elevated' ? 'Volatile' : 'Calm'}, ${h.volatility_20d_pct}%`}
                   className={`flex-1 rounded-sm ${h.state === 'Elevated' ? 'bg-amber-500/70 h-6' : 'bg-slate-600/60 h-3'}`} />
           ))}
         </div>
       )}
       <p className="text-[11px] text-gray-600 leading-relaxed">
-        Last 90 trading days, oldest on the left. This replaced the Bull / Bear / Sideways label, which a
-        test over 2008-2026 found followed single days rather than market phases. Not a reason on its own
-        to buy or sell anything.
+        Last 90 trading days, oldest on the left. Volatile means the last 20 days' volatility is above its
+        one-year typical level. Tested on the Nifty and confirmed on Nifty Bank, S&amp;P 500, FTSE 100 and
+        Nikkei 225: volatile spells have tended to stay volatile over the next month. Two regime models were
+        tested and are not shown: a Bull / Bear label followed single days, and a Markov-switching model
+        called high risk almost only in the 2020 crash. It does not forecast direction, and is not a reason
+        on its own to buy or sell anything.
       </p>
     </div>
   )
@@ -588,11 +591,11 @@ export default function Dashboard() {
         </div>
         {risk?.state && !riskLoading && (
           <div className="text-right">
-            <p className="text-xs text-gray-500 mb-1">Market risk</p>
+            <p className="text-xs text-gray-500 mb-1">Market regime</p>
             <span className={`inline-block px-2.5 py-1 rounded-full border text-sm font-semibold ${
               risk.state === 'Elevated' ? 'border-amber-700 text-amber-400 bg-amber-900/20'
                                         : 'border-slate-600 text-slate-300 bg-slate-800/40'}`}>
-              {risk.state}
+              {risk.state === 'Elevated' ? 'Volatile' : 'Calm'}
             </span>
           </div>
         )}

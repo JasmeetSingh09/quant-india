@@ -62,7 +62,7 @@ from portfolio_optimizer import (
     hierarchical_risk_parity, risk_decomposition,
     equal_risk_contribution, maximum_diversification, min_cvar_optimize,
 )
-from regime_detector import detect_regime, regime_conditioned_alpha
+from regime_detector import detect_regime
 from monte_carlo import simulate as mc_simulate, compare_methods as mc_compare
 from black_scholes import black_scholes as bs_price, implied_volatility as bs_iv, payoff_curve as bs_payoff
 from momentum_backtest import momentum_backtest as run_momentum_backtest, low_vol_backtest as run_low_vol_backtest
@@ -1648,11 +1648,16 @@ def validation_walk_forward(horizon_days: int = Query(21, ge=5, le=90),
     return r
 
 
+REGIME_RETIRED = ("Retired 2026-10-05. The Bull/Bear/Sideways regime model this route depends on failed its "
+                  "pre-registered test (docs/REGIME_DETECTOR_RESULT_2026-09-28.md): its labels follow single days. "
+                  "A Markov-switching replacement was also tested and not shipped "
+                  "(docs/MARKOV_REGIME_RESULT_2026-10-05.md). The app's tested regime signal is /market-risk.")
+
+
 @app.get("/regime/weights")
 def regime_weight_proposal(regime: str = Query(None)):
-    """What the factor weights would become under regime tilting. A proposal."""
-    from regime_weights import proposed_weights
-    return proposed_weights(regime)
+    """Retired: re-weighted factors by a regime label that failed its test. See /market-risk."""
+    raise HTTPException(status_code=410, detail=REGIME_RETIRED)
 
 
 @app.get("/anomaly/{ticker}")
@@ -2875,16 +2880,8 @@ def predictions_track(min_days: int = 7):
 
 @app.get("/alpha/regime-adjusted")
 def alpha_regime_adjusted(ticker: str = Query(...)):
-    """
-    Regime-conditioned alpha score — the full original algorithm.
-
-    Pipeline: Nifty HMM regime → adjust factor weights → recompute alpha.
-    In a bear regime, quality and sentiment weighted more heavily.
-    In a bull regime, momentum weighted more heavily.
-    Returns both raw and regime-adjusted scores.
-    """
-    result = regime_conditioned_alpha(ticker)
-    return result
+    """Retired: adjusted the alpha score by a regime label that failed its test. See /market-risk."""
+    raise HTTPException(status_code=410, detail=REGIME_RETIRED)
 
 
 @app.post("/alpha/retrain")
@@ -3314,11 +3311,11 @@ def regime_current(
     lookback_days: int = Query(252, description="Days of history to fit HMM on"),
 ):
     """
-    Detect current market regime using a 3-state Gaussian HMM.
+    Research record only: the 3-state Gaussian HMM that failed its pre-registered test.
 
-    Fits a Hidden Markov Model on Nifty 50 daily returns and volatility.
-    Returns: Bull | Bear | Sideways with probability, regime statistics,
-    transition matrix, 90-day history, and factor weight adjustments.
+    Its labels follow single days (docs/REGIME_DETECTOR_RESULT_2026-09-28.md), so the
+    app does not show it and nothing uses its weight adjustments. Kept so the result
+    can be reproduced. The app's tested regime signal is /market-risk.
     """
     result = detect_regime(ticker, lookback_days=lookback_days)
     if "error" in result:
