@@ -1,0 +1,60 @@
+{
+ "written": "2026-10-05T00:29:16",
+ "note": "simulated data only; no market data used",
+ "with_regimes": {
+  "P1_vol": {
+   "coef": 6.9835,
+   "p": 3.331626883158749e-09
+  },
+  "P2_drawdown": {
+   "coef": 2.4199,
+   "p": 0.0002082781989917373
+  },
+  "persistence": {
+   "monthly_median_spell_weeks": 8.7,
+   "weekly_median_spell_weeks": 5.0,
+   "final_fit_converged": true,
+   "passes": true
+  },
+  "weekly_state_accuracy": 0.784,
+  "months": 168,
+  "dropped": 0
+ },
+ "no_regimes": [
+  {
+   "seed": 11,
+   "P1_p": 0.4340843772233265,
+   "P1_coef": -0.6398
+  },
+  {
+   "seed": 12,
+   "P1_p": 0.21760975917336767,
+   "P1_coef": 0.5597
+  },
+  {
+   "seed": 13,
+   "P1_p": 0.10096421982334386,
+   "P1_coef": -0.8325
+  }
+ ],
+ "checks": {
+  "finds regimes that exist (P1 passes)": true,
+  "weekly states match the truth at least 80%": false,
+  "persistence gate passes on persistent regimes": true,
+  "no false signal on data without regimes (all 3 nulls fail P1)": true
+ },
+ "plumbing_ok": false,
+ "diagnosis": {
+  "written": "2026-10-05, after the check, on simulated data only",
+  "missed_check": "weekly state accuracy 0.784 against an 80% bar set in the runner (the bar is not in the pre-registration). Left as missed; the bar was not changed.",
+  "hindsight_accuracy": 0.856,
+  "real_time_accuracy_inside_one_regime": 0.797,
+  "switches": 77,
+  "weeks_to_catch_up_median": 3,
+  "weeks_to_catch_up_mean": 4.5,
+  "true_spell_median_weeks": 9.5,
+  "real_time_spell_median_weeks": 5.0,
+  "reading": "The code recovers the simulated parameters (variance 15.5 vs 16.2 true, 2.6 vs 2.45) and detects the regimes' effect on volatility strongly (p 3e-9) with no false signal on three series without regimes. Even hindsight (smoothed) states reach only 86%, because the two simulated regimes overlap. The 78% is the real-time model's lag at switches, about 3 weeks, not a fault. It means the model confirms a change in risk after a few weeks; it does not call the turn.",
+  "owner_decision": "accepted 2026-10-05 ('Accept, go on'); the missed bar stays recorded as missed"
+ }
+}
