@@ -145,6 +145,20 @@ d2 = df2._derived_fundamentals("USDCO.NS", {"netIncomeToCommon": 800.0, "bookVal
                                              "financialCurrency": "USD", "currency": "INR"})
 ok(abs(d2["roe"] - 800.0 / 6000.0) < 1e-4, "ROE for a USD reporter divides dollars by dollars (balance-sheet equity)")
 
+print("\n4c. Momentum reports the month it skips, without using it")
+import numpy as np  # noqa: E402
+_px = pd.Series(np.linspace(100, 130, 300).tolist() + [130, 125, 120, 115, 110, 105, 100, 98, 96, 95,
+                                                        94, 93, 92, 91, 90, 89, 88, 87, 86, 85, 84],
+                index=pd.bdate_range("2025-06-02", periods=321))
+alpha_model.yf.download = lambda *a, **k: pd.DataFrame({"Close": _px})
+mo = alpha_model._compute_momentum_factor("FELL.NS")
+ok(mo["skipped_month_return_pct"] < -30 and mo["mom_12_1_pct"] > 0,
+   f"a stock that rose then fell: window {mo['mom_12_1_pct']:+.1f}%, skipped month {mo['skipped_month_return_pct']:+.1f}%")
+_px2 = _px.copy(); _px2.iloc[-21:] = 130.0
+alpha_model.yf.download = lambda *a, **k: pd.DataFrame({"Close": _px2})
+ok(alpha_model._compute_momentum_factor("FLAT.NS")["score"] == mo["score"],
+   "the score is identical whatever the skipped month did (reported only)")
+
 print("\n5. The specification records v1.5.0's rules")
 import strategy_version  # noqa: E402
 spec = strategy_version.current_spec()

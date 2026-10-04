@@ -424,6 +424,13 @@ def _compute_momentum_factor(ticker: str, peers: list = None) -> dict:
             "ann_vol_pct":  round(ann_vol * 100, 2),
             "risk_adj":     round(risk_adj, 3),
             "window":       f"{n - 1 - start_idx}→{SKIP} trading days ago",
+            # The month the score skips, so the page can say what was left out and
+            # why a stock that just fell can still rank high (SBIN, 2026-10-05).
+            # Reported only: the score above does not read these.
+            "window_from":  str(s.index[start_idx])[:10],
+            "window_to":    str(s.index[end_idx])[:10],
+            "skipped_month_return_pct": round(float(s.iloc[-1] / s.iloc[end_idx] - 1) * 100, 2),
+            "latest_close_date": str(s.index[-1])[:10],
             "interpretation": (
                 "Strong upward momentum"     if score > MOMENTUM_INTERP_STRONG else
                 "Positive momentum"          if score > MOMENTUM_INTERP_MILD else

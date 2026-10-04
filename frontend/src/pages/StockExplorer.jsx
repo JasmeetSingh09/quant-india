@@ -472,6 +472,28 @@ function StocksList({ onSelect }) {
 // ═════════════════════════════════════════════════════════════════════════════
 // DETAIL VIEW
 // ═════════════════════════════════════════════════════════════════════════════
+/**
+ * SkippedMonth — what the momentum score measured, and the recent month it leaves out.
+ *
+ * Momentum is the 12-1 return: twelve months ago to one month ago. The latest month is
+ * skipped by design (it tends to reverse, and this is the design that passed the
+ * 2011-2026 test), so a stock can rank high on momentum just after falling.
+ */
+function SkippedMonth({ m }) {
+  const sk = m.skipped_month_return_pct
+  const signed = v => `${v >= 0 ? '+' : ''}${Number(v).toFixed(1)}%`
+  return (
+    <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+      Measured {m.window_from} to {m.window_to}: {signed(m.mom_12_1_pct)}.{' '}
+      <span className={sk < 0 ? 'text-amber-300/90' : 'text-gray-400'}>
+        The latest month ({m.window_to} to {m.latest_close_date}, {signed(sk)}) is not counted
+      </span>{' '}
+      by design: the most recent month tends to reverse, and this is the version that passed the
+      2011–2026 test. It enters the score as the window moves forward.
+    </p>
+  )
+}
+
 function StockDetail({ ticker, onBack }) {
   const explain = useMutation({ mutationFn: explainAlpha })
 
@@ -853,6 +875,11 @@ function StockDetail({ ticker, onBack }) {
                         <p className="text-xs text-gray-600 mt-0.5">
                           {alpha.factors?.[factor]?.interpretation}
                         </p>
+                        {/* Momentum skips the latest month by design. Without saying so, a stock
+                            that just fell (SBIN, Oct 2026) looks wrongly ranked. */}
+                        {factor === 'momentum' && alpha.factors?.momentum?.skipped_month_return_pct != null && (
+                          <SkippedMonth m={alpha.factors.momentum} />
+                        )}
                       </div>
                     ))}
                   </div>
