@@ -170,6 +170,26 @@ ok(br is not None and "FY2024" in br and "not comparable" in br, "an EPS halving
 ok(A._eps_break([{"label": "FY1", "eps_diluted": 10, "net_income": 100},
                  {"label": "FY2", "eps_diluted": 5, "net_income": 50}]) is None,
    "EPS halving because profit halved is not flagged")
+# 21st Century Management as Yahoo has it: an investment company with negative revenue in FY2023.
+neg = pd.DataFrame({pd.Timestamp("2024-03-31"): [40e7, 20e7], pd.Timestamp("2023-03-31"): [-13.52e7, -18.06e7],
+                    pd.Timestamp("2022-03-31"): [30e7, 10e7]}, index=["Total Revenue", "Net Income"])
+A.STATEMENTS = lambda t: {"income": neg, "balance": None, "cashflow": None, "quarterly": None}
+ny = {r["label"]: r for r in A.fundamentals_history("TEST.NS")["annual"]}
+ok(ny["FY2023"]["revenue"] == -13.52 and ny["FY2023"]["net_margin_pct"] is None,
+   "negative revenue is shown as reported, with no margin computed from it")
+ok(ny["FY2024"]["revenue_growth_pct"] is None and ny["FY2024"]["net_income_growth_pct"] is None,
+   "no growth percentage from a negative base year")
+ok(ny["FY2023"]["revenue_growth_pct"] is not None, "growth from a positive base into a loss is still shown")
+# Alembic Ltd / Alfred Herbert as Yahoo has them: profit larger than revenue (income from holdings).
+hold = pd.DataFrame({pd.Timestamp("2025-03-31"): [211.18e7, 310.68e7], pd.Timestamp("2024-03-31"): [147.12e7, 50e7]},
+                    index=["Total Revenue", "Net Income"])
+A.STATEMENTS = lambda t: {"income": hold, "balance": None, "cashflow": None, "quarterly": None}
+h = A.fundamentals_history("TEST.NS")
+ok(h["annual"][-1]["net_margin_pct"] > 100, "a margin above 100% is kept in the data, not altered")
+ok(h["notes"]["margin_outliers"] and "FY2025" in h["notes"]["margin_outliers"]
+   and "FY2024" not in h["notes"]["margin_outliers"], "the note names exactly the years beyond 100%")
+ok(f["notes"]["margin_outliers"] is None, "ordinary margins raise no note")
+
 A.STATEMENTS = lambda t: {"income": pd.DataFrame(), "balance": None, "cashflow": pd.DataFrame(), "quarterly": None}
 ok("error" in A.fundamentals_history("TEST.NS"), "no statements at all is an error")
 

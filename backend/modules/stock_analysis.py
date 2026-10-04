@@ -135,8 +135,10 @@ def fundamentals_history(ticker):
             x = v.get(k)
             row[k] = None if x is None else (round(x / CRORE, 2) if k in IN_CRORE else round(x, 2))
         rev, ni, oi, eq = v.get("revenue"), v.get("net_income"), v.get("operating_income"), v.get("equity")
-        row["net_margin_pct"] = _pct(_ratio(ni, rev))
-        row["operating_margin_pct"] = _pct(_ratio(oi, rev))
+        # A margin is a share of revenue, so it only exists when revenue is positive. Investment
+        # companies can report negative revenue (losses on holdings); a "margin" of that is noise.
+        row["net_margin_pct"] = _pct(_ratio(ni, rev)) if rev and rev > 0 else None
+        row["operating_margin_pct"] = _pct(_ratio(oi, rev)) if rev and rev > 0 else None
         row["roe_pct"] = _pct(_ratio(ni, eq)) if eq and eq > 0 else None
         row["debt_to_equity"] = _round(_ratio(v.get("total_debt"), eq) if eq and eq > 0 else None, 2)
         # Growth only between consecutive fiscal years, both present: a gap year
@@ -144,7 +146,8 @@ def fundamentals_history(ticker):
         consecutive = prev is not None and 300 <= (ts - prev[0]).days <= 430
         for k in ("revenue", "net_income"):
             a, b = v.get(k), prev[1].get(k) if consecutive else None
-            row[f"{k}_growth_pct"] = _pct((a - b) / abs(b)) if a is not None and b not in (None, 0) else None
+            # Growth from a loss or a negative base has no meaning as a percentage, so it is left blank.
+            row[f"{k}_growth_pct"] = _pct((a - b) / b) if a is not None and b is not None and b > 0 else None
         annual.append(row)
         prev = (ts, v)
 
@@ -157,7 +160,8 @@ def fundamentals_history(ticker):
             x = v.get(k)
             q[k] = None if x is None else round(x / CRORE, 2)
         q["eps_diluted"] = _round(v.get("eps_diluted"), 2)
-        q["net_margin_pct"] = _pct(_ratio(v.get("net_income"), v.get("revenue")))
+        qr = v.get("revenue")
+        q["net_margin_pct"] = _pct(_ratio(v.get("net_income"), qr)) if qr and qr > 0 else None
         quarterly.append(q)
 
     plain = {"revenue": "revenue", "operating_income": "operating income", "net_income": "net profit",
@@ -176,6 +180,7 @@ def fundamentals_history(ticker):
             "gaps": (f"Yahoo leaves some figures blank for this company ({', '.join(missing)}); "
                      "they are shown as gaps, not zero.") if missing else None,
             "eps_break": _eps_break(annual),
+            "margin_outliers": _margin_outliers(annual),
             "banks": ("Banks and lenders report no operating income or EBITDA in the same sense, so those rows "
                       "can be empty for them. Their cash flow is driven by deposits and loans, so free cash "
                       "flow does not mean for a bank what it means for other companies."),
@@ -201,6 +206,25 @@ def _eps_break(annual):
                     f"merger changed the number of shares and the figures are adjusted for it in some years but not "
                     f"others, so EPS before and after {r['label']} is not comparable.")
     return None
+
+
+MARGIN_CHART_LIMIT = 100.0      # percent; beyond this the page keeps the figure in its table but not on the chart
+
+
+def _margin_outliers(annual):
+    """Years whose net or operating margin is beyond +/-100%: profit or loss larger than revenue.
+
+    The figure is correct arithmetic and stays in the response; the page leaves it
+    off the margin chart (owner decision 2026-10-04) and shows this note instead.
+    """
+    years = [r["label"] for r in annual
+             if any(r[k] is not None and abs(r[k]) > MARGIN_CHART_LIMIT for k in ("net_margin_pct", "operating_margin_pct"))]
+    if not years:
+        return None
+    return (f"In {', '.join(years)} the margin is beyond 100% either way: profit or loss was larger than revenue. "
+            "That happens when most of the profit comes from other income or holdings in other companies, or when "
+            "revenue is very small, so a margin means little here. Those years are left off the margin chart; "
+            "the figures table shows them.")
 
 
 def _pct(x):

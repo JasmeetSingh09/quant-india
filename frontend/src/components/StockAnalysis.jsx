@@ -78,6 +78,10 @@ function Fundamentals({ ticker }) {
 
   const a = data.annual
   const q = data.quarterly || []
+  // Margins beyond +/-100% (profit or loss larger than revenue) stay in the table but not
+  // on the chart, where one such year would flatten every other (owner decision 2026-10-04).
+  const inChart = v => (v != null && Math.abs(v) <= 100 ? v : null)
+  const marginRows = a.map(r => ({ ...r, net_margin_pct: inChart(r.net_margin_pct), operating_margin_pct: inChart(r.operating_margin_pct) }))
   const noOperating = a.every(r => r.operating_income == null)
   const hasCash = a.some(r => r.operating_cash_flow != null || r.free_cash_flow != null)
 
@@ -101,7 +105,7 @@ function Fundamentals({ ticker }) {
         </ChartBox>
 
         <ChartBox title="Margins" sub={noOperating ? 'Net margin (no operating income reported for this company)' : 'Operating and net margin, % of revenue'}>
-          <LineChart data={a} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
+          <LineChart data={marginRows} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
             {GRID}
             <XAxis dataKey="label" {...AXIS} />
             <YAxis {...AXIS} width={44} unit="%" />
@@ -174,6 +178,7 @@ function Fundamentals({ ticker }) {
         <li>{data.notes.roe}</li>
         {data.notes.gaps && <li>{data.notes.gaps}</li>}
         {data.notes.eps_break && <li className="text-amber-300/90">{data.notes.eps_break}</li>}
+        {data.notes.margin_outliers && <li className="text-amber-300/90">{data.notes.margin_outliers}</li>}
         {(noOperating || !hasCash) && <li>{data.notes.banks}</li>}
       </ul>
     </div>
