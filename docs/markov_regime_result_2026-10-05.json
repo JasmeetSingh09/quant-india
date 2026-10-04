@@ -1,0 +1,104 @@
+{
+ "prereg": "docs/PREREG_MARKOV_SWITCHING_REGIME_2026-10-05.md",
+ "runner_commit": "f273dd7",
+ "run_at": "2026-10-05T00:35:04",
+ "data": "Yahoo daily closes to 2026-09-30",
+ "nifty": {
+  "months": 168,
+  "first_signal": "2012-09",
+  "dropped": [],
+  "share_high": 0.036,
+  "P1_vol": {
+   "high": {
+    "coef": 22.5124,
+    "p": 0.025427755691478735
+   },
+   "n": 168,
+   "mean_when_0": 13.3961
+  },
+  "P2_drawdown": {
+   "high": {
+    "coef": 6.4978,
+    "p": 0.09951934045027981
+   },
+   "n": 168,
+   "mean_when_0": 3.6175
+  },
+  "persistence": {
+   "monthly_median_spell_weeks": 30.3,
+   "weekly_median_spell_weeks": 19.0,
+   "final_fit_converged": true,
+   "passes": true
+  },
+  "final_fit_params": {
+   "mean_high": -0.1882,
+   "mean_low": 0.2258,
+   "var_high": 25.2775,
+   "var_low": 3.5936,
+   "p_stay_high": 0.9688,
+   "p_stay_low": 0.9932
+  },
+  "S1_adds_to_market_risk": {
+   "high": {
+    "coef": 20.308,
+    "p": 0.04354939902643361
+   },
+   "elevated": {
+    "coef": 4.1525,
+    "p": 4.181379211845951e-07
+   },
+   "n": 168,
+   "mean_when_0": 11.448
+  },
+  "S2_direction": {
+   "high": {
+    "coef": -0.1435,
+    "p": 0.9674589475253254
+   },
+   "n": 168,
+   "mean_when_0": 0.932
+  },
+  "comparison": {
+   "market_risk_vol": {
+    "elevated": {
+     "coef": 5.6385,
+     "p": 0.00015596020747386837
+    },
+    "n": 168,
+    "mean_when_0": 11.448
+   },
+   "market_risk_drawdown": {
+    "elevated": {
+     "coef": 1.5432,
+     "p": 0.00517171789263469
+    },
+    "n": 168,
+    "mean_when_0": 3.0963
+   },
+   "trend_vol": {
+    "downtrend": {
+     "coef": 4.6482,
+     "p": 0.08143867375850224
+    },
+    "n": 168,
+    "mean_when_0": 13.0657
+   },
+   "trend_drawdown": {
+    "downtrend": {
+     "coef": 1.1302,
+     "p": 0.18875147525639324
+    },
+    "n": 168,
+    "mean_when_0": 3.5737
+   },
+   "trend_median_spell_months": 5.0
+  },
+  "seconds": 37
+ },
+ "verdict": {
+  "persistence_gate": true,
+  "P1_passed": false,
+  "P2_passed": false,
+  "ship": false
+ }
+}
