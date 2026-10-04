@@ -29,9 +29,20 @@ const AXIS = { stroke: '#6b7280', fontSize: 10 }
 
 // Under 0.01 crore (Rs 1 lakh) a rounded figure would read as 0, which must only ever mean zero.
 const tiny = v => v !== 0 && Math.abs(v) < 0.01
-const rupees = v => `Rs ${Math.round(v * 1e7).toLocaleString('en-IN')}`
-const cr = v => (v == null ? 'no figure' : tiny(v) ? rupees(v)
-  : `Rs ${Number(v).toLocaleString('en-IN', { maximumFractionDigits: 0 })} cr`)
+// Money in the company's reporting currency: Rs crore for rupee reporters, "<CCY> million"
+// otherwise (Infosys and HCL Tech report in US dollars; their figures are not converted).
+const MONEY = 'money'
+function moneyFmt(currency) {
+  const inr = !currency || currency === 'INR'
+  const unit = inr ? 1e7 : 1e6
+  const exact = v => (inr ? `Rs ${Math.round(v * unit).toLocaleString('en-IN')}`
+                          : `${currency} ${Math.round(v * unit).toLocaleString('en-US')}`)
+  const fmt = v => (v == null ? 'no figure' : tiny(v) ? exact(v)
+    : inr ? `Rs ${Number(v).toLocaleString('en-IN', { maximumFractionDigits: 0 })} cr`
+          : `${currency} ${Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 })} mn`)
+  const bare = v => Number(v).toLocaleString(inr ? 'en-IN' : 'en-US', { maximumFractionDigits: 0 })
+  return { fmt, exact, bare, label: inr ? 'Rs crore' : `${currency} million` }
+}
 const pc = v => (v == null ? 'no figure' : `${Number(v).toFixed(1)}%`)
 const nx = (v, d = 2) => (v == null ? 'no figure' : Number(v).toFixed(d))
 const errText = e => (typeof e === 'string' ? e : e?.message || 'Could not load this.')
@@ -82,6 +93,7 @@ function Fundamentals({ ticker }) {
 
   const a = data.annual
   const q = data.quarterly || []
+  const m = moneyFmt(data.currency)
   // Margins beyond +/-100% (profit or loss larger than revenue) stay in the table but not
   // on the chart, where one such year would flatten every other (owner decision 2026-10-04).
   const inChart = v => (v != null && Math.abs(v) <= 100 ? v : null)
@@ -92,7 +104,7 @@ function Fundamentals({ ticker }) {
   return (
     <div className="space-y-4">
       <p className="text-xs text-gray-500">
-        {a.length} years ({a[0].label} to {a[a.length - 1].label}) from {data.source}, in Rs crore. {data.notes.point_in_time}
+        {a.length} years ({a[0].label} to {a[a.length - 1].label}) from {data.source}, in {m.label}. {data.notes.point_in_time}
       </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -101,7 +113,7 @@ function Fundamentals({ ticker }) {
             {GRID}
             <XAxis dataKey="label" {...AXIS} />
             <YAxis {...AXIS} width={64} tickFormatter={v => Number(v).toLocaleString('en-IN')} />
-            <Tooltip contentStyle={TIP} formatter={(v, n) => [cr(v), n]} />
+            <Tooltip contentStyle={TIP} formatter={(v, n) => [m.fmt(v), n]} />
             <Legend wrapperStyle={{ fontSize: 11 }} />
             <Bar dataKey="revenue" name="Revenue" fill={C.revenue} isAnimationActive={false} />
             <Bar dataKey="net_income" name="Net profit" fill={C.profit} isAnimationActive={false} />
@@ -140,7 +152,7 @@ function Fundamentals({ ticker }) {
               {GRID}
               <XAxis dataKey="label" {...AXIS} />
               <YAxis {...AXIS} width={64} tickFormatter={v => Number(v).toLocaleString('en-IN')} />
-              <Tooltip contentStyle={TIP} formatter={(v, n) => [cr(v), n]} />
+              <Tooltip contentStyle={TIP} formatter={(v, n) => [m.fmt(v), n]} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <ReferenceLine y={0} stroke="#4b5563" />
               <Bar dataKey="operating_cash_flow" name="From operations" fill={C.ocf} isAnimationActive={false} />
@@ -151,12 +163,12 @@ function Fundamentals({ ticker }) {
         )}
 
         <ChartBox title="Earnings per share"
-          sub={data.notes.eps_break ? 'Diluted EPS, Rs. Not comparable across all years: see the note below' : 'Diluted EPS, Rs'}>
+          sub={`Diluted EPS, ${data.units?.eps || 'Rs per share'}` + (data.notes.eps_break ? '. Not comparable across all years: see the note below' : '')}>
           <LineChart data={a} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
             {GRID}
             <XAxis dataKey="label" {...AXIS} />
             <YAxis {...AXIS} width={44} />
-            <Tooltip contentStyle={TIP} formatter={v => [v == null ? 'no figure' : `Rs ${nx(v)}`, 'EPS']} />
+            <Tooltip contentStyle={TIP} formatter={v => [v == null ? 'no figure' : `${m.label.startsWith('Rs') ? 'Rs' : data.currency} ${nx(v)}`, 'EPS']} />
             <Line dataKey="eps_diluted" name="EPS" stroke={C.eps} dot isAnimationActive={false} />
           </LineChart>
         </ChartBox>
@@ -167,7 +179,7 @@ function Fundamentals({ ticker }) {
               {GRID}
               <XAxis dataKey="label" {...AXIS} />
               <YAxis {...AXIS} width={64} tickFormatter={v => Number(v).toLocaleString('en-IN')} />
-              <Tooltip contentStyle={TIP} formatter={(v, n) => [cr(v), n]} />
+              <Tooltip contentStyle={TIP} formatter={(v, n) => [m.fmt(v), n]} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="revenue" name="Revenue" fill={C.revenue} isAnimationActive={false} />
               <Bar dataKey="net_income" name="Net profit" fill={C.profit} isAnimationActive={false} />
@@ -176,11 +188,12 @@ function Fundamentals({ ticker }) {
         )}
       </div>
 
-      <FiguresTable rows={a} />
+      <FiguresTable rows={a} m={m} />
 
       <ul className="text-xs text-gray-500 space-y-1 list-disc pl-4">
         <li>{data.notes.roe}</li>
         {data.notes.gaps && <li>{data.notes.gaps}</li>}
+        {data.notes.currency && <li className="text-amber-300/90">{data.notes.currency}</li>}
         {data.notes.eps_break && <li className="text-amber-300/90">{data.notes.eps_break}</li>}
         {data.notes.margin_outliers && <li className="text-amber-300/90">{data.notes.margin_outliers}</li>}
         {(noOperating || !hasCash) && <li>{data.notes.banks}</li>}
@@ -190,16 +203,16 @@ function Fundamentals({ ticker }) {
 }
 
 const TABLE_ROWS = [
-  ['Revenue', 'revenue', cr], ['Revenue growth', 'revenue_growth_pct', pc],
-  ['Operating income', 'operating_income', cr], ['Net profit', 'net_income', cr],
+  ['Revenue', 'revenue', MONEY], ['Revenue growth', 'revenue_growth_pct', pc],
+  ['Operating income', 'operating_income', MONEY], ['Net profit', 'net_income', MONEY],
   ['Profit growth', 'net_income_growth_pct', pc], ['Operating margin', 'operating_margin_pct', pc],
   ['Net margin', 'net_margin_pct', pc], ['EPS (diluted, Rs)', 'eps_diluted', v => nx(v)],
-  ['Total assets', 'total_assets', cr], ['Equity', 'equity', cr], ['Total debt', 'total_debt', cr],
-  ['Cash', 'cash', cr], ['Return on equity', 'roe_pct', pc], ['Debt / equity', 'debt_to_equity', v => nx(v)],
-  ['Cash from operations', 'operating_cash_flow', cr], ['Capex', 'capex', cr], ['Free cash flow', 'free_cash_flow', cr],
+  ['Total assets', 'total_assets', MONEY], ['Equity', 'equity', MONEY], ['Total debt', 'total_debt', MONEY],
+  ['Cash', 'cash', MONEY], ['Return on equity', 'roe_pct', pc], ['Debt / equity', 'debt_to_equity', v => nx(v)],
+  ['Cash from operations', 'operating_cash_flow', MONEY], ['Capex', 'capex', MONEY], ['Free cash flow', 'free_cash_flow', MONEY],
 ]
 
-function FiguresTable({ rows }) {
+function FiguresTable({ rows, m }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
@@ -215,16 +228,16 @@ function FiguresTable({ rows }) {
               <td className="py-1.5 pr-4 text-gray-400">{label}</td>
               {rows.map(r => (
                 <td key={r.label} className={`py-1.5 px-2 text-right font-mono tabular-nums ${r[key] == null ? 'text-gray-600' : 'text-gray-200'}`}
-                    title={r[key] == null ? 'Yahoo has no figure for this year' : fmt === cr && tiny(r[key]) ? rupees(r[key]) : undefined}>
-                  {r[key] == null ? '—' : fmt === cr && tiny(r[key]) ? (r[key] > 0 ? '<0.01' : '>-0.01')
-                    : fmt(r[key]).replace('Rs ', '').replace(' cr', '')}
+                    title={r[key] == null ? 'Yahoo has no figure for this year' : fmt === MONEY && tiny(r[key]) ? m.exact(r[key]) : undefined}>
+                  {r[key] == null ? '—' : fmt === MONEY ? (tiny(r[key]) ? (r[key] > 0 ? '<0.01' : '>-0.01') : m.bare(r[key]))
+                    : fmt(r[key])}
                 </td>
               ))}
             </tr>
           ))}
         </tbody>
       </table>
-      <p className="text-xs text-gray-600 mt-1">Money in Rs crore. A dash means Yahoo has no figure, not zero.</p>
+      <p className="text-xs text-gray-600 mt-1">Money in {m.label}. A dash means Yahoo has no figure, not zero.</p>
     </div>
   )
 }

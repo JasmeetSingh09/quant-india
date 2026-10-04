@@ -327,6 +327,7 @@ def current_spec() -> dict:
             "MID_CAP_MIN", "EXCLUDED_ISIN_PREFIXES"])
     _cap(uni, "piotroski_statement_fallbacks",
          lambda: list(__import__("metrics").PIOTROSKI_STATEMENT_FALLBACKS))
+    _cap(uni, "currency_rule", lambda: __import__("metrics").CURRENCY_RULE)
     spec["universe_rules"] = uni
 
     bm = {}

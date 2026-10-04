@@ -116,12 +116,42 @@ ok(v["pe_ratio"] == -12.5 and v["pb_ratio"] == -3.3 and v["legs_used"] == 0 and 
 from factor_provenance import CAPTURE_MAP  # noqa: E402
 ok(not all(v.get(k) is None for k in CAPTURE_MAP["value"]), "provenance no longer sees a score from nothing")
 
+print("\n4b. Accounts in another currency are converted before meeting a rupee price")
+INFY_INFO = {"financialCurrency": "USD", "currency": "INR", "freeCashflow": 3.0e9, "marketCap": 4.3e12,
+             "returnOnEquity": 0.30, "netIncomeToCommon": 3.2e9, "bookValue": 228.0, "sharesOutstanding": 4.15e9}
+alpha_model._ticker_info = lambda t: dict(INFY_INFO)
+metrics.piotroski_score = lambda t: {"f_score": 7, "inputs_present": [], "inputs_available": 5}
+alpha_model._interest_coverage = lambda t: None
+data_fetcher.fx_rate = lambda a, b: 88.0
+q = alpha_model._compute_quality_factor("INFY.NS")
+ok(abs(q["fcf_yield"] - 3.0e9 * 88 / 4.3e12 * 100) < 0.01 and q["fcf_fx_rate"] == 88.0,
+   f"USD cash flow converted at the FX rate before dividing by the rupee market cap ({q['fcf_yield']}%)")
+data_fetcher.fx_rate = lambda a, b: None
+q = alpha_model._compute_quality_factor("INFY.NS")
+ok(q["fcf_yield"] is None and "fcf_yield" not in q["inputs_used"], "no FX rate: the input is dropped, not guessed")
+INFY_INFO.update(financialCurrency="INR")
+
+
+def _no_fx(a, b):
+    raise AssertionError("no FX lookup for the same currency")
+
+
+data_fetcher.fx_rate = _no_fx
+q = alpha_model._compute_quality_factor("TCS.NS")
+ok(abs(q["fcf_yield"] - 3.0e9 / 4.3e12 * 100) < 0.01, "same currency: no conversion")
+df2 = importlib.reload(data_fetcher)
+df2.yf.Ticker = FakeTicker
+d2 = df2._derived_fundamentals("USDCO.NS", {"netIncomeToCommon": 800.0, "bookValue": 228.0, "sharesOutstanding": 10.0,
+                                             "financialCurrency": "USD", "currency": "INR"})
+ok(abs(d2["roe"] - 800.0 / 6000.0) < 1e-4, "ROE for a USD reporter divides dollars by dollars (balance-sheet equity)")
+
 print("\n5. The specification records v1.5.0's rules")
 import strategy_version  # noqa: E402
 spec = strategy_version.current_spec()
 uni = spec.get("universe_rules", {})
 ok(list(uni.get("excluded_isin_prefixes") or []) == ["INF"], "excluded ISIN prefixes are part of the spec")
 ok(uni.get("piotroski_statement_fallbacks"), "Piotroski's statement fallbacks are part of the spec")
+ok("converted" in (uni.get("currency_rule") or ""), "the currency rule is part of the spec")
 
 print("\n" + "=" * 60)
 print(f"passed {len(PASS)}, failed {len(FAIL)}")

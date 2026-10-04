@@ -93,8 +93,13 @@ def _fy_label(ts):
 def _yahoo_statements(ticker):
     import yfinance as yf
     tk = yf.Ticker(ticker)
+    try:
+        from data_fetcher import get_info
+        ccy = (get_info(ticker) or {}).get("financialCurrency")
+    except Exception:
+        ccy = None
     return {"income": tk.income_stmt, "balance": tk.balance_sheet, "cashflow": tk.cashflow,
-            "quarterly": tk.quarterly_income_stmt}
+            "quarterly": tk.quarterly_income_stmt, "currency": ccy}
 
 
 def _yahoo_ohlcv(ticker, start, end):
@@ -119,6 +124,12 @@ def fundamentals_history(ticker):
         st = STATEMENTS(ticker)
     except Exception as e:
         return {"error": f"Could not fetch statements for {ticker}: {type(e).__name__}"}
+    # Shown in the company's own reporting currency. Infosys and HCL Tech report in
+    # US dollars; labelling their figures "Rs crore" was off by ~88x. Converting past
+    # years at today's rate would distort growth, so they are not converted.
+    ccy = (st.get("currency") or "INR").upper()
+    unit = CRORE if ccy == "INR" else 1e6
+    money_label = "Rs crore" if ccy == "INR" else f"{ccy} million"
     years = {}
     for part, wanted in (("income", INCOME_ROWS), ("balance", BALANCE_ROWS), ("cashflow", CASHFLOW_ROWS)):
         for ts, vals in _rows(st.get(part), wanted).items():
@@ -133,7 +144,7 @@ def fundamentals_history(ticker):
         row = {"period_end": ts.strftime("%Y-%m-%d"), "label": _fy_label(ts)}
         for k in list(INCOME_ROWS) + list(BALANCE_ROWS) + list(CASHFLOW_ROWS):
             x = v.get(k)
-            row[k] = None if x is None else (_crore(x) if k in IN_CRORE else round(x, 2))
+            row[k] = None if x is None else (_crore(x, unit) if k in IN_CRORE else round(x, 2))
         rev, ni, oi, eq = v.get("revenue"), v.get("net_income"), v.get("operating_income"), v.get("equity")
         # A margin is a share of revenue, so it only exists when revenue is positive. Investment
         # companies can report negative revenue (losses on holdings); a "margin" of that is noise.
@@ -158,7 +169,7 @@ def fundamentals_history(ticker):
         q = {"period_end": ts.strftime("%Y-%m-%d"), "label": ts.strftime("%b %Y")}
         for k in ("revenue", "operating_income", "net_income"):
             x = v.get(k)
-            q[k] = None if x is None else _crore(x)
+            q[k] = None if x is None else _crore(x, unit)
         q["eps_diluted"] = _round(v.get("eps_diluted"), 2)
         qr = v.get("revenue")
         q["net_margin_pct"] = _pct(_ratio(v.get("net_income"), qr)) if qr and qr > 0 else None
@@ -171,12 +182,16 @@ def fundamentals_history(ticker):
         "ticker": ticker,
         "as_of": datetime.now().strftime("%Y-%m-%d"),
         "source": "Yahoo Finance",
-        "units": {"money": "Rs crore", "eps": "Rs per share", "ratios": "percent unless named otherwise"},
+        "currency": ccy,
+        "units": {"money": money_label, "eps": f"{'Rs' if ccy == 'INR' else ccy} per share",
+                  "ratios": "percent unless named otherwise"},
         "annual": annual,
         "quarterly": quarterly,
         "notes": {
             "point_in_time": NOT_PIT,
             "roe": "Return on equity here is the year's profit divided by year-end equity.",
+            "currency": (f"This company reports in {ccy}. Figures are in {money_label} as reported, not "
+                         "converted to rupees, so exchange-rate moves do not distort growth.") if ccy != "INR" else None,
             "gaps": (f"Yahoo leaves some figures blank for this company ({', '.join(missing)}); "
                      "they are shown as gaps, not zero.") if missing else None,
             "eps_break": _eps_break(annual),
@@ -227,10 +242,11 @@ def _margin_outliers(annual):
             "the figures table shows them.")
 
 
-def _crore(x):
-    """Rupees to crore. Two decimals normally, but full precision below 0.01 crore
-    (Rs 1 lakh), so a company with Rs 29,000 of revenue is not shown as 0."""
-    c = x / CRORE
+def _crore(x, unit=CRORE):
+    """Money in the display unit (crore for rupees, million otherwise). Two decimals
+    normally, but full precision below 0.01 of a unit, so a company with Rs 29,000
+    of revenue is not shown as 0."""
+    c = x / unit
     return round(c, 2) if abs(c) >= 0.01 else round(c, 7)
 
 

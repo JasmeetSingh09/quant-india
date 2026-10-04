@@ -295,6 +295,10 @@ def dupont_analysis(ticker: str) -> dict:
 # v1.5.0: where Yahoo's .info lacks these, the Piotroski score reads them from the
 # balance sheet and cash-flow statement (data_fetcher._derived_fundamentals). Long-term
 # debt falls back to total debt, which can only make the low-leverage point harder to earn.
+# v1.5.0: statement money in another currency than the share price is converted at
+# the latest Yahoo FX close before it meets a rupee price or market cap.
+CURRENCY_RULE = "statement money converted to the price currency at the latest FROMTO=X close; no rate, no input"
+
 PIOTROSKI_STATEMENT_FALLBACKS = ("operating_cashflow", "total_assets", "total_equity",
                                  "long_term_debt (else total debt)")
 

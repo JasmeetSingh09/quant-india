@@ -72,11 +72,60 @@ changes is that a strong balance sheet now counts, as the formula always intende
 - The -0.5 result now records the negative P/E and P/B, `legs_used = 0`, and `valued_on = "distress: ..."`.
 - **Recording only:** the score is unchanged.
 
+## 4. Two companies' cash flow mixed dollars with rupees (added after the ratio audit)
+
+**Evidence.**
+- The ratio audit (2,553 stocks, 2026-10-05) found two companies that report in US dollars while
+  their shares trade in rupees: Infosys and HCL Tech.
+- The quality factor divided their dollar free cash flow by their rupee market cap. On 2026-10-04
+  the live scan recorded:
+
+| Company | FCF yield recorded | Comparison |
+|---|---|---|
+| Infosys | 0.08% | TCS 5.29% |
+| HCL Tech | 0.05% | Wipro 6.88% |
+
+- That is about 88 times too small: an unfair quality penalty worth roughly 2 to 3 alpha points.
+
+**Fix.**
+- Statement money is converted to the price currency at the latest Yahoo FX close (`USDINR=X`)
+  before it meets a rupee market cap. With no rate, the input is dropped, never guessed.
+- The statement-based ROE fallback no longer divides dollar profit by rupee book value.
+- The new Fundamentals tab shows such companies in their own reporting currency ("USD million") with
+  a note, instead of labelling dollars as "Rs crore". Display only.
+
+**Effect** (live data, 2026-10-05):
+
+| Company | FCF yield | Quality score |
+|---|---|---|
+| Infosys | 0.08% to 7.27% | 0.528 to 0.662 |
+| HCL Tech | 0.05% to 5.19% | 0.426 to 0.526 |
+
+The quality change includes the Piotroski fix.
+
+## Ratio audit: what it found and what is not fixed
+
+Every stock's Yahoo ratios were re-derived from Yahoo's own price, share count and statements.
+- **Clean:** 2,255 of 2,553 stocks had no disagreement.
+- **EPS against profit ÷ shares:** 196 disagree. Judged against EPS in the company's own quarterly
+  statements:
+  - Yahoo's EPS matched in 71 cases;
+  - profit ÷ shares matched in 38;
+  - both matched in 3;
+  - neither matched in 51;
+  - 33 could not be judged.
+- **P/E affected:** where Yahoo's EPS was the odd one out and a P/E exists (26 stocks, about 1% of
+  the scan), the model's P/E is off, mostly by 20 to 60%.
+- **No fix:** no single Yahoo field is reliably right, and checking every stock against its quarterly
+  statements would add about 2,500 requests to each nightly scan. **Recommendation: record a
+  disagreement flag and revisit.** Not part of v1.5.0.
+- **Book value against balance-sheet equity:** 133 disagree. Not fixed; same reasoning.
+
 ## Not changed here (known, separate)
 
 - **Piotroski F7 (no dilution)** is still given to every stock, as before. Prior-year share counts
   would be needed; that would be its own proposal.
-- **EPS and book-value disagreements inside Yahoo's own data:** found by the ratio audit run on all
+- **EPS and book-value disagreements inside Yahoo's own data:** see "Ratio audit" above. Found by the run on all
   2,553 stocks on 2026-10-05, and still being analysed. Any fix will be proposed separately.
 
 ## Versioning and tests

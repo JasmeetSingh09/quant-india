@@ -38,6 +38,26 @@ def download_close(ticker: str, start: str, end: str = None) -> pd.Series:
     return series
 
 
+def fx_rate(from_ccy: str, to_ccy: str):
+    """
+    Latest Yahoo close of FROMTO=X (e.g. USDINR=X), or None if unavailable.
+
+    Infosys and HCL Tech report in US dollars while their shares trade in
+    rupees. Statement money divided by a rupee market cap was ~88x too small
+    (Infosys FCF yield 0.08% against TCS 5.29%) until v1.5.0 converted it.
+    An unknown rate returns None so the caller drops the input, never guesses.
+    """
+    if not from_ccy or not to_ccy or from_ccy == to_ccy:
+        return 1.0
+    start = (datetime.now() - pd.Timedelta(days=14)).strftime("%Y-%m-%d")
+    s = download_close(f"{from_ccy}{to_ccy}=X", start)
+    try:
+        s = s.dropna()
+        return float(s.iloc[-1]) if len(s) else None
+    except Exception:
+        return None
+
+
 def clear_price_cache():
     """Empty the shared price cache (e.g. for a forced refresh)."""
     _PRICE_CACHE.clear()
@@ -757,9 +777,13 @@ def _derived_fundamentals(ticker: str, info: dict) -> dict:
 
     net_income = info.get("netIncomeToCommon")
 
-    # ROE straight from .info — no network call needed
+    # ROE straight from .info — no network call needed. Not when the accounts are
+    # in another currency than the share price (Infosys, HCL Tech report in USD):
+    # bookValue is per share in rupees, net income in dollars. The balance-sheet
+    # fallback below divides dollars by dollars instead.
     bv, shares = info.get("bookValue"), info.get("sharesOutstanding")
-    if net_income and bv and shares:
+    same_ccy = (info.get("financialCurrency") or "INR") == (info.get("currency") or "INR")
+    if net_income and bv and shares and same_ccy:
         equity = bv * shares
         if equity > 0:
             out["roe"] = round(net_income / equity, 4)

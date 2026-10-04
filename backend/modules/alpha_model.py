@@ -550,6 +550,15 @@ def _compute_quality_factor(ticker: str) -> dict:
             parts.append((0.4, f_norm)); wsum += 0.4
         if roe is not None:
             parts.append((0.4, ((roe - roe_mean) / roe_std) / 3)); wsum += 0.4
+        # Accounts in another currency than the share price (Infosys and HCL Tech
+        # report in US dollars): convert the cash flow before dividing by the
+        # rupee market cap. Before v1.5.0 it was ~88x too small. No rate, no input.
+        fin_ccy, px_ccy = info.get("financialCurrency"), info.get("currency")
+        fcf_fx = None
+        if fcf is not None and fin_ccy and px_ccy and fin_ccy != px_ccy:
+            from data_fetcher import fx_rate
+            fcf_fx = fx_rate(fin_ccy, px_ccy)
+            fcf = fcf * fcf_fx if fcf_fx else None
         fcf_yield = (fcf / mktcap) if (fcf is not None and mktcap) else None
         if fcf_yield is not None:
             parts.append((0.2, ((fcf_yield - fcf_mean) / fcf_std) / 3)); wsum += 0.2
@@ -623,6 +632,7 @@ def _compute_quality_factor(ticker: str) -> dict:
             "piotroski_inputs_available": f_result.get("inputs_available"),
             "roe":         round(roe * 100, 2) if roe is not None else None,
             "fcf_yield":   round(fcf_yield * 100, 2) if fcf_yield is not None else None,
+            "fcf_fx_rate": round(fcf_fx, 4) if fcf_fx else None,
             "interpretation": (
                 "High quality business"       if score > 0.4 else
                 "Above-average quality"       if score > 0.1 else

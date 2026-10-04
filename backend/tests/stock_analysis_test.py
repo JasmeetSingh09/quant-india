@@ -196,6 +196,15 @@ A.STATEMENTS = lambda t: {"income": tinyrev, "balance": None, "cashflow": None, 
 tr = A.fundamentals_history("TEST.NS")["annual"][0]
 ok(tr["revenue"] != 0 and abs(tr["revenue"] * 1e7 - 29000) < 1, "Rs 29,000 of revenue is kept, not rounded to 0")
 
+# Infosys as Yahoo has it: statements in US dollars.
+usd = pd.DataFrame({pd.Timestamp("2026-03-31"): [19.3e9, 3.2e9]}, index=["Total Revenue", "Net Income"])
+A.STATEMENTS = lambda t: {"income": usd, "balance": None, "cashflow": None, "quarterly": None, "currency": "USD"}
+u = A.fundamentals_history("INFY.NS")
+ok(u["units"]["money"] == "USD million" and u["annual"][0]["revenue"] == 19300.0,
+   "a USD reporter is shown in USD million, not labelled Rs crore")
+ok(u["notes"]["currency"] and "not converted" in u["notes"]["currency"], "the page says the figures are in USD")
+ok(f["notes"]["currency"] is None and f["units"]["money"] == "Rs crore", "rupee reporters stay in Rs crore, with no note")
+
 A.STATEMENTS = lambda t: {"income": pd.DataFrame(), "balance": None, "cashflow": pd.DataFrame(), "quarterly": None}
 ok("error" in A.fundamentals_history("TEST.NS"), "no statements at all is an error")
 
