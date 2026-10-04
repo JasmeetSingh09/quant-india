@@ -88,7 +88,7 @@ WEIGHT_NOTES = {
                 "better risk-adjusted returns than their beta predicts.",
 }
 
-MODEL_VERSION_V2 = "alpha-v2-six-factor"
+MODEL_VERSION_V2 = "alpha-v2.1-six-factor"
 
 # ---------------------------------------------------------------------------
 # Behavioural parameters, named so they can be frozen. Previously inline

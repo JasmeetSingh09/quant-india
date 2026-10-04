@@ -47,7 +47,10 @@ MAX_WORKERS    = 6
 # model fix reaches already-scanned stocks instead of waiting for tomorrow's
 # cycle. IDEA.NS sat at +55.95 STRONG BUY for hours after the distress fix
 # landed purely because its row already existed for the current cycle.
-MODEL_VERSION  = "distress-v3-coverage"
+MODEL_VERSION  = "v1.5.0-statement-inputs"
+# Security ISIN prefixes left out of the scored universe (v1.5.0): INF = mutual fund
+# and ETF units. The factors are company measures, so a fund cannot be scored on them.
+EXCLUDED_ISIN_PREFIXES = ("INF",)
 
 _LOCK    = threading.Lock()
 _THREAD  = None
@@ -375,9 +378,18 @@ def _bhavcopy_symbols() -> list:
     try:
         from db import get_conn
         conn = get_conn()
+        # v1.5.0: funds and ETFs are left out. Their ISINs start INF (mutual fund
+        # units); companies' start INE. The factors are company measures (P/E,
+        # ROE, Piotroski), so a fund scored on them is meaningless: the
+        # 2026-10-04 cycle scored 292 funds, labelled 100 of them BUY and a
+        # liquid fund (LIQUID1) STRONG BUY.
+        # The pattern goes in as a parameter: a literal % in the SQL text is read
+        # by psycopg2 as a placeholder when params are passed, and fails on Postgres.
         rows = conn.execute(
             "SELECT DISTINCT symbol FROM bhavcopy_eod "
-            "WHERE day >= (SELECT MAX(day) FROM bhavcopy_eod)").fetchall()
+            "WHERE day >= (SELECT MAX(day) FROM bhavcopy_eod) "
+            + "AND (isin IS NULL OR isin NOT LIKE ?) " * len(EXCLUDED_ISIN_PREFIXES),
+            tuple(p + "%" for p in EXCLUDED_ISIN_PREFIXES)).fetchall()
         conn.close()
         return [r[0] for r in rows if r and r[0]]
     except Exception:

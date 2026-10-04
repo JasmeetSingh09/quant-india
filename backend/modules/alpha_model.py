@@ -44,7 +44,7 @@ from bounded_cache import BoundedCache
 
 # Bumped whenever a change alters what a score means. Stamped on every
 # result so a stored signal records which model produced it.
-MODEL_VERSION = "alpha-v4-distress-coverage"
+MODEL_VERSION = "alpha-v5-statement-inputs"
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
@@ -663,6 +663,7 @@ def _compute_value_factor(ticker: str, peers: list = None) -> dict:
         info     = _ticker_info(ticker)
         pe_self  = info.get("trailingPE")
         pb_self  = info.get("priceToBook")
+        pe_raw, pb_raw = pe_self, pb_self      # as Yahoo reported them, for the record below
 
         # A NEGATIVE multiple is distress, not a discount. Vodafone Idea
         # (IDEA.NS) carries bookValue -3.30 and priceToBook -4.09 — liabilities
@@ -682,9 +683,15 @@ def _compute_value_factor(ticker: str, peers: list = None) -> dict:
             # Nothing usable left. If that is BECAUSE the multiples were
             # negative, say so and score it as a warning, not as neutral.
             if distressed:
+                # The multiples that triggered the warning are returned so the
+                # provenance record shows what the -0.5 was computed from. Before
+                # 2026-10-05 they were not, and the audit counted these 60 stocks
+                # as "scored from nothing". Recording only: the score is unchanged.
                 return {"score": -0.5, "confidence": 0.6,
                         "reason": f"unusable valuation: {', '.join(distressed)}",
-                        "interpretation": "Distressed — " + " and ".join(distressed)}
+                        "interpretation": "Distressed — " + " and ".join(distressed),
+                        "pe_ratio": pe_raw, "pb_ratio": pb_raw, "legs_used": 0,
+                        "valued_on": "distress: " + " and ".join(distressed)}
             return {"score": 0.0, "confidence": 0.0, "reason": "no valuation data"}
 
         peer_pes = []

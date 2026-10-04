@@ -789,6 +789,27 @@ def _derived_fundamentals(ticker: str, info: dict) -> dict:
         if ocf is not None and capex is not None:
             out["free_cashflow"] = round(ocf + capex, 2)   # capex is negative
             out["_derived"].append("free_cashflow")
+        # Raw statement values for the Piotroski F-score (v1.5.0). Yahoo's .info
+        # never carries totalAssets, totalStockholderEquity or longTermDebt for
+        # NSE tickers, so F4 and F5 could never be earned. Unknown stays unknown:
+        # a missing row is left out, never filled with 0.
+        if total_assets:
+            out["total_assets"] = total_assets
+        eq_bs = _row(bs, "Stockholders Equity", "Total Stockholder Equity", "Common Stock Equity")
+        if eq_bs is not None:
+            out["total_equity"] = eq_bs
+        ltd = _row(bs, "Long Term Debt", "Long Term Debt And Capital Lease Obligation")
+        if ltd is not None:
+            out["long_term_debt"], out["long_term_debt_source"] = ltd, "long-term debt"
+        else:
+            # Total debt can only overstate long-term debt, so using it can make
+            # the low-leverage test harder to pass, never easier.
+            tdebt = _row(bs, "Total Debt")
+            if tdebt is not None:
+                out["long_term_debt"], out["long_term_debt_source"] = tdebt, "total debt (no long-term row)"
+        if ocf is not None:
+            out["operating_cashflow"] = ocf
+
         # ROE fallback if bookValue was unavailable above
         if "roe" not in out and net_income:
             eq = _row(bs, "Stockholders Equity", "Total Stockholder Equity")

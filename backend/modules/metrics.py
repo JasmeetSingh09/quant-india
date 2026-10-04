@@ -292,6 +292,12 @@ def dupont_analysis(ticker: str) -> dict:
 # The eight fields the nine legs below read. Named here so the presence of each
 # can be recorded alongside the score, and so a future reader can see the input
 # set without reverse-engineering it from the leg tests.
+# v1.5.0: where Yahoo's .info lacks these, the Piotroski score reads them from the
+# balance sheet and cash-flow statement (data_fetcher._derived_fundamentals). Long-term
+# debt falls back to total debt, which can only make the low-leverage point harder to earn.
+PIOTROSKI_STATEMENT_FALLBACKS = ("operating_cashflow", "total_assets", "total_equity",
+                                 "long_term_debt (else total debt)")
+
 PIOTROSKI_INPUTS = ("returnOnAssets", "operatingCashflow", "currentRatio",
                     "longTermDebt", "grossMargins", "revenueGrowth",
                     "totalAssets", "totalStockholderEquity")
@@ -319,10 +325,15 @@ def piotroski_score(ticker: str) -> dict:
         der = _derived_fundamentals(ticker, info)
 
         roa           = info.get("returnOnAssets") or der.get("roa") or 0
-        cfo           = info.get("operatingCashflow", 0) or 0
-        total_assets  = info.get("totalAssets") or None
-        long_term_debt= info.get("longTermDebt", 0) or 0
-        total_equity  = info.get("totalStockholderEquity") or None
+        # v1.5.0: total assets, equity, long-term debt and operating cash flow
+        # fall back to the statements already fetched. Before, .info never had
+        # the first three for NSE tickers, so F4 and F5 were 0 for every stock.
+        cfo           = info.get("operatingCashflow") or der.get("operating_cashflow") or 0
+        total_assets  = info.get("totalAssets") or der.get("total_assets") or None
+        long_term_debt= info.get("longTermDebt")
+        if long_term_debt is None:
+            long_term_debt = der.get("long_term_debt")
+        total_equity  = info.get("totalStockholderEquity") or der.get("total_equity") or None
         current_ratio = info.get("currentRatio") or der.get("current_ratio") or 0
         gross_margin  = info.get("grossMargins", 0) or 0
         revenue_growth= info.get("revenueGrowth", 0) or 0
@@ -337,7 +348,9 @@ def piotroski_score(ticker: str) -> dict:
         f4_cfo_beats_roa  = 1 if (total_assets and (cfo / total_assets) > roa) else 0
 
         # Leverage & Liquidity
-        leverage_ratio    = (long_term_debt / total_equity) if total_equity else None
+        # Leverage needs both figures and positive equity; unknown debt is not zero debt.
+        leverage_ratio    = (long_term_debt / total_equity
+                             if (total_equity and total_equity > 0 and long_term_debt is not None) else None)
         f5_low_leverage   = 1 if (leverage_ratio is not None and leverage_ratio < 0.5) else 0
         f6_good_liquidity = 1 if current_ratio > 1.0 else 0
         # Share dilution proxy: we assume no dilution (yfinance lacks prior-year share count easily)
@@ -381,6 +394,11 @@ def piotroski_score(ticker: str) -> dict:
             "health_bucket": bucket,
             "signals":       signals,
             "inputs_present":   present,
+            "inputs_from_statements": sorted(k for k, v in (("total_assets", total_assets),
+                                              ("total_equity", total_equity), ("long_term_debt", long_term_debt))
+                                             if v is not None and info.get({"total_assets": "totalAssets",
+                                             "total_equity": "totalStockholderEquity",
+                                             "long_term_debt": "longTermDebt"}[k]) is None),
             "inputs_available": len(present),
             "inputs_declared":  len(PIOTROSKI_INPUTS),
             "note": (

@@ -324,7 +324,9 @@ def current_spec() -> dict:
     uni = {}
     _block(uni, "universe_scan",
            ["LARGE_CAP_RANK_MAX", "MID_CAP_RANK_MAX", "LARGE_CAP_MIN",
-            "MID_CAP_MIN"])
+            "MID_CAP_MIN", "EXCLUDED_ISIN_PREFIXES"])
+    _cap(uni, "piotroski_statement_fallbacks",
+         lambda: list(__import__("metrics").PIOTROSKI_STATEMENT_FALLBACKS))
     spec["universe_rules"] = uni
 
     bm = {}
