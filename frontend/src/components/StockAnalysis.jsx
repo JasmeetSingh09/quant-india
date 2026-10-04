@@ -27,7 +27,11 @@ const GRID = <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" />
 const TIP = { background: '#111827', border: '1px solid #374151', fontSize: 12, borderRadius: 8 }
 const AXIS = { stroke: '#6b7280', fontSize: 10 }
 
-const cr = v => (v == null ? 'no figure' : `Rs ${Number(v).toLocaleString('en-IN', { maximumFractionDigits: 0 })} cr`)
+// Under 0.01 crore (Rs 1 lakh) a rounded figure would read as 0, which must only ever mean zero.
+const tiny = v => v !== 0 && Math.abs(v) < 0.01
+const rupees = v => `Rs ${Math.round(v * 1e7).toLocaleString('en-IN')}`
+const cr = v => (v == null ? 'no figure' : tiny(v) ? rupees(v)
+  : `Rs ${Number(v).toLocaleString('en-IN', { maximumFractionDigits: 0 })} cr`)
 const pc = v => (v == null ? 'no figure' : `${Number(v).toFixed(1)}%`)
 const nx = (v, d = 2) => (v == null ? 'no figure' : Number(v).toFixed(d))
 const errText = e => (typeof e === 'string' ? e : e?.message || 'Could not load this.')
@@ -211,8 +215,9 @@ function FiguresTable({ rows }) {
               <td className="py-1.5 pr-4 text-gray-400">{label}</td>
               {rows.map(r => (
                 <td key={r.label} className={`py-1.5 px-2 text-right font-mono tabular-nums ${r[key] == null ? 'text-gray-600' : 'text-gray-200'}`}
-                    title={r[key] == null ? 'Yahoo has no figure for this year' : undefined}>
-                  {r[key] == null ? '—' : fmt(r[key]).replace('Rs ', '').replace(' cr', '')}
+                    title={r[key] == null ? 'Yahoo has no figure for this year' : fmt === cr && tiny(r[key]) ? rupees(r[key]) : undefined}>
+                  {r[key] == null ? '—' : fmt === cr && tiny(r[key]) ? (r[key] > 0 ? '<0.01' : '>-0.01')
+                    : fmt(r[key]).replace('Rs ', '').replace(' cr', '')}
                 </td>
               ))}
             </tr>

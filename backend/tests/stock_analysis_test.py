@@ -190,6 +190,12 @@ ok(h["notes"]["margin_outliers"] and "FY2025" in h["notes"]["margin_outliers"]
    and "FY2024" not in h["notes"]["margin_outliers"], "the note names exactly the years beyond 100%")
 ok(f["notes"]["margin_outliers"] is None, "ordinary margins raise no note")
 
+# DCM Financial Services as Yahoo has it: Rs 29,000 of revenue. Rounded to 0.01 crore that is 0.
+tinyrev = pd.DataFrame({pd.Timestamp("2026-03-31"): [29000.0, -10238000.0]}, index=["Total Revenue", "Net Income"])
+A.STATEMENTS = lambda t: {"income": tinyrev, "balance": None, "cashflow": None, "quarterly": None}
+tr = A.fundamentals_history("TEST.NS")["annual"][0]
+ok(tr["revenue"] != 0 and abs(tr["revenue"] * 1e7 - 29000) < 1, "Rs 29,000 of revenue is kept, not rounded to 0")
+
 A.STATEMENTS = lambda t: {"income": pd.DataFrame(), "balance": None, "cashflow": pd.DataFrame(), "quarterly": None}
 ok("error" in A.fundamentals_history("TEST.NS"), "no statements at all is an error")
 

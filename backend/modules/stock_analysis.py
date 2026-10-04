@@ -133,7 +133,7 @@ def fundamentals_history(ticker):
         row = {"period_end": ts.strftime("%Y-%m-%d"), "label": _fy_label(ts)}
         for k in list(INCOME_ROWS) + list(BALANCE_ROWS) + list(CASHFLOW_ROWS):
             x = v.get(k)
-            row[k] = None if x is None else (round(x / CRORE, 2) if k in IN_CRORE else round(x, 2))
+            row[k] = None if x is None else (_crore(x) if k in IN_CRORE else round(x, 2))
         rev, ni, oi, eq = v.get("revenue"), v.get("net_income"), v.get("operating_income"), v.get("equity")
         # A margin is a share of revenue, so it only exists when revenue is positive. Investment
         # companies can report negative revenue (losses on holdings); a "margin" of that is noise.
@@ -158,7 +158,7 @@ def fundamentals_history(ticker):
         q = {"period_end": ts.strftime("%Y-%m-%d"), "label": ts.strftime("%b %Y")}
         for k in ("revenue", "operating_income", "net_income"):
             x = v.get(k)
-            q[k] = None if x is None else round(x / CRORE, 2)
+            q[k] = None if x is None else _crore(x)
         q["eps_diluted"] = _round(v.get("eps_diluted"), 2)
         qr = v.get("revenue")
         q["net_margin_pct"] = _pct(_ratio(v.get("net_income"), qr)) if qr and qr > 0 else None
@@ -225,6 +225,13 @@ def _margin_outliers(annual):
             "That happens when most of the profit comes from other income or holdings in other companies, or when "
             "revenue is very small, so a margin means little here. Those years are left off the margin chart; "
             "the figures table shows them.")
+
+
+def _crore(x):
+    """Rupees to crore. Two decimals normally, but full precision below 0.01 crore
+    (Rs 1 lakh), so a company with Rs 29,000 of revenue is not shown as 0."""
+    c = x / CRORE
+    return round(c, 2) if abs(c) >= 0.01 else round(c, 7)
 
 
 def _pct(x):
