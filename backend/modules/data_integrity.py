@@ -262,13 +262,18 @@ def identity_integrity(sample_offenders: int = 8) -> dict:
             "a symbol carrying two ISINs is two companies in one series",
             [str(r[0]) + " (" + str(r[1]) + " ISINs)" for r in reused]))
 
+        # The pattern is a parameter. As a literal ('IN%') psycopg2 read the % as
+        # a placeholder, the query failed on Postgres, and this check was silently
+        # left out of every production report (found 2026-10-05).
         malformed = ("isin IS NOT NULL AND (LENGTH(isin) <> 12 "
-                     "OR isin NOT LIKE 'IN%')")
-        bad_isin = _one(conn, "SELECT COUNT(*) FROM bhavcopy_eod WHERE " + malformed)
-        if not isinstance(bad_isin, dict) and bad_isin is not None:
+                     "OR isin NOT LIKE ?)")
+        bad_isin = _one(conn, "SELECT COUNT(*) FROM bhavcopy_eod WHERE " + malformed, ("IN%",))
+        if isinstance(bad_isin, dict) or bad_isin is None:
+            findings.append(_finding("every ISIN is well formed", bad_isin or {}, bad_isin or {}))
+        else:
             mal = conn.execute(
                 "SELECT DISTINCT isin FROM bhavcopy_eod WHERE " + malformed +
-                " LIMIT " + str(int(sample_offenders))).fetchall()
+                " LIMIT " + str(int(sample_offenders)), ("IN%",)).fetchall()
             findings.append(_finding(
                 "every ISIN is well formed", rows_with_isin, bad_isin[0] or 0,
                 "12 characters, INE/INF/IN9 prefix",

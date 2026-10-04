@@ -46,7 +46,7 @@ NETBLOCK = os.path.join(HERE, "ci")
 SUITES = [
     ("test_core_properties.py",          81215, 600),
     ("test_new_algorithms_stress.py",    87173, 600),
-    ("data_integrity_test.py",             109, 300),
+    ("data_integrity_test.py",             110, 300),
     ("corporate_action_audit_test.py",      66, 120),
     ("bhavcopy_history_test.py",            51, 120),
     ("pit_validation_e2e.py",               65, 300),

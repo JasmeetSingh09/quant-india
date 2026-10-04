@@ -334,6 +334,11 @@ r = DI.identity_integrity()
 f = [x for x in r["findings"] if x["check"] == "every ISIN is well formed"][0]
 check("a malformed ISIN trips the check", f["status"] == "FAIL",
       f"bad={f['bad']} {f['offenders']}")
+# SQLite accepts a literal % in the SQL; Postgres (psycopg2 with params) does not, and
+# the check then vanished from every production report. Guard the source, not just SQLite.
+_src = open(DI.__file__, encoding="utf-8").read()
+check("the ISIN pattern is passed as a parameter (Postgres-safe)",
+      "NOT LIKE 'IN%'" not in _src and 'NOT LIKE ?)' in _src)
 
 print()
 print("=" * 74)
