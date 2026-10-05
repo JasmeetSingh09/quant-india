@@ -59,3 +59,32 @@ Momentum's five groups are still in order at every holding period; low risk's st
 - **Still open:** 46 suspected splits that no source records yet are listed in
   `docs/HAND_CHECK_SPLITS_2026-10-05.md`. When they are verified from company filings, this run is
   repeated under the same plan.
+
+## Second re-run, after the hand-check (2026-10-05, 19:26–19:33 UTC)
+
+**Same request and plan.** Raw output: `docs/factor_test1_pit_result_corrected2_2026-10-05.json`.
+
+**What changed in the data since the first re-run:**
+- 2 splits that were genuinely missing were added: ALANKIT 2016-12-15 and DAAWAT 2017-02-07.
+- 340 dividend rows now store the sum of all payouts on the exchange line, not just the first.
+
+**A run at 13:48 UTC is not a result and is not recorded.** It ran while 31 hand-verified split
+rows were in the table. Those rows duplicated splits the adjuster already applied, so the
+splits were applied twice. Welspun India, for example, showed a false tenfold gain in March
+2016. The rows were removed before this run (`docs/HAND_CHECK_SPLITS_2026-10-05.md`).
+
+| Factor | Holding | First re-run | Second re-run | p | Passes |
+|---|---|---|---|---|---|
+| Momentum | 1 month | +1.57% | +1.58% | 0.0001 | yes |
+| Momentum | 3 months | +4.34% | +4.36% | <0.0001 | yes |
+| Momentum | 6 months | +7.67% | +7.68% | <0.0001 | yes |
+| Momentum | 12 months | +11.44% | +11.45% | <0.0001 | yes |
+| Low risk | 1 month | +0.97% | +0.97% | 0.093 | no |
+| Low risk | 3 months | +2.45% | +2.45% | 0.020 | no |
+| Low risk | 6 months | +3.47% | +3.48% | 0.015 | no |
+| Low risk | 12 months | +3.29% | +3.33% | 0.139 | no |
+
+**Corporate actions:** 20,298 seen and 19,994 applied (the two added splits); 304 could not be applied.
+
+**Verdict unchanged.** The repairs moved no spread by more than 0.04 points, which is what
+correct, small repairs should do.
