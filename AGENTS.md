@@ -28,15 +28,16 @@ An NSE quant research platform.
    without BSE's written consent, which has not been given. People may
    download by hand. The code enforces this with `modules/bse_access.py`
    (paused unless `BSE_COLLECTION=on`), as `nse_access.py` does for NSE.
-3. **The v1.5.0 model is frozen** (frozen 2026-10-05; spec hash
-   `f1cbc536bcf405f4`; v1.5.0 = v1.4.3 plus the approved data fixes in
-   `docs/PROPOSAL_V150_DATA_FIXES_2026-10-05.md`: Piotroski reads the statements,
-   funds and rights-entitlement lines are not scored, foreign-currency accounts are
-   converted). Do not change factor formulas, weights, thresholds,
-   signal cut-offs, portfolio construction or validation gates. Any
-   behavioural change needs a written proposal, the owner's approval and a new
-   version. `GET /strategy/drift/v1.5.0` must keep reporting
-   `behavioural_drift: false`.
+3. **The v1.6.0 model is frozen** (frozen 2026-10-05 18:03 UTC; spec hash
+   `54ced1e2c8af0a77`; v1.6.0 = v1.5.0 plus the approved change in
+   `docs/PROPOSAL_V160_LOW_RISK_2026-10-05.md`: in the six-factor model, low risk
+   is shown but not scored and its 18% moved to momentum, now 36%. The live
+   four-factor model is unchanged.) v1.5.0 (`f1cbc536bcf405f4`) was v1.4.3 plus
+   the data fixes in `docs/PROPOSAL_V150_DATA_FIXES_2026-10-05.md`. Do not change
+   factor formulas, weights, thresholds, signal cut-offs, portfolio construction
+   or validation gates. Any behavioural change needs a written proposal, the
+   owner's approval and a new version. `GET /strategy/drift/v1.6.0` must keep
+   reporting `behavioural_drift: false`.
 4. **Pushing to `main` deploys to production** (Render for the backend, Vercel
    for the frontend). Only push or merge to `main` with the owner's explicit
    approval.
@@ -83,7 +84,7 @@ Signals are shown as ranks ("Top ranked" … "Bottom ranked", in
 - **Frontend:** `cd frontend && npx vite build` must succeed.
 - **Production, read-only, after a deploy:**
   - `GET /strategy/drift/v1.4` gives the live commit;
-  - `GET /strategy/drift/v1.5.0` must show no behavioural drift;
+  - `GET /strategy/drift/v1.6.0` must show no behavioural drift;
   - `GET /health/caches` gives memory (the plan is 2 GB; keep it under about
     1.6 GB at idle).
 - **Server memory:** the backend runs FinBERT (about 800 MB) plus nightly
