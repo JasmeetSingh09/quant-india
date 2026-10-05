@@ -47,7 +47,8 @@ TO_CRORE = {"crore": 1.0, "lakh": 0.01, "million": 0.1, "billion": 100.0, "thous
 
 TITLE = {
     "bs": re.compile(r"\bbalance\s*sheet\b", re.I),
-    "pl": re.compile(r"(statement\s+of\s+profit\s+(and|&)\s+loss|profit\s+(and|&)\s+loss\s+(account|statement))", re.I),
+    # "Statements of Profit and Loss" (TCS FY2018) is plural.
+    "pl": re.compile(r"(statements?\s+of\s+profit\s+(and|&)\s+loss|profit\s+(and|&)\s+loss\s+(account|statement))", re.I),
     "cf": re.compile(r"(cash\s*flow\s+statement|statement\s+of\s+cash\s*flows?)", re.I),
 }
 NEED = {
@@ -58,6 +59,63 @@ NEED = {
 SKIP_HEAD = re.compile(r"consolidated|auditor|report\s+on|notes?\s+(to|forming)|significant\s+accounting|"
                        r"we\s+have\s+audited|directors|annexure|highlights|ten\s*year|financial\s+summary|"
                        r"key\s+(figures|indicators)|at\s+a\s+glance", re.I)
+# A running navigation banner names every section of the report on every page:
+# "Company Overview ... Standalone Accounts Consolidated Accounts" (M&M FY2017).
+# Such a line is not a heading, so it must not make a standalone page look consolidated.
+NAV_BANNER = re.compile(r"standalone.{0,40}consolidated|consolidated.{0,40}standalone|"
+                        r"(overview|report|analysis|governance|accounts)(\s+\S+){0,3}\s+"
+                        r"(overview|report|analysis|governance|accounts)\s+(overview|report|analysis|governance|accounts)",
+                        re.I)
+
+
+def head_of(text, n=12):
+    """The first n lines without navigation-banner lines."""
+    return "\n".join(l for l in text.splitlines()[:n] if not NAV_BANNER.search(l))
+
+
+# Font-encoded text. pdfplumber returns "(cid:N)" for glyphs whose font has no
+# Unicode map. Two shapes occur:
+#   ligatures only: "Pro(cid:191) t", "bene(cid:191) ts" (DLF FY2013) -- one code
+#     stands for "fi" or "fl";
+#   the whole page: every character is (cid:N), N = ord(c) + k for one shift k
+#     per font (GAIL FY2012 k = 0, GAIL FY2021 k = 29).
+CID = re.compile(r"\(cid:(\d+)\)")
+CHECK_WORDS = ("profit", "benefit", "financial", "fixed", "flow", "assets", "total", "share",
+               "capital", "loss", "statement", "balance", "sheet", "revenue", "year", "income")
+
+
+def decode_cids(text):
+    """Decode (cid:N) codes when a single, checkable rule explains them; else leave them."""
+    if "(cid:" not in text:
+        return text
+    codes = CID.findall(text)
+    if len(codes) > 0.3 * max(1, len(re.sub(r"\(cid:\d+\)", "", text))):
+        # Whole-page encoding: pick the shift that turns the page into English.
+        best, best_hits = None, 0
+        for k in range(-40, 60):
+            try:
+                dec = CID.sub(lambda m: chr(int(m.group(1)) + k) if 9 < int(m.group(1)) + k < 0x2000 else " ", text)
+            except ValueError:
+                continue
+            hits = sum(dec.lower().count(w) for w in CHECK_WORDS)
+            if hits > best_hits:
+                best, best_hits = dec, hits
+        return best if best_hits >= 5 else text
+    # Ligature codes between letters: "Pro(cid:191) t" -> "Profit". Each code is
+    # mapped to whichever of fi/fl/ff makes more of the check words appear.
+    out = text
+    for code in set(codes):
+        pat = re.compile(r"\(cid:" + code + r"\)\s?")
+        best, best_hits = None, 0
+        for lig in ("fi", "fl", "ff", "ffi"):
+            dec = pat.sub(lig, out)
+            hits = sum(dec.lower().count(w) for w in CHECK_WORDS)
+            if hits > best_hits:
+                best, best_hits = dec, hits
+        base = sum(out.lower().count(w) for w in CHECK_WORDS)
+        if best is not None and best_hits > base:
+            out = best
+    return out
 
 
 def num(tok):
@@ -122,7 +180,7 @@ def find_statements(pages):
     cand = {"bs": [], "pl": [], "cf": []}
     titled_pl = []
     for i, text in enumerate(pages):
-        head = "\n".join(text.splitlines()[:12])
+        head = head_of(text)
         if SKIP_HEAD.search(head) or len(re.findall(r"\d[\d,]{3,}", text)) < 15:
             continue
         # A statement can run onto the next page (HUL FY2018 prints its EPS on
@@ -323,7 +381,7 @@ def face_check(profit, eps, caps, k_cr, exact_any=False):
 
 def extract_pages(pages, name):
     out = {"file": name, "pages": len(pages)}
-    pages = [LIGATURE.sub(r"\1", p) for p in pages]
+    pages = [LIGATURE.sub(r"\1", decode_cids(p)) for p in pages]
     st = find_statements(pages)
     out["statement_pages"] = {k: v + 1 for k, v in st.items()}
     if not st:

@@ -82,6 +82,24 @@ announcement or annual report) before any is entered. The momentum correction re
 | BIOFILCHEM | 2026-02-02 | x0.695 | none | real move |
 | SADHNANIQ | 2026-02-18 | x3.38 | none | real move |
 
+## CORRECTION (2026-10-05, 13:55 UTC): 31 of the 33 inserted rows were duplicates
+
+After the 33 rows below were inserted, a re-run of factor test 1 moved one month's momentum spread
+by 16 points (2016-02). The cause: the exchange had already filed 27 of these 29 events, under the
+company's post-split ISIN and its later symbol (TATAMOTORS as TMPV, CADILAHC as ZYDUSLIFE,
+WELSPUNIND as WELSPUNLIV, PHILIPCARB as PCBL, and so on). The price adjuster links those ISINs
+to the old ones through the shared symbol, so these splits were **already applied** in the morning
+run. This list was built by a check that matched actions by ISIN and current symbol only, so it
+flagged them as missing. The hand rows applied them a second time.
+
+- Genuinely missing, keep: **ALANKIT 2016-12-15** and **DAAWAT 2017-02-07**. Both have an exchange
+  line that was stored but never parsed ("Fv Splt Frm ...").
+- Duplicates, must be withdrawn: the other 31 rows. The production delete was blocked by the
+  permission check and is waiting for the owner. Until it runs, the 13:48 UTC factor test re-run
+  is contaminated and is not recorded as a result.
+- Follow-up: the integrity big-move check needs to match actions through the resolver's linked
+  ISINs, not only the current symbol. Otherwise it reports applied splits as missing.
+
 ## Lookup results (2026-10-05, later the same day)
 
 The 46 "split or bonus" rows were looked up in public sources: financial news sites and corporate-action
