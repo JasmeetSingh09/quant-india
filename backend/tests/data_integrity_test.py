@@ -435,6 +435,30 @@ check("the same drop WITH a corporate action does NOT fail",
 check("  ...and the move is still counted, not hidden",
       f["examined"] >= 1, f"examined={f['examined']}")
 
+# A split that mints a new ISIN, with the action filed under the OLD one (as for
+# Nestle, 2024). The backtest links the two ISINs; the check must too.
+build_clean()
+seed_actions([("INE000000003", "2026-01-15", "split")])
+corrupt("UPDATE bhavcopy_eod SET close = close / 2.0, open = open / 2.0,"
+        " high = high / 2.0, low = low / 2.0, isin = 'INE00000003X' "
+        "WHERE symbol='S3.NS' AND day >= '2026-01-15'")
+r = DI.continuity_integrity()
+f = [x for x in r["findings"] if "corporate action" in x["check"]][0]
+check("a split filed under the PREVIOUS ISIN explains the drop",
+      f["status"] == "PASS", f"bad={f['bad']} {f['offenders'][:2]}")
+
+# A 1-paisa tick on a 2-paisa stock is a 50% move, not a defect.
+build_clean()
+seed_actions([])
+corrupt("UPDATE bhavcopy_eod SET close = 1.0, open = 1.0, high = 1.0, low = 1.0 "
+        "WHERE symbol='S5.NS' AND day < '2026-01-15'")
+corrupt("UPDATE bhavcopy_eod SET close = 1.5, open = 1.5, high = 1.5, low = 1.5 "
+        "WHERE symbol='S5.NS' AND day >= '2026-01-15'")
+r = DI.continuity_integrity()
+f = [x for x in r["findings"] if "corporate action" in x["check"]][0]
+check("tick-size noise under Rs 2 is not counted as a defect, but is reported",
+      f["bad"] == 0 and "under Rs 2" in (f.get("detail") or ""), f"bad={f['bad']}")
+
 # A resumption after a long silence is NOT an overnight move. A stock that
 # stops trading and comes back months later at a different price has produced
 # no defect; the two observations are simply not adjacent in time.
@@ -614,6 +638,16 @@ check("the article count is real", r["examined"]["articles"] == len(RELEVANT),
       str(r["examined"]))
 check("all seven securities are covered",
       r["examined"]["securities"] == 7, str(r["examined"]["securities"]))
+
+# A company with no stored name is not judged against its bare ticker: on
+# production, "20 Microns Q1 results" was failed against "20MICRONS".
+build_clean()
+seed_articles([(t, ti, TODAY) for t, ti in RELEVANT] + [("20MICRONS.NS", "20 Microns Q1 FY27 Results Preview", TODAY)])
+r = DI.news_integrity()
+f = [x for x in r["findings"] if "names the company" in x["check"]][0]
+check("an article for a company with no stored name is not judged (not failed)",
+      f["bad"] == 0 and f["examined"] == len(RELEVANT) and "not judged" in (f.get("detail") or ""),
+      f"bad={f['bad']} examined={f['examined']}")
 check("relevance is 100%", r["relevance_pct"] == 100.0, str(r["relevance_pct"]))
 
 # The regression: each company's OWN headline must match, individually. A single

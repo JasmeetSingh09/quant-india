@@ -521,7 +521,10 @@ def run(top_fraction: float = 0.2, min_turnover: float = MIN_MONTHLY_TURNOVER,
                f"({(prices.get('adjustment') or {}).get('actions_applied')} "
                f"corporate actions applied, "
                f"{(prices.get('adjustment') or {}).get('actions_unapplied')} "
-               f"could not be); traded value is left as printed."
+               f"could not be); traded value is left as printed. "
+               "Demergers are not adjusted: the split of value between the two companies "
+               "is not in the data, so a demerger shows as a fall in the parent's price "
+               "that month (2026-10-05 review)."
                if prices.get("adjusted_for_corporate_actions") else
                "Prices are exchange closes, unadjusted for splits and dividends, "
                "so a corporate action inside the hold month distorts that "

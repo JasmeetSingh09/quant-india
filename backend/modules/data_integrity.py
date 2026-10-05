@@ -411,12 +411,13 @@ def continuity_integrity(move_pct: float = 40.0, sample_offenders: int = 12,
                 WITH stepped AS (
                     SELECT symbol, isin, day, close,
                            LAG(close) OVER (PARTITION BY symbol ORDER BY day) AS prev,
-                           LAG(day)   OVER (PARTITION BY symbol ORDER BY day) AS prev_day
+                           LAG(day)   OVER (PARTITION BY symbol ORDER BY day) AS prev_day,
+                           LAG(isin)  OVER (PARTITION BY symbol ORDER BY day) AS prev_isin
                     FROM bhavcopy_eod
                     WHERE close IS NOT NULL AND close > 0
                 )
                 SELECT symbol, isin, day, prev_day,
-                       100.0 * (close - prev) / prev AS pct
+                       100.0 * (close - prev) / prev AS pct, prev, prev_isin
                 FROM stepped
                 WHERE prev IS NOT NULL AND prev > 0
                   AND ABS(100.0 * (close - prev) / prev) >= {ph}
@@ -424,11 +425,17 @@ def continuity_integrity(move_pct: float = 40.0, sample_offenders: int = 12,
                 LIMIT 5000
             """, (move_pct,)).fetchall()
 
+            # Keyed by ISIN AND by symbol: a split mints a new ISIN, and its action
+            # may be filed under either the old or the new one. The backtest links
+            # them (security_identity); counting only the same ISIN reported
+            # Nestle's 2024 split as unexplained (2026-10-05 review).
             actions = set()
             try:
-                for isin, ex in conn.execute(
-                        "SELECT isin, ex_date FROM corporate_actions").fetchall():
+                for isin, sym, ex in conn.execute(
+                        "SELECT isin, symbol, ex_date FROM corporate_actions").fetchall():
                     actions.add((str(isin), str(ex)[:10]))
+                    if sym:
+                        actions.add(("sym:" + str(sym).upper().replace(".NS", ""), str(ex)[:10]))
             except Exception:
                 actions = None
 
@@ -441,7 +448,12 @@ def continuity_integrity(move_pct: float = 40.0, sample_offenders: int = 12,
             else:
                 explained = unexplained = stale = 0
                 stale_eg = []
-                for sym, isin, day, prev_day, pct in rows:
+                # Not defects, counted apart: a 1-paisa tick is 50% of a 2-paisa
+                # stock; funds and rights-entitlement lines are not company shares.
+                tick = funds = rights = 0
+                import re as _re
+                _re_line = _re.compile(r"-RE\d*(?:\.NS)?$", _re.I)
+                for sym, isin, day, prev_day, pct, prev, prev_isin in rows:
                     d = str(day)[:10]
                     # Not adjacent in time -> not an overnight move at all.
                     apart = None
@@ -456,27 +468,40 @@ def continuity_integrity(move_pct: float = 40.0, sample_offenders: int = 12,
                         if len(stale_eg) < sample_offenders:
                             stale_eg.append(f"{sym}@{d} {pct:+.1f}% after {apart}d silent")
                         continue
+                    if prev is not None and float(prev) < 2:
+                        tick += 1
+                        continue
+                    if isin and str(isin).upper().startswith("INF"):
+                        funds += 1
+                        continue
+                    if _re_line.search(str(sym or "")):
+                        rights += 1
+                        continue
                     near = False
-                    if isin:
-                        base = _dt.date.fromisoformat(d)
-                        for k in range(-3, 4):
-                            if (str(isin), (base + _dt.timedelta(days=k)).isoformat()) in actions:
-                                near = True
-                                break
+                    keys = {str(k) for k in (isin, prev_isin) if k}
+                    keys.add("sym:" + str(sym or "").upper().replace(".NS", ""))
+                    base = _dt.date.fromisoformat(d)
+                    for k in range(-3, 4):
+                        dd = (base + _dt.timedelta(days=k)).isoformat()
+                        if any((key, dd) in actions for key in keys):
+                            near = True
+                            break
                     if near:
                         explained += 1
                     else:
                         unexplained += 1
                         if len(offenders) < sample_offenders:
                             offenders.append(f"{sym}@{d} {pct:+.1f}%")
-                adjacent = len(rows) - stale
+                adjacent = len(rows) - stale - tick - funds - rights
                 findings.append(_finding(
                     "a large overnight move is explained by a corporate action",
                     adjacent, unexplained,
                     f"moves of at least {move_pct}% between CONSECUTIVE trading "
                     f"days no more than {resume_days} days apart; a corporate "
-                    f"action on the same ISIN within 3 days counts as explained. "
-                    f"{explained} explained, {unexplained} not. A further {stale} "
+                    f"action within 3 days, under either ISIN or the symbol, counts as "
+                    f"explained. {explained} explained, {unexplained} not. Not counted as "
+                    f"defects: {tick} from a price under Rs 2 (tick size), {funds} funds, "
+                    f"{rights} rights-entitlement lines. A further {stale} "
                     f"large moves were excluded as resumptions after a long "
                     f"silence -- those are not overnight moves and are reported "
                     f"separately rather than counted as defects.",
@@ -738,7 +763,7 @@ def news_integrity(cycle: str = None, sample_offenders: int = 10,
         return {"domain": "news", "status": "UNMEASURED",
                 "reason": f"no articles stored for cycle {cycle}", "findings": []}
 
-    terms, offtopic, future, undated = {}, [], 0, 0
+    terms, offtopic, future, undated, unjudged = {}, [], 0, 0, 0
     per_ticker = {}
     for ticker, title, published_at in rows:
         t = str(ticker)
@@ -751,15 +776,22 @@ def news_integrity(cycle: str = None, sample_offenders: int = 10,
             future += 1
 
         if t not in terms:
-            name = t.replace(".NS", "")
+            # Judged only against a real company name. Falling back to the bare
+            # ticker tested "20 Microns ..." against "20MICRONS" and failed 52% of
+            # articles on production, where the names table was empty; with names,
+            # 98.7% name their company (2026-10-05 review). Unknown is not judged.
+            name = None
             if get_stock_by_symbol:
                 try:
-                    rec = get_stock_by_symbol(name)
+                    rec = get_stock_by_symbol(t.replace(".NS", ""))
                     if rec and rec.get("company_name"):
                         name = rec["company_name"]
                 except Exception:
                     pass
-            terms[t] = _identity_terms(name, t)
+            terms[t] = _identity_terms(name, t) if name else None
+        if terms[t] is None:
+            unjudged += 1
+            continue
         words, patterns = terms[t]
         if title and not _mentions(title, words, patterns):
             per_ticker[t][1] += 1
@@ -787,8 +819,10 @@ def news_integrity(cycle: str = None, sample_offenders: int = 10,
     off_n = sum(v[1] for v in per_ticker.values())
     findings = [
         _finding("every scored article names the company it was scored for",
-                 n, off_n,
-                 "re-run through the production matcher, not a copy of it",
+                 n - unjudged, off_n,
+                 "re-run through the production matcher, not a copy of it; judged "
+                 f"against each company's stored name. {unjudged} article(s) for "
+                 "companies with no stored name were not judged",
                  offtopic),
         _finding("no article is published in the future", n, future,
                  "boundary " + boundary + " (UTC/IST slack)"),

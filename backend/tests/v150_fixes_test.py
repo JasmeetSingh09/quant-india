@@ -99,10 +99,11 @@ c.execute("CREATE TABLE IF NOT EXISTS bhavcopy_eod (symbol TEXT, day TEXT, open 
 c.executemany("INSERT INTO bhavcopy_eod (symbol, day, isin) VALUES (?, ?, ?)",
               [("TCS.NS", "2026-09-07", "INE467B01029"), ("LIQUID1.NS", "2026-09-07", "INF732E01037"),
                ("NIFTYBEES.NS", "2026-09-07", "INF204KB14I2"), ("JISLDVREQS.NS", "2026-09-07", "IN9175A01010"),
-               ("NOISIN.NS", "2026-09-07", None), ("OLD.NS", "2026-09-06", "INE000000000")])
+               ("NOISIN.NS", "2026-09-07", None), ("OLD.NS", "2026-09-06", "INE000000000"),
+               ("VINNY-RE.NS", "2026-09-07", "INE0R7Z20015"), ("INDO-RE2.NS", "2026-09-07", "INE0Q2T20025")])
 c.commit(); c.close()
 syms = set(universe_scan._bhavcopy_symbols())
-ok(syms == {"TCS.NS", "JISLDVREQS.NS", "NOISIN.NS"}, f"companies kept, funds and ETFs left out ({sorted(syms)})")
+ok(syms == {"TCS.NS", "JISLDVREQS.NS", "NOISIN.NS"}, f"companies kept; funds, ETFs and rights entitlements (-RE) left out ({sorted(syms)})")
 src = open(universe_scan.__file__, encoding="utf-8").read()
 q = src[src.index("SELECT DISTINCT symbol FROM bhavcopy_eod"):src.index(".fetchall()", src.index("SELECT DISTINCT symbol FROM bhavcopy_eod"))]
 ok("%'" not in q and "NOT LIKE ?" in q, "the pattern is a parameter, so Postgres does not read % as a placeholder")

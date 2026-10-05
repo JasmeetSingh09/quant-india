@@ -99,8 +99,14 @@ _API = ("https://www.nseindia.com/api/corporates-corporateActions?index=equities
 # The face-value context is REQUIRED, and that is the safety property: without
 # it, "Rights 3:4 @ Premium Rs.32/- Per Share" offers two numbers and a "to"
 # and would be read as a split. A rights premium is not a face value.
+# "Consolidation Of Equity Shares From Re 1 Per Share To Rs 10" is the same
+# face-value change in the other direction (2026-10-05: two were stored unparsed).
+# price_multiplier's new/old then scales history UP, which is what a
+# consolidation needs. "Capital Reduction Rs 10 To Rs 3.30 / Consolidation Rs
+# 3.30 To Rs.10" yields only the consolidation leg: a capital reduction cuts the
+# face value without changing the share count, so it does not move the price.
 _SPLIT_RE = re.compile(
-    r"(?:face\s*val\w*|sub-?divi\w*)"
+    r"(?:face\s*val\w*|sub-?divi\w*|consolidat\w*)"
     r"[^0-9]{0,60}?r[se]\.?\s*([0-9]+(?:\.[0-9]+)?)"
     r"[^0-9]{0,30}?to\s*r[se]\.?\s*([0-9]+(?:\.[0-9]+)?)", re.I)
 

@@ -46,11 +46,11 @@ NETBLOCK = os.path.join(HERE, "ci")
 SUITES = [
     ("test_core_properties.py",          81215, 600),
     ("test_new_algorithms_stress.py",    87173, 600),
-    ("data_integrity_test.py",             110, 300),
+    ("data_integrity_test.py",             113, 300),
     ("corporate_action_audit_test.py",      66, 120),
     ("bhavcopy_history_test.py",            51, 120),
     ("pit_validation_e2e.py",               65, 300),
-    ("corporate_actions_test.py",           55, 120),
+    ("corporate_actions_test.py",           58, 120),
     ("parse_subject_test.py",               54, 120),
     ("strategy_version_test.py",            48, 120),
     ("isin_split_diagnostic_test.py",       47, 120),
@@ -104,6 +104,7 @@ SUITES = [
     ("stock_analysis_test.py",              49, 120),
     ("regime_retired_test.py",              11, 60),
     ("v150_fixes_test.py",                  24, 120),
+    ("security_names_test.py",              11, 60),
     ("thesis_records_test.py",              40, 60),
 ]
 # run_ci_selftest.py is not listed: the workflow runs it as its own step first,

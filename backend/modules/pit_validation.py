@@ -1031,6 +1031,9 @@ def validate(min_turnover: float = MIN_MONTHLY_TURNOVER,
                f"({adjustment.get('actions_applied')} corporate actions applied, "
                f"{adjustment.get('actions_unapplied')} could not be; see "
                f"'adjustment'), and traded value is left as printed. "
+               "Demergers are not adjusted: the split of value between the two companies "
+               "is not in the data, so a demerger shows as a fall in the parent's price "
+               "that month (2026-10-05 review). "
                if adjustment.get("applied") else
                "Closes are as the exchange printed them, not corrected for "
                "splits or dividends, so a corporate action inside a holding "

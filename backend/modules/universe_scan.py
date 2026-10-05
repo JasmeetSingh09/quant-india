@@ -51,6 +51,9 @@ MODEL_VERSION  = "v1.5.0-statement-inputs"
 # Security ISIN prefixes left out of the scored universe (v1.5.0): INF = mutual fund
 # and ETF units. The factors are company measures, so a fund cannot be scored on them.
 EXCLUDED_ISIN_PREFIXES = ("INF",)
+# Rights-entitlement lines (VINNY-RE, INDO-RE2): short-lived tradeable rights, not
+# shares. They carry INE ISINs, so the prefix rule above does not catch them.
+EXCLUDED_SYMBOL_PATTERN = r"-RE\d*(?:\.NS)?$"
 
 _LOCK    = threading.Lock()
 _THREAD  = None
@@ -391,7 +394,9 @@ def _bhavcopy_symbols() -> list:
             + "AND (isin IS NULL OR isin NOT LIKE ?) " * len(EXCLUDED_ISIN_PREFIXES),
             tuple(p + "%" for p in EXCLUDED_ISIN_PREFIXES)).fetchall()
         conn.close()
-        return [r[0] for r in rows if r and r[0]]
+        import re as _re
+        rx = _re.compile(EXCLUDED_SYMBOL_PATTERN, _re.I)
+        return [r[0] for r in rows if r and r[0] and not rx.search(str(r[0]))]
     except Exception:
         return []
 

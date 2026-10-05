@@ -116,6 +116,16 @@ for s in ["Annual General Meeting",
 ok(CA.parse_subject("Rights Issue 1:4 @ Premium Rs 50 Per Share") == [],
    "a rights price is not mistaken for a dividend")
 
+print("\n5a. CONSOLIDATIONS (2026-10-05: two were stored unparsed)")
+c = CA.parse_subject("Consolidation Of Equity Shares From Re 1 Per Share To Rs 10 Per Share")
+ok(c == [{"kind": CA.SPLIT, "num": 1.0, "den": 10.0}] and abs(CA.price_multiplier(c[0]) - 10.0) < 1e-9,
+   "a 1-to-10 consolidation scales earlier prices UP by 10")
+c = CA.parse_subject("Capital Reduction Rs 10 To Rs 3.30 / Consolidation Rs 3.30 To Rs.10")
+ok(len(c) == 1 and c[0]["num"] == 3.3 and c[0]["den"] == 10.0,
+   "capital reduction + consolidation: only the consolidation leg moves the price")
+ok(CA.parse_subject("Consolidated Financial Results For The Quarter") == [],
+   "'Consolidated' results are not a consolidation")
+
 print("\n5b. THE KNOWN GAPS, MEASURED ON THE LIVE FEED")
 # Across 1,958 real rows spanning 2012-2026 the parser extracted 774 dividends,
 # 37 bonuses and 17 splits. Exactly three unparsed rows contained the words

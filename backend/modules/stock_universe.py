@@ -505,6 +505,15 @@ def search_stocks(query: str, exchange: str = "NSE", limit: int = 30) -> list:
         except Exception:
             pass
         if not results:
+            # Names from the shared database (security_names), which production
+            # has even though its local nse_stocks file is empty. Before this,
+            # production could only match symbols: "20 microns" found nothing.
+            try:
+                from security_names import search as _names_search
+                results.extend(_names_search(query, limit))
+            except Exception:
+                pass
+        if not results:
             results.extend(_search_bhavcopy())
     if exchange.upper() in ("BSE", "ALL"):
         results.extend(_search_bse())
@@ -526,6 +535,11 @@ def get_stock_by_symbol(symbol: str, exchange: str = "NSE") -> dict | None:
         if row:
             return {"symbol": row[0], "company_name": row[1], "series": row[2],
                     "isin": row[3], "yf_ticker": row[4], "exchange": "NSE"}
+        try:
+            from security_names import lookup as _names_lookup
+            return _names_lookup(symbol)
+        except Exception:
+            return None
     else:
         row = conn.execute(
             "SELECT bse_code, company_name, group_name, isin, yf_ticker FROM bse_stocks WHERE bse_code = ?",
