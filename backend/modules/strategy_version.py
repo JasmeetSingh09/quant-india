@@ -694,7 +694,11 @@ def drift(version: str) -> dict:
     rec = get(version)
     if not rec.get("found"):
         return {"found": False, "version": version}
-    live = current_spec()
+    # The live spec goes through the same JSON round trip as the stored one, so a
+    # tuple constant (("INF",)) and its stored list (["INF"]) compare equal. Without
+    # this, v1.5.0 reported drift seconds after it was frozen (2026-10-05). The hash
+    # was never affected: it is computed from the JSON form.
+    live = json.loads(json.dumps(current_spec(), default=str))
     # captured_at always differs; it is metadata, not configuration.
     a = {k: v for k, v in rec["spec"].items() if k != "captured_at"}
     b = {k: v for k, v in live.items() if k != "captured_at"}

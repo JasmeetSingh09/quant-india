@@ -168,6 +168,16 @@ ok(list(uni.get("excluded_isin_prefixes") or []) == ["INF"], "excluded ISIN pref
 ok(uni.get("piotroski_statement_fallbacks"), "Piotroski's statement fallbacks are part of the spec")
 ok("converted" in (uni.get("currency_rule") or ""), "the currency rule is part of the spec")
 
+# Freezing stores the spec as JSON, so a tuple constant comes back as a list. v1.5.0
+# reported drift on ("INF",) vs ["INF"] seconds after it was frozen.
+import json as _json  # noqa: E402
+_stored = _json.loads(_json.dumps(spec, default=str))
+_orig_get = strategy_version.get
+strategy_version.get = lambda v: {"found": True, "version": v, "spec": _stored, "frozen_at": "now"}
+_d = strategy_version.drift("vtest")
+strategy_version.get = _orig_get
+ok(not _d.get("behavioural_drift"), f"a tuple constant does not drift from its stored list ({_d.get('verdict')})")
+
 print("\n" + "=" * 60)
 print(f"passed {len(PASS)}, failed {len(FAIL)}")
 for x in FAIL:

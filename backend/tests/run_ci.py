@@ -103,7 +103,7 @@ SUITES = [
     ("stock_compare_test.py",               25, 60),
     ("stock_analysis_test.py",              49, 120),
     ("regime_retired_test.py",              11, 60),
-    ("v150_fixes_test.py",                  24, 120),
+    ("v150_fixes_test.py",                  25, 120),
     ("security_names_test.py",              15, 60),
     ("adjustment_orphan_test.py",            4, 60),
     ("reparse_external_test.py",             4, 60),
