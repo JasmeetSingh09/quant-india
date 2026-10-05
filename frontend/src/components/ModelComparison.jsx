@@ -35,7 +35,7 @@ export default function ModelComparison() {
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
         <h2 className="font-semibold text-sm">Model comparison</h2>
         <span className="text-[11px] text-gray-500">
-          four-factor · six-factor · portfolio-aware
+          four-factor · five-factor · portfolio-aware
         </span>
       </div>
 
@@ -118,7 +118,7 @@ export default function ModelComparison() {
                 <tr className="text-[11px] uppercase tracking-wide text-gray-500">
                   <th className="text-left py-1">Stock</th>
                   <th className="text-right py-1">4-factor</th>
-                  <th className="text-right py-1">6-factor</th>
+                  <th className="text-right py-1">5-factor</th>
                   <th className="text-right py-1">Gap</th>
                 </tr>
               </thead>

@@ -172,10 +172,11 @@ def current_spec() -> dict:
     spec = {"captured_at": datetime.now().strftime("%Y-%m-%d %H:%M")}
 
     try:
-        from alpha_v2 import WEIGHTS_V2, MODEL_VERSION_V2
-        spec["model"] = "six-factor"
+        from alpha_v2 import WEIGHTS_V2, MODEL_VERSION_V2, REPORTED_NOT_SCORED
+        spec["model"] = "six-factor (five scored)"
         spec["model_version"] = MODEL_VERSION_V2
         spec["factor_weights"] = {k: round(v, 6) for k, v in sorted(WEIGHTS_V2.items())}
+        spec["reported_not_scored"] = list(REPORTED_NOT_SCORED)
     except Exception as e:
         spec["model_error"] = type(e).__name__
 

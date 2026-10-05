@@ -1,5 +1,6 @@
 """
-alpha_v2.py — the six-factor model, built to be compared rather than believed.
+alpha_v2.py — the six-factor model (five scored since v1.6.0; low risk is shown,
+not scored), built to be compared rather than believed.
 
 V1 uses four factors: momentum, sentiment, quality, value. V2 adds growth and
 low-risk, and reweights the rest. It does NOT replace V1 — both are computed for
@@ -39,15 +40,27 @@ import numpy as np
 # These are a STARTING point, not a finding. They are configurable so the app can
 # eventually answer "why these weights?" with a comparison instead of a shrug.
 WEIGHTS_V2 = {
-    "momentum":  0.18,
+    "momentum":  0.36,
     "quality":   0.22,
     "growth":    0.15,
     "value":     0.17,
     "sentiment": 0.10,
-    "low_risk":  0.18,
 }
 
-# These changed once, on evidence rather than preference.
+# Low risk is still computed and shown, but carries no weight (v1.6.0,
+# docs/PROPOSAL_V160_LOW_RISK_2026-10-05.md). Factor test 1 found no
+# demonstrated edge for it at any horizon on 2011-2026 point-in-time prices,
+# while momentum passed at all four; the 18% moved to momentum. Like liquidity,
+# it is reported beside the score as a fact about risk, not as attractiveness.
+REPORTED_NOT_SCORED = ("low_risk",)
+
+# History of the weights, kept because each change was made on evidence.
+#
+# 2026-10-05 (v2.2): momentum 18% -> 36%, low risk 18% -> 0%. The paragraphs
+# below describe the earlier change and the walk-forward evidence it rested on;
+# the point-in-time tests of 2026-09-13 superseded that evidence for momentum.
+#
+# Earlier, the weights changed once, on evidence rather than preference.
 #
 # Momentum fell from 25% to 18% because it is the ONLY factor that has been
 # tested on this universe, and it failed: 12 walk-forward configurations across
@@ -70,12 +83,11 @@ WEIGHTS_V2 = {
 # None of this makes the model validated. It makes the weights consistent with
 # what is known, which is a lower bar and the only one currently reachable.
 WEIGHT_NOTES = {
-    "momentum": "Strongest published record elsewhere, and the only factor "
-                "computed purely from prices. When these weights were set, it had "
-                "not demonstrated a statistically significant edge on THIS "
-                "universe, which is why its weight was cut rather than raised. "
-                "Later point-in-time tests (2026-09-13 and 09-18) found an edge "
-                "outside the largest, most liquid stocks; the weight is unchanged.",
+    "momentum": "The only factor in this model with a demonstrated edge on Indian "
+                "data: pre-registered point-in-time tests on 2011-2026 prices found "
+                "one at 1, 3, 6 and 12 months, and it held in liquid stocks and in "
+                "2019-2026 alone. Its weight rose to 36% on 2026-10-05 when low "
+                "risk, which failed the same test, stopped being scored.",
     "quality":  "Profitability and balance-sheet health. Also carries the distress "
                 "veto that stops a nearly-insolvent company scoring as cheap.",
     "growth":   "Revenue and earnings growth. Weighted moderately because fast "
@@ -84,11 +96,13 @@ WEIGHT_NOTES = {
                 "for years.",
     "sentiment": "FinBERT on recent headlines. The weakest evidence base here at "
                  "this horizon; a candidate for reduction once the log can judge it.",
-    "low_risk": "The low-volatility anomaly: calmer stocks have historically earned "
-                "better risk-adjusted returns than their beta predicts.",
+    "low_risk": "Shown, not scored. Volatility and worst fall over about a year. "
+                "The low-volatility anomaly is well documented elsewhere, but on "
+                "2011-2026 Indian prices it showed no demonstrated edge, so since "
+                "2026-10-05 it carries no weight and is reported as risk information.",
 }
 
-MODEL_VERSION_V2 = "alpha-v2.1-six-factor"
+MODEL_VERSION_V2 = "alpha-v2.2-five-factor"
 
 # ---------------------------------------------------------------------------
 # Behavioural parameters, named so they can be frozen. Previously inline
@@ -291,21 +305,22 @@ def compute_v2(ticker: str, v1_result: dict = None) -> dict:
         "evidence_status": "experimental",
         "evidence_note": (
             "This model has NOT been shown to predict returns. Momentum passed "
-            "pre-registered point-in-time tests on 2011-2026 prices, but not "
-            "among the largest, most liquid stocks. Low risk was tested and did "
-            "not pass. Quality, growth, value and sentiment cannot yet be tested "
-            "as we compute them, and the combined score has not been tested. "
+            "pre-registered point-in-time tests on 2011-2026 prices. Low risk "
+            "was tested and did not pass, so it is shown but not scored. "
+            "Quality, growth, value and sentiment cannot yet be tested as we "
+            "compute them, and the combined score has not been tested. "
             "Treat every score as a research output, not a recommendation."),
+        "reported_not_scored": {k: factors.get(k) for k in REPORTED_NOT_SCORED},
         "score_scale": {"range": [-100, 100],
                         "means": "Model preference, not a predicted return."},
         # The comparison is the point of running both.
         "v1_score": v1.get("alpha_score"),
         "v1_signal": v1.get("signal"),
         "disagreement": (round(alpha - (v1.get("alpha_score") or 0), 2)),
-        "note": ("Six factors against V1's four, with growth and low-risk added "
-                 "and sentiment reduced from 25% to 8%. Both models run on every "
-                 "stock so the track record can eventually say which is better — "
-                 "neither has been shown to work yet."),
+        "note": ("Five scored factors against V1's four: growth added, sentiment "
+                 "reduced from 25% to 10%, and low risk shown but not scored. Both "
+                 "models run on every stock so the track record can eventually say "
+                 "which is better — neither has been shown to work yet."),
     }
 
 

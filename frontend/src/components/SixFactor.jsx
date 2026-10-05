@@ -42,7 +42,7 @@ export default function SixFactor({ ticker }) {
   return (
     <div className="card space-y-4">
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
-        <h2 className="font-semibold">Six-factor view</h2>
+        <h2 className="font-semibold">Five-factor view</h2>
         <span className="text-[11px] text-gray-500 uppercase tracking-wide">
           {data.horizon_days}-day horizon
         </span>
@@ -164,6 +164,15 @@ export default function SixFactor({ ticker }) {
         </p>
       )}
 
+      {/* Low risk is shown, not scored (v1.6.0): it failed its 15-year test. */}
+      {data.reported_not_scored?.low_risk?.annual_volatility_pct != null && (
+        <p className="text-[11px] text-gray-500">
+          <b className="text-gray-400">Risk:</b> {data.reported_not_scored.low_risk.reason}
+          <span className="text-gray-600"> — shown, not scored. Low risk showed no edge
+          on 2011–2026 Indian prices, so it no longer counts toward the score.</span>
+        </p>
+      )}
+
       {/* Both models, side by side. The comparison is the point of running two. */}
       <div className="pt-2 border-t border-gray-800">
         <button onClick={() => setShowMethod(m => !m)}
@@ -180,7 +189,7 @@ export default function SixFactor({ ticker }) {
                 <span className="text-gray-600"> ({data.v1_signal})</span>
               </span>
               <span className="text-gray-400">
-                6-factor: <span className="font-mono text-gray-200">
+                5-factor: <span className="font-mono text-gray-200">
                   {data.alpha_score > 0 ? '+' : ''}{data.alpha_score}</span>
                 <span className="text-gray-600"> ({data.signal})</span>
               </span>

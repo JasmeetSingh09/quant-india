@@ -670,19 +670,19 @@ ok(_even_fix.get("changed") is False or "steps" in _even_fix,
 from alpha_v2 import WEIGHTS_V2, explain as _v2explain, FACTOR_PLAIN
 
 ok(abs(sum(WEIGHTS_V2.values()) - 1.0) < 1e-9, "V2 weights sum to 1.0")
-ok(len(WEIGHTS_V2) == 6, "V2 has exactly six factors")
+ok(len(WEIGHTS_V2) == 5, "V2 scores five factors (low risk is shown, not scored, since v1.6.0)")
+ok("low_risk" not in WEIGHTS_V2,
+   "low risk carries no weight: it failed factor test 1 at every horizon")
 ok("liquidity" not in WEIGHTS_V2,
    "liquidity is NOT a factor — it is an execution constraint, not attractiveness")
 ok(len(set(WEIGHTS_V2.values())) > 1, "weights are not all equal")
-# This test previously asserted momentum should carry the LARGEST weight, on the
-# reasoning that it has the strongest published record. The walk-forward then
-# tested it on this universe across 12 configurations and found no edge surviving
-# correction for multiple testing. So the assertion inverted: the one factor
-# measured and found wanting must not hold the largest share.
-ok(WEIGHTS_V2["momentum"] < max(WEIGHTS_V2.values()),
-   "momentum is no longer the largest weight — it was tested here and failed")
-ok(WEIGHTS_V2["momentum"] > 0,
-   "but it is reduced, not removed: a null on one market is not proof of none")
+# This assertion has flipped twice, each time on evidence. Momentum was first the
+# largest weight (published record), then cut after a walk-forward found no edge,
+# then raised to the largest again in v1.6.0 after pre-registered point-in-time
+# tests on 2011-2026 prices found an edge at every horizon -- the only factor here
+# that has passed one.
+ok(WEIGHTS_V2["momentum"] == max(WEIGHTS_V2.values()),
+   "momentum carries the largest weight — the only factor with a demonstrated edge")
 ok(WEIGHTS_V2["sentiment"] == min(WEIGHTS_V2.values()),
    "sentiment carries the smallest weight, matching the weakest evidence base")
 ok(all(k in FACTOR_PLAIN for k in WEIGHTS_V2), "every factor has a plain-language label")
