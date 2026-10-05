@@ -654,6 +654,11 @@ def missed_actions(max_rows: int = 60000, sample: int = 40) -> dict:
 
 # ------------------------------------------------------------- the dry run
 
+# Subject prefixes of rows that did not come from the exchange feed, so the parser
+# is not expected to reproduce them.
+EXTERNAL_SOURCE_PREFIXES = ("Yahoo split factor",)
+
+
 def reparse_dry_run(sample: int = 25) -> dict:
     """
     What a re-parse WOULD write, without writing any of it.
@@ -721,6 +726,11 @@ def reparse_dry_run(sample: int = 25) -> dict:
 
     adds, conflicts, drops = [], [], []
     n_add = n_conflict = n_drop = 0
+    # Rows added from another source (2026-10-05: Yahoo splits verified against the
+    # price jump) carry a subject the exchange parser cannot read by design. The
+    # re-parse only ever inserts, so it cannot lose them; counting them as DROP
+    # would block every future re-parse for a row that is not at risk.
+    n_external = 0
     add_by_kind = {}
     add_inside = 0
 
@@ -765,6 +775,9 @@ def reparse_dry_run(sample: int = 25) -> dict:
 
         for kind in have:
             if kind not in want:
+                if subj.startswith(EXTERNAL_SOURCE_PREFIXES):
+                    n_external += 1
+                    continue
                 n_drop += 1
                 if len(drops) < sample:
                     drops.append({"isin": isin, "ex_date": ex, "kind": kind,
@@ -785,6 +798,7 @@ def reparse_dry_run(sample: int = 25) -> dict:
             "ADD_inside_price_coverage": add_inside,
             "CONFLICT_would_change_a_stored_action": n_conflict,
             "DROP_would_lose_a_stored_action": n_drop,
+            "EXTERNAL_rows_not_from_the_parser": n_external,
         },
         "safe_to_write": safe,
         "verdict": ("no stored action would change or be lost; the re-parse "
