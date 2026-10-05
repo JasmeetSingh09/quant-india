@@ -296,28 +296,75 @@ def _apply_adjustment(conn, keys, days, C, canonical):
     index = {k: i for i, k in enumerate(keys)}
 
     try:
-        rows = conn.execute(
-            "SELECT isin, ex_date, kind, num, den, amount FROM corporate_actions "
-            "WHERE parsed = 1 AND kind IN ('split', 'bonus', 'dividend') "
-            "ORDER BY ex_date").fetchall()
+        try:
+            rows = conn.execute(
+                "SELECT isin, ex_date, kind, num, den, amount, symbol FROM corporate_actions "
+                "WHERE parsed = 1 AND kind IN ('split', 'bonus', 'dividend') "
+                "ORDER BY ex_date").fetchall()
+        except Exception:
+            # An older table without the symbol column: ISIN matching only, as before.
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            rows = [tuple(r) + (None,) for r in conn.execute(
+                "SELECT isin, ex_date, kind, num, den, amount FROM corporate_actions "
+                "WHERE parsed = 1 AND kind IN ('split', 'bonus', 'dividend') "
+                "ORDER BY ex_date").fetchall()]
+        # Where each symbol traded under each ISIN. Some actions are filed under an
+        # ISIN that never appears in the price archive (Kotak's 2026 split under
+        # INE237A01010, Britannia's 2018 split under INE216A01014): keyed by ISIN
+        # alone they matched no row and were silently dropped -- 9 splits, 17
+        # bonuses and 909 dividends (2026-10-05 review). Such an action is applied
+        # to the ISIN its symbol traded under on the last day before the ex-date.
+        spans = {}
+        try:
+            for sym_, isin_, lo_, hi_ in conn.execute(
+                    "SELECT symbol, isin, MIN(day), MAX(day) FROM bhavcopy_eod "
+                    "WHERE isin IS NOT NULL GROUP BY symbol, isin").fetchall():
+                spans.setdefault(str(sym_).upper().replace(".NS", ""), []).append(
+                    (str(lo_)[:10], str(hi_)[:10], str(isin_)))
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            spans = {}
     except Exception as e:
         return F, {"applied": False, "reason": f"{type(e).__name__}",
                    "note": "corporate actions unavailable; series left RAW"}
 
     stats = {"actions_seen": len(rows), "applied": 0, "unapplied": 0,
              "identities_with_actions": set(), "by_kind": {},
-             "unapplied_by_reason": {}}
+             "unapplied_by_reason": {}, "applied_via_symbol": 0}
+
+    def _isin_by_symbol(sym, ex):
+        """The ISIN `sym` traded under on its last stored day before `ex`, or None."""
+        best = None
+        for lo, hi, isin_ in spans.get(str(sym or "").upper().replace(".NS", ""), []):
+            if lo < ex:
+                last_before = min(hi, ex)
+                if best is None or last_before > best[0]:
+                    best = (last_before, isin_)
+        return best[1] if best else None
 
     def _skip(reason):
         stats["unapplied"] += 1
         stats["unapplied_by_reason"][reason] =             stats["unapplied_by_reason"].get(reason, 0) + 1
 
-    for isin, ex_date, kind, num, den, amount in rows:
+    for isin, ex_date, kind, num, den, amount, sym in rows:
         if not isin or not ex_date:
             _skip("no isin or ex_date")
             continue
         key = canonical.get(isin, isin)
         i = index.get(key)
+        via_symbol = False
+        if i is None:
+            alt = _isin_by_symbol(sym, str(ex_date)[:10])
+            if alt and alt != isin:
+                key = canonical.get(alt, alt)
+                i = index.get(key)
+                via_symbol = i is not None
         if i is None:
             _skip("security not in the price matrix")
             continue
@@ -348,6 +395,7 @@ def _apply_adjustment(conn, keys, days, C, canonical):
         # does. days is sorted, so that is the half-open slice [0, c).
         F[i, :c] *= np.float32(m)
         stats["applied"] += 1
+        stats["applied_via_symbol"] += int(via_symbol)
         stats["by_kind"][kind] = stats["by_kind"].get(kind, 0) + 1
         stats["identities_with_actions"].add(key)
 
@@ -361,6 +409,9 @@ def _apply_adjustment(conn, keys, days, C, canonical):
         "actions_seen": stats["actions_seen"],
         "actions_applied": stats["applied"],
         "actions_unapplied": stats["unapplied"],
+        "actions_applied_via_symbol": stats["applied_via_symbol"],
+        "via_symbol_note": ("actions filed under an ISIN with no prices, applied to the ISIN "
+                            "their symbol traded under just before the ex-date"),
         "unapplied_by_reason": stats["unapplied_by_reason"],
         "applied_by_kind": stats["by_kind"],
         "identities_with_actions": len(stats["identities_with_actions"]),
