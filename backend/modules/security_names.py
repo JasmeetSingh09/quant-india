@@ -10,15 +10,20 @@ articles as off-topic when 98.7% name their company (2026-10-05 review).
 
 This table holds names in the database every process shares, Postgres on
 production and SQLite locally. It is loaded once from a stored list
-(`load_from_local_list`), the NSE list saved on 2026-08-21. Nothing is fetched
+(`seed_from_file`, backend/data/security_names_nse_2026-08-21.json), the NSE list saved on 2026-08-21. Nothing is fetched
 from NSE. `stock_universe` falls back to it whenever its own list is empty.
 """
 
+import json
 from datetime import datetime
+from pathlib import Path
 
 from db import get_conn, IS_POSTGRES
 
 _READY = False
+# The stored list shipped with the app. Loaded into an EMPTY table on first use,
+# so production gets names without anyone handling database credentials.
+SEED_FILE = Path(__file__).parent.parent / "data" / "security_names_nse_2026-08-21.json"
 
 
 def _init():
@@ -38,8 +43,22 @@ def _init():
             " loaded_at TEXT NOT NULL)")
         conn.commit()
         _READY = True
+        empty = int(conn.execute("SELECT COUNT(*) FROM security_names").fetchone()[0] or 0) == 0
     finally:
         conn.close()
+    if empty:
+        seed_from_file()
+
+
+def seed_from_file(path=None) -> dict:
+    """Load the shipped list (see SEED_FILE). Safe to repeat: existing rows are refreshed, not duplicated."""
+    p = Path(path) if path else SEED_FILE
+    if not p.exists():
+        return {"loaded": 0, "reason": f"{p.name} not found"}
+    data = json.loads(p.read_text(encoding="utf-8"))
+    fields = data["fields"]
+    rows = [dict(zip(fields, r)) for r in data["rows"]]
+    return load(rows, source=data.get("source", p.name)[:200])
 
 
 def load(rows: list, source: str) -> dict:

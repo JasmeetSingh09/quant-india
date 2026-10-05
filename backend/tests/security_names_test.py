@@ -23,6 +23,10 @@ os.environ["QUANT_DATA_DIR"] = TMP
 os.environ.pop("DATABASE_URL", None)
 
 import security_names as SN  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+REAL_SEED = SN.SEED_FILE
+SN.SEED_FILE = Path(TMP) / "no_seed_here.json"      # start empty; the shipped file is tested at the end
 
 PASS, FAIL = [], []
 
@@ -64,6 +68,12 @@ import stock_universe as SU  # noqa: E402
 ok([x["symbol"] for x in SU.search_stocks("20 microns")] == ["20MICRONS"], "search_stocks finds a company by name")
 ok((SU.get_stock_by_symbol("SBIN") or {}).get("company_name") == "State Bank of India",
    "get_stock_by_symbol returns the stored name")
+
+print("\n4. The shipped list seeds production's empty table")
+r = SN.seed_from_file(REAL_SEED)
+ok(r["loaded"] >= 2500, f"{r['loaded']} names loaded from {REAL_SEED.name}")
+ok(SN.lookup("20MICRONS")["company_name"].lower().startswith("20 microns"), "20 Microns has its real name")
+ok(SN.lookup("TCS")["company_name"].lower().startswith("tata consultancy"), "TCS is Tata Consultancy Services")
 
 print("\n" + "=" * 60)
 print(f"passed {len(PASS)}, failed {len(FAIL)}")

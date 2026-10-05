@@ -104,7 +104,7 @@ SUITES = [
     ("stock_analysis_test.py",              49, 120),
     ("regime_retired_test.py",              11, 60),
     ("v150_fixes_test.py",                  24, 120),
-    ("security_names_test.py",              11, 60),
+    ("security_names_test.py",              14, 60),
     ("adjustment_orphan_test.py",            4, 60),
     ("thesis_records_test.py",              40, 60),
 ]
