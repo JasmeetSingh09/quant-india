@@ -10,7 +10,7 @@ articles as off-topic when 98.7% name their company (2026-10-05 review).
 
 This table holds names in the database every process shares, Postgres on
 production and SQLite locally. It is loaded once from a stored list
-(`seed_from_file`, backend/data/security_names_nse_2026-08-21.json), the NSE list saved on 2026-08-21. Nothing is fetched
+(`seed_from_file`, backend/seed/security_names_nse_2026-08-21.json), the NSE list saved on 2026-08-21. Nothing is fetched
 from NSE. `stock_universe` falls back to it whenever its own list is empty.
 """
 
@@ -23,7 +23,9 @@ from db import get_conn, IS_POSTGRES
 _READY = False
 # The stored list shipped with the app. Loaded into an EMPTY table on first use,
 # so production gets names without anyone handling database credentials.
-SEED_FILE = Path(__file__).parent.parent / "data" / "security_names_nse_2026-08-21.json"
+# Not under backend/data: production mounts its persistent disk at /app/data, which
+# hides anything shipped in that folder (the first deploy found the table empty).
+SEED_FILE = Path(__file__).parent.parent / "seed" / "security_names_nse_2026-08-21.json"
 
 
 def _init():

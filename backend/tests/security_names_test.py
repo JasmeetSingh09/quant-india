@@ -70,6 +70,8 @@ ok((SU.get_stock_by_symbol("SBIN") or {}).get("company_name") == "State Bank of 
    "get_stock_by_symbol returns the stored name")
 
 print("\n4. The shipped list seeds production's empty table")
+ok(REAL_SEED.exists() and REAL_SEED.parent.name != "data",
+   "the shipped file exists and is not under backend/data, which production's disk mount hides")
 r = SN.seed_from_file(REAL_SEED)
 ok(r["loaded"] >= 2500, f"{r['loaded']} names loaded from {REAL_SEED.name}")
 ok(SN.lookup("20MICRONS")["company_name"].lower().startswith("20 microns"), "20 Microns has its real name")
