@@ -188,17 +188,26 @@ def parse_subject(subject: str) -> list:
     # Only read a dividend when the word appears -- "Rs" alone is not enough,
     # and a rights issue price must never be mistaken for a cash payout.
     #
-    # Known limitation, deliberately left alone: a line carrying two payouts
-    # ("Div. Of Rs.8 Per Share + Spl. Div Of Rs.3/-") yields only the first.
-    # Summing them is a change to what a dividend MEANS here, not a parsing
-    # fix, and it belongs in its own decision rather than smuggled into this
-    # one. The residual is the smaller payout, on a handful of lines.
+    # A line carrying several payouts on one ex-date ("Final Dividend Rs 8 /
+    # Special Dividend Rs 67") pays all of them, so the amount is their SUM
+    # (owner decision 2026-10-05). Reading only the first stored TCS's
+    # 2023-01-16 payout as Rs 8 when Rs 75 left the price, on ~270 lines.
+    # Two kinds of line keep the first amount, because summing would double
+    # count or mix units:
+    #   "Dividend-Rs.8.50 Per Share (Including Special Dividend Of Rs.2/-)"
+    #       -- the second figure is already inside the first;
+    #   "Taxable Dividend - Rs 0.62 Per Unit / Exempt Dividend ..." -- trust
+    #       distributions, whose interest and capital legs are not read here.
     if _DIV_WORD.search(s) and "rights" not in s.lower():
-        m = _DIV_RE.search(s)
-        if m:
-            amt = float(m.group(1))
-            if amt > 0:
-                out.append({"kind": DIVIDEND, "amount": amt})
+        low = s.lower()
+        amts = [float(m.group(1)) for m in _DIV_RE.finditer(s)]
+        amts = [a for a in amts if a > 0]
+        if amts:
+            if "includ" in low or "per unit" in low:
+                amt = amts[0]
+            else:
+                amt = round(sum(amts), 4)
+            out.append({"kind": DIVIDEND, "amount": amt})
     return out
 
 

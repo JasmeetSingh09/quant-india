@@ -67,6 +67,13 @@ ok(d["diff"]["DROP_would_lose_a_stored_action"] == 0 and d["diff"]["CONFLICT_wou
    "no drop and no conflict")
 ok(d["diff"]["ADD_new_actions"] == 1 and d["safe_to_write"], "the consolidation is the one addition, and it is safe to write")
 
+print("\n1b. Hand-verified rows are external too")
+seed(extra=[("INE023M01019", "PRAKASHCON", "2012-12-13", "split", 10, 1, None,
+             "Hand-verified 2026-10-05: split, 10-for-1 split (face values not confirmed). Price jump x9.61.", 1, "h1")])
+d = CAA.reparse_dry_run()
+ok(d["diff"]["EXTERNAL_rows_not_from_the_parser"] == 2 and d["diff"]["DROP_would_lose_a_stored_action"] == 0,
+   "a hand-verified row the parser cannot read is external, not a drop")
+
 print("\n2. A real drop still blocks the write")
 seed(extra=[("INE002", "BBB", "2016-02-01", "bonus", 1, 1, None, "Something the parser cannot read", 1, "b1")])
 d = CAA.reparse_dry_run()

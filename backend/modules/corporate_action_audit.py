@@ -655,8 +655,9 @@ def missed_actions(max_rows: int = 60000, sample: int = 40) -> dict:
 # ------------------------------------------------------------- the dry run
 
 # Subject prefixes of rows that did not come from the exchange feed, so the parser
-# is not expected to reproduce them.
-EXTERNAL_SOURCE_PREFIXES = ("Yahoo split factor",)
+# is not expected to reproduce them. "Hand-verified" rows were looked up in public
+# company announcements and checked against the price jump (2026-10-05 hand check).
+EXTERNAL_SOURCE_PREFIXES = ("Yahoo split factor", "Hand-verified")
 
 
 def reparse_dry_run(sample: int = 25) -> dict:

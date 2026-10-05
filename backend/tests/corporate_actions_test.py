@@ -147,6 +147,24 @@ both = CA.parse_subject(
 kinds = sorted(a["kind"] for a in both)
 ok(kinds == [CA.BONUS, CA.DIVIDEND], f"dividend and bonus both read ({kinds})")
 
+print("\n6b. SEVERAL PAYOUTS ON ONE LINE ARE ADDED (owner decision 2026-10-05)")
+SUMS = [
+    ("Interim Dividend - Rs 8 Per Share Special Dividend - Rs 67 Per Share", 75.0),   # TCS 2023-01-16
+    ("Annual General Meeting/Final Dividend Rs.3/- Per Share/Interim Dividend Rs.120/- Per Share (Purpose Revised)", 123.0),
+    ("Agm/Div. Of Rs.8 Per Share + Spl. Div Of Rs.3/- Per Share", 11.0),
+    ("Final Dividend Rs.2/- Per Share/Interim Dividend Rs.2/- Per Share/Special Dividend Rs.2/- Per Share", 6.0),
+    ("Annual General Meeting/Final Dividend Rs.1.10 Per Share And Special Dividend Re.0.40 Per Share", 1.5),
+    ("Annual General Meeting/ Dividend - Rs 3.60 Per Share", 3.6),                    # one payout: unchanged
+]
+for s, want in SUMS:
+    got = one(s, CA.DIVIDEND)
+    ok(got is not None and abs(got["amount"] - want) < 1e-9, f"{want} from '{s[:60]}'",
+       f"got {got and got['amount']}")
+got = one("Dividend-Rs.8.50 Per Share (Including Special Dividend Of Rs.2/- Per Share).", CA.DIVIDEND)
+ok(got and got["amount"] == 8.5, "'including' a special: the first figure already holds it, so 8.50, not 10.50")
+got = one("Interest- Rs 1.98 Per Unit/Taxable Dividend - Rs 0.62 Per Unit/Exempt Dividend- Rs 0.20 Per Unit", CA.DIVIDEND)
+ok(got and got["amount"] == 0.62, "a trust's per-unit distribution keeps its old reading (not summed)")
+
 print("\n7. STORAGE — parsed and unparsed both recorded, only parsed adjusts")
 rows = [
     {"isin": "INE001A01036", "symbol": "AAA", "exDate": "15-Jul-2015",
