@@ -2046,6 +2046,20 @@ def validation_pit(min_turnover: float = Query(1e7, ge=0),
     return r
 
 
+@app.get("/validation/price-signals")
+def validation_price_signals():
+    """
+    Factor test 4 (docs/PREREG_FACTOR_TEST4_PRICE_SIGNALS_2026-10-06.md): do short-term
+    reversal and nearness to the 52-week high add anything beyond momentum? Same machinery
+    as /validation/pit; run once, with defaults, as the prereg requires.
+    """
+    from price_signals import validate_signals
+    r = validate_signals()
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+
 @app.get("/backtest/identity-ab")
 def backtest_identity_ab(top_fraction: float = Query(0.2, ge=0.05, le=0.5)):
     """

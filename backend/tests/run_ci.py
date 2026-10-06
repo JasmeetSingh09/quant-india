@@ -108,6 +108,7 @@ SUITES = [
     ("adjustment_orphan_test.py",            4, 60),
     ("reparse_external_test.py",             4, 60),
     ("v160_low_risk_test.py",               10, 120),
+    ("price_signals_test.py",               11, 600),
     ("thesis_records_test.py",              40, 60),
 ]
 # run_ci_selftest.py is not listed: the workflow runs it as its own step first,
