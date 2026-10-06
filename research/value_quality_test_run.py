@@ -1,8 +1,8 @@
 """
 value_quality_test_run.py — the runner for the value and quality test on as-published accounts.
 
-Rules: docs/PREREG_VALUE_QUALITY_REPORTS_DRAFT_2026-09-26.md. This file implements them and
-nothing else. Until that document is approved and committed, the only run allowed is the
+Rules: docs/PREREG_VALUE_QUALITY_REPORTS_2026-10-06.md. This file implements them and
+nothing else. The document was approved and committed on 2026-10-06 (e285f22). Before the real run, the only run allowed is the
 placebo (plumbing) check, which this file can do on its own:
 
     python research/value_quality_test_run.py placebo INPUT_DIR      # allowed before commit
