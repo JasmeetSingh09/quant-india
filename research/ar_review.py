@@ -176,7 +176,12 @@ def check(root, extract, review_dir, cache):
             for who, rd in reads.items():
                 v = rd["figures"].get(k)
                 if v and v.get("current") is not None:
-                    votes.setdefault((rd["unit"], v["current"], v["previous"]), []).append(who)
+                    # Rounded to 4 decimals before voting: a derived figure (share capital +
+                    # reserves) carries float noise (240950.21000000002) that made two readers
+                    # of the same printed number disagree. Printed figures have <= 2 decimals,
+                    # so this merges only float noise, never two different numbers (2026-10-06).
+                    rnd = lambda x: None if x is None else round(float(x), 4)
+                    votes.setdefault((rd["unit"], rnd(v["current"]), rnd(v["previous"])), []).append(who)
             if not votes:
                 continue
             (unit, cur, prev), who = max(votes.items(), key=lambda kv: len(kv[1]))
@@ -185,10 +190,17 @@ def check(root, extract, review_dir, cache):
         units = {v["unit"] for v in final.values()}
         unit = units.pop() if len(units) == 1 else None
         chk = report_checks(final, unit) if unit else {}
+        # A reader who finds the pages are the wrong statements (another company's, a
+        # subsidiary's) writes notes starting "reject:". That vetoes the whole report,
+        # because a balance check passes just as well on the wrong company's accounts.
+        rejected = [who for who, rd in reads.items() if str(rd.get("notes", "")).startswith("reject:")]
+        if rejected:
+            problems.append(f"rejected by {', '.join(rejected)}")
         for k, v in final.items():
             by_check = (k in ("total_assets", "total_equity_and_liabilities") and chk.get("balance")) or \
                        (k in ("profit_for_year", "eps_basic", "share_capital") and chk.get("face_value"))
-            v["accepted"] = bool(v["agreed"] and not v["disputed"]) or bool(by_check and not v["disputed"])
+            v["accepted"] = not rejected and (bool(v["agreed"] and not v["disputed"]) or
+                                              bool(by_check and not v["disputed"]))
         accepted[name] = {"unit": unit, "checks": chk, "figures": final, "problems": problems,
                           "readers": sorted(reads)}
         n_acc = sum(1 for v in final.values() if v["accepted"])
