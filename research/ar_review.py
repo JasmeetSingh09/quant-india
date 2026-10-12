@@ -154,7 +154,7 @@ def check(root, extract, review_dir, cache):
         problems = []
         for who, path in readers.items():
             try:
-                d = json.load(open(path, encoding="utf-8"))
+                d = json.load(open(path, encoding="utf-8-sig"))   # tolerate a BOM (files written by PowerShell)
             except (ValueError, OSError) as e:
                 problems.append(f"{who}: unreadable file ({type(e).__name__})")
                 continue
@@ -185,8 +185,13 @@ def check(root, extract, review_dir, cache):
             if not votes:
                 continue
             (unit, cur, prev), who = max(votes.items(), key=lambda kv: len(kv[1]))
+            # With three or more readers a dispute is settled by a strict majority: the value at
+            # least two readers read independently, held by more readers than any other value
+            # (owner, 2026-10-07: "a blind third reading" settles rule-reader disagreements).
+            runner_up = max((len(w) for v, w in votes.items() if w is not who), default=0)
             final[k] = {"current": cur, "previous": prev, "unit": unit, "readers": who,
-                        "agreed": len(who) >= 2, "disputed": len(votes) > 1}
+                        "agreed": len(who) >= 2, "disputed": len(who) <= runner_up,
+                        "outvoted": sorted(r for v, w in votes.items() if w is not who for r in w)}
         units = {v["unit"] for v in final.values()}
         unit = units.pop() if len(units) == 1 else None
         chk = report_checks(final, unit) if unit else {}
