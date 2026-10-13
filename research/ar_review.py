@@ -118,6 +118,26 @@ def grounded(pages, fig, value):
     return any(x is not None and abs(abs(x) - abs(value)) < 1e-6 for x in nums)
 
 
+def is_gross_revenue(pages, value):
+    """True if `value` is printed on a revenue line directly followed by "Less: excise duty" and the
+    net figure two lines down is different, i.e. the value is gross revenue, not the plan's net."""
+    for page in pages:
+        lines = [_norm(x) for x in page.splitlines()]
+        for i in range(len(lines) - 2):
+            if not re.search(r"revenue|sales|income from operations", lines[i], re.I):
+                continue
+            if not re.search(r"^less\b.*excise", lines[i + 1], re.I):
+                continue
+            nums = [A.num(t) for t in A.NUM.findall(lines[i].replace("`", " "))]
+            if not any(x is not None and abs(abs(x) - abs(value)) < 1e-6 for x in nums):
+                continue
+            net = [A.num(t) for t in A.NUM.findall(lines[i + 2].replace("`", " "))]
+            net = [x for x in net if x is not None]
+            if net and all(abs(abs(x) - abs(value)) > 1e-6 for x in net):
+                return True
+    return False
+
+
 def rule_reading(r):
     f = r["figures"]
     out = {k: ({"current": v["current"], "previous": v["previous"]} if v else None) for k, v in f.items()}
@@ -206,6 +226,11 @@ def check(root, extract, review_dir, cache):
                        (k in ("profit_for_year", "eps_basic", "share_capital") and chk.get("face_value"))
             v["accepted"] = not rejected and (bool(v["agreed"] and not v["disputed"]) or
                                               bool(by_check and not v["disputed"]))
+            # The plan defines revenue NET of excise duty. Readers can agree on the gross line;
+            # agreement does not make it the defined figure, so it is not accepted (2026-10-14).
+            if k == "revenue" and v["accepted"] and is_gross_revenue(pages, v["current"]):
+                v["accepted"] = False
+                problems.append("revenue is the gross line; the net-of-excise line below it differs")
         accepted[name] = {"unit": unit, "checks": chk, "figures": final, "problems": problems,
                           "readers": sorted(reads)}
         n_acc = sum(1 for v in final.values() if v["accepted"])
