@@ -38,7 +38,10 @@ export default function Landing() {
     staleTime: 60 * 60 * 1000,
     retry: 1,
   })
-  const scored = scan?.data?.succeeded
+  // The axios interceptor already returns the body (api.js), so the count is
+  // scan.succeeded. Reading scan.data.succeeded was always undefined and the
+  // page showed the fallback, 2,704, while the scan scored 2,462 (2026-10-14).
+  const scored = scan?.succeeded
   // The fallback is the last measured value, not an aspiration, and it is
   // labelled the same way whether it is live or not.
   const scoredLabel = (scored ?? 2704).toLocaleString('en-IN')
