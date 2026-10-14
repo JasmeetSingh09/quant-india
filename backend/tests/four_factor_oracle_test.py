@@ -364,7 +364,14 @@ section("2. SENTIMENT — decay-weighted FinBERT, shrunk by confidence")
 
 def run_sent(arts, labels):
     _news.get_stock_news = lambda ticker, days_back=14: arts
-    _sent.score_headline = lambda t: {"label": labels[t][0], "confidence": labels[t][1]}
+    # A label of "ERROR" models a failed inference exactly as sentiment.score_headline
+    # reports one: neutral, confidence 0, and an "error" key.
+    # "ERROR_EMPTY" is the same with an empty message, as str(e) gives for an
+    # exception raised without one.
+    _sent.score_headline = lambda t: ({"label": "neutral", "confidence": 0.0,
+                                       "error": "" if labels[t][0] == "ERROR_EMPTY" else "inference failed"}
+                                      if labels[t][0] in ("ERROR", "ERROR_EMPTY")
+                                      else {"label": labels[t][0], "confidence": labels[t][1]})
     return A._compute_sentiment_factor("X.NS")
 
 
@@ -430,31 +437,46 @@ check("S11c", "only untitled headlines: refused as 'no scorable headlines', not 
 act = run_sent([{"title": "a", "published_at": iso(1)}], labels)
 check("S11d", "a normal result gains no new field", "untitled_articles_skipped" not in act)
 
-# FinBERT inference failure: CURRENT policy, pinned so any change is deliberate.
-# sentiment.score_headline turns an exception into neutral at confidence 0, and
-# the headline still enters with full recency weight. Because the score is
-# (weighted mean) x min(1, sum of weights / 7), an added zero-signal headline
-# cancels out while the cap does not bind: the score is unchanged but the
-# reported confidence (data coverage) rises. Once the cap binds (many recent
-# headlines) it dilutes the score. Both effects are pinned. The owner asked
-# (2026-10-14) for an explicit policy instead; it is specified in
-# docs/PEER_METHODOLOGY_DECISION_2026-10-14.md, not made here.
-labels_fail = dict(labels, x=("neutral", 0.0))
-two = [{"title": "a", "published_at": iso(1)}, {"title": "x", "published_at": iso(1)}]
-act = run_sent(two, labels_fail)
-exp_with = oracle_sentiment([(1, *labels["a"]), (1, "neutral", 0.0)])
+# FinBERT inference failure (docs/SPEC_SENTIMENT_FAILURE_POLICY_2026-10-14.md,
+# owner-approved in principle 2026-10-14): a failed headline is skipped and
+# counted, not scored as neutral at full weight; all failing refuses sentiment.
+labels_fail = dict(labels, x=("ERROR",), n=("neutral", 0.95))
+act = run_sent([{"title": "a", "published_at": iso(1)}, {"title": "x", "published_at": iso(1)}], labels_fail)
 exp_skip = oracle_sentiment([(1, *labels["a"])])
-check("S12", "failure, cap not binding: score unchanged, reported confidence inflated",
-      close(act["score"], exp_skip["score"], 2e-4) and close(act["confidence"], exp_with["confidence"], 2e-4)
-      and act["confidence"] > exp_skip["confidence"] + 0.05,
-      f"score {act['score']} (if skipped {exp_skip['score']}), confidence {act['confidence']} vs {exp_skip['confidence']}")
-many_pos = [{"title": "a", "published_at": iso(0)}] * 8
-act = run_sent(many_pos + [{"title": "x", "published_at": iso(0)}] * 4, labels_fail)
-exp_with = oracle_sentiment([(0, *labels["a"])] * 8 + [(0, "neutral", 0.0)] * 4)
+check("S12", "failure, cap not binding: skipped, so score AND coverage equal the scored headline alone",
+      close(act["score"], exp_skip["score"], 2e-4) and close(act["confidence"], exp_skip["confidence"], 2e-4)
+      and act["n_articles"] == 1 and act.get("inference_failures") == 1,
+      f"score {act['score']} conf {act['confidence']} vs {exp_skip}")
+act = run_sent([{"title": "a", "published_at": iso(0)}] * 8 + [{"title": "x", "published_at": iso(0)}] * 4, labels_fail)
 exp_skip = oracle_sentiment([(0, *labels["a"])] * 8)
-check("S12b", "failure, cap binding: the failed headlines dilute the score",
-      close(act["score"], exp_with["score"], 2e-4) and act["score"] < exp_skip["score"] - 0.05,
-      f"score {act['score']} with 4 failures vs {exp_skip['score']} if skipped")
+check("S12b", "failure, cap binding: no dilution", close(act["score"], exp_skip["score"], 2e-4)
+      and act.get("inference_failures") == 4, f"score {act['score']} vs {exp_skip['score']}")
+act = run_sent([{"title": "x", "published_at": iso(1)}] * 3, labels_fail)
+from model_config import is_refusal  # noqa: E402
+check("S13", "every headline fails: sentiment unavailable (a refusal), not a neutral 0",
+      act["score"] == 0.0 and act["confidence"] == 0.0 and act.get("reason") == "sentiment inference failed"
+      and act.get("inference_failures") == 3 and is_refusal(act), act.get("reason"))
+act = run_sent([{"title": "a", "published_at": iso(1)}, {"title": "n", "published_at": iso(1)}], labels_fail)
+exp = oracle_sentiment([(1, *labels["a"]), (1, "neutral", 0.95)])
+check("S14", "a genuine neutral prediction is still counted, at its weight",
+      close(act["score"], exp["score"], 2e-4) and close(act["confidence"], exp["confidence"], 2e-4)
+      and act["n_articles"] == 2 and "inference_failures" not in act)
+act = run_sent([{"title": "a", "published_at": iso(1)}, {"title": "x", "published_at": iso(1)},
+                {"title": None, "published_at": iso(1)}], labels_fail)
+check("S15", "untitled and failed headlines are counted separately",
+      act.get("untitled_articles_skipped") == 1 and act.get("inference_failures") == 1 and act["n_articles"] == 1)
+labels_fail["e"] = ("ERROR_EMPTY",)
+act = run_sent([{"title": "a", "published_at": iso(1)}, {"title": "e", "published_at": iso(1)}], labels_fail)
+check("S16", "a failure whose error message is empty is still treated as a failure",
+      act.get("inference_failures") == 1 and act["n_articles"] == 1
+      and close(act["confidence"], oracle_sentiment([(1, *labels["a"])])["confidence"], 2e-4))
+act = run_sent([{"title": None, "published_at": iso(1)}, {"title": "x", "published_at": iso(1)}], labels_fail)
+check("S17", "untitled and failed with none scored: 'no scorable headlines', both counts reported",
+      act.get("reason") == "no scorable headlines" and act.get("untitled_articles_skipped") == 1
+      and act.get("inference_failures") == 1)
+act = run_sent([{"title": None, "published_at": iso(1)}], labels_fail)
+check("S18", "a refusal with no failures carries no inference_failures field",
+      "inference_failures" not in act and act.get("reason") == "no scorable headlines")
 
 
 # ===========================================================================

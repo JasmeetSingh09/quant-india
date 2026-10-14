@@ -107,5 +107,35 @@ assigned, because the peer methodology may also need one and the release sequenc
 - About 53% of stocks have no stored headlines (D-02), so the prevalence of failures is known only
   for the stored half.
 
-**Merge:** awaiting the owner's review of this section. A local merge would not push or deploy.
+**Merge:** conditionally approved by the owner on 2026-10-15, as a local merge only.
+
+## 7. Review outcome and local merge (2026-10-15)
+
+**Defects the diff review found and fixed** (commit `ccbd90e`, on the branch, before the merge):
+1. **An empty error message passed as success.** The failure check was `s.get("error")`, which is
+   falsy when an exception is raised without a message (`score_headline` stores `str(e)`, i.e. `""`).
+   Such a failure would still have been scored as neutral at full weight. The check is now
+   `"error" in s`.
+2. **A stray counter on refusals.** The refusal path always returned `inference_failures`, 0 when
+   none failed, against section 2. It is now present only when non-zero.
+
+New oracle checks S16–S18 cover both, and S16 and S18 fail on the pre-fix commit `adf52d9`. The
+real-model injection now also raises an empty-message exception inside the pinned pipeline: 10/10.
+
+**One rule made explicit (S17).** Untitled and failed headlines with none scored give "no scorable
+headlines", with both counts reported. "Sentiment inference failed" is used only when every fetched
+headline failed inference.
+
+**The owner's merge conditions, checked on the merged tree:**
+
+| Condition | Result |
+|---|---|
+| Only the intended changes | 4 files: the sentiment function, the spec's failure-policy text, the oracle tests, the injection script |
+| The production path uses the tested error signal | `alpha_model._compute_sentiment_factor` calls `sentiment.score_headline` only, whose failure branch sets the `error` key; nothing else scores V1 headlines |
+| All-failed and partially failed cases behave as specified | S12–S18 and the 10/10 real-model injection |
+| No historical scores rewritten | 0 storage statements added or removed; the change affects only scores computed after it runs |
+| Regression suite and snapshots unchanged | CI 69/69; behavioural snapshots 339/339; provenance audit 106/106; oracle 204 pass, 3 fail (D-01, unrelated) |
+
+**Status:** merged into local `main`, working identifier `sentiment-failure-policy`. Not pushed or
+deployed, with no final model version assigned.
 
