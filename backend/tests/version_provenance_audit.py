@@ -102,6 +102,9 @@ INVENTORY = {
         "REPORTED_NOT_SCORED": BEHAVIOURAL,
     },
     "model_config": {
+        # Sentiment model pin (owner-approved 2026-10-14), captured as sentiment_model.
+        "FINBERT_MODEL": BEHAVIOURAL, "FINBERT_REVISION": BEHAVIOURAL,
+        "FINBERT_MAX_CHARS": BEHAVIOURAL,
         "RISK_FREE_RATE": BEHAVIOURAL, "TRADING_DAYS_PER_YEAR": BEHAVIOURAL,
         "MONTHS_PER_YEAR": BEHAVIOURAL, "COST_BROKERAGE_PCT": BEHAVIOURAL,
         "COST_STT_PCT": BEHAVIOURAL, "COST_STAMP_DUTY_PCT": BEHAVIOURAL,
@@ -208,6 +211,9 @@ SPEC_MAPPING = {
     ("alpha_v2", "WEIGHTS_V2"): ("factor_weights", None),
     ("alpha_model", "FACTOR_WEIGHTS"): ("v1_factor_weights", None),
     ("alpha_model", "VALUE_PEERS_USED"): ("sector_map.value_peers_used", None),
+    ("model_config", "FINBERT_MODEL"): ("sentiment_model.repo", None),
+    ("model_config", "FINBERT_REVISION"): ("sentiment_model.revision", None),
+    ("model_config", "FINBERT_MAX_CHARS"): ("sentiment_model.max_chars", None),
     ("alpha_v2", "REPORTED_NOT_SCORED"): ("reported_not_scored", list),
     ("alpha_model", "SIGNAL_STRONG_BUY"): ("signal_thresholds.signal_strong_buy", None),
     ("alpha_model", "SIGNAL_BUY"): ("signal_thresholds.signal_buy", None),

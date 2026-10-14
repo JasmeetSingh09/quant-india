@@ -105,3 +105,19 @@ MUST_AGREE = (
     "holdings are NOT shared — they match today by coincidence of judgement, "
     "and are separate parameters on purpose."
 )
+
+
+# FinBERT, the sentiment model, pinned (owner-approved 2026-10-14). It was
+# loaded as "ProsusAI/finbert" with no revision, so each Docker build took
+# whatever upstream main was. Upstream changed on 2026-10-12 (safetensors
+# weights, licence terms CC BY-NC-SA 4.0). Production was built 2026-10-06, so
+# it runs 4556d130 (main from 2023-05-23 until 2026-10-12): this pin keeps the
+# next build on the same weights. The 2026-10-12 weights scored the baseline
+# cases identically (max |prob diff| 4.8e-07, docs/audit/finbert_baseline_2026-10-14.json).
+# Shared by sentiment.py, the Dockerfile pre-download (tested to agree) and the spec.
+FINBERT_MODEL = "ProsusAI/finbert"
+FINBERT_REVISION = "4556d13015211d73dccd3fdd39d39232506f3e43"
+# Headlines are cut to this many CHARACTERS before FinBERT sees them (the old
+# comment said tokens). 512 characters is far below the 512-token window: the
+# longest baseline case was 66 tokens.
+FINBERT_MAX_CHARS = 512

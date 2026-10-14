@@ -331,6 +331,18 @@ def current_spec() -> dict:
     _cap(uni, "currency_rule", lambda: __import__("metrics").CURRENCY_RULE)
     spec["universe_rules"] = uni
 
+    # The sentiment model and how its output is read (owner-approved 2026-10-14).
+    # Before this the model was unpinned and none of it was in the spec.
+    def _sentiment_model():
+        import model_config as mc
+        return {"repo": mc.FINBERT_MODEL, "revision": mc.FINBERT_REVISION,
+                "max_chars": mc.FINBERT_MAX_CHARS, "task": "text-classification",
+                "top_k": None, "label_rule": "argmax of the three class probabilities",
+                "confidence": "probability of the chosen label, rounded to 4",
+                "failure_policy": ("current: inference error -> neutral at confidence 0, "
+                                   "still weighted by recency (policy change pending owner)")}
+    _cap(spec, "sentiment_model", _sentiment_model)
+
     # The sector map that picks every valuation peer (data_fetcher.NSE_SECTORS
     # via get_sector_peers). It was never captured, so editing it changed value
     # scores without moving the hash and the drift check could not see it
@@ -501,6 +513,14 @@ def _environment() -> dict:
     for lib in ("numpy", "pandas", "scipy", "statsmodels", "yfinance"):
         try:
             env[f"{lib}_version"] = __import__(lib).__version__
+        except Exception:
+            env[f"{lib}_version"] = None
+    # The sentiment inference stack. Read from package metadata, not imported:
+    # importing torch to build a spec would cost seconds and hundreds of MB.
+    from importlib import metadata as _md
+    for lib in ("transformers", "torch", "tokenizers"):
+        try:
+            env[f"{lib}_version"] = _md.version(lib)
         except Exception:
             env[f"{lib}_version"] = None
 

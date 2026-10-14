@@ -36,9 +36,17 @@ _DEVICE = 0 if torch.cuda.is_available() else -1   # 0 = first GPU, -1 = CPU
 _DEVICE_NAME = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU"
 print(f"Loading FinBERT model on {_DEVICE_NAME} (first run downloads ~400 MB)...")
 
+try:
+    from model_config import FINBERT_MODEL, FINBERT_REVISION, FINBERT_MAX_CHARS
+except Exception:                                   # pragma: no cover
+    from .model_config import FINBERT_MODEL, FINBERT_REVISION, FINBERT_MAX_CHARS
+
+# Pinned to an immutable revision: the model and tokenizer can no longer change
+# under a rebuild without the spec (sentiment_model) changing too.
 _finbert = hf_pipeline(
     "text-classification",
-    model="ProsusAI/finbert",
+    model=FINBERT_MODEL,
+    revision=FINBERT_REVISION,
     top_k=None,          # return all three sentiment scores
     device=_DEVICE,      # GPU if available, else CPU
 )
@@ -59,7 +67,7 @@ def score_headline(text: str) -> dict:
       scores     — dict with all three scores
     """
     try:
-        text = text[:512]   # FinBERT max token window
+        text = text[:FINBERT_MAX_CHARS]   # characters, not tokens
         results = _finbert(text)[0]
         best = max(results, key=lambda x: x["score"])
         return {
@@ -87,7 +95,7 @@ def score_headlines_batch(texts: list[str]) -> list[dict]:
     if not texts:
         return []
 
-    truncated = [t[:512] for t in texts]
+    truncated = [t[:FINBERT_MAX_CHARS] for t in texts]
     try:
         raw = _finbert(truncated)
         results = []

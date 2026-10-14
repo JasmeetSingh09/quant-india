@@ -1,0 +1,139 @@
+{
+ "revision": "4556d13015211d73dccd3fdd39d39232506f3e43",
+ "transformers": "5.12.1",
+ "torch": "2.12.1",
+ "tokenizer": {
+  "class": "BertTokenizer",
+  "model_max_length": 512,
+  "do_lower_case": true
+ },
+ "pipeline": {
+  "task": "text-classification",
+  "top_k": null,
+  "device": "cpu",
+  "threads": 1,
+  "preprocess": "text[:512] (characters) before the pipeline; no truncation flag"
+ },
+ "cases": {
+  "valid_positive": {
+   "chars_in": 66,
+   "tokens_after_cut": 11,
+   "label": "positive",
+   "confidence": 0.9047,
+   "scores": {
+    "positive": 0.904692,
+    "negative": 0.050739,
+    "neutral": 0.044569
+   }
+  },
+  "valid_negative": {
+   "chars_in": 69,
+   "tokens_after_cut": 16,
+   "label": "negative",
+   "confidence": 0.9684,
+   "scores": {
+    "negative": 0.968404,
+    "neutral": 0.023331,
+    "positive": 0.008265
+   }
+  },
+  "valid_neutral": {
+   "chars_in": 56,
+   "tokens_after_cut": 14,
+   "label": "neutral",
+   "confidence": 0.9431,
+   "scores": {
+    "neutral": 0.943123,
+    "negative": 0.035677,
+    "positive": 0.0212
+   }
+  },
+  "valid_mixed": {
+   "chars_in": 69,
+   "tokens_after_cut": 15,
+   "label": "negative",
+   "confidence": 0.972,
+   "scores": {
+    "negative": 0.97197,
+    "neutral": 0.014217,
+    "positive": 0.013812
+   }
+  },
+  "unicode_hindi": {
+   "chars_in": 22,
+   "tokens_after_cut": 12,
+   "label": "neutral",
+   "confidence": 0.9151,
+   "scores": {
+    "neutral": 0.915083,
+    "positive": 0.057268,
+    "negative": 0.027649
+   }
+  },
+  "long_over_512_chars": {
+   "chars_in": 959,
+   "tokens_after_cut": 66,
+   "label": "neutral",
+   "confidence": 0.9388,
+   "scores": {
+    "neutral": 0.938846,
+    "negative": 0.030931,
+    "positive": 0.030223
+   }
+  },
+  "empty_string": {
+   "chars_in": 0,
+   "tokens_after_cut": 2,
+   "label": "neutral",
+   "confidence": 0.4242,
+   "scores": {
+    "neutral": 0.424185,
+    "positive": 0.359163,
+    "negative": 0.216652
+   }
+  },
+  "non_string_none": {
+   "error": "ValueError: You need to specify either `text` or `text_target`.",
+   "score_headline_returns": "label neutral, confidence 0.0 (sentiment.py except branch)"
+  },
+  "non_string_int": {
+   "error": "ValueError: text input must be of type `str` (single example), `list[str]` (batch or single pretokenized example) or `list[list[str]",
+   "score_headline_returns": "label neutral, confidence 0.0 (sentiment.py except branch)"
+  }
+ },
+ "upstream_main_0bc2ac1_vs_pinned": {
+  "same_labels": true,
+  "max_abs_prob_diff": 4.845747947693213e-07,
+  "cases": {
+   "valid_positive": {
+    "label_new": "positive",
+    "max_abs_prob_diff": 1.25019073538013e-07
+   },
+   "valid_negative": {
+    "label_new": "negative",
+    "max_abs_prob_diff": 2.984849214564267e-07
+   },
+   "valid_neutral": {
+    "label_new": "neutral",
+    "max_abs_prob_diff": 4.573304653171517e-07
+   },
+   "valid_mixed": {
+    "label_new": "negative",
+    "max_abs_prob_diff": 3.9999204873991667e-07
+   },
+   "unicode_hindi": {
+    "label_new": "neutral",
+    "max_abs_prob_diff": 4.845747947693213e-07
+   },
+   "long_over_512_chars": {
+    "label_new": "neutral",
+    "max_abs_prob_diff": 4.4670128822310584e-07
+   },
+   "empty_string": {
+    "label_new": "neutral",
+    "max_abs_prob_diff": 3.4390640257786487e-07
+   }
+  },
+  "note": "0bc2ac1 (2026-10-12) adds safetensors weights; transformers loads those when present"
+ }
+}

@@ -20,7 +20,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Bakes the ~500 MB model into the image so the first real request is instant.
 RUN python -c "\
 from transformers import pipeline; \
-pipeline('text-classification', model='ProsusAI/finbert', top_k=None)"
+pipeline('text-classification', model='ProsusAI/finbert', revision='4556d13015211d73dccd3fdd39d39232506f3e43', top_k=None)"
 
 # ── Application code ──────────────────────────────────────────────────────
 COPY . .
