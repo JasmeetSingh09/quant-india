@@ -96,6 +96,8 @@ INVENTORY = {
         "LOW_RISK_VOL_WEIGHT": BEHAVIOURAL, "LOW_RISK_DD_WEIGHT": BEHAVIOURAL,
         "LOW_RISK_CONFIDENCE_BASE": BEHAVIOURAL,
         "LOW_RISK_CONFIDENCE_DIVISOR": BEHAVIOURAL,
+        # v1.6.0: low risk shown, not scored. Captured as spec "reported_not_scored".
+        "REPORTED_NOT_SCORED": BEHAVIOURAL,
     },
     "model_config": {
         "RISK_FREE_RATE": BEHAVIOURAL, "TRADING_DAYS_PER_YEAR": BEHAVIOURAL,
@@ -167,6 +169,8 @@ INVENTORY = {
         "MODEL_VERSION": METADATA, "SHUFFLE_SEED": ENVIRONMENT,
         "LARGE_CAP_RANK_MAX": BEHAVIOURAL, "MID_CAP_RANK_MAX": BEHAVIOURAL,
         "LARGE_CAP_MIN": BEHAVIOURAL, "MID_CAP_MIN": BEHAVIOURAL,
+        # v1.5.0: funds and ETFs left out of the universe. Captured in universe_rules.
+        "EXCLUDED_ISIN_PREFIXES": BEHAVIOURAL, "EXCLUDED_SYMBOL_PATTERN": BEHAVIOURAL,
         "MIN_COMPLETE_FRACTION": ALIAS, "IS_POSTGRES": ALIAS,
         # Which tickers the scan bothers to attempt, not how any is scored: a
         # ticker is skipped only after three "no market data" attempts in a
@@ -201,6 +205,7 @@ INVENTORY = {
 SPEC_MAPPING = {
     ("alpha_v2", "WEIGHTS_V2"): ("factor_weights", None),
     ("alpha_model", "FACTOR_WEIGHTS"): ("v1_factor_weights", None),
+    ("alpha_v2", "REPORTED_NOT_SCORED"): ("reported_not_scored", list),
     ("alpha_model", "SIGNAL_STRONG_BUY"): ("signal_thresholds.signal_strong_buy", None),
     ("alpha_model", "SIGNAL_BUY"): ("signal_thresholds.signal_buy", None),
     ("alpha_model", "SIGNAL_SELL"): ("signal_thresholds.signal_sell", None),
@@ -276,7 +281,7 @@ for name in ("MAX_SINGLE", "MAX_SECTOR", "MIN_HOLDINGS"):
     SPEC_MAPPING[("portfolio_fix", name)] = \
         (f"portfolio_construction.{name.lower()}", None)
 for name in ("LARGE_CAP_RANK_MAX", "MID_CAP_RANK_MAX", "LARGE_CAP_MIN",
-             "MID_CAP_MIN"):
+             "MID_CAP_MIN", "EXCLUDED_ISIN_PREFIXES", "EXCLUDED_SYMBOL_PATTERN"):
     SPEC_MAPPING[("universe_scan", name)] = (f"universe_rules.{name.lower()}", None)
 
 
