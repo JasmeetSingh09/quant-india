@@ -649,12 +649,32 @@ def _write_articles(ticker, cycle_id, factors, now):
         conn.executemany(stmt, rows)
         conn.commit()
         return len(rows)
-    except Exception:
+    except Exception as e:
+        # The batch used to be dropped whole and silently: on 2026-10-14 the
+        # headlines behind 1,302 of 2,460 sentiment scores were never stored,
+        # every night, with no trace of why. Retry row by row, as _write does,
+        # so one bad headline costs one row, and say what failed.
         try:
             conn.rollback()
         except Exception:
             pass
-        return 0
+        ok, first_err = 0, None
+        for r in rows:
+            try:
+                conn.execute(stmt, r)
+                conn.commit()
+                ok += 1
+            except Exception as e_row:
+                first_err = first_err or e_row
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+        print(f"[provenance] {ticker} {cycle_id}: headline batch failed "
+              f"({type(e).__name__}: {str(e)[:160]}); stored {ok} of {len(rows)} "
+              f"row by row" + (f"; first row error {type(first_err).__name__}: "
+                               f"{str(first_err)[:160]}" if first_err else ""))
+        return ok
     finally:
         conn.close()
 
