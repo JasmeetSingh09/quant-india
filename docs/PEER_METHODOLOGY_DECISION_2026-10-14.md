@@ -269,15 +269,114 @@ The provenance record would store it, and the stock page would show "Valued agai
 leaders, not industry peers" for the fallback. Scores would not change. It needs owner approval
 before any code.
 
-## 8. Decisions still open (after round 3)
+## 8. Round 4: owner decisions and what was done (2026-10-14)
 
-1. **The NSE company-level classification file and its terms.** This is the one blocker: the
-   sensitivity results and rule R's real costing both wait for it.
-2. **The missing own measure:** kept (no score change) or renormalise (55 label flips on the 322).
-3. **Assumptions A1 and A2** in 7.5.
-4. **The methodology-limited marking (7.7):** build it, display only, as its own versioned change?
-5. **FinBERT:** approve pinning the revision and recording the inference stack, so it can no longer
-   change unseen.
+**Owner decisions:**
+- **Missing own measure:** keep the weight; do not renormalise.
+- **A1 and A2:** approved.
+- **`peer_basis`:** approved in principle as its own display-only change.
+- **FinBERT:** pinning and version recording approved for controlled preparation.
+- **No scoring change, push or deploy.**
 
-Already decided (round 3): rule R is the candidate; "not measured" replaces market averages in a
-later version; the fallback is kept for now and labelled a limitation; no refactor, push or deploy.
+### 8.1 Missing own measure, as an explicit, tested rule
+
+**Rule.** If a stock has only one valid valuation measure, the missing measure contributes nothing
+and the weights are not redistributed: value = tanh((−0.6 z_PE − 0.4 z_PB) ÷ 2), with the missing z
+taken as 0 *because it is absent*, not because it was measured at the mean. This is today's
+behaviour exactly (7.4), so no score changes.
+
+**Oracle checks:**
+- **V15:** the rule holds.
+- **V15b:** the weight is not renormalised.
+- **V16:** a measured z of 0 and a missing measure give the same score.
+- **V16b:** they are told apart by `legs_used`, `valued_on` and the halved confidence.
+- **V16c:** pins the remaining reporting gap. A missing P/E still reports `pe_z_score` 0.0, and the
+  `peer_basis` change (`SPEC_PEER_BASIS_DISPLAY_2026-10-14.md` §2) adds an honest per-measure `z`.
+
+### 8.2 A1 and A2 in the harness and in a future implementation
+
+- **A1 (per-measure widening):** implemented in `research/peer_rule_costing.py`.
+- **A2 (one peer snapshot per scan):** the harness reads each peer's own stored value for the
+  cycle. A production implementation must do the same, because today's code can read a peer twice
+  in one night with different values (DLF, GODREJPROP, OBEROIRLTY on 2026-10-14). That would be a
+  per-cycle cache of peer multiples, part of the rule-R version.
+- **Thresholds:** remain hypotheses until the grid runs on the real file.
+
+### 8.3 FinBERT: pinned, recorded and baselined (local, not deployed)
+
+**Pin.** `model_config.FINBERT_REVISION = 4556d130…`:
+- `sentiment.py` passes it to the pipeline (model and tokenizer), and the Dockerfile pre-downloads
+  the same revision.
+- The spec records `sentiment_model`: repo, revision, character cut, task, label rule, confidence
+  rule and failure policy.
+- The environment block records the transformers, torch and tokenizers versions.
+- `finbert_pin_test` (13 checks) proves the pin is the same everywhere and moves the spec hash.
+
+**Why that revision.** Upstream `main` changed on **2026-10-12**: four commits added safetensors
+weights and a licence statement. Production was built on 2026-10-06, so it runs `4556d130`, which
+was main from 2023-05-23 until then. This is inferred from the commit history, not read from the
+server. Without the pin, the next deploy would have switched weight files.
+
+**What the two revisions do on the baseline:** identical labels; probabilities within 4.8 × 10⁻⁷.
+
+**Licence (a matter for the owner).** The model card now declares **CC BY-NC-SA 4.0**: copyright MIH
+AI B.V., non-commercial use only, with share-alike for adaptations. The previous card declared no
+licence, and the training data (Financial PhraseBank) is noted as CC BY-NC-SA 3.0. Whether Quant
+India's use is non-commercial is not something this audit can decide.
+
+**Baseline** (`docs/audit/finbert_baseline_2026-10-14.json`). It covers:
+- **valid cases:** positive, negative, neutral, mixed, and Hindi, which is scored *neutral 0.92*
+  because the model is English-only;
+- **malformed cases:** 960 characters cut to 512 (66 tokens); an empty string, scored neutral 0.42;
+- **failed cases:** `None` and an integer, which raise and become neutral at confidence 0.
+
+It records the tokenizer (BertTokenizer, lower-case, 512-token maximum), versions (transformers
+5.12.1, torch 2.12.1 locally) and the inference settings. Loading the pinned `sentiment.py`
+reproduces it exactly.
+
+**Library pinning is deliberately deferred.** Production's transformers and torch versions are
+unknown. Pinning to the local versions could itself change production. The next authorised deploy
+records them in the spec, and the pin then follows those.
+
+### 8.4 FinBERT failure policy: defined, not yet changed
+
+**Today.** An inference error becomes neutral at confidence 0, at full recency weight. The oracle
+checks S12 and S12b pin its exact effect. The sentiment score is
+(weighted mean) × min(1, Σweights ÷ 7):
+- **while the cap does not bind:** a failure leaves the score unchanged but inflates the reported
+  coverage (in the test, 0.113 → 0.227);
+- **once the cap binds:** failures dilute the score (in the test, 0.9 → 0.6 with 4 failures among
+  12 headlines).
+
+**Proposed policy:**
+1. A headline whose inference fails is skipped and counted (`inference_failures`), exactly like an
+   untitled headline.
+2. If every headline fails, sentiment is refused with the reason "sentiment inference failed", not
+   "no news".
+3. The count is recorded in provenance.
+
+**Impact assessment.**
+- **Stored history:** across 1,005,320 stored headline scorings (42 cycles, 2026-09-03 to 10-14),
+  the failure signature (neutral, confidence 0) occurs **0 times**; the lowest real confidence is
+  0.338. So the policy would have changed no recorded score.
+- **Caveat:** headlines are stored for only about 47% of stocks (D-02), so the unstored half cannot
+  be checked.
+- **Version:** if adopted, it is a behavioural change to sentiment and gets its own version and
+  impact note.
+
+## 9. Status after round 4
+
+| # | Item | Status |
+|---|---|---|
+| 1 | NSE company-level classification file and terms | **Blocked on the source** (the owner) |
+| 2 | Rule-R sensitivity grid | Harness ready; waits for 1 |
+| 3 | This decision document | Complete up to the classification results |
+| 4 | `peer_basis` display change | Specified (`SPEC_PEER_BASIS_DISPLAY_2026-10-14.md`); 2 wording points open; not built |
+| 5 | FinBERT pin and baselines | Done locally; library pins wait for production versions; failure policy defined, adoption pending |
+| 6 | Investment evidence for each factor | Separate track, still required |
+
+**Decisions still open:**
+- the classification file (1);
+- the `peer_basis` wording points (4);
+- adopting the FinBERT failure policy (8.4);
+- the FinBERT licence question (8.3).
