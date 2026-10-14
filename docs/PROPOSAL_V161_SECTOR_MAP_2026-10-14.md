@@ -60,9 +60,46 @@ to it today (the first match), so its own peers do not change, and its second li
 **Why "appended last".** Adding to the end of NBFC changes no existing NBFC member's peers. Those
 peers are drawn from the first five names, and NBFC already has 13.
 
-**Option B (not costed).** Put ADANIENT in Diversified as a conglomerate and remove it from Infra.
-That changes ADANIENT's own peers and every Infra member's. Choose it only with a separate impact
-run.
+**Option B (costed 2026-10-14 by the same method).** ADANIENT moves to Diversified as a
+conglomerate and comes out of Infra. ADANIGREEN also comes out of Infra, as in option A. The
+Diversified members keep ADANIENT as a peer, so they do not move.
+
+| Stock | Value before → after | Alpha before → after | Label |
+|---|---|---|---|
+| ADANIPORTS | +0.2766 → −0.8145 (Infra P/E mean 63.0 → 15.2) | 30.33 → **13.96** | **Buy → Neutral** |
+| ADANIENT | +0.1547 → −0.4867 (peers BAJAJHLDNG, TATAINVEST, GODREJIND) | 13.81 → 4.19 | Neutral |
+| GPPL | +0.4999 → −0.0373 | 24.27 → 16.21 | Buy |
+| IRB | +0.5783 → +0.0795 | 5.93 → −1.55 | Neutral |
+| KNRCON | +0.6559 → +0.7847 | −9.61 → −7.68 | Neutral |
+
+KALYANKJIL, EDELWEISS and KEYFINSERV change exactly as in option A.
+
+**A against B:**
+
+| | Option A | Option B |
+|---|---|---|
+| Stocks that change | 12 | 8 |
+| Labels that flip | KALYANKJIL Neutral → Buy; GODREJIND Neutral → Sell | KALYANKJIL Neutral → Buy; ADANIPORTS Buy → Neutral |
+| ADANIENT's own peers | unchanged (it stays where it is scored today) | it moves to holding companies |
+| Infra's peer pool | keeps one Adani conglomerate | ports and roads only |
+| Not shown in the impact table | — | ADANIGREEN's own peers stay Power, so it does not move |
+
+What to weigh:
+- **Option A** keeps ADANIENT's own valuation basis.
+- **Option B** treats it as a conglomerate. That matches Yahoo's view that it is not infrastructure
+  (Energy / Thermal Coal), but compares it with holding companies whose P/Es are high.
+- **Neither is established by this evidence.** It is a classification judgement for the owner.
+
+**KEYFINSERV choices:**
+
+| Choice | Peers | Value | Alpha |
+|---|---|---|---|
+| Today (Real_Estate) | DLF, GODREJPROP, OBEROIRLTY | +0.8784 | 6.35 |
+| NBFC, appended (proposed) | BAJFINANCE, BAJAJFINSV, MUTHOOTFIN (lenders) | +0.4840 | 0.56 |
+| Removed from the map | falls back to Yahoo "Financial Services" → Banking: HDFCBANK, ICICIBANK, SBIN | −0.3131 | −11.40 |
+
+Neither group is a true peer for a capital-markets firm. A dedicated capital-markets sector would
+need its own membership list. That is outside this proposal and not costed.
 
 ## Impact on the 2026-10-14 cycle (option A)
 
@@ -92,9 +129,33 @@ run.
 - **Approximation:** for KNRCON and JSWHL, peer multiples not stored as peer rows were taken from the
   peer's own stored inputs, where a negative multiple had already been dropped.
 
+## Spec capture: done separately, map unchanged
+
+The spec gap was fixed on its own, at the owner's request, ahead of the map decision. The commit is
+local and not pushed.
+
+**What `current_spec()` now records** as `sector_map`:
+- the sector order (the first match wins);
+- every sector's members, in order;
+- a hash of both.
+
+**Test:** `tests/sector_map_spec_test.py` (7 checks, in CI) shows the capture matches the module, and
+that removing a member, reordering a sector, or reordering the sectors each moves the hash.
+
+**Drift against v1.6.0.** Once deployed, the drift check reports `sector_map` as "never captured by
+this version" (coverage), not as behavioural drift. That is accurate: v1.6.0's hash never protected
+the map.
+
+**Still not captured:**
+- the peer counts, which are inline literals: `peers[:5]` in `get_sector_peers` and `peers[:3]` in
+  `_compute_value_factor`;
+- the Yahoo-sector fallback table inside `get_sector_peers`.
+
+They belong in the same version as the map change.
+
 ## What also changes, and what does not
 
-**Also changes:**
+**Also changes (the first item is already done, separately; see above):**
 - **The spec captures the map.** `current_spec()` records a hash of `NSE_SECTORS` (and its version),
   so any future edit is visible to the drift check. Today it is not captured at all.
 - **Stored rows are stamped.** `universe_scan.MODEL_VERSION` is bumped, so rows scored on the new map

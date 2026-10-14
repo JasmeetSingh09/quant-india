@@ -331,6 +331,23 @@ def current_spec() -> dict:
     _cap(uni, "currency_rule", lambda: __import__("metrics").CURRENCY_RULE)
     spec["universe_rules"] = uni
 
+    # The sector map that picks every valuation peer (data_fetcher.NSE_SECTORS
+    # via get_sector_peers). It was never captured, so editing it changed value
+    # scores without moving the hash and the drift check could not see it
+    # (audit D-01, 2026-10-14). Order is recorded explicitly: the first sector
+    # that lists a stock wins, and peers are taken in list order, while the hash
+    # sorts dict keys. Captured as configuration only; the map is unchanged.
+    def _sector_map():
+        from data_fetcher import NSE_SECTORS
+        members = {k: list(v) for k, v in NSE_SECTORS.items()}
+        blob = json.dumps({"order": list(NSE_SECTORS), "members": members},
+                          separators=(",", ":"))
+        return {"source": "data_fetcher.NSE_SECTORS",
+                "sector_order": list(NSE_SECTORS),
+                "members": members,
+                "sha256_16": hashlib.sha256(blob.encode()).hexdigest()[:16]}
+    _cap(spec, "sector_map", _sector_map)
+
     bm = {}
     _cap(bm, "index", lambda: __import__("benchmark").BENCHMARK)
     _cap(bm, "tracker_index",
