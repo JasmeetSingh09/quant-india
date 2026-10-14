@@ -436,7 +436,11 @@ def _universe() -> list:
     except Exception:
         priority = []
     pri_set = set(priority)
-    head = [t for t in priority if t in set(out)]
+    # dict.fromkeys keeps first-seen order and drops repeats. A stock filed under
+    # two sectors (KALYANKJIL, ADANIGREEN, ADANIENT) was listed twice, scored twice
+    # a night, and counted twice in `total` (2,494 attempts for 2,491 stocks).
+    out_set = set(out)
+    head = [t for t in dict.fromkeys(priority) if t in out_set]
     tail = [t for t in out if t not in pri_set]
     import random as _r
     _r.Random(SHUFFLE_SEED).shuffle(tail)     # fixed seed: same order across restarts
