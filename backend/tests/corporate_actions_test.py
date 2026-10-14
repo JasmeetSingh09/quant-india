@@ -113,8 +113,8 @@ for s in ["Annual General Meeting",
     acts = CA.parse_subject(s)
     priced = [a for a in acts if a["kind"] in (CA.SPLIT, CA.BONUS, CA.DIVIDEND)]
     ok(not priced, f"no adjustment invented for: {s[:52] or '(empty)'}")
-ok(CA.parse_subject("Rights Issue 1:4 @ Premium Rs 50 Per Share") == [],
-   "a rights price is not mistaken for a dividend")
+ok([a["kind"] for a in CA.parse_subject("Rights Issue 1:4 @ Premium Rs 50 Per Share")]
+   == [CA.RIGHTS], "a rights price is not mistaken for a dividend")
 
 print("\n5a. CONSOLIDATIONS (2026-10-05: two were stored unparsed)")
 c = CA.parse_subject("Consolidation Of Equity Shares From Re 1 Per Share To Rs 10 Per Share")
@@ -136,8 +136,8 @@ ok(CA.parse_subject("Dividend") == [],
 ok(CA.parse_subject(
     "Distribution - Rs 3.6078 Per Unit Consists Of Rs 3.6078 Per Unit As Dividend") == [],
    "a REIT/InvIT per-UNIT distribution is not read as a per-share dividend")
-ok(CA.parse_subject("Rights 1:2 @ Premium Rs.1.75 Per Share") == [],
-   "a rights premium is not read as a dividend")
+ok([a["kind"] for a in CA.parse_subject("Rights 1:2 @ Premium Rs.1.75 Per Share")]
+   == [CA.RIGHTS], "a rights premium is not read as a dividend")
 print("       consequence: a bare 'Dividend' row is a real price drop we do not")
 print("       adjust for. It is recorded with parsed=0 and counted, not guessed.")
 
@@ -205,6 +205,46 @@ ok(cov.get("splits") == 1 and cov.get("bonuses") == 1 and cov.get("dividends") =
 ok(cov.get("unparsed") == 1, f"the AGM is kept, flagged unparsed ({cov.get('unparsed')})")
 ok(cov.get("first") == "2015-07-15" and cov.get("last") == "2018-03-10",
    f"date span {cov.get('first')} .. {cov.get('last')}")
+
+print("\n10. RIGHTS ISSUES (owner-approved 2026-10-14)")
+# Theoretical ex-rights price: A new for every B held at issue price S, prior
+# close P, gives (B*P + A*S) / ((A+B)*P). The feed prints only the premium.
+r = CA.parse_subject("Rights 1:26 @ Premium Rs 817/-")
+ok(r == [{"kind": CA.RIGHTS, "num": 1.0, "den": 26.0, "amount": 817.0}],
+   f"ratio and premium read ({r})")
+m = CA.price_multiplier(dict(r[0], face_value=1.0), prev_close=1100.0)
+ok(abs(m - (26 * 1100 + 818) / (27 * 1100)) < 1e-12,
+   f"issue price = premium + face value (m={m:.6f})")
+m10 = CA.price_multiplier(r[0], prev_close=1100.0)
+ok(abs(m10 - (26 * 1100 + 827) / (27 * 1100)) < 1e-12,
+   f"unknown face value assumes Rs {CA.RIGHTS_ASSUMED_FACE_VALUE:g}")
+ok(m10 >= m, "the assumption under-corrects rather than over-corrects")
+ok(CA.price_multiplier(r[0], prev_close=800.0) == 1.0,
+   "an issue priced above the market moves nothing")
+ok(CA.price_multiplier(r[0]) is None, "no prior close, no multiplier")
+for subj, want in [
+        ("Right Issue 1:15 @ Premium Of Rs 333 Per Share", (1, 15, 333)),
+        ("Rights 1:2@Prem Rs 40", (1, 2, 40)),
+        ("Rights 7:10 @ Prm Rs 102/-", (7, 10, 102)),
+        ("Rights 1:9 @ Premium 91", (1, 9, 91)),
+        ("Rights 5: 116 At Premium Rs 244/- Per Share", (5, 116, 244)),
+        ("Rights 1:11.10 @ Premium Rs 0/-", (1, 11.1, 0)),
+        ("Rights 2:5 @ Premium Re 0.85/-", (2, 5, 0.85)),
+        ("Rights 9:77 Partly Paid @ Premium Rs 100/-", (9, 77, 100)),
+        ("Rights : 24:10 At Par", (24, 10, 0))]:
+    got = [(a["num"], a["den"], a["amount"]) for a in CA.parse_subject(subj)
+           if a["kind"] == CA.RIGHTS]
+    ok(got == [tuple(float(x) for x in want)], f"{subj[:46]} -> {got}")
+par = CA.parse_subject("Rights - 2:3@ Par Rs 10 Per Share")
+ok(par and par[0].get("face_value") == 10.0 and par[0]["amount"] == 0.0,
+   f"'at par Rs 10' is premium 0 on a stated face value ({par})")
+both = CA.parse_subject(
+    "Interim Dividend- Rs 3 Per Share / Rights 1:16 @ Premium Rs 554 Per Share")
+ok(sorted((a["kind"], a.get("amount")) for a in both)
+   == [(CA.DIVIDEND, 3.0), (CA.RIGHTS, 554.0)],
+   f"a line with a dividend and a rights issue keeps both ({both})")
+ok([a["kind"] for a in CA.parse_subject("Dividend Re1/- Per Share + Rights Issue 5:6")]
+   == [CA.DIVIDEND], "a rights line with no price keeps its dividend only")
 
 try:
     os.remove(DB)

@@ -74,6 +74,18 @@ _READY = False
 # Actions that move the price. Everything else (AGMs, e-voting, board meetings)
 # is recorded for completeness and adjusts nothing.
 SPLIT, BONUS, DIVIDEND, OTHER = "split", "bonus", "dividend", "other"
+RIGHTS = "rights"
+
+# Every kind price_multiplier can express, for the readers that filter on kind.
+PRICED_KINDS = (SPLIT, BONUS, DIVIDEND, RIGHTS)
+
+# The feed prints a rights PREMIUM, not the issue price, and nothing stored
+# records the face value the premium sits on. Rs 10 is the commonest face value
+# and the highest usual one, so assuming it never makes the issue price too low:
+# where the true face value is smaller the drop is under-corrected, never
+# over-corrected. pit_validation replaces it with the face value the exchange's
+# own split lines give, where there is one (owner-approved 2026-10-14).
+RIGHTS_ASSUMED_FACE_VALUE = 10.0
 
 _HEADERS = {
     "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -153,6 +165,26 @@ _DIV_RE = re.compile(
     re.I)
 _DIV_WORD = re.compile(r"(?:dividend|\bdiv\b)", re.I)
 
+# "Rights 3:4 @ Premium Rs.32/- Per Share", "Right Issue 1:15 @ Premium Of Rs
+# 333", "Rights 1:2@Prem Rs 40", "Rights 7:10 @ Prm Rs 102/-", "Rights 1:9 @
+# Premium 91", "Rights - 2:3@ Par Rs 10 Per Share". A:B is A new shares for
+# every B held. Without a premium or "par" the issue price is unknown and the
+# line is left unparsed rather than guessed ("Rights 2:7").
+_RIGHTS_RE = re.compile(
+    r"\brights?\b[^0-9]{0,20}?([0-9]+(?:\.[0-9]+)?)\s*:\s*([0-9]+(?:\.[0-9]+)?)",
+    re.I)
+_RIGHTS_PREMIUM = re.compile(
+    r"\b(?:premium|prem|prm)\b\.?\s*(?:of\s*)?(?:r[se]\.?\s*)?([0-9]+(?:\.[0-9]+)?)",
+    re.I)
+_RIGHTS_AT_PAR = re.compile(r"\bpar\b(?:[^0-9]{0,6}?r[se]\.?\s*([0-9]+(?:\.[0-9]+)?))?",
+                            re.I)
+# Rights in another instrument (debentures, preference shares, warrants riding
+# along) do not dilute the equity at one price; a line offering two tranches
+# ("4:25 Fully Paid ... / 2:25 Partly Paid") has no single price either.
+_NOT_EQUITY_RIGHTS = re.compile(
+    r"debenture|preference|\bncd\b|\bccps\b|\bocrps\b|\bncrps\b|warrant|"
+    r"convertible", re.I)
+
 
 def parse_subject(subject: str) -> list:
     """
@@ -198,7 +230,13 @@ def parse_subject(subject: str) -> list:
     #       -- the second figure is already inside the first;
     #   "Taxable Dividend - Rs 0.62 Per Unit / Exempt Dividend ..." -- trust
     #       distributions, whose interest and capital legs are not read here.
-    if _DIV_WORD.search(s) and "rights" not in s.lower():
+    #
+    # A line can carry a dividend AND a rights issue ("Interim Dividend- Rs 3
+    # Per Share / Rights 1:16 @ Premium Rs 554 Per Share"). The old guard
+    # dropped the whole line's dividend, which lost three payouts; _DIV_RE
+    # cannot reach the rights price anyway, because the gap it allows after
+    # the word excludes the letter r, so "Rights" stops it.
+    if _DIV_WORD.search(s):
         low = s.lower()
         amts = [float(m.group(1)) for m in _DIV_RE.finditer(s)]
         amts = [a for a in amts if a > 0]
@@ -208,6 +246,23 @@ def parse_subject(subject: str) -> list:
             else:
                 amt = round(sum(amts), 4)
             out.append({"kind": DIVIDEND, "amount": amt})
+
+    # A rights issue: num:den is new:held, amount is the PREMIUM over face
+    # value (all the feed prints). "@ Par Rs 10" is premium 0 and states the
+    # face value, which is kept so the multiplier need not assume one.
+    if not _NOT_EQUITY_RIGHTS.search(s):
+        ratios = _RIGHTS_RE.findall(s)
+        all_ratios = re.findall(r"[0-9]+(?:\.[0-9]+)?\s*:\s*[0-9]+", s)
+        if len(ratios) == 1 and len(all_ratios) == 1:
+            a, b = float(ratios[0][0]), float(ratios[0][1])
+            prem = _RIGHTS_PREMIUM.search(s)
+            par = _RIGHTS_AT_PAR.search(s)
+            if a > 0 and b > 0 and (prem or par):
+                act = {"kind": RIGHTS, "num": a, "den": b,
+                       "amount": float(prem.group(1)) if prem else 0.0}
+                if not prem and par.group(1):
+                    act["face_value"] = float(par.group(1))
+                out.append(act)
     return out
 
 
@@ -220,6 +275,13 @@ def price_multiplier(action: dict, prev_close: float = None):
       split  face value Rs X -> Rs Y : shares scale X/Y, so price scales Y/X
       bonus  A:B                     : shares scale (A+B)/B, price scales B/(A+B)
       cash dividend D                : price scales (P - D) / P
+      rights A:B at issue price S    : price scales (B*P + A*S) / ((A+B)*P),
+                                       the theoretical ex-rights price over P
+
+    A rights issue price is premium + face value. Face value comes from the
+    action ("face_value") when known, else RIGHTS_ASSUMED_FACE_VALUE. An issue
+    priced at or above the prior close transfers nothing to holders, so it
+    returns 1.0: understood, and nothing to correct.
     """
     k = action.get("kind")
     if k == SPLIT:
@@ -239,6 +301,16 @@ def price_multiplier(action: dict, prev_close: float = None):
         if d >= prev_close:            # a payout at or above the price is not
             return None                # a dividend we can model; refuse it
         return (float(prev_close) - float(d)) / float(prev_close)
+    if k == RIGHTS:
+        a, b, prem = action.get("num"), action.get("den"), action.get("amount")
+        if not a or not b or prem is None or not prev_close or prev_close <= 0:
+            return None
+        fv = action.get("face_value") or RIGHTS_ASSUMED_FACE_VALUE
+        issue = float(prem) + float(fv)
+        p = float(prev_close)
+        if issue >= p:
+            return 1.0
+        return (float(b) * p + float(a) * issue) / ((float(a) + float(b)) * p)
     return None
 
 
@@ -334,7 +406,7 @@ def store(rows: list) -> dict:
                 acts = [{"kind": OTHER}]
                 out["unparsed"] += 1
             for a in acts:
-                if a["kind"] in (SPLIT, BONUS, DIVIDEND):
+                if a["kind"] in PRICED_KINDS:
                     out["priced"] += 1
                 vals = (isin, sym, ex, a["kind"], a.get("num"), a.get("den"),
                         a.get("amount"), subject[:400],
@@ -516,7 +588,7 @@ def actions_for(isin: str, start: str = None, end: str = None) -> list:
     try:
         sql = ("SELECT ex_date, kind, num, den, amount, subject, symbol "
                "FROM corporate_actions WHERE isin=? AND parsed=1 "
-               "AND kind IN ('split','bonus','dividend')")
+               "AND kind IN ('split','bonus','dividend','rights')")
         args = [isin]
         if start:
             sql += " AND ex_date >= ?"; args.append(start)

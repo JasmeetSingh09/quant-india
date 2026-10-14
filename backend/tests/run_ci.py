@@ -106,6 +106,7 @@ SUITES = [
     ("v150_fixes_test.py",                  25, 120),
     ("security_names_test.py",              15, 60),
     ("adjustment_orphan_test.py",            4, 60),
+    ("rights_adjustment_test.py",            7, 60),
     ("reparse_external_test.py",             4, 60),
     ("v160_low_risk_test.py",               10, 120),
     ("price_signals_test.py",               11, 600),

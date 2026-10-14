@@ -85,7 +85,7 @@ PRICE_AFFECTING = {"split", "bonus", "dividend", "consolidation", "demerger",
                    "rights", "buyback", "capital_reduction", "amalgamation"}
 
 # Of those, the ones the current multiplier model can actually express.
-MODELLED = {"split", "bonus", "dividend"}
+MODELLED = {"split", "bonus", "dividend", "rights"}
 
 _RATIO = re.compile(r"([0-9]+(?:\.[0-9]+)?)\s*:\s*([0-9]+(?:\.[0-9]+)?)")
 _AMOUNT = re.compile(_MONEY + r"*(?:[0-9]+(?:\.[0-9]+)?)", re.I)
@@ -128,6 +128,10 @@ def reconstructible(bucket: str, subject: str):
         if re.search(_MONEY, s, re.I):
             return True, "an amount is present"
         return False, "no amount in the text"
+    if bucket == "rights":
+        if _RATIO.search(s) and re.search(r"\b(?:premium|prem|prm|par)\b", s, re.I):
+            return True, "a ratio and a premium (or 'at par') are present"
+        return False, "no ratio or no issue price in the text"
     return False, "unknown"
 
 
@@ -593,7 +597,7 @@ def missed_actions(max_rows: int = 60000, sample: int = 40) -> dict:
     for isin, ex, subject, kind, parsed in rows:
         key = (str(isin), str(ex)[:10])
         stored.setdefault(key, set())
-        if int(parsed or 0) and kind in ("split", "bonus", "dividend"):
+        if int(parsed or 0) and kind in ("split", "bonus", "dividend", "rights"):
             stored[key].add(kind)
         subjects.setdefault(key, set()).add(str(subject or ""))
 
@@ -719,7 +723,7 @@ def reparse_dry_run(sample: int = 25) -> dict:
     for isin, ex, subject, kind, num, den, amount, parsed in rows:
         key = (str(isin), str(ex)[:10], str(subject or ""))
         subjects[key] = str(subject or "")
-        if int(parsed or 0) and kind in ("split", "bonus", "dividend"):
+        if int(parsed or 0) and kind in ("split", "bonus", "dividend", "rights"):
             stored.setdefault(key, {})[kind] = {
                 "num": None if num is None else float(num),
                 "den": None if den is None else float(den),
@@ -872,7 +876,7 @@ def reparse_apply(confirm: str = "") -> dict:
         for isin, sym, ex, subject, kind, num, den, amount, parsed in rows:
             key = (str(isin), str(ex)[:10], str(subject or ""))
             meta[key] = str(sym or "")
-            if int(parsed or 0) and kind in ("split", "bonus", "dividend"):
+            if int(parsed or 0) and kind in ("split", "bonus", "dividend", "rights"):
                 stored.setdefault(key, set()).add(kind)
 
         for key, sym in meta.items():
@@ -1004,7 +1008,7 @@ def post_write_verify() -> dict:
         for isin, ex, subject, kind, p in rows:
             key = (str(isin), str(ex)[:10], str(subject or ""))
             subjects[key] = str(subject or "")
-            if int(p or 0) and kind in ("split", "bonus", "dividend"):
+            if int(p or 0) and kind in ("split", "bonus", "dividend", "rights"):
                 stored.setdefault(key, set()).add(str(kind))
         remaining = 0
         for key, subj in subjects.items():

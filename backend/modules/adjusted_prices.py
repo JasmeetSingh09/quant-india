@@ -117,12 +117,12 @@ def price_series(isin: str, start: str = None, end: str = None,
     acts = [a for a in CA.actions_for(isin, start=days[0], end=last_day)
             if a["ex_date"] > days[0]]
 
-    # Multiplier per action, in ex-date order. A dividend needs the close on
-    # the last trading day BEFORE the ex-date.
+    # Multiplier per action, in ex-date order. A dividend or a rights issue
+    # needs the close on the last trading day BEFORE the ex-date.
     resolved = []
     for a in acts:
         prev_close = None
-        if a["kind"] == CA.DIVIDEND:
+        if a["kind"] in (CA.DIVIDEND, CA.RIGHTS):
             i = bisect_left(days, a["ex_date"]) - 1
             if i >= 0:
                 prev_close = closes[i]
@@ -131,7 +131,8 @@ def price_series(isin: str, start: str = None, end: str = None,
             out["unapplied"].append({
                 "ex_date": a["ex_date"], "kind": a["kind"],
                 "subject": (a.get("subject") or "")[:90],
-                "why": ("no close before the ex-date" if a["kind"] == CA.DIVIDEND
+                "why": ("no close before the ex-date"
+                        if a["kind"] in (CA.DIVIDEND, CA.RIGHTS)
                         and prev_close is None else "multiplier not computable"),
             })
             continue

@@ -299,7 +299,7 @@ def _apply_adjustment(conn, keys, days, C, canonical):
         try:
             rows = conn.execute(
                 "SELECT isin, ex_date, kind, num, den, amount, symbol FROM corporate_actions "
-                "WHERE parsed = 1 AND kind IN ('split', 'bonus', 'dividend') "
+                "WHERE parsed = 1 AND kind IN ('split', 'bonus', 'dividend', 'rights') "
                 "ORDER BY ex_date").fetchall()
         except Exception:
             # An older table without the symbol column: ISIN matching only, as before.
@@ -309,7 +309,7 @@ def _apply_adjustment(conn, keys, days, C, canonical):
                 pass
             rows = [tuple(r) + (None,) for r in conn.execute(
                 "SELECT isin, ex_date, kind, num, den, amount FROM corporate_actions "
-                "WHERE parsed = 1 AND kind IN ('split', 'bonus', 'dividend') "
+                "WHERE parsed = 1 AND kind IN ('split', 'bonus', 'dividend', 'rights') "
                 "ORDER BY ex_date").fetchall()]
         # Where each symbol traded under each ISIN. Some actions are filed under an
         # ISIN that never appears in the price archive (Kotak's 2026 split under
@@ -334,9 +334,40 @@ def _apply_adjustment(conn, keys, days, C, canonical):
         return F, {"applied": False, "reason": f"{type(e).__name__}",
                    "note": "corporate actions unavailable; series left RAW"}
 
+    # Face value per identity, from the exchange's own split lines ("Face Value
+    # Split From Rs 10 To Rs 2"), so a rights premium can become an issue price
+    # without assuming one. Rows added from Yahoo or by hand carry a share
+    # factor, not face values, and are skipped.
+    fv_splits = {}
+    try:
+        for isin_, ex_, old_fv, new_fv, subj_ in conn.execute(
+                "SELECT isin, ex_date, num, den, subject FROM corporate_actions "
+                "WHERE parsed = 1 AND kind = 'split'").fetchall():
+            if str(subj_ or "").startswith(("Yahoo split factor", "Hand-verified")):
+                continue
+            if old_fv and new_fv:
+                fv_splits.setdefault(canonical.get(isin_, isin_), []).append(
+                    (str(ex_)[:10], float(old_fv), float(new_fv)))
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        fv_splits = {}
+
+    def _face_value(key, ex):
+        """Face value on `ex`: after the last split before it, else before the next."""
+        sp = sorted(fv_splits.get(key, []))
+        before = [new for d, _, new in sp if d <= ex]
+        if before:
+            return before[-1]
+        after = [old for d, old, _ in sp if d > ex]
+        return after[0] if after else None
+
     stats = {"actions_seen": len(rows), "applied": 0, "unapplied": 0,
              "identities_with_actions": set(), "by_kind": {},
-             "unapplied_by_reason": {}, "applied_via_symbol": 0}
+             "unapplied_by_reason": {}, "applied_via_symbol": 0,
+             "rights_face_value": {"from split lines": 0, "assumed": 0}}
 
     def _isin_by_symbol(sym, ex):
         """The ISIN `sym` traded under on its last stored day before `ex`, or None."""
@@ -377,7 +408,12 @@ def _apply_adjustment(conn, keys, days, C, canonical):
 
         action = {"kind": kind, "num": num, "den": den, "amount": amount}
         prev_close = None
-        if kind == CA.DIVIDEND:
+        if kind == CA.RIGHTS:
+            fv = _face_value(key, ex)
+            stats["rights_face_value"]["from split lines" if fv else "assumed"] += 1
+            if fv:
+                action["face_value"] = fv
+        if kind in (CA.DIVIDEND, CA.RIGHTS):
             prev_close = float(C[i, c - 1]) if np.isfinite(C[i, c - 1]) else None
             if prev_close is None or prev_close <= 0:
                 _skip("no close before the ex-date")
@@ -414,6 +450,8 @@ def _apply_adjustment(conn, keys, days, C, canonical):
                             "their symbol traded under just before the ex-date"),
         "unapplied_by_reason": stats["unapplied_by_reason"],
         "applied_by_kind": stats["by_kind"],
+        "rights_face_value": dict(stats["rights_face_value"],
+                                  assumed_value=CA.RIGHTS_ASSUMED_FACE_VALUE),
         "identities_with_actions": len(stats["identities_with_actions"]),
         "priced_observations": int(priced.sum()),
         "observations_adjusted": int(moved.sum()),

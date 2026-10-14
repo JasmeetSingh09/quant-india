@@ -82,9 +82,27 @@ for subject, why in MUST_NOT_SPLIT:
     check(f"refuses split in: {subject[:50]}", "split" not in kinds(subject),
           f"{why} | got {kinds(subject)}")
 
-check("a rights line yields nothing at all",
-      parse_subject("Rights 3:4 @ Premium Rs.32/- Per Share") == [],
-      "rights are not modelled as a single multiplier")
+check("a rights line yields only a rights action (no split, no dividend)",
+      parse_subject("Rights 3:4 @ Premium Rs.32/- Per Share")
+      == [{"kind": "rights", "num": 3.0, "den": 4.0, "amount": 32.0}],
+      f"got {parse_subject('Rights 3:4 @ Premium Rs.32/- Per Share')}")
+
+# Rights in another instrument, or in two tranches, have no single equity
+# price and must stay unparsed (2026-10-14: six such lines in production).
+MUST_NOT_RIGHTS = [
+    ("Rights:14 Compulosry Convertible Debentures For Every 15 Equity Shares",
+     "debentures"),
+    ("Rights 1:50 @ Premium Rs 690/- With 17 Warrants For 50 Equity Shares",
+     "warrants ride along"),
+    ("Rights - 7 Ccps And 7 Warrants:40", "CCPS"),
+    ("Rights - 4:25 Fully Paid Up Shares @ Premium Rs 500/- Per Share / 2:25 "
+     "Partly Paid Up Shares @ Premium Rs 605/- Per Share", "two tranches"),
+    ("Rights 2:7", "no issue price"),
+    ("Rights Entitlement Listing", "no ratio"),
+]
+for subject, why in MUST_NOT_RIGHTS:
+    check(f"refuses rights in: {subject[:50]}", "rights" not in kinds(subject),
+          f"{why} | got {kinds(subject)}")
 
 print()
 print("=" * 74)

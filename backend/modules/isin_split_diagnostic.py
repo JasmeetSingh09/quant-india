@@ -170,7 +170,7 @@ def diagnose(symbols: list = None, max_symbols: int = 12,
                 price_affecting = []
                 if acts:
                     for a in acts:
-                        if a["kind"] not in ("split", "bonus", "dividend"):
+                        if a["kind"] not in ("split", "bonus", "dividend", "rights"):
                             continue
                         if not a["parsed"]:
                             continue
