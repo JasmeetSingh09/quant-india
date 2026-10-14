@@ -1,0 +1,279 @@
+{
+ "audit": "four-factor model (V1) end-to-end",
+ "date_utc": "2026-10-14",
+ "code_commit": "63d84d0 (local) on top of origin/main; working tree also holds uncommitted 52-week edits to alpha_model.py and factor_provenance.py that do not change any score",
+ "frozen_spec": "v1.6.0 (hash 54ced1e2c8af0a77); live drift check: behavioural_drift=false, environment_drift=true",
+ "final_status": "FAIL",
+ "final_status_reason": "Every formula and every stored score reconciles, but one P1 defect (D-01, wrong sector peers for value) is unresolved and the signed-in frontend check is BLOCKED. No-score defects D-02, D-03, D-04, D-05, D-10, D-11, D-12 were fixed the same day; after the fixes the oracle suite is 181 pass / 7 fail (D-01, D-07, D-08, D-09) and run_ci 67/67.",
+ "production_reconciliation": {
+  "cycle": "2026-10-14",
+  "source": "Supabase production, read-only SQL",
+  "scan_state": {
+   "done": 2494,
+   "total": 2494,
+   "status": "complete"
+  },
+  "rows_in_cycle": 2491,
+  "row_gap_explained": "3 tickers appear twice in the scan universe (D-03): KALYANKJIL, ADANIGREEN, ADANIENT",
+  "scored": 2462,
+  "errors": 29,
+  "errors_by_reason": {
+   "no market cap and fewer than 60 days of Yahoo prices": 29
+  },
+  "excluded_before_scan_no_market_data": 49,
+  "composite": {
+   "checked": 2462,
+   "mismatch_over_0.011": 0,
+   "max_abs_diff": 0.0100015,
+   "label_mismatch": 0,
+   "factor_out_of_range": 0,
+   "coverage_out_of_range": 0
+  },
+  "momentum_from_stored_inputs": {
+   "measured": 2290,
+   "refused": 172,
+   "mismatch": 0,
+   "max_abs_diff": 0.000232,
+   "refusal_reasons": {
+    "price history too short": 172
+   }
+  },
+  "quality_from_stored_inputs": {
+   "checked": 2462,
+   "mismatch": 0,
+   "max_abs_diff": 0.000178,
+   "with_distress_penalty": 515
+  },
+  "value_from_stored_inputs_and_peers": {
+   "checked": 2462,
+   "mismatch": 0,
+   "max_abs_diff": 5e-05,
+   "refused": 4,
+   "pe_market_fallback": 80,
+   "stocks_with_negative_pb_peer": 72
+  },
+  "sentiment_from_stored_headlines": {
+   "stocks_with_headlines_stored": 1158,
+   "mismatch": 0,
+   "max_abs_diff": 5e-05,
+   "stocks_with_news_but_no_headlines_stored": 1302,
+   "refused": 2
+  },
+  "history_vs_scan_table": {
+   "rows": 2462,
+   "alpha_mismatch": 0,
+   "refusals_stored_as_null": 172,
+   "refusal_zero_in_history": 0,
+   "cycle_complete_flag": 2462,
+   "raw_inputs_available": 2041
+  },
+  "missing_inputs": {
+   "roe": 103,
+   "fcf_yield": 65,
+   "pe_ratio": 358,
+   "pb_ratio": 36
+  },
+  "exchange_archive_last_day": "2026-09-07 (NSE collection paused by NSE_COLLECTION; live V1 uses Yahoo)"
+ },
+ "api_live_checks": {
+  "base": "https://quant-india.onrender.com",
+  "GET /factors/history (5 stocks)": "200 in 0.47-0.80 s; latest row equals the database and the oracle for RELIANCE, IDEA, SBIFUNDS, KALYANKJIL, PNCINFRA",
+  "GET /alpha/universe/top?n=50": "200 in 31.8 s on a cold cache; serving_cycle 2026-10-14; contributions equal weight x stored score x 100",
+  "GET /alpha/universe/status": "200; succeeded 2462, failed 29",
+  "GET /strategy/drift/v1.6.0": "behavioural_drift false"
+ },
+ "suites": [
+  {
+   "name": "run_ci.py (67 suites)",
+   "status": "PASS",
+   "checks": 170339
+  },
+  {
+   "name": "four_factor_oracle_test.py (new)",
+   "status": "FAIL",
+   "passed": 176,
+   "failed": 9,
+   "failures_are_defects": [
+    "D-01",
+    "D-03",
+    "D-04",
+    "D-07",
+    "D-08",
+    "D-09"
+   ],
+   "report": "docs/audit/four_factor_oracle_results_2026-10-14.json"
+  },
+  {
+   "name": "bad_input_test.py",
+   "status": "PASS",
+   "passed": 29
+  },
+  {
+   "name": "consistency_test.py",
+   "status": "PASS",
+   "clean": 14
+  },
+  {
+   "name": "leak_test.py",
+   "status": "PASS",
+   "clean": 5,
+   "known_limitations": 4
+  },
+  {
+   "name": "full_audit.py",
+   "status": "PASS",
+   "failures": 0
+  },
+  {
+   "name": "behavioural_fixtures.py",
+   "status": "FAIL",
+   "defect": "D-10",
+   "detail": "8 differences, all the display-only skipped_month_return_pct added 2026-10-05; no score differs"
+  },
+  {
+   "name": "version_provenance_audit.py",
+   "status": "FAIL",
+   "defect": "D-12",
+   "detail": "26 passed, 5 gaps; 3 are constants the spec does capture, 2 are uncommitted 52-week constants"
+  },
+  {
+   "name": "test_alpha_audit.py",
+   "status": "BLOCKED",
+   "detail": "network-bound; 30 of 60 done with 0 failures when the 400 s cap stopped it"
+  },
+  {
+   "name": "test_modules_integration.py",
+   "status": "BLOCKED",
+   "detail": "network-bound; stopped at the 400 s cap"
+  }
+ ],
+ "coverage": {
+  "tool": "python -m trace (stdlib); coverage.py is not installed",
+  "suite": "four_factor_oracle_test.py",
+  "alpha_model_factor_and_composite_lines_240_978": {
+   "executed": 333,
+   "missed": 43,
+   "pct": 88.6
+  },
+  "compute_alpha_score": {
+   "executed": 82,
+   "missed": 1
+  },
+  "module_line_coverage_pct": {
+   "alpha_model": 52,
+   "universe_scan": 41,
+   "factor_provenance": 40,
+   "data_fetcher": 37,
+   "factor_history": 36,
+   "metrics": 6
+  },
+  "branch_coverage": "BLOCKED: needs coverage.py",
+  "main_uncovered": [
+   "_interest_coverage (network)",
+   "peer lookup when peers are not passed",
+   "unreachable 'insufficient price history' and 'no scorable headlines' branches"
+  ]
+ },
+ "frontend": {
+  "build": "PASS (vite build, 44.8 s)",
+  "lint_or_tests": "none configured",
+  "live_signed_in_pages": "BLOCKED: the app requires sign-in; credentials cannot be entered by the agent",
+  "public_landing_page": "FAIL: D-11, shows hard-coded 2,704 stocks scored while the live status says 2,462",
+  "code_review_findings": [
+   "D-05"
+  ]
+ },
+ "defects": [
+  {
+   "id": "D-01",
+   "severity": "P1",
+   "title": "Sector map gives wrong value peers",
+   "score_changing_fix": true,
+   "status": "open"
+  },
+  {
+   "id": "D-02",
+   "severity": "P2",
+   "title": "Headlines behind 53% of sentiment scores are never stored",
+   "score_changing_fix": false,
+   "status": "fixed 40c2b23"
+  },
+  {
+   "id": "D-03",
+   "severity": "P3",
+   "title": "Scan universe lists 3 stocks twice",
+   "score_changing_fix": false,
+   "status": "fixed beb3735"
+  },
+  {
+   "id": "D-04",
+   "severity": "P3",
+   "title": "Value interpretation drops the one-measure and distress notes",
+   "score_changing_fix": false,
+   "status": "fixed 332389e"
+  },
+  {
+   "id": "D-05",
+   "severity": "P2",
+   "title": "A refused factor is displayed as a measured zero",
+   "score_changing_fix": false,
+   "status": "fixed 7b48397"
+  },
+  {
+   "id": "D-06",
+   "severity": "P2",
+   "title": "Negative peer multiples enter the sector mean",
+   "score_changing_fix": true,
+   "status": "open"
+  },
+  {
+   "id": "D-07",
+   "severity": "P3",
+   "title": "Backtest momentum uses population std, live uses sample std",
+   "score_changing_fix": "research only",
+   "status": "open"
+  },
+  {
+   "id": "D-08",
+   "severity": "P3",
+   "title": "Momentum assumes sorted, unique dates",
+   "score_changing_fix": false,
+   "status": "open"
+  },
+  {
+   "id": "D-09",
+   "severity": "P3",
+   "title": "One headline without a title voids the sentiment factor",
+   "score_changing_fix": "only on malformed input",
+   "status": "open"
+  },
+  {
+   "id": "D-10",
+   "severity": "P3",
+   "title": "Behavioural fixture snapshot is stale",
+   "score_changing_fix": false,
+   "status": "fixed cf7f32e"
+  },
+  {
+   "id": "D-11",
+   "severity": "P3",
+   "title": "Landing page stock count is always the fallback",
+   "score_changing_fix": false,
+   "status": "fixed e117f0f"
+  },
+  {
+   "id": "D-12",
+   "severity": "P3",
+   "title": "Provenance audit's constant registry is stale",
+   "score_changing_fix": false,
+   "status": "fixed cf7f32e"
+  }
+ ],
+ "blocked": [
+  "Signed-in frontend pages, desktop and mobile: needs the owner to sign in in the browser pane",
+  "Lint, type check, branch coverage, dependency audit: tools not installed (pip install coverage ruff mypy pip-audit needs approval)",
+  "Provider-side completeness (records Yahoo/news actually hold vs received): no independent source for Yahoo's side",
+  "Database concurrency, locking and outage injection against Postgres: not run; production must not be used and no isolated Postgres exists",
+  "Two network-bound legacy suites stopped at the 400 s cap"
+ ]
+}

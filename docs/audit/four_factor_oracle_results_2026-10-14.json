@@ -1,0 +1,1513 @@
+{
+ "suite": "four_factor_oracle_test",
+ "generated_utc": "2026-10-14T10:44:59",
+ "synthetic_inputs": true,
+ "passed": 181,
+ "failed": 7,
+ "checks": [
+  {
+   "id": "M01",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "normal 300 closes \u2014 score and confidence match oracle",
+   "status": "PASS",
+   "detail": "actual 0.8828/0.95 expected 0.8828/0.95",
+   "defect": null
+  },
+  {
+   "id": "M01b",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "normal 300 closes \u2014 raw 12-1 return and volatility match",
+   "status": "PASS",
+   "detail": "mom 59.39 vs 59.39, vol 28.51 vs 28.51",
+   "defect": null
+  },
+  {
+   "id": "M01c",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "normal 300 closes \u2014 score within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "M02",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "exactly 60 closes (minimum valid) \u2014 score and confidence match oracle",
+   "status": "PASS",
+   "detail": "actual -0.3773/0.49 expected -0.3773/0.49",
+   "defect": null
+  },
+  {
+   "id": "M02b",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "exactly 60 closes (minimum valid) \u2014 raw 12-1 return and volatility match",
+   "status": "PASS",
+   "detail": "mom -18.91 vs -18.91, vol 31.76 vs 31.76",
+   "defect": null
+  },
+  {
+   "id": "M02c",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "exactly 60 closes (minimum valid) \u2014 score within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "M03",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "253 closes: window starts at index 0 \u2014 score and confidence match oracle",
+   "status": "PASS",
+   "detail": "actual -0.659/0.95 expected -0.659/0.95",
+   "defect": null
+  },
+  {
+   "id": "M03b",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "253 closes: window starts at index 0 \u2014 raw 12-1 return and volatility match",
+   "status": "PASS",
+   "detail": "mom -34.69 vs -34.69, vol 29.23 vs 29.23",
+   "defect": null
+  },
+  {
+   "id": "M03c",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "253 closes: window starts at index 0 \u2014 score within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "M04",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "274 closes: window starts at index 21 \u2014 score and confidence match oracle",
+   "status": "PASS",
+   "detail": "actual 0.81/0.95 expected 0.81/0.95",
+   "defect": null
+  },
+  {
+   "id": "M04b",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "274 closes: window starts at index 21 \u2014 raw 12-1 return and volatility match",
+   "status": "PASS",
+   "detail": "mom 46.37 vs 46.37, vol 27.43 vs 27.43",
+   "defect": null
+  },
+  {
+   "id": "M04c",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "274 closes: window starts at index 21 \u2014 score within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "M05",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "steady decline (negative sign) \u2014 score and confidence match oracle",
+   "status": "PASS",
+   "detail": "actual -0.8214/0.95 expected -0.8214/0.95",
+   "defect": null
+  },
+  {
+   "id": "M05b",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "steady decline (negative sign) \u2014 raw 12-1 return and volatility match",
+   "status": "PASS",
+   "detail": "mom -52.84 vs -52.84, vol 30.34 vs 30.34",
+   "defect": null
+  },
+  {
+   "id": "M05c",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "steady decline (negative sign) \u2014 score within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "M06",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "extreme rally x50 (bounded below 1) \u2014 score and confidence match oracle",
+   "status": "PASS",
+   "detail": "actual 1.0/0.95 expected 1.0/0.95",
+   "defect": null
+  },
+  {
+   "id": "M06b",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "extreme rally x50 (bounded below 1) \u2014 raw 12-1 return and volatility match",
+   "status": "PASS",
+   "detail": "mom 3675.44 vs 3675.44, vol 16.03 vs 16.03",
+   "defect": null
+  },
+  {
+   "id": "M06c",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "extreme rally x50 (bounded below 1) \u2014 score within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "M07",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "very high volatility \u2014 score and confidence match oracle",
+   "status": "PASS",
+   "detail": "actual 0.0948/0.95 expected 0.0948/0.95",
+   "defect": null
+  },
+  {
+   "id": "M07b",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "very high volatility \u2014 raw 12-1 return and volatility match",
+   "status": "PASS",
+   "detail": "mom 18.75 vs 18.75, vol 131.47 vs 131.47",
+   "defect": null
+  },
+  {
+   "id": "M07c",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "very high volatility \u2014 score within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "M08",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "window dates are 252 and 21 trading days back",
+   "status": "PASS",
+   "detail": "2025-03-07 -> 2026-01-26",
+   "defect": null
+  },
+  {
+   "id": "M09",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "skipped month return is reported, not scored",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "M10",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "59 closes: refused as short history (score 0, confidence 0)",
+   "status": "PASS",
+   "detail": "price history too short",
+   "defect": null
+  },
+  {
+   "id": "M11",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "no closes: refused as unavailable",
+   "status": "PASS",
+   "detail": "price data unavailable",
+   "defect": null
+  },
+  {
+   "id": "M12",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "provider timeout: refused, never raises",
+   "status": "PASS",
+   "detail": "price data unavailable",
+   "defect": null
+  },
+  {
+   "id": "M13",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "HTTP 429 from provider: refused, never raises",
+   "status": "PASS",
+   "detail": "price data unavailable",
+   "defect": null
+  },
+  {
+   "id": "M14",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "missing observations (NaN) are dropped, not zero-filled",
+   "status": "PASS",
+   "detail": "-0.7113 vs -0.7113",
+   "defect": null
+  },
+  {
+   "id": "M15",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "flat prices: zero volatility gives score 0 at positive confidence (measured, not refused)",
+   "status": "PASS",
+   "detail": "confidence 0.95 (a full window is 231 of 252 days, so the ceiling is 0.95)",
+   "defect": null
+  },
+  {
+   "id": "M16",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "identical inputs give identical outputs",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "M17",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "out-of-order rows give the sorted answer (no defensive sort)",
+   "status": "FAIL",
+   "detail": "-0.0588 vs sorted 0.8555",
+   "defect": "D-08"
+  },
+  {
+   "id": "M18",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "duplicated dates are not double counted",
+   "status": "FAIL",
+   "detail": "0.8236 vs 0.8555",
+   "defect": "D-08"
+  },
+  {
+   "id": "M19",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "PIT backtest momentum equals live momentum (docstring: 'identical arithmetic')",
+   "status": "FAIL",
+   "detail": "pit 0.978859 vs live 0.978700 (pit uses population std, live sample std)",
+   "defect": "D-07"
+  },
+  {
+   "id": "M20",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "PIT and live momentum share window constants",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "S01",
+   "section": "2. SENTIMENT \u2014 decay-weighted FinBERT, shrunk by confidence",
+   "name": "mixed headlines match oracle",
+   "status": "PASS",
+   "detail": "0.0552/0.2989 vs {'score': 0.0552, 'confidence': 0.2989}",
+   "defect": null
+  },
+  {
+   "id": "S02",
+   "section": "2. SENTIMENT \u2014 decay-weighted FinBERT, shrunk by confidence",
+   "name": "every headline used is recorded",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "S03",
+   "section": "2. SENTIMENT \u2014 decay-weighted FinBERT, shrunk by confidence",
+   "name": "no news: refused (0, 0) with a reason",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "S04",
+   "section": "2. SENTIMENT \u2014 decay-weighted FinBERT, shrunk by confidence",
+   "name": "undated headline counts as 7 days old",
+   "status": "PASS",
+   "detail": "0.0255 vs 0.0255",
+   "defect": null
+  },
+  {
+   "id": "S05",
+   "section": "2. SENTIMENT \u2014 decay-weighted FinBERT, shrunk by confidence",
+   "name": "unparseable date treated as undated, headline kept",
+   "status": "PASS",
+   "detail": "0.0255",
+   "defect": null
+  },
+  {
+   "id": "S06",
+   "section": "2. SENTIMENT \u2014 decay-weighted FinBERT, shrunk by confidence",
+   "name": "future-dated headline is clamped to age 0",
+   "status": "PASS",
+   "detail": "0.1286",
+   "defect": null
+  },
+  {
+   "id": "S07",
+   "section": "2. SENTIMENT \u2014 decay-weighted FinBERT, shrunk by confidence",
+   "name": "timezone-aware date converted to UTC",
+   "status": "PASS",
+   "detail": "0.102 vs 0.102",
+   "defect": null
+  },
+  {
+   "id": "S08",
+   "section": "2. SENTIMENT \u2014 decay-weighted FinBERT, shrunk by confidence",
+   "name": "alternative field name publishedAt is read",
+   "status": "PASS",
+   "detail": "0.102",
+   "defect": null
+  },
+  {
+   "id": "S09",
+   "section": "2. SENTIMENT \u2014 decay-weighted FinBERT, shrunk by confidence",
+   "name": "all neutral: score 0 at positive confidence",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "S10",
+   "section": "2. SENTIMENT \u2014 decay-weighted FinBERT, shrunk by confidence",
+   "name": "confidence capped at 1 and score bounded",
+   "status": "PASS",
+   "detail": "0.9/1.0",
+   "defect": null
+  },
+  {
+   "id": "S11",
+   "section": "2. SENTIMENT \u2014 decay-weighted FinBERT, shrunk by confidence",
+   "name": "one malformed article (no title) does not discard the others",
+   "status": "FAIL",
+   "detail": "'title'",
+   "defect": "D-09"
+  },
+  {
+   "id": "Q01",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "all three parts present",
+   "status": "PASS",
+   "detail": "actual 0.4104/0.85 expected 0.4104/0.85",
+   "defect": null
+  },
+  {
+   "id": "Q01b",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "all three parts present \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "Q02",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "Piotroski only",
+   "status": "PASS",
+   "detail": "actual 0.5047/0.34 expected 0.5047/0.34",
+   "defect": null
+  },
+  {
+   "id": "Q02b",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "Piotroski only \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "Q03",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "ROE from the statements when the summary lacks it",
+   "status": "PASS",
+   "detail": "actual 0.4686/0.85 expected 0.4686/0.85",
+   "defect": null
+  },
+  {
+   "id": "Q03b",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "ROE from the statements when the summary lacks it \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "Q04",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "market cap missing: FCF yield dropped, not zero",
+   "status": "PASS",
+   "detail": "actual 0.2837/0.68 expected 0.2837/0.68",
+   "defect": null
+  },
+  {
+   "id": "Q04b",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "market cap missing: FCF yield dropped, not zero \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "Q05",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "negative book value: capped at 0 then -0.5",
+   "status": "PASS",
+   "detail": "actual -0.4621/0.68 expected -0.4621/0.68",
+   "defect": null
+  },
+  {
+   "id": "Q05b",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "negative book value: capped at 0 then -0.5 \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "Q06",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "loss-making and negative operating cash flow",
+   "status": "PASS",
+   "detail": "actual -0.5594/0.68 expected -0.5594/0.68",
+   "defect": null
+  },
+  {
+   "id": "Q06b",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "loss-making and negative operating cash flow \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "Q07",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "interest cover 1.2x is penalised",
+   "status": "PASS",
+   "detail": "actual -0.2449/0.68 expected -0.2449/0.68",
+   "defect": null
+  },
+  {
+   "id": "Q07b",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "interest cover 1.2x is penalised \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "Q08",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "interest cover exactly 1.5x is not (strict)",
+   "status": "PASS",
+   "detail": "actual 0.3215/0.68 expected 0.3215/0.68",
+   "defect": null
+  },
+  {
+   "id": "Q08b",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "interest cover exactly 1.5x is not (strict) \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "Q09",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "accounts in USD converted at the FX rate",
+   "status": "PASS",
+   "detail": "actual 0.5525/0.85 expected 0.5525/0.85",
+   "defect": null
+  },
+  {
+   "id": "Q09b",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "accounts in USD converted at the FX rate \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "Q10",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "accounts in USD with no FX rate: FCF dropped",
+   "status": "PASS",
+   "detail": "actual 0.6434/0.68 expected 0.6434/0.68",
+   "defect": null
+  },
+  {
+   "id": "Q10b",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "accounts in USD with no FX rate: FCF dropped \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "Q11",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "Piotroski failed: ROE alone",
+   "status": "PASS",
+   "detail": "actual 0.3215/0.34 expected 0.3215/0.34",
+   "defect": null
+  },
+  {
+   "id": "Q11b",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "Piotroski failed: ROE alone \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "Q12",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "nothing available: refused",
+   "status": "PASS",
+   "detail": "actual 0.0/0.0 expected 0.0/0.0",
+   "defect": null
+  },
+  {
+   "id": "Q12b",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "nothing available: refused \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "Q13",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "extreme ROE 300% stays bounded",
+   "status": "PASS",
+   "detail": "actual 1.0/0.68 expected 1.0/0.68",
+   "defect": null
+  },
+  {
+   "id": "Q13b",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "extreme ROE 300% stays bounded \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "Q14",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "net income exactly 0 is not loss-making",
+   "status": "PASS",
+   "detail": "actual 0.0278/0.68 expected 0.0278/0.68",
+   "defect": null
+  },
+  {
+   "id": "Q14b",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "net income exactly 0 is not loss-making \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "Q15",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "Piotroski 0 counts as measured (not missing)",
+   "status": "PASS",
+   "detail": "actual 0.0/0.34 expected 0.0/0.34",
+   "defect": null
+  },
+  {
+   "id": "Q15b",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "Piotroski 0 counts as measured (not missing) \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "Q16",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "refusal carries a reason",
+   "status": "PASS",
+   "detail": "no quality inputs available",
+   "defect": null
+  },
+  {
+   "id": "Q17",
+   "section": "3. QUALITY \u2014 Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties",
+   "name": "an exception inside a helper degrades to a refusal, never raises",
+   "status": "PASS",
+   "detail": "provider down",
+   "defect": null
+  },
+  {
+   "id": "V01",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "three peers, both multiples",
+   "status": "PASS",
+   "detail": "actual 0.7073/0.8 expected 0.7073/0.8",
+   "defect": null
+  },
+  {
+   "id": "V01b",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "three peers, both multiples \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "V02",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "one peer: market averages for both",
+   "status": "PASS",
+   "detail": "actual -0.5872/0.6 expected -0.5872/0.6",
+   "defect": null
+  },
+  {
+   "id": "V02b",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "one peer: market averages for both \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "V03",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "two peer P/Es, one peer P/B",
+   "status": "PASS",
+   "detail": "actual 0.9461/0.7 expected 0.9461/0.7",
+   "defect": null
+  },
+  {
+   "id": "V03b",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "two peer P/Es, one peer P/B \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "V04",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "negative P/E: P/B only, confidence halved",
+   "status": "PASS",
+   "detail": "actual 0.4541/0.4 expected 0.4541/0.4",
+   "defect": null
+  },
+  {
+   "id": "V04b",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "negative P/E: P/B only, confidence halved \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "V05",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "both multiples negative: -0.5 at 0.6",
+   "status": "PASS",
+   "detail": "actual -0.5/0.6 expected -0.5/0.6",
+   "defect": null
+  },
+  {
+   "id": "V05b",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "both multiples negative: -0.5 at 0.6 \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "V06",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "both missing: refused",
+   "status": "PASS",
+   "detail": "actual 0.0/0.0 expected 0.0/0.0",
+   "defect": null
+  },
+  {
+   "id": "V06b",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "both missing: refused \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "V07",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "identical peers: spread floored (1 and 0.5)",
+   "status": "PASS",
+   "detail": "actual -0.9978/0.8 expected -0.9978/0.8",
+   "defect": null
+  },
+  {
+   "id": "V07b",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "identical peers: spread floored (1 and 0.5) \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "V08",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "five peers: only the first three used",
+   "status": "PASS",
+   "detail": "actual -0.9881/0.8 expected -0.9881/0.8",
+   "defect": null
+  },
+  {
+   "id": "V08b",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "five peers: only the first three used \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "V09",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "P/E absent (not negative): one leg, no distress",
+   "status": "PASS",
+   "detail": "actual 0.4541/0.4 expected 0.4541/0.4",
+   "defect": null
+  },
+  {
+   "id": "V09b",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "P/E absent (not negative): one leg, no distress \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "V10",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "P/E exactly 0 is treated as non-positive",
+   "status": "PASS",
+   "detail": "actual 0.4541/0.4 expected 0.4541/0.4",
+   "defect": null
+  },
+  {
+   "id": "V10b",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "P/E exactly 0 is treated as non-positive \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "V11",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "extreme P/E 900",
+   "status": "PASS",
+   "detail": "actual -1.0/0.8 expected -1.0/0.8",
+   "defect": null
+  },
+  {
+   "id": "V11b",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "extreme P/E 900 \u2014 within [-1, 1]",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "V12",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "negative P/E is flagged as distress",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "V13",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "a one-leg, distressed score says so in its interpretation (score in the middle band)",
+   "status": "PASS",
+   "detail": "score -0.0: 'Negative earnings \u2014 Valued on one measure only. Fairly valued vs peers'",
+   "defect": "D-04"
+  },
+  {
+   "id": "V14",
+   "section": "4. VALUE \u2014 P/E and P/B z-scores against up to 3 sector peers",
+   "name": "refusal carries a reason",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C01",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "favourable on every factor \u2014 score, coverage, label",
+   "status": "PASS",
+   "detail": "actual 78.0/0.932/STRONG BUY expected 78.0/0.932/STRONG BUY",
+   "defect": null
+  },
+  {
+   "id": "C01b",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "favourable on every factor \u2014 contributions",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C02",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "unfavourable on every factor \u2014 score, coverage, label",
+   "status": "PASS",
+   "detail": "actual -78.0/0.932/STRONG SELL expected -78.0/0.932/STRONG SELL",
+   "defect": null
+  },
+  {
+   "id": "C02b",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "unfavourable on every factor \u2014 contributions",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C03",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "mixed: strong momentum, poor value \u2014 score, coverage, label",
+   "status": "PASS",
+   "detail": "actual 22.25/0.932/BUY expected 22.25/0.932/BUY",
+   "defect": null
+  },
+  {
+   "id": "C03b",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "mixed: strong momentum, poor value \u2014 contributions",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C04",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "mixed: cheap and weak \u2014 score, coverage, label",
+   "status": "PASS",
+   "detail": "actual -19.75/0.932/SELL expected -19.75/0.932/SELL",
+   "defect": null
+  },
+  {
+   "id": "C04b",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "mixed: cheap and weak \u2014 contributions",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C05",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "all +1 (maximum) \u2014 score, coverage, label",
+   "status": "PASS",
+   "detail": "actual 100.0/0.932/STRONG BUY expected 100.0/0.932/STRONG BUY",
+   "defect": null
+  },
+  {
+   "id": "C05b",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "all +1 (maximum) \u2014 contributions",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C06",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "all -1 (minimum) \u2014 score, coverage, label",
+   "status": "PASS",
+   "detail": "actual -100.0/0.932/STRONG SELL expected -100.0/0.932/STRONG SELL",
+   "defect": null
+  },
+  {
+   "id": "C06b",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "all -1 (minimum) \u2014 contributions",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C07",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "all neutral \u2014 score, coverage, label",
+   "status": "PASS",
+   "detail": "actual 0.0/0.932/NEUTRAL expected 0.0/0.932/NEUTRAL",
+   "defect": null
+  },
+  {
+   "id": "C07b",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "all neutral \u2014 contributions",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C08",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "sentiment missing (refused) \u2014 score, coverage, label",
+   "status": "PASS",
+   "detail": "actual 37.5/0.682/BUY expected 37.5/0.682/BUY",
+   "defect": null
+  },
+  {
+   "id": "C08b",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "sentiment missing (refused) \u2014 contributions",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C09",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "momentum and sentiment missing \u2014 score, coverage, label",
+   "status": "PASS",
+   "detail": "actual 24.0/0.333/BUY expected 24.0/0.333/BUY",
+   "defect": null
+  },
+  {
+   "id": "C09b",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "momentum and sentiment missing \u2014 contributions",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C10",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "only value measured \u2014 score, coverage, label",
+   "status": "PASS",
+   "detail": "actual 13.5/0.12/NEUTRAL expected 13.5/0.12/NEUTRAL",
+   "defect": null
+  },
+  {
+   "id": "C10b",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "only value measured \u2014 contributions",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C11",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "distress value judgement (-0.5 at 0.6) \u2014 score, coverage, label",
+   "status": "PASS",
+   "detail": "actual -5.5/0.902/NEUTRAL expected -5.5/0.902/NEUTRAL",
+   "defect": null
+  },
+  {
+   "id": "C11b",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "distress value judgement (-0.5 at 0.6) \u2014 contributions",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C12",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "lands exactly on +15 \u2014 score, coverage, label",
+   "status": "PASS",
+   "detail": "actual 15.0/0.932/NEUTRAL expected 15.0/0.932/NEUTRAL",
+   "defect": null
+  },
+  {
+   "id": "C12b",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "lands exactly on +15 \u2014 contributions",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C13",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "just above +15 \u2014 score, coverage, label",
+   "status": "PASS",
+   "detail": "actual 15.01/0.932/BUY expected 15.01/0.932/BUY",
+   "defect": null
+  },
+  {
+   "id": "C13b",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "just above +15 \u2014 contributions",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C14",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "lands exactly on +40 \u2014 score, coverage, label",
+   "status": "PASS",
+   "detail": "actual 40.0/0.932/BUY expected 40.0/0.932/BUY",
+   "defect": null
+  },
+  {
+   "id": "C14b",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "lands exactly on +40 \u2014 contributions",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C15",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "just above +40 \u2014 score, coverage, label",
+   "status": "PASS",
+   "detail": "actual 40.02/0.932/STRONG BUY expected 40.02/0.932/STRONG BUY",
+   "defect": null
+  },
+  {
+   "id": "C15b",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "just above +40 \u2014 contributions",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C16",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "lands exactly on -15 \u2014 score, coverage, label",
+   "status": "PASS",
+   "detail": "actual -15.0/0.932/NEUTRAL expected -15.0/0.932/NEUTRAL",
+   "defect": null
+  },
+  {
+   "id": "C16b",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "lands exactly on -15 \u2014 contributions",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C17",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "just below -15 \u2014 score, coverage, label",
+   "status": "PASS",
+   "detail": "actual -15.01/0.932/SELL expected -15.01/0.932/SELL",
+   "defect": null
+  },
+  {
+   "id": "C17b",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "just below -15 \u2014 contributions",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C18",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "lands exactly on -40 \u2014 score, coverage, label",
+   "status": "PASS",
+   "detail": "actual -40.0/0.932/SELL expected -40.0/0.932/SELL",
+   "defect": null
+  },
+  {
+   "id": "C18b",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "lands exactly on -40 \u2014 contributions",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C19",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "just below -40 \u2014 score, coverage, label",
+   "status": "PASS",
+   "detail": "actual -40.02/0.932/STRONG SELL expected -40.02/0.932/STRONG SELL",
+   "defect": null
+  },
+  {
+   "id": "C19b",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "just below -40 \u2014 contributions",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C20",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "extreme mixed \u2014 score, coverage, label",
+   "status": "PASS",
+   "detail": "actual 0.0/0.932/NEUTRAL expected 0.0/0.932/NEUTRAL",
+   "defect": null
+  },
+  {
+   "id": "C20b",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "extreme mixed \u2014 contributions",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C21",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "tiny values (rounding) \u2014 score, coverage, label",
+   "status": "PASS",
+   "detail": "actual 0.0/0.932/NEUTRAL expected 0.0/0.932/NEUTRAL",
+   "defect": null
+  },
+  {
+   "id": "C21b",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "tiny values (rounding) \u2014 contributions",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C22",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "low confidence everywhere \u2014 score, coverage, label",
+   "status": "PASS",
+   "detail": "actual 30.0/0.287/BUY expected 30.0/0.287/BUY",
+   "defect": null
+  },
+  {
+   "id": "C22b",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "low confidence everywhere \u2014 contributions",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C23",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "two companies with identical inputs score identically",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C24",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "no momentum and no market cap: refused",
+   "status": "PASS",
+   "detail": "No market data found for 'SYN.NS'. Check the symbol (NSE tickers end in .NS, e.g. RELIANCE.NS).",
+   "defect": null
+  },
+  {
+   "id": "C25",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "short history and no market cap: refusal says the company exists",
+   "status": "PASS",
+   "detail": "No market data found for 'SYN.NS': Yahoo has fewer than 60 days of prices and no market cap.",
+   "defect": null
+  },
+  {
+   "id": "C26",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "no momentum but a market cap: scored, momentum contributes 0",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C27",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "bare lower-case symbol normalised to .NS",
+   "status": "PASS",
+   "detail": "TCS.NS",
+   "defect": null
+  },
+  {
+   "id": "C28",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "non-NSE suffix refused",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C29",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "empty ticker refused",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C30",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "custom weights are applied and not cached",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C31",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "a NaN factor score is not turned into a confident label",
+   "status": "PASS",
+   "detail": "alpha None signal NEUTRAL \u2014 specification does not define this case",
+   "defect": null
+  },
+  {
+   "id": "C32",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "result carries model version, coverage meaning and timestamp",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C33",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "weights total 1.0",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "C34",
+   "section": "5. COMPOSITE \u2014 100 x (0.25 S + 0.35 M + 0.25 Q + 0.15 V), labels, refusal",
+   "name": "weights match the documented methodology",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "D01",
+   "section": "6. STORAGE \u2014 scan table, factor history, tiers (temporary SQLite)",
+   "name": "re-saving the same stock and cycle keeps one row",
+   "status": "PASS",
+   "detail": "1",
+   "defect": null
+  },
+  {
+   "id": "D02",
+   "section": "6. STORAGE \u2014 scan table, factor history, tiers (temporary SQLite)",
+   "name": "scan table stores the factor scores exactly",
+   "status": "PASS",
+   "detail": "(0.0, 0.3, 0.2, 0.1, 12.5)",
+   "defect": null
+  },
+  {
+   "id": "D03",
+   "section": "6. STORAGE \u2014 scan table, factor history, tiers (temporary SQLite)",
+   "name": "history keeps one row per stock per day",
+   "status": "PASS",
+   "detail": "1",
+   "defect": null
+  },
+  {
+   "id": "D04",
+   "section": "6. STORAGE \u2014 scan table, factor history, tiers (temporary SQLite)",
+   "name": "a refused factor is stored as NULL in history, not 0",
+   "status": "PASS",
+   "detail": "[(None, 0.3, 0.2, 0.1, 12.5, '2099-01-01')]",
+   "defect": null
+  },
+  {
+   "id": "D05",
+   "section": "6. STORAGE \u2014 scan table, factor history, tiers (temporary SQLite)",
+   "name": "history matches the scan table",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "D06",
+   "section": "6. STORAGE \u2014 scan table, factor history, tiers (temporary SQLite)",
+   "name": "a partial later write does not erase the fuller record",
+   "status": "PASS",
+   "detail": "(12.5, 0.31, 0.2)",
+   "defect": null
+  },
+  {
+   "id": "D07",
+   "section": "6. STORAGE \u2014 scan table, factor history, tiers (temporary SQLite)",
+   "name": "history rejects an unknown model name",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "D08",
+   "section": "6. STORAGE \u2014 scan table, factor history, tiers (temporary SQLite)",
+   "name": "an error result is stored in the scan table but never in history",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "D09",
+   "section": "6. STORAGE \u2014 scan table, factor history, tiers (temporary SQLite)",
+   "name": "serves the last complete cycle only",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "D10",
+   "section": "6. STORAGE \u2014 scan table, factor history, tiers (temporary SQLite)",
+   "name": "errored rows and rows under the confidence floor are excluded",
+   "status": "PASS",
+   "detail": "294",
+   "defect": null
+  },
+  {
+   "id": "D11",
+   "section": "6. STORAGE \u2014 scan table, factor history, tiers (temporary SQLite)",
+   "name": "large tier is market-cap ranks 1-100 of the eligible set",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "D12",
+   "section": "6. STORAGE \u2014 scan table, factor history, tiers (temporary SQLite)",
+   "name": "top buys are the ten highest scores in the tier, in order",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "D13",
+   "section": "6. STORAGE \u2014 scan table, factor history, tiers (temporary SQLite)",
+   "name": "buys and avoids never overlap",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "D14",
+   "section": "6. STORAGE \u2014 scan table, factor history, tiers (temporary SQLite)",
+   "name": "tier contributions are weight x stored score x 100",
+   "status": "PASS",
+   "detail": "{'momentum': 3.5, 'quality': 5.0, 'value': 4.5, 'sentiment': 10.0}",
+   "defect": null
+  },
+  {
+   "id": "D15",
+   "section": "6. STORAGE \u2014 scan table, factor history, tiers (temporary SQLite)",
+   "name": "tiers flag factors that were not measured (NULL in history), and only those",
+   "status": "PASS",
+   "detail": "['momentum', 'sentiment']",
+   "defect": "D-05"
+  },
+  {
+   "id": "D16",
+   "section": "6. STORAGE \u2014 scan table, factor history, tiers (temporary SQLite)",
+   "name": "flagging changes no score or ranking",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "D17",
+   "section": "6. STORAGE \u2014 scan table, factor history, tiers (temporary SQLite)",
+   "name": "a failed headline batch is retried row by row, not dropped",
+   "status": "PASS",
+   "detail": "returned 3, stored 3",
+   "defect": "D-02"
+  },
+  {
+   "id": "U01",
+   "section": "7. UNIVERSE AND SECTOR MAP",
+   "name": "the scan universe lists each stock once",
+   "status": "PASS",
+   "detail": "duplicates: []",
+   "defect": "D-03"
+  },
+  {
+   "id": "U02",
+   "section": "7. UNIVERSE AND SECTOR MAP",
+   "name": "each mapped stock belongs to one sector",
+   "status": "FAIL",
+   "detail": "{'KALYANKJIL.NS': ['Steel_Metal', 'Consumer_Durables'], 'ADANIGREEN.NS': ['Power', 'Infra'], 'ADANIENT.NS': ['Infra', 'Diversified']}",
+   "defect": "D-01"
+  },
+  {
+   "id": "U03",
+   "section": "7. UNIVERSE AND SECTOR MAP",
+   "name": "Kalyan Jewellers is valued against jewellery/consumer peers, not steel",
+   "status": "FAIL",
+   "detail": "['TATASTEEL.NS', 'JSWSTEEL.NS', 'SAIL.NS']",
+   "defect": "D-01"
+  },
+  {
+   "id": "U04",
+   "section": "7. UNIVERSE AND SECTOR MAP",
+   "name": "Edelweiss (financial services) is not valued against steel makers",
+   "status": "FAIL",
+   "detail": "['TATASTEEL.NS', 'JSWSTEEL.NS', 'SAIL.NS']",
+   "defect": "D-01"
+  },
+  {
+   "id": "A01",
+   "section": "8. API \u2014 FastAPI test client, stubbed model, temporary SQLite",
+   "name": "GET /alpha/score: 200 and the oracle's score",
+   "status": "PASS",
+   "detail": "200 16.5 vs 16.5",
+   "defect": null
+  },
+  {
+   "id": "A02",
+   "section": "8. API \u2014 FastAPI test client, stubbed model, temporary SQLite",
+   "name": "response carries the four factors and contributions",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "A03",
+   "section": "8. API \u2014 FastAPI test client, stubbed model, temporary SQLite",
+   "name": "missing ticker: 422",
+   "status": "PASS",
+   "detail": "422",
+   "defect": null
+  },
+  {
+   "id": "A04",
+   "section": "8. API \u2014 FastAPI test client, stubbed model, temporary SQLite",
+   "name": "unknown company: 400 with the reason, no score",
+   "status": "PASS",
+   "detail": "400",
+   "defect": null
+  },
+  {
+   "id": "A05",
+   "section": "8. API \u2014 FastAPI test client, stubbed model, temporary SQLite",
+   "name": "non-NSE symbol: 400",
+   "status": "PASS",
+   "detail": "400",
+   "defect": null
+  },
+  {
+   "id": "A06",
+   "section": "8. API \u2014 FastAPI test client, stubbed model, temporary SQLite",
+   "name": "GET /alpha/universe/top matches the stored tiers",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  },
+  {
+   "id": "A07",
+   "section": "8. API \u2014 FastAPI test client, stubbed model, temporary SQLite",
+   "name": "n below 1 rejected: 422",
+   "status": "PASS",
+   "detail": "422",
+   "defect": null
+  },
+  {
+   "id": "A08",
+   "section": "8. API \u2014 FastAPI test client, stubbed model, temporary SQLite",
+   "name": "GET /factors/history returns the stored row, NULL kept as null",
+   "status": "PASS",
+   "detail": "[{'captured_at': '2026-10-14', 'model': 'v1', 'alpha_score': 12.5, 'momentum': None, 'quality': 0.31, 'growth': None, 'value': 0.2, 'sentiment': 0.1, 'low_risk': None, 'price': 100.0}]",
+   "defect": null
+  },
+  {
+   "id": "A09",
+   "section": "8. API \u2014 FastAPI test client, stubbed model, temporary SQLite",
+   "name": "unknown company history: empty list, not an error or a fabricated row",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
+  }
+ ]
+}
