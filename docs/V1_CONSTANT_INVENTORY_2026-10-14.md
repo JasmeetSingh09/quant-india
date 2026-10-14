@@ -84,6 +84,9 @@ as stored-precision settings, not as model parameters.
 | Item | Why it matters | What capture would need |
 |---|---|---|
 | FinBERT model, loaded as `"ProsusAI/finbert"` with no revision pin | An upstream model update changes every sentiment score, with no drift reported | Pin a model revision (a commit hash) and record it in the spec |
+| `transformers` and `torch` versions (both unpinned; absent from the spec's environment block) | A rebuild can change tokenisation or inference | Pin them in the Dockerfile and requirements, and record them in the spec environment |
+| FinBERT failure path: an exception returns neutral at confidence 0, and the headline still counts with full weight | A failed inference pulls sentiment toward 0, silently | A policy decision: skip the headline and count it, as was done for untitled headlines |
+| Input cut at 512 characters (the comment says tokens) | Long titles are cut by character count | Name it, and correct the comment |
 | Yahoo field semantics (`trailingPE`, `priceToBook`, `returnOnEquity`, `freeCashflow`) | The provider defines them and can change them | Not capturable; can only be documented and monitored |
 | Statement row names in `_interest_coverage` ("ebit", "operating income", "interest expense") | Strings, not numbers; a renamed row silently removes the coverage test | Promote to a named tuple and capture it |
 | News sources and matching | Already captured (`news_matching` block in the spec) | — |

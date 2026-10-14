@@ -132,14 +132,152 @@ proposed as a membership.
 6. **Rollback:** revert to the prior version, whose spec is frozen. Rows carry the model-version
    stamp, so studies can exclude either side.
 
-## 7. Decisions requested, in order
+## 7. Round 3: owner decisions and what has been established (2026-10-14)
 
-1. **The source.** Will you supply NSE's industry classification as a file? Please confirm its
-   licence and update frequency.
-2. **Rule R** as written, or amendments. In particular: the classification level, *k*, and "missing
-   own multiple is not measured".
-3. **Alt 3** (not measured instead of market averages): adopt now, or with rule R.
-4. **Interim position until rule R is ready:** keep the status quo, which is documented as not
-   matching the methodology's description, or adopt alt 2.
-5. **Separate, later:** nearest-in-size peers; the constant-promotion work in
-   `V1_CONSTANT_INVENTORY_2026-10-14.md`.
+**Owner decisions:**
+- **Source:** the NSE Indices classification is the preferred source, subject to obtaining the
+  actual file and its terms. The owner verified the published methodology: a four-level hierarchy
+  (12 macro-economic sectors, 22 sectors, 59 industries, 197 basic industries), reviewed annually
+  and on corporate events. The owner could not verify a downloadable company-level file or terms
+  covering this use. It is not to be scraped or redistributed on the assumption that public means
+  unrestricted.
+- **Rule R:** approved as the candidate to cost and test, with two clarifications: metric-specific
+  eligibility, and an explicit rule for a missing own measure. K = 3 and the 2-peer minimum need a
+  rationale and a sensitivity analysis.
+- **Market averages → "not measured":** approved for a separately versioned change after
+  validation. Not deployed.
+- **The 2,160 fallback stocks:** current behaviour kept temporarily and marked as a methodology
+  limitation. No universe-wide removal without a replacement rule.
+- **No refactor, push or deployment.**
+
+### 7.1 Scores reported by peer basis, not pooled (cycle 2026-10-14)
+
+| Peer basis | Stocks | Mean value | SD | Below 0.3 coverage | No market cap | Buy / Sell labels |
+|---|---|---|---|---|---|---|
+| Hand-written map peers | 233 | −0.048 | 0.675 | 0 | 0 | 75 / 35 |
+| **Broad-sector fallback (methodology-limited)** | 2,151 | −0.047 | 0.718 | 21 | 7 | 572 / 517 |
+| Market averages (no valid comparison) | 10 | −0.165 | 0.539 | 1 | 8 | 1 / 3 |
+| Distress (no peers needed) | 64 | −0.500 | 0 | 1 | 1 | 0 / 59 |
+| No valuation data | 4 | 0 | 0 | 1 | 0 | 0 / 2 |
+
+The two large groups have near-identical means and spreads. That does not make them comparable: the
+fallback group's peers are three mega-caps of a broad sector, so its distribution answers a
+different question.
+
+### 7.2 The 10 market-average cases, validated against the fingerprinted cycle
+
+| Stock | Valued on | Value | Alpha now → if not measured | Label |
+|---|---|---|---|---|
+| AARNAV | P/B only | 0.3095 | 14.87 → 10.23 | Neutral |
+| ARTEMISMED | both | −0.9998 | 18.03 → 33.03 | Buy |
+| DISAQ | P/B only | −0.2952 | 4.75 → 9.18 | Neutral |
+| **ELCIDIN** | P/B only | 0.3765 | −12.74 → −18.39 | **Neutral → Sell** |
+| GUJRAFFIA | both | 0.1386 | 6.18 → 4.10 | Neutral |
+| **INDIGO** | P/B only (26.62 against a market 3.2, z = 15.6) | −0.9961 | −48.79 → −33.85 | **Strong Sell → Sell** |
+| SILLYMONKS | P/B only | 0.2317 | −19.14 → −22.62 | Sell |
+| SINGERIND | P/B only | 0.0717 | 12.40 → 11.32 | Neutral |
+| TCC | P/B only | 0.3310 | −3.33 → −8.29 | Neutral |
+| **ZODIAC** | both | −0.8208 | −19.86 → −7.55 | **Sell → Neutral** |
+
+What this shows:
+- **The three label changes reproduce.**
+- **Why these stocks lack peers.** Eight of the 10 have no market cap on Yahoo, which is also why they
+  had no Yahoo sector and so no peers. INDIGO has peers in neither the map nor the fallback: it is
+  alone in Aviation.
+- **Distress cases are untouched.** None of the 64 uses market averages.
+
+### 7.3 Metric-specific eligibility (today's peer groups)
+
+Of the 2,384 stocks with peers:
+- **P/E:** 2 have fewer than 2 valid P/E peers; 283 have no valid own P/E.
+- **P/B:** 0 have fewer than 2 valid P/B peers; 32 have no valid own P/B.
+- **Negative peers:** 72 have a negative peer counted today (Vodafone Idea's P/B, D-06). Under
+  per-measure eligibility it would be excluded.
+- **By measure:** both measures measurable 2,067; exactly one 317; neither 0.
+
+### 7.4 Missing own measure: an explicit rule
+
+**Today's behaviour.** A missing measure "sits at the peer mean". Across all 322 single-measure stocks
+(290 P/B only, 32 P/E only), today's value equals tanh((−0.6 z_PE − 0.4 z_PB) ÷ 2) with the missing
+z set to 0, to within 0.0001. So today's behaviour already *is* "the missing measure contributes
+nothing, and its weight is kept"; it is just not described that way.
+
+| Option | Rule | Cost on the 322 |
+|---|---|---|
+| Kept | The missing measure is reported "not measured"; it contributes 0 and its weight is kept | No score change; reporting only |
+| Renormalise | Value is computed on the measured measure alone (weights rescaled to 1) | Mean change 3.95 alpha points; 55 label flips |
+
+Owner decision pending. The costing harness runs both.
+
+### 7.5 K = 3 and the 2-peer minimum: rationale and sensitivity
+
+**Rationale, stated as hypotheses:**
+- K = 3 matches the number of peers the factor already compares against (`VALUE_PEERS_USED`). A
+  basic industry with fewer than 3 eligible peers cannot supply a full comparison set.
+- 2 is the smallest number that gives a non-degenerate spread. With one peer the population SD is
+  0 and the floor (1 or 0.5) decides the z-score alone.
+
+**Sensitivity harness.** `research/peer_rule_costing.py` generates one read-only statement over the
+fingerprinted cycle:
+- **Grid:** K ∈ {2, 3, 4, 5} × minimum ∈ {2, 3} × {kept, renormalise}.
+- **Per-setting categories:** classified with both measures, one measure or too few peers;
+  unclassified; distress; no data.
+- **Per-setting changes:** widened, scores changed, label flips into and out of Buy, tier exits,
+  top-10 slots, and tier-rank changes.
+
+It was smoke-tested on a 50-stock *toy* file (Yahoo industry standing in for basic industry): it ran,
+and its categories summed to 2,462. **The toy numbers are not results.** Real sensitivity needs the
+NSE file.
+
+**Assumptions to confirm:**
+- **A1:** widening is decided per measure.
+- **A2:** each peer's stored multiple for the cycle is used, one value per peer per cycle.
+
+### 7.6 FinBERT: what is and is not fixed today
+
+**Not fixed:**
+- **The model** is loaded as `"ProsusAI/finbert"` with **no revision**. The Docker build downloads
+  whatever upstream `main` is at build time, so production's revision is whatever existed when
+  `cf9e3be` was built, and it is not recorded anywhere. The local cache's `main` is
+  `0bc2ac10dda6929bcb1f77ccc43c7ec5c424f031`.
+- **`transformers` and `torch` are unpinned.** Unlike numpy, pandas and scipy, they are absent from
+  the spec's environment block.
+
+**Configuration:**
+- **Preprocessing:** text is cut to 512 *characters* (the comment says tokens).
+- **Inference:** the most probable label is taken, with its probability as confidence, rounded to 4
+  places.
+- **Runtime:** CPU, one thread.
+
+**A missing-as-zero path.** If inference raises, the headline is returned as neutral with confidence
+0. It still enters the weighted average with full recency weight, so it pulls the score toward 0.
+
+**Required before any sentiment or constant refactor:**
+- pin the revision and record it, with the transformers and torch versions, in the spec;
+- record baseline outputs for quality, value and sentiment.
+
+### 7.7 Marking the fallback as methodology-limited (proposed, not built)
+
+Every value result would carry `peer_basis`, one of:
+- `map`
+- `broad_sector_fallback`
+- `market_average`
+- `distress`
+- `none`
+
+The provenance record would store it, and the stock page would show "Valued against broad-sector
+leaders, not industry peers" for the fallback. Scores would not change. It needs owner approval
+before any code.
+
+## 8. Decisions still open (after round 3)
+
+1. **The NSE company-level classification file and its terms.** This is the one blocker: the
+   sensitivity results and rule R's real costing both wait for it.
+2. **The missing own measure:** kept (no score change) or renormalise (55 label flips on the 322).
+3. **Assumptions A1 and A2** in 7.5.
+4. **The methodology-limited marking (7.7):** build it, display only, as its own versioned change?
+5. **FinBERT:** approve pinning the revision and recording the inference stack, so it can no longer
+   change unseen.
+
+Already decided (round 3): rule R is the candidate; "not measured" replaces market averages in a
+later version; the fallback is kept for now and labelled a limitation; no refactor, push or deploy.

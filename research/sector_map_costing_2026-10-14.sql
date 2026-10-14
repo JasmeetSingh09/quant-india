@@ -131,3 +131,46 @@ FROM lab l GROUP BY l.alt ORDER BY 1;
 SELECT 'alpha_scan2' tbl, count(*) n, md5(string_agg(concat_ws('|', ticker, alpha_score, signal, confidence, market_cap, momentum, quality, value, sentiment, error), E'\n' ORDER BY ticker)) fp FROM alpha_scan2 WHERE cycle='2026-10-14'
 UNION ALL SELECT 'factor_inputs(value)', count(*), md5(string_agg(concat_ws('|', ticker, input_name, value_num, value_text, missing), E'\n' ORDER BY ticker, input_name)) FROM factor_inputs WHERE cycle_id='2026-10-14' AND factor='value'
 UNION ALL SELECT 'factor_input_peers', count(*), md5(string_agg(concat_ws('|', ticker, peer_ticker, peer_pe, peer_pb), E'\n' ORDER BY ticker, peer_ticker)) FROM factor_input_peers WHERE cycle_id='2026-10-14';
+
+-- 7. Round 3 (decision document 7.2): the stocks valued on market averages.
+WITH np AS (SELECT a.* FROM alpha_scan2 a WHERE a.cycle='2026-10-14' AND a.error IS NULL
+              AND NOT EXISTS (SELECT 1 FROM factor_input_peers p WHERE p.ticker=a.ticker AND p.cycle_id=a.cycle)),
+v AS (SELECT ticker, max(value_num) FILTER (WHERE input_name='legs_used') legs,
+             max(value_text) FILTER (WHERE input_name='valued_on') valued_on
+      FROM factor_inputs WHERE cycle_id='2026-10-14' AND factor='value' GROUP BY ticker)
+SELECT np.ticker, np.signal, np.alpha_score, np.value, v.valued_on,
+       round((np.alpha_score - 15*np.value)::numeric,2) alpha_if_not_measured
+FROM np JOIN v ON v.ticker=np.ticker WHERE v.legs>0 ORDER BY np.ticker;
+
+-- 8. Round 3 (7.3): metric-specific eligibility under today's peer groups.
+WITH p AS MATERIALIZED (SELECT ticker,
+   count(*) FILTER (WHERE peer_pe IS NOT NULL AND peer_pe<>0) pe_code, count(*) FILTER (WHERE peer_pe>0) pe_valid,
+   count(*) FILTER (WHERE peer_pb IS NOT NULL AND peer_pb<>0) pb_code, count(*) FILTER (WHERE peer_pb>0) pb_valid
+ FROM factor_input_peers WHERE cycle_id='2026-10-14' GROUP BY ticker),
+v AS MATERIALIZED (SELECT ticker, max(value_num) FILTER (WHERE input_name='pe_ratio') pe, max(value_num) FILTER (WHERE input_name='pb_ratio') pb
+ FROM factor_inputs WHERE cycle_id='2026-10-14' AND factor='value' AND input_name IN ('pe_ratio','pb_ratio') GROUP BY ticker)
+SELECT count(*) stocks_with_peers, count(*) FILTER (WHERE pe_valid<2) pe_too_few, count(*) FILTER (WHERE v.pe IS NULL) own_pe_absent,
+ count(*) FILTER (WHERE pb_valid<2) pb_too_few, count(*) FILTER (WHERE v.pb IS NULL) own_pb_absent,
+ count(*) FILTER (WHERE pe_code<>pe_valid OR pb_code<>pb_valid) negative_peer_counted_today,
+ count(*) FILTER (WHERE v.pe IS NOT NULL AND pe_valid>=2 AND v.pb IS NOT NULL AND pb_valid>=2) both_measurable,
+ count(*) FILTER (WHERE (v.pe IS NOT NULL AND pe_valid>=2) <> (v.pb IS NOT NULL AND pb_valid>=2)) one_measurable
+FROM p LEFT JOIN v USING (ticker);
+
+-- 9. Round 3 (7.4): today's one-measure value equals "missing measure weight kept,
+--    contributes 0"; and the cost of renormalising.
+WITH v AS MATERIALIZED (SELECT ticker, max(value_num) FILTER (WHERE input_name='legs_used') legs,
+   max(value_num) FILTER (WHERE input_name='pe_ratio') pe, max(value_num) FILTER (WHERE input_name='pe_z_score') pez,
+   max(value_num) FILTER (WHERE input_name='pb_z_score') pbz
+ FROM factor_inputs WHERE cycle_id='2026-10-14' AND factor='value'
+   AND input_name IN ('legs_used','pe_ratio','pe_z_score','pb_z_score') GROUP BY ticker),
+a AS (SELECT a.ticker, a.alpha_score, a.signal, a.value, v.* FROM alpha_scan2 a JOIN v ON v.ticker=a.ticker
+      WHERE a.cycle='2026-10-14' AND a.error IS NULL AND v.legs=1),
+r AS (SELECT *, tanh(CASE WHEN pe IS NOT NULL THEN -pez ELSE -pbz END / 2) v_renorm,
+             tanh((CASE WHEN pe IS NOT NULL THEN -0.6*pez ELSE -0.4*pbz END) / 2) v_kept FROM a),
+l AS (SELECT *, alpha_score + 15*(v_renorm - value) a1 FROM r)
+SELECT count(*) one_measure_stocks, max(abs(v_kept - value)) kept_equals_today_within,
+ round(avg(abs(a1-alpha_score))::numeric,2) mean_abs_change_renorm,
+ count(*) FILTER (WHERE signal <> CASE WHEN a1>40 THEN 'STRONG BUY' WHEN a1>15 THEN 'BUY' WHEN a1< -40 THEN 'STRONG SELL'
+                                       WHEN a1< -15 THEN 'SELL' ELSE 'NEUTRAL' END) flips_renorm
+FROM l;
+-- The 7.1 by-peer-basis table uses query 4's IN list with the categories of 7.1.
