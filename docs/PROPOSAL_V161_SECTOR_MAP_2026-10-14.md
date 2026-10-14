@@ -1,5 +1,9 @@
 # Proposal v1.6.1: correct the sector map that picks valuation peers
 
+**Superseded for decision purposes by `docs/PEER_METHODOLOGY_DECISION_2026-10-14.md`** (owner, 2026-10-14: prioritise a universe-wide methodology over isolated sector corrections).
+That document corrects revision 2's census: 2,151 fallback stocks, not 479/440/376/226 peer-set
+counts. Of the 78 stocks without peer rows, 64 are distress judgements that never use peers.
+
 **Status: DRAFT, revision 2. Nothing in the map is implemented.** Audit defect D-01
 (`docs/AUDIT_FOUR_FACTOR_2026-10-14.md`).
 

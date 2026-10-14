@@ -1,0 +1,1045 @@
+[
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 238,
+  "value": 14,
+  "source": "def _compute_sentiment_factor(ticker: str, days_back: int = 14) -> dict:"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 253,
+  "value": 0.0,
+  "source": "return {\"score\": 0.0, \"confidence\": 0.0, \"reason\": \"no news found\","
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 253,
+  "value": 0.0,
+  "source": "return {\"score\": 0.0, \"confidence\": 0.0, \"reason\": \"no news found\","
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 254,
+  "value": 0,
+  "source": "\"n_articles\": 0}"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 256,
+  "value": 2,
+  "source": "lam = np.log(2) / SENTIMENT_HALF_LIFE_DAYS"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 261,
+  "value": 0,
+  "source": "undated         = 0"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 262,
+  "value": 0,
+  "source": "untitled        = 0"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 278,
+  "value": 1,
+  "source": "untitled += 1"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 284,
+  "value": 0.5,
+  "source": "age_days = days_back * 0.5"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 285,
+  "value": 1,
+  "source": "undated += 1"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 287,
+  "value": 0,
+  "source": "age_days = max(0, (now - pub).total_seconds() / 86400)"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 287,
+  "value": 86400,
+  "source": "age_days = max(0, (now - pub).total_seconds() / 86400)"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 301,
+  "value": 0.0,
+  "source": "numeric = 0.0"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 312,
+  "value": 0.0,
+  "source": "return {\"score\": 0.0, \"confidence\": 0.0, \"reason\": \"no scorable headlines\","
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 312,
+  "value": 0.0,
+  "source": "return {\"score\": 0.0, \"confidence\": 0.0, \"reason\": \"no scorable headlines\","
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 313,
+  "value": 0,
+  "source": "\"n_articles\": 0, \"untitled_articles_skipped\": untitled}"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 317,
+  "value": 0.5,
+  "source": "confidence   = min(1.0, sum(weights) / (days_back * 0.5))"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 317,
+  "value": 1.0,
+  "source": "confidence   = min(1.0, sum(weights) / (days_back * 0.5))"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 328,
+  "value": 4,
+  "source": "\"score\":      round(float(weighted_avg), 4),"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 329,
+  "value": 4,
+  "source": "\"confidence\": round(float(confidence), 4),"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 345,
+  "value": 0.4,
+  "source": "\"Strongly positive news flow\" if weighted_avg > 0.4 else"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 346,
+  "value": 0.1,
+  "source": "\"Mildly positive news flow\"   if weighted_avg > 0.1 else"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 347,
+  "value": 0.4,
+  "source": "\"Strongly negative news flow\" if weighted_avg < -0.4 else"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 348,
+  "value": 0.1,
+  "source": "\"Mildly negative news flow\"   if weighted_avg < -0.1 else"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 353,
+  "value": 0.0,
+  "source": "return {\"score\": 0.0, \"confidence\": 0.0, \"reason\": str(e), \"n_articles\": 0}"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 353,
+  "value": 0.0,
+  "source": "return {\"score\": 0.0, \"confidence\": 0.0, \"reason\": str(e), \"n_articles\": 0}"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_sentiment_factor",
+  "line": 353,
+  "value": 0,
+  "source": "return {\"score\": 0.0, \"confidence\": 0.0, \"reason\": str(e), \"n_articles\": 0}"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_interest_coverage",
+  "line": 504,
+  "value": 0,
+  "source": "if hit and now - hit[0] < _COVERAGE_TTL:"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_interest_coverage",
+  "line": 505,
+  "value": 1,
+  "source": "return hit[1]"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_interest_coverage",
+  "line": 517,
+  "value": 0,
+  "source": "return float(s.iloc[0])"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_interest_coverage",
+  "line": 523,
+  "value": 0,
+  "source": "if denom > 0:"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 554,
+  "value": 4,
+  "source": "f_norm   = f_result.get(\"f_score\", 4) / 9"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 554,
+  "value": 9,
+  "source": "f_norm   = f_result.get(\"f_score\", 4) / 9"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 579,
+  "value": 0.08,
+  "source": "roe_mean, roe_std   = 0.12, 0.08     # median NSE ROE"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 579,
+  "value": 0.12,
+  "source": "roe_mean, roe_std   = 0.12, 0.08     # median NSE ROE"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 580,
+  "value": 0.035,
+  "source": "fcf_mean, fcf_std   = 0.035, 0.04    # median NSE FCF yield"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 580,
+  "value": 0.04,
+  "source": "fcf_mean, fcf_std   = 0.035, 0.04    # median NSE FCF yield"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 583,
+  "value": 0.0,
+  "source": "parts, wsum = [], 0.0"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 585,
+  "value": 0.4,
+  "source": "parts.append((0.4, f_norm)); wsum += 0.4"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 585,
+  "value": 0.4,
+  "source": "parts.append((0.4, f_norm)); wsum += 0.4"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 587,
+  "value": 0.4,
+  "source": "parts.append((0.4, ((roe - roe_mean) / roe_std) / 3)); wsum += 0.4"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 587,
+  "value": 0.4,
+  "source": "parts.append((0.4, ((roe - roe_mean) / roe_std) / 3)); wsum += 0.4"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 587,
+  "value": 3,
+  "source": "parts.append((0.4, ((roe - roe_mean) / roe_std) / 3)); wsum += 0.4"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 599,
+  "value": 0.2,
+  "source": "parts.append((0.2, ((fcf_yield - fcf_mean) / fcf_std) / 3)); wsum += 0.2"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 599,
+  "value": 0.2,
+  "source": "parts.append((0.2, ((fcf_yield - fcf_mean) / fcf_std) / 3)); wsum += 0.2"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 599,
+  "value": 3,
+  "source": "parts.append((0.2, ((fcf_yield - fcf_mean) / fcf_std) / 3)); wsum += 0.2"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 602,
+  "value": 0.0,
+  "source": "return {\"score\": 0.0, \"confidence\": 0.0,"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 602,
+  "value": 0.0,
+  "source": "return {\"score\": 0.0, \"confidence\": 0.0,"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 624,
+  "value": 0.0,
+  "source": "flags, penalty = [], 0.0"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 625,
+  "value": 0,
+  "source": "if book_value is not None and book_value < 0:"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 626,
+  "value": 0.5,
+  "source": "flags.append(\"negative shareholders' equity\"); penalty += 0.5"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 638,
+  "value": 1.5,
+  "source": "if cov is not None and cov < 1.5:"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 639,
+  "value": 0.25,
+  "source": "flags.append(f\"interest coverage {cov:.1f}x\"); penalty += 0.25"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 640,
+  "value": 0,
+  "source": "if net_income is not None and net_income < 0:"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 641,
+  "value": 0.25,
+  "source": "flags.append(\"loss-making\"); penalty += 0.25"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 642,
+  "value": 0,
+  "source": "if ocf is not None and ocf < 0:"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 643,
+  "value": 0.25,
+  "source": "flags.append(\"negative operating cash flow\"); penalty += 0.25"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 648,
+  "value": 0.0,
+  "source": "raw = min(raw, 0.0) - penalty"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 654,
+  "value": 4,
+  "source": "\"score\":       round(score, 4),"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 656,
+  "value": 0.85,
+  "source": "\"confidence\":  round(0.85 * wsum, 3),"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 656,
+  "value": 3,
+  "source": "\"confidence\":  round(0.85 * wsum, 3),"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 668,
+  "value": 2,
+  "source": "\"roe\":         round(roe * 100, 2) if roe is not None else None,"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 668,
+  "value": 100,
+  "source": "\"roe\":         round(roe * 100, 2) if roe is not None else None,"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 669,
+  "value": 2,
+  "source": "\"fcf_yield\":   round(fcf_yield * 100, 2) if fcf_yield is not None else None,"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 669,
+  "value": 100,
+  "source": "\"fcf_yield\":   round(fcf_yield * 100, 2) if fcf_yield is not None else None,"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 670,
+  "value": 4,
+  "source": "\"fcf_fx_rate\": round(fcf_fx, 4) if fcf_fx else None,"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 672,
+  "value": 0.4,
+  "source": "\"High quality business\"       if score > 0.4 else"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 673,
+  "value": 0.1,
+  "source": "\"Above-average quality\"       if score > 0.1 else"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 675,
+  "value": 0.4,
+  "source": "\"Low quality / weak business\" if score < -0.4 else"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 676,
+  "value": 0.1,
+  "source": "\"Below-average quality\"       if score < -0.1 else"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 681,
+  "value": 0.0,
+  "source": "return {\"score\": 0.0, \"confidence\": 0.0, \"reason\": str(e)}"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_quality_factor",
+  "line": 681,
+  "value": 0.0,
+  "source": "return {\"score\": 0.0, \"confidence\": 0.0, \"reason\": str(e)}"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 704,
+  "value": 0,
+  "source": "sys.path.insert(0, str(Path(__file__).parent))"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 720,
+  "value": 0,
+  "source": "if pe_self is not None and pe_self <= 0:"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 723,
+  "value": 0,
+  "source": "if pb_self is not None and pb_self <= 0:"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 735,
+  "value": 0.5,
+  "source": "return {\"score\": -0.5, \"confidence\": 0.6,"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 735,
+  "value": 0.6,
+  "source": "return {\"score\": -0.5, \"confidence\": 0.6,"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 738,
+  "value": 0,
+  "source": "\"pe_ratio\": pe_raw, \"pb_ratio\": pb_raw, \"legs_used\": 0,"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 740,
+  "value": 0.0,
+  "source": "return {\"score\": 0.0, \"confidence\": 0.0, \"reason\": \"no valuation data\"}"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 740,
+  "value": 0.0,
+  "source": "return {\"score\": 0.0, \"confidence\": 0.0, \"reason\": \"no valuation data\"}"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 759,
+  "value": 2,
+  "source": "if len(peer_pes) < 2:"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 760,
+  "value": 8.0,
+  "source": "pe_mean, pe_std = 22.0, 8.0"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 760,
+  "value": 22.0,
+  "source": "pe_mean, pe_std = 22.0, 8.0"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 762,
+  "value": 1,
+  "source": "pe_mean, pe_std = np.mean(peer_pes), max(np.std(peer_pes), 1)"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 764,
+  "value": 2,
+  "source": "if len(peer_pbs) < 2:"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 765,
+  "value": 1.5,
+  "source": "pb_mean, pb_std = 3.2, 1.5"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 765,
+  "value": 3.2,
+  "source": "pb_mean, pb_std = 3.2, 1.5"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 767,
+  "value": 0.5,
+  "source": "pb_mean, pb_std = np.mean(peer_pbs), max(np.std(peer_pbs), 0.5)"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 773,
+  "value": 0.4,
+  "source": "raw   = -0.6 * pe_z - 0.4 * pb_z"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 773,
+  "value": 0.6,
+  "source": "raw   = -0.6 * pe_z - 0.4 * pb_z"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 774,
+  "value": 2,
+  "source": "score = float(np.tanh(raw / 2))"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 790,
+  "value": 0,
+  "source": "_legs = (1 if pe_self else 0) + (1 if pb_self else 0)"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 790,
+  "value": 0,
+  "source": "_legs = (1 if pe_self else 0) + (1 if pb_self else 0)"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 790,
+  "value": 1,
+  "source": "_legs = (1 if pe_self else 0) + (1 if pb_self else 0)"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 790,
+  "value": 1,
+  "source": "_legs = (1 if pe_self else 0) + (1 if pb_self else 0)"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 791,
+  "value": 0.1,
+  "source": "_conf = min(1.0, 0.5 + len(peer_pes) * 0.1)"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 791,
+  "value": 0.5,
+  "source": "_conf = min(1.0, 0.5 + len(peer_pes) * 0.1)"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 791,
+  "value": 1.0,
+  "source": "_conf = min(1.0, 0.5 + len(peer_pes) * 0.1)"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 792,
+  "value": 2,
+  "source": "if _legs < 2:"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 793,
+  "value": 0.5,
+  "source": "_conf = round(_conf * 0.5, 3)"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 793,
+  "value": 3,
+  "source": "_conf = round(_conf * 0.5, 3)"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 796,
+  "value": 4,
+  "source": "\"score\":        round(score, 4),"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 800,
+  "value": 2,
+  "source": "\"valued_on\": (\"P/E and P/B\" if _legs == 2"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 806,
+  "value": 1,
+  "source": "\"sector_pe\":    round(pe_mean, 1),"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 807,
+  "value": 2,
+  "source": "\"sector_pb\":    round(pb_mean, 2),"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 808,
+  "value": 3,
+  "source": "\"pe_z_score\":   round(pe_z, 3),"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 809,
+  "value": 3,
+  "source": "\"pb_z_score\":   round(pb_z, 3),"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 816,
+  "value": 2,
+  "source": "(\"Valued on one measure only. \" if _legs < 2 else \"\") +"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 817,
+  "value": 0.4,
+  "source": "(\"Significantly undervalued vs peers\" if score > 0.4 else"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 818,
+  "value": 0.1,
+  "source": "\"Slightly cheap vs peers\"            if score > 0.1 else"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 819,
+  "value": 0.4,
+  "source": "\"Significantly overvalued vs peers\"  if score < -0.4 else"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 820,
+  "value": 0.1,
+  "source": "\"Slightly expensive vs peers\"        if score < -0.1 else"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 825,
+  "value": 0.0,
+  "source": "return {\"score\": 0.0, \"confidence\": 0.0, \"reason\": str(e)}"
+ },
+ {
+  "file": "alpha_model.py",
+  "function": "_compute_value_factor",
+  "line": 825,
+  "value": 0.0,
+  "source": "return {\"score\": 0.0, \"confidence\": 0.0, \"reason\": str(e)}"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 331,
+  "value": 0,
+  "source": "roa           = info.get(\"returnOnAssets\") or der.get(\"roa\") or 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 335,
+  "value": 0,
+  "source": "cfo           = info.get(\"operatingCashflow\") or der.get(\"operating_cashflow\") or 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 341,
+  "value": 0,
+  "source": "current_ratio = info.get(\"currentRatio\") or der.get(\"current_ratio\") or 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 342,
+  "value": 0,
+  "source": "gross_margin  = info.get(\"grossMargins\", 0) or 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 342,
+  "value": 0,
+  "source": "gross_margin  = info.get(\"grossMargins\", 0) or 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 343,
+  "value": 0,
+  "source": "revenue_growth= info.get(\"revenueGrowth\", 0) or 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 343,
+  "value": 0,
+  "source": "revenue_growth= info.get(\"revenueGrowth\", 0) or 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 346,
+  "value": 0,
+  "source": "f1_roa_positive   = 1 if roa > 0 else 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 346,
+  "value": 0,
+  "source": "f1_roa_positive   = 1 if roa > 0 else 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 346,
+  "value": 1,
+  "source": "f1_roa_positive   = 1 if roa > 0 else 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 347,
+  "value": 0,
+  "source": "f2_cfo_positive   = 1 if cfo > 0 else 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 347,
+  "value": 0,
+  "source": "f2_cfo_positive   = 1 if cfo > 0 else 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 347,
+  "value": 1,
+  "source": "f2_cfo_positive   = 1 if cfo > 0 else 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 348,
+  "value": 0,
+  "source": "f3_roa_strong     = 1 if roa > 0.05 else 0      # proxy: ROA > 5 %"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 348,
+  "value": 0.05,
+  "source": "f3_roa_strong     = 1 if roa > 0.05 else 0      # proxy: ROA > 5 %"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 348,
+  "value": 1,
+  "source": "f3_roa_strong     = 1 if roa > 0.05 else 0      # proxy: ROA > 5 %"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 352,
+  "value": 0,
+  "source": "f4_cfo_beats_roa  = 1 if (total_assets and (cfo / total_assets) > roa) else 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 352,
+  "value": 1,
+  "source": "f4_cfo_beats_roa  = 1 if (total_assets and (cfo / total_assets) > roa) else 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 357,
+  "value": 0,
+  "source": "if (total_equity and total_equity > 0 and long_term_debt is not None) else None)"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 358,
+  "value": 0,
+  "source": "f5_low_leverage   = 1 if (leverage_ratio is not None and leverage_ratio < 0.5) else 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 358,
+  "value": 0.5,
+  "source": "f5_low_leverage   = 1 if (leverage_ratio is not None and leverage_ratio < 0.5) else 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 358,
+  "value": 1,
+  "source": "f5_low_leverage   = 1 if (leverage_ratio is not None and leverage_ratio < 0.5) else 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 359,
+  "value": 0,
+  "source": "f6_good_liquidity = 1 if current_ratio > 1.0 else 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 359,
+  "value": 1,
+  "source": "f6_good_liquidity = 1 if current_ratio > 1.0 else 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 359,
+  "value": 1.0,
+  "source": "f6_good_liquidity = 1 if current_ratio > 1.0 else 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 361,
+  "value": 1,
+  "source": "f7_no_dilution    = 1"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 364,
+  "value": 0,
+  "source": "f8_high_margin    = 1 if gross_margin > 0.20 else 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 364,
+  "value": 0.2,
+  "source": "f8_high_margin    = 1 if gross_margin > 0.20 else 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 364,
+  "value": 1,
+  "source": "f8_high_margin    = 1 if gross_margin > 0.20 else 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 365,
+  "value": 0,
+  "source": "f9_revenue_growth = 1 if revenue_growth > 0 else 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 365,
+  "value": 0,
+  "source": "f9_revenue_growth = 1 if revenue_growth > 0 else 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 365,
+  "value": 1,
+  "source": "f9_revenue_growth = 1 if revenue_growth > 0 else 0"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 380,
+  "value": 4,
+  "source": "bucket = \"Strong\" if total >= 7 else (\"Moderate\" if total >= 4 else \"Weak\")"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 380,
+  "value": 7,
+  "source": "bucket = \"Strong\" if total >= 7 else (\"Moderate\" if total >= 4 else \"Weak\")"
+ },
+ {
+  "file": "metrics.py",
+  "function": "piotroski_score",
+  "line": 397,
+  "value": 9,
+  "source": "\"max_score\":     9,"
+ }
+]
