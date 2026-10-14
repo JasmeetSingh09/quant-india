@@ -1,7 +1,21 @@
 # Proposal v1.6.1: correct the sector map that picks valuation peers
 
-**Status: DRAFT, awaiting owner decision. Nothing is implemented.** The current map stays in force
-until this is approved. Audit defect D-01 (`docs/AUDIT_FOUR_FACTOR_2026-10-14.md`).
+**Status: DRAFT, revision 2. Nothing in the map is implemented.** Audit defect D-01
+(`docs/AUDIT_FOUR_FACTOR_2026-10-14.md`).
+
+**Owner decisions on revision 1 (2026-10-14):**
+- **Options A and B:** not approved as final classifications.
+- **The map:** stays unchanged. Adani Enterprises keeps its current classification until a
+  classification rule and an authoritative source are documented.
+- **Keynote Financial:** cost a dedicated capital-markets sector before placing it.
+- **Configuration:** capture the peer counts and the fallback table with the map.
+- **Deployment:** not authorised.
+
+Revision 2 does exactly that, and finds that the larger problem is the fallback table, not the
+handful of map entries (section "The larger problem").
+
+The queries are in `research/sector_map_costing_2026-10-14.sql`. Yahoo's classification of the
+candidates is in `docs/audit/capital_markets_candidates_yahoo_2026-10-14.json`.
 
 ## The problem
 
@@ -25,9 +39,14 @@ the first sector that lists the stock, of which `_compute_value_factor` uses the
 - Production cycle 2026-10-14, read-only.
 - Each score was recomputed with the methodology's value formula from the multiples the scan stored
   (`factor_inputs`, `factor_input_peers`).
-- **Check on the method:** using the current peers, the recomputation reproduces the stored value
-  score for 11 of 12 stocks exactly. KEYFINSERV is off by 0.008, because peer multiples were
-  re-fetched at slightly different times during the night.
+- **Check on the method:** using each stock's own stored peer rows, the recomputation reproduces
+  the stored value score exactly for all 12 stocks, KEYFINSERV included (0.8700).
+- **Where revision 1's KEYFINSERV gap came from (0.008):** it read a peer's multiples off another
+  stock's peer rows. During one night's scan DLF, GODREJPROP and OBEROIRLTY were each read with two
+  different P/Es (about 2.5% apart), because Yahoo data was re-fetched mid-scan. So within one cycle,
+  different stocks can be compared against slightly different values for the same peer. That is a
+  reproducibility limitation of live fetching, recorded rather than fixed here.
+- **"After" figures** use each new peer's own stored multiples.
 - **Alpha after** = stored alpha + 15 × (value after − value before). Value is the only factor that
   moves.
 
@@ -198,8 +217,134 @@ keep their stamp, so they can be excluded from any study.
 **Research records.** Factor history from before the change keeps the old peers. Any study spanning
 the change must say so, or use one side only.
 
-## Decision needed
+## Revision 2: the larger problem is the fallback table
 
-1. **Approve option A, choose option B, or reject.**
-2. **KEYFINSERV:** confirm NBFC as its group, or remove it from the map. Removing it means Yahoo's
-   "Financial Services" sends it to Banking peers, a worse fit.
+**Who every scored stock is valued against tonight** (query 2 in the SQL file):
+
+| Peers used | Stocks | How they got there |
+|---|---|---|
+| BHEL, LT, SIEMENS | 479 | Yahoo "Industrials" → Capital_Goods |
+| M&M, MARUTI, TMPV | 440 | Yahoo "Consumer Cyclical" → Auto (jewellers, hotels, textiles, retailers) |
+| JSWSTEEL, SAIL, TATASTEEL | 376 | Yahoo "Basic Materials" → Steel_Metal (chemicals, paper, fertilisers) |
+| HDFCBANK, ICICIBANK, SBIN | 226 | Yahoo "Financial Services" → Banking (brokers, AMCs, NBFCs, insurers) |
+| INFY, TCS, WIPRO | 185 | "Technology" → IT |
+| CIPLA, DRREDDY, SUNPHARMA | 172 | "Healthcare" → Pharma |
+| HINDUNILVR, ITC, NESTLEIND | 165 | "Consumer Defensive" → FMCG |
+| DLF, GODREJPROP, OBEROIRLTY | 92 | "Real Estate" |
+| none (market averages) | 78 | no usable peers |
+| the rest | ~250 | mapped sectors |
+
+About 2,230 of the 2,462 scored stocks are not in `NSE_SECTORS` (which lists 236) at all. Each takes its peers from the
+**three largest companies** of one of 11 broad Yahoo sectors. So the value factor for most of the
+universe answers "cheap compared with three mega-caps in a broad sector", not "cheap against
+sector peers" as the methodology describes it.
+
+**This is a specification issue.** The methodology document does say "sector peers come from
+today's sector map", and the code does exactly that. But the peer groups do not deliver the
+comparison the methodology describes. Correcting KALYANKJIL or EDELWEISS in the map alone would leave
+this untouched.
+
+## Revision 2: a dedicated capital-markets sector, costed
+
+**Membership screen:**
+- All 2,462 scored stocks were screened by company name (`security_names`) for capital-markets
+  terms, plus 12 named firms the screen cannot catch (ANGELONE, BSE, CAMS, KFINTECH and others):
+  120 candidates.
+- Each candidate's Yahoo sector and industry were fetched on 2026-10-14.
+- This is a screen, not a universe-wide classification. The app stores no industry for any stock.
+
+**Candidate rule:** Yahoo industry = "Capital Markets". That gives 49 stocks.
+
+**Ordering:** members in descending stored market cap, so each member's peers are the three largest
+other members, the same structural rule every sector uses. The top four are GROWW, MOTILALOFS, AIIL
+and ANGELONE.
+
+| Measure | Result |
+|---|---|
+| Members | 49 |
+| Their peers today | HDFCBANK, ICICIBANK, SBIN for 48; DLF, GODREJPROP, OBEROIRLTY for KEYFINSERV |
+| Peer availability | every member has at least 2 peers with a P/E; 0 fall back to market averages |
+| Value moves of 0.05 or more | 39 |
+| Mean change in alpha | 8.50 points |
+| Direction | 38 rise, 11 fall: large banks make brokers look expensive |
+| Labels that flip | 12 (8 Neutral → Buy, 4 Sell → Neutral) |
+| Effect on other stocks | none: the members come from the fallback, not from any mapped sector's first five, apart from KEYFINSERV, which must leave Real_Estate, where it is 10th and never anyone's peer |
+| KEYFINSERV | alpha 6.35 → **1.76** (value 0.87 → 0.56), against GROWW, MOTILALOFS, AIIL |
+
+The 12 flips: ARYAMAN, IIFLCAPS, SGFIN, ANGELONE, GEOJITFSL, SMCGLOBAL, SHARDUL and HYBRIDFIN go
+Neutral → Buy; ARIHANTCAP, 5PAISA, EMKAY and INVENTURE go Sell → Neutral.
+
+**The candidate rule is not clean.** Yahoo's "Capital Markets" includes:
+- investment-holding companies: DHUNINV, NAHARCAP, WELINV, SUMMITSEC, MASKINVEST;
+- AIIL (Authum Investment), which is the third-largest member and therefore a peer for nearly every
+  member;
+- IEX, a power exchange.
+
+Yahoo also splits AMCs ("Asset Management", 21 names, which itself includes holding companies) and
+exchanges, depositories and rating agencies ("Financial Data & Stock Exchanges": BSE, MCX, CRISIL,
+ICRA, CARERATING) into other industries. An authoritative classification is needed before any
+membership is fixed.
+
+## Revision 2: what a sound rule needs (proposed for the owner)
+
+1. **An authoritative classification for every scored stock, not a hand list.**
+   - The natural source is the NSE's own industry classification (macro-economic sector, sector,
+     industry, basic industry).
+   - The app must not fetch from nseindia.com, so the file has to be supplied by the owner and
+     versioned in the repo.
+   - Yahoo's industry is useful as a cross-check, not as the source: the noise above shows why.
+2. **One documented level of that classification defines a peer group**, for example basic
+   industry, falling back to industry when the group is too small. The fallback must be stated, not
+   discovered.
+3. **Multi-business companies** (ADANIENT, BAJAJHLDNG and others) take the classification the source
+   assigns. The source settles placement, not the score outcome.
+4. **Peer choice within a group.** Today it is the first three in list order, which in practice
+   means the three largest, so a small broker is valued against Groww. Whether peers should instead
+   be nearest in size is a methodology change and needs its own costing.
+5. **Too few valid peers.** The owner suggested reporting value as not measured rather than using
+   the 22 ± 8 and 3.2 ± 1.5 market averages. Tonight 78 stocks have no peers and 80 use the P/E
+   average. This is a methodology change, separate from classification, and not costed here.
+6. **Within-cycle reproducibility.** A peer's multiples can differ between stocks in the same cycle
+   (see KEYFINSERV above). Reading each peer once per cycle would make peer groups consistent. This
+   is an operational change, not costed.
+
+## Revision 2: the three configuration elements are now captured
+
+Done locally, not pushed, with no score change. They are in the frozen-spec field `sector_map`:
+- **the map:** sector order and members in order;
+- **the peer counts:** `data_fetcher.SECTOR_PEER_FETCH_LIMIT` = 5 and
+  `alpha_model.VALUE_PEERS_USED` = 3;
+- **the fallback table:** `data_fetcher.YAHOO_SECTOR_FALLBACK`, 11 entries.
+
+The literals were promoted to named constants unchanged.
+
+**Evidence:**
+- `sector_map_spec_test.py`: 15 checks. Any change to any of the three moves the hash, and
+  `get_sector_peers` still returns the same peer lists.
+- Behavioural snapshots: 339/339 identical.
+- `run_ci`: 68/68.
+- `version_provenance_audit`: 103/103.
+
+**A related gap, reported and not changed.** That audit's literal scan covers only momentum, the
+composite and V2. It never inspects `_compute_quality_factor`, `_compute_value_factor` or
+`_compute_sentiment_factor`. Their constants are not captured by the frozen spec, including:
+- value's 22 ± 8 and 3.2 ± 1.5 averages, the spread floors, the −0.6/−0.4 weights and the distress
+  −0.5/0.6;
+- quality's 0.4/0.4/0.2 weights, the 12% ± 8% and 3.5% ± 4% references, and the penalties.
+
+V1.4's precedent (promote to named constants, prove identity with recorded outputs, freeze) would
+close it. That is a separate approval.
+
+## Decision needed (revision 2)
+
+Nothing here asks for a classification choice yet. In order:
+1. **The classification source.** Will you supply the NSE industry classification file, or name
+   another authoritative source?
+2. **The rule.** Which level of that classification defines a peer group, with which fallback?
+3. **Scope.** Does this version fix the fallback for the whole universe (about 2,230 stocks), or
+   only the mis-mapped names? Fixing only the names leaves the larger problem in place.
+4. **Separate decisions:** "not measured" for too few peers, peer choice by size, and closing the
+   quality/value constant gap.
+
+Once the source and rule are chosen, every affected stock is re-costed with the SQL file before
+any approval. Options A and B above are kept for the record. They are not proposals any more.

@@ -1,0 +1,602 @@
+{
+ "5PAISA.NS": {
+  "name": "5paisa Capital Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "ABCAPITAL.NS": {
+  "name": "Aditya Birla Capital Limited",
+  "sector": "Financial Services",
+  "industry": "Financial Conglomerates"
+ },
+ "ABSLAMC.NS": {
+  "name": "Aditya Birla Sun Life AMC Limited",
+  "sector": "Financial Services",
+  "industry": "Asset Management"
+ },
+ "ADVIKCA.NS": {
+  "name": "Advik Capital Limited",
+  "sector": "Financial Services",
+  "industry": "Credit Services"
+ },
+ "AFSL.NS": {
+  "name": "Abans Financial Services Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "AIIL.NS": {
+  "name": "Authum Investment & Infrastructure Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "AKCAPIT.NS": {
+  "name": "A. K. Capital Services Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "ALGOQUANT.NS": {
+  "name": "Algoquant Fintech Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "ALMONDZ.NS": {
+  "name": "Almondz Global Securities Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "ANANDRATHI.NS": {
+  "name": "Anand Rathi Wealth Limited",
+  "sector": "Financial Services",
+  "industry": "Asset Management"
+ },
+ "APOORVA.NS": {
+  "name": "Apoorva Leasing Finance and Investment Company Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "ARIHANTCAP.NS": {
+  "name": "Arihant Capital Markets Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "ARMANFIN.NS": {
+  "name": "Arman Financial Services Limited",
+  "sector": "Financial Services",
+  "industry": "Credit Services"
+ },
+ "ARSSBL.NS": {
+  "name": "Anand Rathi Share and Stock Brokers Limited",
+  "sector": "Financial Services",
+  "industry": "Financial Conglomerates"
+ },
+ "ARYAMAN.NS": {
+  "name": "Aryaman Financial Services Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "AVONMORE.NS": {
+  "name": "Avonmore Capital & Management Services Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "BAIDFIN.NS": {
+  "name": "Baid Finserv Limited",
+  "sector": "Financial Services",
+  "industry": "Credit Services"
+ },
+ "BAJAJFINSV.NS": {
+  "name": "Bajaj Finserv Ltd.",
+  "sector": "Financial Services",
+  "industry": "Financial Conglomerates"
+ },
+ "BAJAJHLDNG.NS": {
+  "name": "Bajaj Holdings & Investment Limited",
+  "sector": "Financial Services",
+  "industry": "Asset Management"
+ },
+ "BFINVEST.NS": {
+  "name": "BF Investment Limited",
+  "sector": "Financial Services",
+  "industry": "Asset Management"
+ },
+ "BLIL.NS": {
+  "name": "Balmer Lawrie Investments Limited",
+  "sector": "Industrials",
+  "industry": "Conglomerates"
+ },
+ "CAPITALSFB.NS": {
+  "name": "Capital Small Finance Bank Limited",
+  "sector": "Financial Services",
+  "industry": "Banks - Regional"
+ },
+ "CAPTRUST.NS": {
+  "name": "Capital Trust Limited",
+  "sector": "Financial Services",
+  "industry": "Credit Services"
+ },
+ "CDSL.NS": {
+  "name": "Central Depository Services (India) Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "CENTRUM.NS": {
+  "name": "Centrum Capital Limited",
+  "sector": "Financial Services",
+  "industry": "Financial Conglomerates"
+ },
+ "CGCL.NS": {
+  "name": "Capri Global Capital Limited",
+  "sector": "Financial Services",
+  "industry": "Credit Services"
+ },
+ "CHOLAFIN.NS": {
+  "name": "Cholamandalam Investment and Finance Company Limited",
+  "sector": "Financial Services",
+  "industry": "Credit Services"
+ },
+ "CIFL.NS": {
+  "name": "Capital India Finance Limited",
+  "sector": "Financial Services",
+  "industry": "Credit Services"
+ },
+ "CONSOFINVT.NS": {
+  "name": "Consolidated Finvest & Holdings Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "CPCAP.NS": {
+  "name": "CP Capital Limited",
+  "sector": "Financial Services",
+  "industry": "Credit Services"
+ },
+ "CRAMC.NS": {
+  "name": "Canara Robeco Asset Management Company Limited",
+  "sector": "Financial Services",
+  "industry": "Asset Management"
+ },
+ "DAMCAPITAL.NS": {
+  "name": "DAM Capital Advisors Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "DBSTOCKBRO.NS": {
+  "name": "DB (International) Stock Brokers Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "DCMFINSERV.NS": {
+  "name": "DCM Financial Services Limited",
+  "sector": "Financial Services",
+  "industry": "Credit Services"
+ },
+ "DHUNINV.NS": {
+  "name": "Dhunseri Investments Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "EDELWEISS.NS": {
+  "name": "Edelweiss Financial Services Limited",
+  "sector": "Financial Services",
+  "industry": "Financial Conglomerates"
+ },
+ "ELCIDIN.NS": {
+  "name": "Elcid Investments Limited",
+  "sector": "",
+  "industry": ""
+ },
+ "EMKAY.NS": {
+  "name": "Emkay Global Financial Services Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "FEDFINA.NS": {
+  "name": "Fedbank Financial Services Limited",
+  "sector": "Financial Services",
+  "industry": "Credit Services"
+ },
+ "FINKURVE.NS": {
+  "name": "Finkurve Financial Services Limited",
+  "sector": "Financial Services",
+  "industry": "Credit Services"
+ },
+ "GANGESSECU.NS": {
+  "name": "Ganges Securities Limited",
+  "sector": "Consumer Defensive",
+  "industry": "Packaged Foods"
+ },
+ "GEOJITFSL.NS": {
+  "name": "Geojit Financial Services Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "HBPOR.NS": {
+  "name": "HB Portfolio Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "HBSL.NS": {
+  "name": "HB Stockholdings Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "HDBFS.NS": {
+  "name": "HDB Financial Services Limited",
+  "sector": "Financial Services",
+  "industry": "Credit Services"
+ },
+ "HDFCAMC.NS": {
+  "name": "HDFC Asset Management Company Limited",
+  "sector": "Financial Services",
+  "industry": "Asset Management"
+ },
+ "HYBRIDFIN.NS": {
+  "name": "Hybrid Financial Services Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "ICICIAMC.NS": {
+  "name": "ICICI Prudential Asset Management Company Limited",
+  "sector": "Financial Services",
+  "industry": "Asset Management"
+ },
+ "IEX.NS": {
+  "name": "Indian Energy Exchange Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "IIFLCAPS.NS": {
+  "name": "IIFL Capital Services Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "IITL.NS": {
+  "name": "Industrial Investment Trust Limited",
+  "sector": "Financial Services",
+  "industry": "Credit Services"
+ },
+ "INDOSTAR.NS": {
+  "name": "IndoStar Capital Finance Limited",
+  "sector": "Financial Services",
+  "industry": "Credit Services"
+ },
+ "INDOTHAI.NS": {
+  "name": "Indo Thai Securities Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "INVENTURE.NS": {
+  "name": "Inventure Growth & Securities Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "IONEXCHANG.NS": {
+  "name": "Ion Exchange (India) Limited",
+  "sector": "Industrials",
+  "industry": "Pollution & Treatment Controls"
+ },
+ "IVC.NS": {
+  "name": "IL&FS Investment Managers Limited",
+  "sector": "Financial Services",
+  "industry": "Financial Conglomerates"
+ },
+ "JIOFIN.NS": {
+  "name": "Jio Financial Services Limited",
+  "sector": "Financial Services",
+  "industry": "Asset Management"
+ },
+ "JPOLYINVST.NS": {
+  "name": "Jindal Poly Investment and Finance Company Limited",
+  "sector": "Financial Services",
+  "industry": "Asset Management"
+ },
+ "KEYFINSERV.NS": {
+  "name": "Keynote Financial Services Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "KHANDSE.NS": {
+  "name": "Khandwala Securities Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "KICL.NS": {
+  "name": "Kalyani Investment Company Limited",
+  "sector": "Financial Services",
+  "industry": "Asset Management"
+ },
+ "KJMCFIN.NS": {
+  "name": "KJMC Financial Services Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "KRN.NS": {
+  "name": "KRN Heat Exchanger and Refrigeration Limited",
+  "sector": "Technology",
+  "industry": "Electronic Components"
+ },
+ "M&MFIN.NS": {
+  "name": "Mahindra & Mahindra Financial Services Limited",
+  "sector": "Financial Services",
+  "industry": "Credit Services"
+ },
+ "MASFIN.NS": {
+  "name": "MAS Financial Services Limited",
+  "sector": "Financial Services",
+  "industry": "Credit Services"
+ },
+ "MASKINVEST.NS": {
+  "name": "Mask Investments Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "MASTERTR.NS": {
+  "name": "Master Trust Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "MCX.NS": {
+  "name": "Multi Commodity Exchange of India Limited",
+  "sector": "Financial Services",
+  "industry": "Financial Data & Stock Exchanges"
+ },
+ "MFSL.NS": {
+  "name": "Max Financial Services Limited",
+  "sector": "Financial Services",
+  "industry": "Insurance - Life"
+ },
+ "MONARCH.NS": {
+  "name": "Monarch Networth Capital Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "MOTILALOFS.NS": {
+  "name": "Motilal Oswal Financial Services Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "MUKESHB.NS": {
+  "name": "Mukesh Babu Financial Services Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "MUTHOOTCAP.NS": {
+  "name": "Muthoot Capital Services Limited",
+  "sector": "Financial Services",
+  "industry": "Credit Services"
+ },
+ "NAGREEKCAP.NS": {
+  "name": "Nagreeka Capital & Infrastructure Ltd.",
+  "sector": "Financial Services",
+  "industry": "Asset Management"
+ },
+ "NAHARCAP.NS": {
+  "name": "Nahar Capital and Financial Services Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "NAM-INDIA.NS": {
+  "name": "Nippon Life India Asset Management Limited",
+  "sector": "Financial Services",
+  "industry": "Asset Management"
+ },
+ "NETWORK18.NS": {
+  "name": "Network18 Media & Investments Limited",
+  "sector": "Communication Services",
+  "industry": "Entertainment"
+ },
+ "NORTHARC.NS": {
+  "name": "Northern Arc Capital Limited",
+  "sector": "Financial Services",
+  "industry": "Credit Services"
+ },
+ "NSIL.NS": {
+  "name": "Nalwa Sons Investments Limited",
+  "sector": "Financial Services",
+  "industry": "Asset Management"
+ },
+ "NUVAMA.NS": {
+  "name": "Nuvama Wealth Management Limited",
+  "sector": "Financial Services",
+  "industry": "Asset Management"
+ },
+ "OFSS.NS": {
+  "name": "Oracle Financial Services Software Limited",
+  "sector": "Technology",
+  "industry": "Software - Infrastructure"
+ },
+ "ONELIFECAP.NS": {
+  "name": "Onelife Capital Advisors Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "PALASHSECU.NS": {
+  "name": "Palash Securities Limited",
+  "sector": "Consumer Defensive",
+  "industry": "Packaged Foods"
+ },
+ "PFS.NS": {
+  "name": "PTC India Financial Services Limited",
+  "sector": "Financial Services",
+  "industry": "Credit Services"
+ },
+ "PILANIINVS.NS": {
+  "name": "Pilani Investment and Industries Corporation Limited",
+  "sector": "Financial Services",
+  "industry": "Asset Management"
+ },
+ "PIONRINV.NS": {
+  "name": "Pioneer Investcorp Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "POLICYBZR.NS": {
+  "name": "PB Fintech Limited",
+  "sector": "Financial Services",
+  "industry": "Insurance Brokers"
+ },
+ "PRIMESECU.NS": {
+  "name": "Prime Securities Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "PRUDENT.NS": {
+  "name": "Prudent Corporate Advisory Services Limited",
+  "sector": "Financial Services",
+  "industry": "Asset Management"
+ },
+ "SAMMAANCAP.NS": {
+  "name": "Sammaan Capital Limited",
+  "sector": "Financial Services",
+  "industry": "Mortgage Finance"
+ },
+ "SGFIN.NS": {
+  "name": "SG Finserve Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "SHARDUL.NS": {
+  "name": "Shardul Securities Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "SHAREINDIA.NS": {
+  "name": "Share India Securities Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "SILINV.NS": {
+  "name": "SIL Investments Limited",
+  "sector": "Financial Services",
+  "industry": "Asset Management"
+ },
+ "SMCGLOBAL.NS": {
+  "name": "SMC Global Securities Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "STEELCITY.NS": {
+  "name": "Steel City Securities Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "STEELXIND.NS": {
+  "name": "Steel Exchange India Limited",
+  "sector": "Basic Materials",
+  "industry": "Steel"
+ },
+ "SUMMITSEC.NS": {
+  "name": "Summit Securities Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "TATACAP.NS": {
+  "name": "Tata Capital Limited",
+  "sector": "Financial Services",
+  "industry": "Credit Services"
+ },
+ "TATAINVEST.NS": {
+  "name": "Tata Investment Corporation Limited",
+  "sector": "Financial Services",
+  "industry": "Asset Management"
+ },
+ "THEINVEST.NS": {
+  "name": "The Investment Trust of India Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "TIINDIA.NS": {
+  "name": "Tube Investments of India Limited",
+  "sector": "Industrials",
+  "industry": "Conglomerates"
+ },
+ "TSFINV.NS": {
+  "name": "TSF Investments Limited",
+  "sector": "Financial Services",
+  "industry": "Asset Management"
+ },
+ "TURTLEMINT.NS": {
+  "name": "Turtlemint Fintech Solutions Limited",
+  "sector": "Financial Services",
+  "industry": "Insurance Brokers"
+ },
+ "UGROCAP.NS": {
+  "name": "UGRO Capital Limited",
+  "sector": "Financial Services",
+  "industry": "Credit Services"
+ },
+ "UTIAMC.NS": {
+  "name": "UTI Asset Management Company Limited",
+  "sector": "Financial Services",
+  "industry": "Asset Management"
+ },
+ "VGCL.NS": {
+  "name": "Vibrant Global Capital Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "WEALTH.NS": {
+  "name": "Wealth First Portfolio Managers Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "WELINV.NS": {
+  "name": "Welspun Investments and Commercials Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "ANGELONE.NS": {
+  "name": "Angel One Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "BSE.NS": {
+  "name": "BSE Limited",
+  "sector": "Financial Services",
+  "industry": "Financial Data & Stock Exchanges"
+ },
+ "CAMS.NS": {
+  "name": "Computer Age Management Services Limited",
+  "sector": "Technology",
+  "industry": "Information Technology Services"
+ },
+ "CARERATING.NS": {
+  "name": "CARE Ratings Limited",
+  "sector": "Financial Services",
+  "industry": "Financial Data & Stock Exchanges"
+ },
+ "CRISIL.NS": {
+  "name": "CRISIL Limited",
+  "sector": "Financial Services",
+  "industry": "Financial Data & Stock Exchanges"
+ },
+ "GROWW.NS": {
+  "name": "Billionbrains Garage Ventures Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "ICRA.NS": {
+  "name": "ICRA Limited",
+  "sector": "Financial Services",
+  "industry": "Financial Data & Stock Exchanges"
+ },
+ "IIFL.NS": {
+  "name": "IIFL Finance Limited",
+  "sector": "Financial Services",
+  "industry": "Credit Services"
+ },
+ "JMFINANCIL.NS": {
+  "name": "JM Financial Limited",
+  "sector": "Financial Services",
+  "industry": "Capital Markets"
+ },
+ "KFINTECH.NS": {
+  "name": "KFin Technologies Limited",
+  "sector": "Technology",
+  "industry": "Software - Application"
+ },
+ "SBIFUNDS.NS": {
+  "name": "SBI Funds Management Limited",
+  "sector": "Financial Services",
+  "industry": "Asset Management"
+ }
+}

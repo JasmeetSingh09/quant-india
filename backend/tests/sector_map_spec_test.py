@@ -39,6 +39,11 @@ ok("sector_map" in spec, "the spec has a sector_map field",
 ok(sm.get("sector_order") == list(DF.NSE_SECTORS), "sector order matches the module")
 ok(sm.get("members") == {k: list(v) for k, v in DF.NSE_SECTORS.items()},
    "every sector's members match the module, in order")
+ok(sm.get("peer_fetch_limit") == DF.SECTOR_PEER_FETCH_LIMIT == 5, "peers fetched per stock (5) is captured")
+import alpha_model as AM  # noqa: E402
+ok(sm.get("value_peers_used") == AM.VALUE_PEERS_USED == 3, "peers compared in value (3) is captured")
+ok(sm.get("yahoo_sector_fallback") == DF.YAHOO_SECTOR_FALLBACK and len(DF.YAHOO_SECTOR_FALLBACK) == 11,
+   "the Yahoo-sector fallback table is captured (11 entries)")
 base = SV._hash(spec)
 
 original = copy.deepcopy(DF.NSE_SECTORS)
@@ -53,8 +58,29 @@ try:
     for k in reversed(list(original)):
         DF.NSE_SECTORS[k] = list(original[k])
     ok(SV._hash(SV.current_spec()) != base, "reordering the sectors (first match wins) changes the hash")
+    DF.NSE_SECTORS.clear(); DF.NSE_SECTORS.update(copy.deepcopy(original))
+    DF.SECTOR_PEER_FETCH_LIMIT = 4
+    ok(SV._hash(SV.current_spec()) != base, "changing the peer fetch limit changes the hash")
+    DF.SECTOR_PEER_FETCH_LIMIT = 5
+    AM.VALUE_PEERS_USED = 2
+    ok(SV._hash(SV.current_spec()) != base, "changing the peers compared changes the hash")
+    AM.VALUE_PEERS_USED = 3
+    DF.YAHOO_SECTOR_FALLBACK["Financial Services"] = "NBFC"
+    ok(SV._hash(SV.current_spec()) != base, "changing one fallback entry changes the hash")
+    DF.YAHOO_SECTOR_FALLBACK["Financial Services"] = "Banking"
 finally:
     DF.NSE_SECTORS.clear(); DF.NSE_SECTORS.update(original)
+    DF.SECTOR_PEER_FETCH_LIMIT, AM.VALUE_PEERS_USED = 5, 3
+    DF.YAHOO_SECTOR_FALLBACK["Financial Services"] = "Banking"
+
+print("\n2b. THE PROMOTION CHANGED NO PEER SET")
+ok(DF.get_sector_peers("KALYANKJIL.NS") == ["TATASTEEL.NS", "JSWSTEEL.NS", "SAIL.NS", "HINDALCO.NS", "VEDL.NS"],
+   "a mapped stock still gets the first five other members, in order")
+_gi = DF.get_info
+DF.get_info = lambda t: {"sector": "Financial Services"}
+ok(DF.get_sector_peers("NOTMAPPED.NS") == ["HDFCBANK.NS", "ICICIBANK.NS", "SBIN.NS", "KOTAKBANK.NS", "AXISBANK.NS"],
+   "an unmapped 'Financial Services' stock still falls back to the first five banks")
+DF.get_info = _gi
 
 print("\n3. RESTORED, THE HASH RETURNS")
 ok(SV._hash(SV.current_spec()) == base, "the unchanged map gives the same hash")

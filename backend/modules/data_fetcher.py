@@ -847,6 +847,31 @@ def _derived_fundamentals(ticker: str, info: dict) -> dict:
     return out
 
 
+# How many peers get_sector_peers returns: the first N other members of the
+# sector, in list order. _compute_value_factor then uses the first
+# alpha_model.VALUE_PEERS_USED of these. Was the literal peers[:5].
+SECTOR_PEER_FETCH_LIMIT = 5
+
+# A stock not in NSE_SECTORS takes its peers from Yahoo's broad sector, mapped
+# to one of ours. About 2,000 of 2,462 scored stocks went this way on
+# 2026-10-14 (e.g. every "Financial Services" name against the three largest
+# banks). Was a dict literal inside get_sector_peers; promoted unchanged so
+# current_spec() can capture it (audit D-01).
+YAHOO_SECTOR_FALLBACK = {
+    "Technology":           "IT",
+    "Financial Services":   "Banking",
+    "Consumer Defensive":   "FMCG",
+    "Healthcare":           "Pharma",
+    "Consumer Cyclical":    "Auto",
+    "Energy":               "Oil_Gas",
+    "Basic Materials":      "Steel_Metal",
+    "Industrials":          "Capital_Goods",
+    "Communication Services":"Telecom",
+    "Real Estate":          "Real_Estate",
+    "Utilities":            "Power",
+}
+
+
 def get_sector_peers(ticker: str) -> list:
     """
     Get peer companies in the same NSE sector.
@@ -859,30 +884,17 @@ def get_sector_peers(ticker: str) -> list:
     for sector, members in NSE_SECTORS.items():
         if ticker in members:
             peers = [t for t in members if t != ticker]
-            return peers[:5]   # return top 5 peers to avoid too many API calls
+            return peers[:SECTOR_PEER_FETCH_LIMIT]   # capped to avoid too many API calls
 
     # Fallback: try to match by yfinance sector label
     try:
         info   = get_info(ticker)
         sector = info.get("sector", "")
         # Map yfinance sector strings to our sector groups
-        sector_map = {
-            "Technology":           "IT",
-            "Financial Services":   "Banking",
-            "Consumer Defensive":   "FMCG",
-            "Healthcare":           "Pharma",
-            "Consumer Cyclical":    "Auto",
-            "Energy":               "Oil_Gas",
-            "Basic Materials":      "Steel_Metal",
-            "Industrials":          "Capital_Goods",
-            "Communication Services":"Telecom",
-            "Real Estate":          "Real_Estate",
-            "Utilities":            "Power",
-        }
-        mapped = sector_map.get(sector, "")
+        mapped = YAHOO_SECTOR_FALLBACK.get(sector, "")
         if mapped and mapped in NSE_SECTORS:
             peers = [t for t in NSE_SECTORS[mapped] if t != ticker]
-            return peers[:5]
+            return peers[:SECTOR_PEER_FETCH_LIMIT]
     except Exception:
         pass
     return []

@@ -342,10 +342,18 @@ def current_spec() -> dict:
         members = {k: list(v) for k, v in NSE_SECTORS.items()}
         blob = json.dumps({"order": list(NSE_SECTORS), "members": members},
                           separators=(",", ":"))
+        from data_fetcher import SECTOR_PEER_FETCH_LIMIT, YAHOO_SECTOR_FALLBACK
+        from alpha_model import VALUE_PEERS_USED
         return {"source": "data_fetcher.NSE_SECTORS",
                 "sector_order": list(NSE_SECTORS),
                 "members": members,
-                "sha256_16": hashlib.sha256(blob.encode()).hexdigest()[:16]}
+                "sha256_16": hashlib.sha256(blob.encode()).hexdigest()[:16],
+                # How peers are drawn from the map: the first N other members
+                # are fetched, the first M of those are compared against.
+                "peer_fetch_limit": SECTOR_PEER_FETCH_LIMIT,
+                "value_peers_used": VALUE_PEERS_USED,
+                # Where a stock outside the map gets its peers from.
+                "yahoo_sector_fallback": dict(YAHOO_SECTOR_FALLBACK)}
     _cap(spec, "sector_map", _sector_map)
 
     bm = {}

@@ -92,6 +92,10 @@ MOMENTUM_CONFIDENCE_SPAN = 0.6    # added in proportion to history available
 MOMENTUM_INTERP_STRONG = 0.5
 MOMENTUM_INTERP_MILD = 0.1
 
+# Value: how many of get_sector_peers' list are compared against. Was the
+# literal peers[:3]; named so the frozen spec captures it (audit D-01).
+VALUE_PEERS_USED = 3
+
 # Signal thresholds on the composite alpha score, which runs -100 to +100.
 SIGNAL_STRONG_BUY = 40
 SIGNAL_BUY = 15
@@ -738,7 +742,7 @@ def _compute_value_factor(ticker: str, peers: list = None) -> dict:
         peer_pes = []
         peer_pbs = []
         used_peers = []
-        for p in peers[:3]:            # cap peer fetches so one stock can't fan out to many slow .info calls
+        for p in peers[:VALUE_PEERS_USED]:  # cap peer fetches so one stock can't fan out to many slow .info calls
             try:
                 pi = _ticker_info(p)
                 if pi.get("trailingPE"):  peer_pes.append(pi["trailingPE"])

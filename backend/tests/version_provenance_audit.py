@@ -67,6 +67,8 @@ INVENTORY = {
     "alpha_model": {
         "MODEL_VERSION": METADATA, "FACTOR_WEIGHTS": BEHAVIOURAL,
         "SENTIMENT_HALF_LIFE_DAYS": BEHAVIOURAL,
+        # Peers compared in the value factor (audit D-01, 2026-10-14).
+        "VALUE_PEERS_USED": BEHAVIOURAL,
         "TOP_PICKS_UNIVERSE": BEHAVIOURAL,
         "MOMENTUM_LOOKBACK_DAYS": BEHAVIOURAL,
         "MOMENTUM_SKIP_DAYS": BEHAVIOURAL,
@@ -205,6 +207,7 @@ INVENTORY = {
 SPEC_MAPPING = {
     ("alpha_v2", "WEIGHTS_V2"): ("factor_weights", None),
     ("alpha_model", "FACTOR_WEIGHTS"): ("v1_factor_weights", None),
+    ("alpha_model", "VALUE_PEERS_USED"): ("sector_map.value_peers_used", None),
     ("alpha_v2", "REPORTED_NOT_SCORED"): ("reported_not_scored", list),
     ("alpha_model", "SIGNAL_STRONG_BUY"): ("signal_thresholds.signal_strong_buy", None),
     ("alpha_model", "SIGNAL_BUY"): ("signal_thresholds.signal_buy", None),
