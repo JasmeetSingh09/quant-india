@@ -255,6 +255,7 @@ def _compute_sentiment_factor(ticker: str, days_back: int = 14) -> dict:
         weighted_scores = []
         weights         = []
         undated         = 0
+        untitled        = 0
         # The exact article set this score was built from. Appended to, never
         # read by the calculation — a sentiment score whose headlines are gone
         # cannot be checked or explained afterwards, and the headlines cannot
@@ -262,6 +263,16 @@ def _compute_sentiment_factor(ticker: str, days_back: int = 14) -> dict:
         used_articles   = []
 
         for art in articles:
+            # A headline with no usable title cannot be scored. It used to raise
+            # KeyError('title'), which the outer except turned into a refusal of
+            # the WHOLE factor, discarding every valid headline beside it. Skip it
+            # and count it. Never observed in production (all 2,410 recorded
+            # sentiment refusals since 2026-09-04 are "no news found"), so no
+            # stored score changes (audit D-09, owner-approved 2026-10-14).
+            title = art.get("title") if isinstance(art, dict) else None
+            if not isinstance(title, str) or not title.strip():
+                untitled += 1
+                continue
             pub = _parse_pub_date(art.get("published_at") or art.get("publishedAt"))
             if pub is None:
                 # Unknown/odd date format — DON'T discard the headline; assume it sits
@@ -272,7 +283,7 @@ def _compute_sentiment_factor(ticker: str, days_back: int = 14) -> dict:
                 age_days = max(0, (now - pub).total_seconds() / 86400)
             w = np.exp(-lam * age_days)
 
-            s = score_headline(art["title"])
+            s = score_headline(title)
             label = s["label"]
             conf  = s["confidence"]
 
@@ -295,7 +306,7 @@ def _compute_sentiment_factor(ticker: str, days_back: int = 14) -> dict:
 
         if not weights:
             return {"score": 0.0, "confidence": 0.0, "reason": "no scorable headlines",
-                    "n_articles": 0}
+                    "n_articles": 0, "untitled_articles_skipped": untitled}
 
         weighted_avg = sum(weighted_scores) / sum(weights)
         # Confidence = total weight normalised by max possible weight
@@ -318,6 +329,9 @@ def _compute_sentiment_factor(ticker: str, days_back: int = 14) -> dict:
             # reproduce the score, because confidence divides by it.
             "days_back": days_back,
             "undated_articles": undated,
+            # Present only when a headline was skipped, so a normal result
+            # keeps exactly the fields it had.
+            **({"untitled_articles_skipped": untitled} if untitled else {}),
             # Provenance, not an input: the calculation above is already
             # finished. Stored so a sentiment score can be explained by
             # the headlines that produced it, which the news feed will
