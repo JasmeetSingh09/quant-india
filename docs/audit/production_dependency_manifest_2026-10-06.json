@@ -1,0 +1,1016 @@
+{
+ "manifest": "production Python dependency set, 2026-10-06",
+ "source": {
+  "render_service": "srv-d9af4hvaqgkc739hu2u0",
+  "deploy": "dep-db2aqcmq1p3s73efcci0",
+  "commit": "cf9e3be",
+  "build_log_lines": [
+   "2026-10-06T08:12:30.550231131Z|#10 22.67 Successfully installed MarkupSafe-3.0.3 filelock-3.32.3 fsspec-2026.7.0 jinja2-3.1.6 mpmath-1.3.0 networkx-3.6.1 setuptools-78.1.0 sympy-1.14.0 torch-2.14.1+cpu typing-extensions-4.16.0",
+   "2026-10-06T08:13:10.007833864Z|#12 38.97 Successfully installed PyJWT-2.15.1 annotated-doc-0.0.5 annotated-types-0.8.0 anyio-4.15.1 apscheduler-3.11.3 arch-8.0.0 beautifulsoup4-4.15.0 certifi-2026.7.22 cffi-2.1.1 charset_normalizer-3.5.2 click-8.5.0 contourpy-1.3.3 curl_cffi-0.16.3 cycler-0.12.1 fastapi-0.142.2 feedparser-6.0.14 feedparser-sgmllib-2.1.0 fonttools-4.66.1 formulaic-1.2.2 h11-0.16.0 hf-xet-1.6.0 httpcore-1.0.9 httptools-0.8.0 httpx-0.28.1 huggingface-hub-1.33.0 idna-3.20 interface-meta-2.0.1 kiwisolver-1.5.1 lxml-6.1.3 markdown-it-py-4.2.0 matplotlib-3.11.2 mdurl-0.1.2 multitasking-0.0.13 narwhals-2.26.0 numpy-1.26.4 nvidia-nccl-cu13-2.32.3 opentelemetry-api-1.45.0 packaging-26.3 pandas-3.0.5 patsy-1.0.3 peewee-4.5.2 pillow-12.3.0 platformdirs-4.12.3 protobuf-7.36.2 psutil-7.2.2 psycopg2-binary-2.9.13 pycparser-3.0 pydantic-2.13.5 pydantic-core-2.46.5 pygments-2.21.0 pyparsing-3.3.3 python-dateutil-2.9.0.post0 python-dotenv-1.2.4 python-multipart-0.0.32 pytz-2026.5 pyyaml-6.0.3 quantstats-0.0.86 regex-2026.9.29 requests-2.34.2 rich-15.0.0 safetensors-0.8.0 scipy-1.17.1 seaborn-0.13.2 shellingham-1.5.4 six-1.17.0 soupsieve-2.10 starlette-1.7.0 statsmodels-0.15.0 tabulate-0.10.0 tokenizers-0.23.2 tqdm-4.70.1 transformers-5.18.0 typer-0.27.2 typing-inspection-0.4.4 tzlocal-5.4.4 urllib3-2.8.0 uvicorn-0.54.0 uvloop-0.23.0 watchfiles-1.3.0 websockets-17.2 wrapt-2.5.0 xgboost-3.4.1 yfinance-1.7.0"
+  ]
+ },
+ "runtime": {
+  "base_image": "python:3.12-slim@sha256:ddb0207ae1f0356c2b724d740769b0c5f5f51cc54a0525178f721825f78fe74c",
+  "python": "3.12.15 (live spec environment, /strategy/drift/v1.6.0)",
+  "platform": "Linux x86_64, CPU",
+  "torch_index": "https://download.pytorch.org/whl/cpu",
+  "finbert": {
+   "repo": "ProsusAI/finbert",
+   "revision": "4556d13015211d73dccd3fdd39d39232506f3e43"
+  },
+  "pip": "base image's pip; version not printed in the build log"
+ },
+ "packages": {
+  "annotated-doc": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "annotated-doc",
+   "step": "requirements.txt",
+   "version": "0.0.5",
+   "file": "annotated_doc-0.0.5-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "117bac03a25ede5df5440e855b32d556049ca169ead221505badf432fed4b101",
+   "hash_source": "pypi json api"
+  },
+  "annotated-types": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "annotated-types",
+   "step": "requirements.txt",
+   "version": "0.8.0",
+   "file": "annotated_types-0.8.0-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0",
+   "hash_source": "pypi json api"
+  },
+  "anyio": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "anyio",
+   "step": "requirements.txt",
+   "version": "4.15.1",
+   "file": "anyio-4.15.1-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "6152fdbbf9a77fdec97731721bebf7c4c44f7c29b424b0065826173efc7ed101",
+   "hash_source": "pypi json api"
+  },
+  "apscheduler": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "apscheduler",
+   "step": "requirements.txt",
+   "version": "3.11.3",
+   "file": "apscheduler-3.11.3-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "bbeb2ec02d23d3c06a6c07ed7f0f3939ada6680eb121fae809a69bb42c537a30",
+   "hash_source": "pypi json api"
+  },
+  "arch": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "arch",
+   "step": "requirements.txt",
+   "version": "8.0.0",
+   "file": "arch-8.0.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "13cbf04d45ecbee7578704a232f897cd02794d845f877158fb2838e6fb637887",
+   "hash_source": "pypi json api"
+  },
+  "beautifulsoup4": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "beautifulsoup4",
+   "step": "requirements.txt",
+   "version": "4.15.0",
+   "file": "beautifulsoup4-4.15.0-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "d6f88de62e1d4e38ecb1077eb9724cd0eff29d2a08ca16a401e9b9e93f117cf9",
+   "hash_source": "pypi json api"
+  },
+  "certifi": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "certifi",
+   "step": "requirements.txt",
+   "version": "2026.7.22",
+   "file": "certifi-2026.7.22-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775",
+   "hash_source": "pypi json api"
+  },
+  "cffi": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "cffi",
+   "step": "requirements.txt",
+   "version": "2.1.1",
+   "file": "cffi-2.1.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "c1453022f490d2459a11819d83ad1d586e9ff65a12ac3e705ffebd46d3685dcf",
+   "hash_source": "pypi json api"
+  },
+  "charset-normalizer": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "charset_normalizer",
+   "step": "requirements.txt",
+   "version": "3.5.2",
+   "file": "charset_normalizer-3.5.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "3d31298449090ab8d47b7b1b2a555ff73cac7ed438a08b7ac160980c7ebed649",
+   "hash_source": "pypi json api"
+  },
+  "click": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "click",
+   "step": "requirements.txt",
+   "version": "8.5.0",
+   "file": "click-8.5.0-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360",
+   "hash_source": "pypi json api"
+  },
+  "contourpy": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "contourpy",
+   "step": "requirements.txt",
+   "version": "1.3.3",
+   "file": "contourpy-1.3.3-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "4d00e655fcef08aba35ec9610536bfe90267d7ab5ba944f7032549c55a146da1",
+   "hash_source": "pypi json api"
+  },
+  "curl-cffi": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "curl_cffi",
+   "step": "requirements.txt",
+   "version": "0.16.3",
+   "file": "curl_cffi-0.16.3-cp310-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "a875a661e2f9a949be29454880bbb9553307a487c4c08819738298cf5c1622e2",
+   "hash_source": "pypi json api"
+  },
+  "cycler": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "cycler",
+   "step": "requirements.txt",
+   "version": "0.12.1",
+   "file": "cycler-0.12.1-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "85cef7cff222d8644161529808465972e51340599459b8ac3ccbac5a854e0d30",
+   "hash_source": "pypi json api"
+  },
+  "fastapi": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "fastapi",
+   "step": "requirements.txt",
+   "version": "0.142.2",
+   "file": "fastapi-0.142.2-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "bd5f4d81f1e93a88bcd77caf4dfe3c2dbffc3805407a0007e9a114c18b3a670b",
+   "hash_source": "pypi json api"
+  },
+  "feedparser": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "feedparser",
+   "step": "requirements.txt",
+   "version": "6.0.14",
+   "file": "feedparser-6.0.14-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "e35e3f760151b0c3b22cac9684155cae186a233e16c49bcbc6c49e91e3131137",
+   "hash_source": "pypi json api"
+  },
+  "feedparser-sgmllib": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "feedparser-sgmllib",
+   "step": "requirements.txt",
+   "version": "2.1.0",
+   "file": "feedparser_sgmllib-2.1.0-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "2cab2d43b95a954f920f18aebce7a4dbbb3f539780b127e2aa114f579821e01d",
+   "hash_source": "pypi json api"
+  },
+  "filelock": {
+   "log_timestamp": "2026-10-06T08:12:30.550231131Z",
+   "name": "filelock",
+   "step": "torch (CPU index)",
+   "version": "3.32.3",
+   "file": "filelock-3.32.3-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "7f0ca4bcc0e181c60dbbd8aa9ab5b120ebb99e4e064e83636340056f833a1f09",
+   "hash_source": "pypi json api"
+  },
+  "fonttools": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "fonttools",
+   "step": "requirements.txt",
+   "version": "4.66.1",
+   "file": "fonttools-4.66.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "7b8ff9e0edbcee2fbf7dff0c41b9041c1901c26acf64e23adb67495012df11de",
+   "hash_source": "pypi json api"
+  },
+  "formulaic": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "formulaic",
+   "step": "requirements.txt",
+   "version": "1.2.2",
+   "file": "formulaic-1.2.2-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "0f84ff49e3fc9dc0e68ab08a0a9427874021aa6c558e66b44dc634a35739b09b",
+   "hash_source": "pypi json api"
+  },
+  "fsspec": {
+   "log_timestamp": "2026-10-06T08:12:30.550231131Z",
+   "name": "fsspec",
+   "step": "torch (CPU index)",
+   "version": "2026.7.0",
+   "file": "fsspec-2026.7.0-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "b57ddbafedfaef7018c1ecab32aa200a9d7ca26b77965f64e48b70061249d279",
+   "hash_source": "pypi json api"
+  },
+  "h11": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "h11",
+   "step": "requirements.txt",
+   "version": "0.16.0",
+   "file": "h11-0.16.0-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86",
+   "hash_source": "pypi json api"
+  },
+  "hf-xet": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "hf-xet",
+   "step": "requirements.txt",
+   "version": "1.6.0",
+   "file": "hf_xet-1.6.0-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "d62671bb130879cef0ee4c9ebe47a14af6c66ec53e6d84dc15936e5ffdfac82f",
+   "hash_source": "pypi json api"
+  },
+  "httpcore": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "httpcore",
+   "step": "requirements.txt",
+   "version": "1.0.9",
+   "file": "httpcore-1.0.9-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55",
+   "hash_source": "pypi json api"
+  },
+  "httptools": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "httptools",
+   "step": "requirements.txt",
+   "version": "0.8.0",
+   "file": "httptools-0.8.0-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "b15fc622b0f869d19207c4089a501d9bcc63ca5e071ffdd2f03f922df882dcb2",
+   "hash_source": "pypi json api"
+  },
+  "httpx": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "httpx",
+   "step": "requirements.txt",
+   "version": "0.28.1",
+   "file": "httpx-0.28.1-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad",
+   "hash_source": "pypi json api"
+  },
+  "huggingface-hub": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "huggingface-hub",
+   "step": "requirements.txt",
+   "version": "1.33.0",
+   "file": "huggingface_hub-1.33.0-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "04e434b06e100eddbce9a6e817d72693a7884b10a79bd67ab48080d5c07eb899",
+   "hash_source": "pypi json api"
+  },
+  "idna": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "idna",
+   "step": "requirements.txt",
+   "version": "3.20",
+   "file": "idna-3.20-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c",
+   "hash_source": "pypi json api"
+  },
+  "interface-meta": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "interface-meta",
+   "step": "requirements.txt",
+   "version": "2.0.1",
+   "file": "interface_meta-2.0.1-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "f38016bef9a4429b6d0792d809be7b65e9781820c674bf7f463999086b6e6323",
+   "hash_source": "pypi json api"
+  },
+  "jinja2": {
+   "log_timestamp": "2026-10-06T08:12:30.550231131Z",
+   "name": "jinja2",
+   "step": "torch (CPU index)",
+   "version": "3.1.6",
+   "file": "jinja2-3.1.6-py3-none-any.whl",
+   "file_source": "download.pytorch.org",
+   "sha256": "85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67",
+   "hash_source": "sha256 of the file fetched from download.pytorch.org (134899 bytes); PyPI's published sha256 for the same filename MATCHES"
+  },
+  "kiwisolver": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "kiwisolver",
+   "step": "requirements.txt",
+   "version": "1.5.1",
+   "file": "kiwisolver-1.5.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "34633ecf50d16187ab8e5528b7a2530f2feb4e23f300db4672538b51cfc5cd38",
+   "hash_source": "pypi json api"
+  },
+  "lxml": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "lxml",
+   "step": "requirements.txt",
+   "version": "6.1.3",
+   "file": "lxml-6.1.3-cp312-cp312-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "909f4e927bb051f7740d6367285fc60cdcfdaf0258c2dba4ff5ba7eadadc250c",
+   "hash_source": "pypi json api"
+  },
+  "markdown-it-py": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "markdown-it-py",
+   "step": "requirements.txt",
+   "version": "4.2.0",
+   "file": "markdown_it_py-4.2.0-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "9f7ebbcd14fe59494226453aed97c1070d83f8d24b6fc3a3bcf9a38092641c4a",
+   "hash_source": "pypi json api"
+  },
+  "markupsafe": {
+   "log_timestamp": "2026-10-06T08:12:30.550231131Z",
+   "name": "MarkupSafe",
+   "step": "torch (CPU index)",
+   "version": "3.0.3",
+   "file": "markupsafe-3.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+   "file_source": "download.pytorch.org",
+   "sha256": "d6dd0be5b5b189d31db7cda48b91d7e0a9795f31430b7f271219ab30f1d3ac9d",
+   "hash_source": "sha256 of the file fetched from download.pytorch.org (22947 bytes); PyPI's published sha256 for the same filename MATCHES"
+  },
+  "matplotlib": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "matplotlib",
+   "step": "requirements.txt",
+   "version": "3.11.2",
+   "file": "matplotlib-3.11.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "df4f7784aca81a94f254c0a2767d592ee25f407e488f5fa7203e51093fb6ca27",
+   "hash_source": "pypi json api"
+  },
+  "mdurl": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "mdurl",
+   "step": "requirements.txt",
+   "version": "0.1.2",
+   "file": "mdurl-0.1.2-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8",
+   "hash_source": "pypi json api"
+  },
+  "mpmath": {
+   "log_timestamp": "2026-10-06T08:12:30.550231131Z",
+   "name": "mpmath",
+   "step": "torch (CPU index)",
+   "version": "1.3.0",
+   "file": "mpmath-1.3.0-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "a0b2b9fe80bbcd81a6647ff13108738cfb482d481d826cc0e02f5b35e5c88d2c",
+   "hash_source": "pypi json api"
+  },
+  "multitasking": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "multitasking",
+   "step": "requirements.txt",
+   "version": "0.0.13",
+   "file": "multitasking-0.0.13-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "ec9243af140c67bfe52dc98d7173c294512735a88e8425c458b250db99dc2b48",
+   "hash_source": "pypi json api"
+  },
+  "narwhals": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "narwhals",
+   "step": "requirements.txt",
+   "version": "2.26.0",
+   "file": "narwhals-2.26.0-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "29326d74f107c347fd1009bd58e38d9f7c7c5b51e6de97bc93dbc325d9038b54",
+   "hash_source": "pypi json api"
+  },
+  "networkx": {
+   "log_timestamp": "2026-10-06T08:12:30.550231131Z",
+   "name": "networkx",
+   "step": "torch (CPU index)",
+   "version": "3.6.1",
+   "file": "networkx-3.6.1-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "d47fbf302e7d9cbbb9e2555a0d267983d2aa476bac30e90dfbe5669bd57f3762",
+   "hash_source": "pypi json api"
+  },
+  "numpy": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "numpy",
+   "step": "requirements.txt",
+   "version": "1.26.4",
+   "file": "numpy-1.26.4-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "675d61ffbfa78604709862923189bad94014bef562cc35cf61d3a07bba02a7ed",
+   "hash_source": "pypi json api"
+  },
+  "nvidia-nccl-cu13": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "nvidia-nccl-cu13",
+   "step": "requirements.txt",
+   "version": "2.32.3",
+   "file": "nvidia_nccl_cu13-2.32.3-py3-none-manylinux_2_27_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "1459723080ac889d73a26edfa3e04383a7928ab31ac8f0ec43b3ea9548b04ff3",
+   "hash_source": "pypi json api"
+  },
+  "opentelemetry-api": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "opentelemetry-api",
+   "step": "requirements.txt",
+   "version": "1.45.0",
+   "file": "opentelemetry_api-1.45.0-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "80e068aba7cd56c8b58512d6a36f8d25cb1dfaa0c0a4cc1c938ccf9f362d9cb3",
+   "hash_source": "pypi json api"
+  },
+  "packaging": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "packaging",
+   "step": "requirements.txt",
+   "version": "26.3",
+   "file": "packaging-26.3-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+   "hash_source": "pypi json api"
+  },
+  "pandas": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "pandas",
+   "step": "requirements.txt",
+   "version": "3.0.5",
+   "file": "pandas-3.0.5-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "d373ce03ffd84010ed9839fa73672a9c8256990532e158440c0085db7d914b34",
+   "hash_source": "pypi json api"
+  },
+  "patsy": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "patsy",
+   "step": "requirements.txt",
+   "version": "1.0.3",
+   "file": "patsy-1.0.3-py2.py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "d3dbebe8fd5f46e29912d030b63c6268647b59bf788a99e2af28a30234cf357c",
+   "hash_source": "pypi json api"
+  },
+  "peewee": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "peewee",
+   "step": "requirements.txt",
+   "version": "4.5.2",
+   "file": "peewee-4.5.2-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "a7765c76834c84799b533aeaa0afeebdcd123b894faefbcebe495fbf4c7548ba",
+   "hash_source": "pypi json api"
+  },
+  "pillow": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "pillow",
+   "step": "requirements.txt",
+   "version": "12.3.0",
+   "file": "pillow-12.3.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "78cb2c6865a35ab8ff8b75fd122f6033b92a62c82801110e48ddd6c936a45d91",
+   "hash_source": "pypi json api"
+  },
+  "platformdirs": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "platformdirs",
+   "step": "requirements.txt",
+   "version": "4.12.3",
+   "file": "platformdirs-4.12.3-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "080f3b39423b5abfca9a23d84c4e9795f54d395cd8459867a8ded44084fcd5f8",
+   "hash_source": "pypi json api"
+  },
+  "protobuf": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "protobuf",
+   "step": "requirements.txt",
+   "version": "7.36.2",
+   "file": "protobuf-7.36.2-cp310-abi3-manylinux2014_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "89f23aa53c24553a2416fd4fd1ec06f74fa42b14b546d8883128813f775bbfd2",
+   "hash_source": "pypi json api"
+  },
+  "psutil": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "psutil",
+   "step": "requirements.txt",
+   "version": "7.2.2",
+   "file": "psutil-7.2.2-cp36-abi3-manylinux2010_x86_64.manylinux_2_12_x86_64.manylinux_2_28_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "076a2d2f923fd4821644f5ba89f059523da90dc9014e85f8e45a5774ca5bc6f9",
+   "hash_source": "pypi json api"
+  },
+  "psycopg2-binary": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "psycopg2-binary",
+   "step": "requirements.txt",
+   "version": "2.9.13",
+   "file": "psycopg2_binary-2.9.13-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "e3861eba31f8ea8663fd876166b032fd89179e42aa63764d6feb281f13f9eb60",
+   "hash_source": "pypi json api"
+  },
+  "pycparser": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "pycparser",
+   "step": "requirements.txt",
+   "version": "3.0",
+   "file": "pycparser-3.0-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "b727414169a36b7d524c1c3e31839a521725078d7b2ff038656844266160a992",
+   "hash_source": "pypi json api"
+  },
+  "pydantic": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "pydantic",
+   "step": "requirements.txt",
+   "version": "2.13.5",
+   "file": "pydantic-2.13.5-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "346a034f080da3755d8e9cb5e00e8b07de1d39e4f6e2c87d8ab7cafa0b269a73",
+   "hash_source": "pypi json api"
+  },
+  "pydantic-core": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "pydantic-core",
+   "step": "requirements.txt",
+   "version": "2.46.5",
+   "file": "pydantic_core-2.46.5-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "0fc5be0abd4a407e200d844b404e33639a554e7bd0d448e7b9ae181be4789ac2",
+   "hash_source": "pypi json api"
+  },
+  "pygments": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "pygments",
+   "step": "requirements.txt",
+   "version": "2.21.0",
+   "file": "pygments-2.21.0-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+   "hash_source": "pypi json api"
+  },
+  "pyjwt": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "PyJWT",
+   "step": "requirements.txt",
+   "version": "2.15.1",
+   "file": "pyjwt-2.15.1-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "42d59d631f7768a1028a64c7ff581a9bf7519804daf91fc5b6c56e30eec5e193",
+   "hash_source": "pypi json api"
+  },
+  "pyparsing": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "pyparsing",
+   "step": "requirements.txt",
+   "version": "3.3.3",
+   "file": "pyparsing-3.3.3-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "ece8c00a69cf01b45d0b1dedabb469c90d8caf996d4fda40f147627a122849a4",
+   "hash_source": "pypi json api"
+  },
+  "python-dateutil": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "python-dateutil",
+   "step": "requirements.txt",
+   "version": "2.9.0.post0",
+   "file": "python_dateutil-2.9.0.post0-py2.py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427",
+   "hash_source": "pypi json api"
+  },
+  "python-dotenv": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "python-dotenv",
+   "step": "requirements.txt",
+   "version": "1.2.4",
+   "file": "python_dotenv-1.2.4-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "42269a8a5b3fd54ffa6f3d84b18abed50064717576b4ecf03dc4a55d8aa04fdc",
+   "hash_source": "pypi json api"
+  },
+  "python-multipart": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "python-multipart",
+   "step": "requirements.txt",
+   "version": "0.0.32",
+   "file": "python_multipart-0.0.32-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "ff6d3f776f16878c894e52e107296ffc890e913c611b1a4ec6c44e2821fe2e23",
+   "hash_source": "pypi json api"
+  },
+  "pytz": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "pytz",
+   "step": "requirements.txt",
+   "version": "2026.5",
+   "file": "pytz-2026.5-py2.py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "e658af3757f9e26a9d25dd2aff38335acd92bc9104f890a894b2c1ba28311b03",
+   "hash_source": "pypi json api"
+  },
+  "pyyaml": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "pyyaml",
+   "step": "requirements.txt",
+   "version": "6.0.3",
+   "file": "pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "ba1cc08a7ccde2d2ec775841541641e4548226580ab850948cbfda66a1befcdc",
+   "hash_source": "pypi json api"
+  },
+  "quantstats": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "quantstats",
+   "step": "requirements.txt",
+   "version": "0.0.86",
+   "file": "quantstats-0.0.86-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "4cfb157c8228cbb47681d6a81767d465fbc2bdf529643dd7e836479d2165efd6",
+   "hash_source": "pypi json api"
+  },
+  "regex": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "regex",
+   "step": "requirements.txt",
+   "version": "2026.9.29",
+   "file": "regex-2026.9.29-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "39ab5894d971f9ac68baa6eca5c50387db579cfcacf36ae8df3feceb1815e6d0",
+   "hash_source": "pypi json api"
+  },
+  "requests": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "requests",
+   "step": "requirements.txt",
+   "version": "2.34.2",
+   "file": "requests-2.34.2-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0",
+   "hash_source": "pypi json api"
+  },
+  "rich": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "rich",
+   "step": "requirements.txt",
+   "version": "15.0.0",
+   "file": "rich-15.0.0-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "33bd4ef74232fb73fe9279a257718407f169c09b78a87ad3d296f548e27de0bb",
+   "hash_source": "pypi json api"
+  },
+  "safetensors": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "safetensors",
+   "step": "requirements.txt",
+   "version": "0.8.0",
+   "file": "safetensors-0.8.0-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "fd6f3f93c9a0a7cc2788ee63fb763353d4bd2e89b0751bc78fcf7dda00bea774",
+   "hash_source": "pypi json api"
+  },
+  "scipy": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "scipy",
+   "step": "requirements.txt",
+   "version": "1.17.1",
+   "file": "scipy-1.17.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "02ae3b274fde71c5e92ac4d54bc06c42d80e399fec704383dcd99b301df37458",
+   "hash_source": "pypi json api"
+  },
+  "seaborn": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "seaborn",
+   "step": "requirements.txt",
+   "version": "0.13.2",
+   "file": "seaborn-0.13.2-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "636f8336facf092165e27924f223d3c62ca560b1f2bb5dff7ab7fad265361987",
+   "hash_source": "pypi json api"
+  },
+  "setuptools": {
+   "log_timestamp": "2026-10-06T08:12:30.550231131Z",
+   "name": "setuptools",
+   "step": "torch (CPU index)",
+   "version": "78.1.0",
+   "file": "setuptools-78.1.0-py3-none-any.whl",
+   "file_source": "download.pytorch.org",
+   "sha256": "3e386e96793c8702ae83d17b853fb93d3e09ef82ec62722e61da5cd22376dcd8",
+   "hash_source": "sha256 of the file fetched from download.pytorch.org (1256108 bytes); PyPI's published sha256 for the same filename MATCHES"
+  },
+  "shellingham": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "shellingham",
+   "step": "requirements.txt",
+   "version": "1.5.4",
+   "file": "shellingham-1.5.4-py2.py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "7ecfff8f2fd72616f7481040475a65b2bf8af90a56c89140852d1120324e8686",
+   "hash_source": "pypi json api"
+  },
+  "six": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "six",
+   "step": "requirements.txt",
+   "version": "1.17.0",
+   "file": "six-1.17.0-py2.py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274",
+   "hash_source": "pypi json api"
+  },
+  "soupsieve": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "soupsieve",
+   "step": "requirements.txt",
+   "version": "2.10",
+   "file": "soupsieve-2.10-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "8596eb8967d744174820280fa62b4542a2e955bfaccca73ed8a13c6eb8e9b502",
+   "hash_source": "pypi json api"
+  },
+  "starlette": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "starlette",
+   "step": "requirements.txt",
+   "version": "1.7.0",
+   "file": "starlette-1.7.0-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "67f8e99895493dd2911a03f11314af6ceebeae4e704bb9f43dfc6a9db151c93e",
+   "hash_source": "pypi json api"
+  },
+  "statsmodels": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "statsmodels",
+   "step": "requirements.txt",
+   "version": "0.15.0",
+   "file": "statsmodels-0.15.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "c6f2bd48915cc9b3b95c3c7f6ac363b6f8aaa38172962ba5f7f6885f0dfe57f2",
+   "hash_source": "pypi json api"
+  },
+  "sympy": {
+   "log_timestamp": "2026-10-06T08:12:30.550231131Z",
+   "name": "sympy",
+   "step": "torch (CPU index)",
+   "version": "1.14.0",
+   "file": "sympy-1.14.0-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "e091cc3e99d2141a0ba2847328f5479b05d94a6635cb96148ccb3f34671bd8f5",
+   "hash_source": "pypi json api"
+  },
+  "tabulate": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "tabulate",
+   "step": "requirements.txt",
+   "version": "0.10.0",
+   "file": "tabulate-0.10.0-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "f0b0622e567335c8fabaaa659f1b33bcb6ddfe2e496071b743aa113f8774f2d3",
+   "hash_source": "pypi json api"
+  },
+  "tokenizers": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "tokenizers",
+   "step": "requirements.txt",
+   "version": "0.23.2",
+   "file": "tokenizers-0.23.2-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "41c2f84d172449b4dadb9cdc508e3e364076613c35b16e76ecfe47a60d1e3305",
+   "hash_source": "pypi json api"
+  },
+  "torch": {
+   "log_timestamp": "2026-10-06T08:12:30.550231131Z",
+   "name": "torch",
+   "step": "torch (CPU index)",
+   "version": "2.14.1+cpu",
+   "file": "torch-2.14.1+cpu-cp312-cp312-manylinux_2_28_x86_64.whl",
+   "file_source": "download.pytorch.org",
+   "sha256": "5a6363570c753812540a05eb82380e329469cbe668643e88111414c12627711f",
+   "hash_source": "download.pytorch.org simple index https://download.pytorch.org/whl/cpu/torch/"
+  },
+  "tqdm": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "tqdm",
+   "step": "requirements.txt",
+   "version": "4.70.1",
+   "file": "tqdm-4.70.1-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "c293e525e6fef9c20e8728fd4612df02a0aa31bb5fe91ecd93e123b1b7bffa73",
+   "hash_source": "pypi json api"
+  },
+  "transformers": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "transformers",
+   "step": "requirements.txt",
+   "version": "5.18.0",
+   "file": "transformers-5.18.0-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "d79e5a515a572ee3deb33eb0d578be47d91e70c75d54cf21bf6eede6edef14a9",
+   "hash_source": "pypi json api"
+  },
+  "typer": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "typer",
+   "step": "requirements.txt",
+   "version": "0.27.2",
+   "file": "typer-0.27.2-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "b3a5fc4342d5fc8fda8fc3010b1cf117e9249aab7fae800c2eff62fd3842d97d",
+   "hash_source": "pypi json api"
+  },
+  "typing-extensions": {
+   "log_timestamp": "2026-10-06T08:12:30.550231131Z",
+   "name": "typing-extensions",
+   "step": "torch (CPU index)",
+   "version": "4.16.0",
+   "file": "typing_extensions-4.16.0-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+   "hash_source": "pypi json api"
+  },
+  "typing-inspection": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "typing-inspection",
+   "step": "requirements.txt",
+   "version": "0.4.4",
+   "file": "typing_inspection-0.4.4-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147",
+   "hash_source": "pypi json api"
+  },
+  "tzlocal": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "tzlocal",
+   "step": "requirements.txt",
+   "version": "5.4.4",
+   "file": "tzlocal-5.4.4-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "aae09f0126a8a86fa736be266eb4a471380d26a0de3bc14844e7821fee3e2a15",
+   "hash_source": "pypi json api"
+  },
+  "urllib3": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "urllib3",
+   "step": "requirements.txt",
+   "version": "2.8.0",
+   "file": "urllib3-2.8.0-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3",
+   "hash_source": "pypi json api"
+  },
+  "uvicorn": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "uvicorn",
+   "step": "requirements.txt",
+   "version": "0.54.0",
+   "file": "uvicorn-0.54.0-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "505bdb0f318731d45f1f712071fc781a8981f6847a31c902c9f5e652d4f67faf",
+   "hash_source": "pypi json api"
+  },
+  "uvloop": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "uvloop",
+   "step": "requirements.txt",
+   "version": "0.23.0",
+   "file": "uvloop-0.23.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "090865d8ce7a03986755a3ce711b7dd0d4b44eb14ab74368b717f3fad1180208",
+   "hash_source": "pypi json api"
+  },
+  "watchfiles": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "watchfiles",
+   "step": "requirements.txt",
+   "version": "1.3.0",
+   "file": "watchfiles-1.3.0-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "b5768b49e426fd5b550b012c866db347cdf15c398ef98dc557b6e6b72fa74cd1",
+   "hash_source": "pypi json api"
+  },
+  "websockets": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "websockets",
+   "step": "requirements.txt",
+   "version": "17.2",
+   "file": "websockets-17.2-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "6627b913b8586b1c06db9516b31dd0dfbc621de3bb9312616d92a7e44f268a5b",
+   "hash_source": "pypi json api"
+  },
+  "wrapt": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "wrapt",
+   "step": "requirements.txt",
+   "version": "2.5.0",
+   "file": "wrapt-2.5.0-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "0cabb9c17ab79b2549d1f23b36f436473ad9253ef53995a817feba26fae69d5b",
+   "hash_source": "pypi json api"
+  },
+  "xgboost": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "xgboost",
+   "step": "requirements.txt",
+   "version": "3.4.1",
+   "file": "xgboost-3.4.1-py3-none-manylinux_2_28_x86_64.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "6adf2afa396da2ae8ed30295b50b99d4712eed9a6e0ce6cfe069290e4335e51f",
+   "hash_source": "pypi json api"
+  },
+  "yfinance": {
+   "log_timestamp": "2026-10-06T08:13:10.007833864Z",
+   "name": "yfinance",
+   "step": "requirements.txt",
+   "version": "1.7.0",
+   "file": "yfinance-1.7.0-py3-none-any.whl",
+   "file_source": "PyPI (files.pythonhosted.org)",
+   "sha256": "91281ecd1f71069a37155ff8653aff2d3085f3492bd8721f18b70955da62911a",
+   "hash_source": "pypi json api"
+  }
+ },
+ "counts": {
+  "total": 93,
+  "torch_step": 10,
+  "requirements_step": 83
+ },
+ "verification": {
+  "resolution_dry_run": {
+   "tool": "pip 25.0.1 --dry-run --report",
+   "target_tags": "cp312, manylinux x86_64, --only-binary=:all:",
+   "resolved": 86,
+   "same_version_as_production": 84,
+   "different_version": 0,
+   "marker_artifacts_of_resolving_on_windows": {
+    "absent_here_present_on_linux": [
+     "uvloop (uvicorn[standard]: sys_platform != 'win32')",
+     "nvidia-nccl-cu13 (xgboost: platform_system == 'Linux')"
+    ],
+    "present_here_absent_on_linux": [
+     "colorama (tqdm/typer: platform_system == 'Windows')",
+     "tzdata (pandas: sys_platform == 'win32'; tzlocal: Windows)"
+    ]
+   },
+   "wheel_kinds": {
+    "pure (py3-none-any)": 58,
+    "cp312 / abi3 linux": 28
+   },
+   "source_builds_needed": 0
+  },
+  "inference_stack_venv_vs_production": {
+   "shared": 34,
+   "identical": 31,
+   "differ": {
+    "typer": [
+     "0.27.2",
+     "0.27.3"
+    ],
+    "hf-xet": [
+     "1.6.0",
+     "1.7.0"
+    ],
+    "numpy": [
+     "1.26.4",
+     "2.5.4"
+    ]
+   },
+   "venv_only": [
+    "colorama"
+   ]
+  },
+  "sentiment_baseline": "identical: docs/audit/finbert_prodmatch_comparison_2026-10-15.json",
+  "file_hashes": {
+   "captured": 93,
+   "of": 93,
+   "cross_check_with_resolver_report": "81 shared filenames: 81 agree, 0 disagree",
+   "pytorch_mirror_without_published_hash": {
+    "jinja2": "sha256 of the file fetched from download.pytorch.org (134899 bytes); PyPI's published sha256 for the same filename MATCHES",
+    "markupsafe": "sha256 of the file fetched from download.pytorch.org (22947 bytes); PyPI's published sha256 for the same filename MATCHES",
+    "setuptools": "sha256 of the file fetched from download.pytorch.org (1256108 bytes); PyPI's published sha256 for the same filename MATCHES"
+   }
+  }
+ }
+}

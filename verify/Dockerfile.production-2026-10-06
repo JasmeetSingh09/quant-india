@@ -1,0 +1,34 @@
+# Isolated verification image: production 2026-10-06 (cf9e3be) rebuilt exactly, plus the current code.
+#
+# NOT the production Dockerfile (backend/Dockerfile is unchanged). Built only by
+# .github/workflows/verify-production-image.yml, never by Render.
+#   docker build -f verify/Dockerfile.production-2026-10-06 -t qi-verify backend   (then see verify/README.md)
+#
+# Differences from backend/Dockerfile, each one the point of the exercise:
+#   - FROM the exact base-image digest production used, not the moving 3.12-slim tag;
+#   - both pip steps hash-locked to the 93 files production installed (--require-hashes, --no-deps:
+#     nothing is resolved, so nothing can drift);
+#   - FinBERT pre-downloaded at the pinned revision.
+FROM python:3.12-slim@sha256:ddb0207ae1f0356c2b724d740769b0c5f5f51cc54a0525178f721825f78fe74c
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential curl && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements-production-locked-torch-2026-10-06.txt requirements-production-locked-2026-10-06.txt ./
+RUN pip install --no-cache-dir --require-hashes --no-deps \
+        --index-url https://download.pytorch.org/whl/cpu \
+        -r requirements-production-locked-torch-2026-10-06.txt \
+ && pip install --no-cache-dir --require-hashes --no-deps \
+        -r requirements-production-locked-2026-10-06.txt \
+ && pip check
+
+RUN python -c "\
+from transformers import pipeline; \
+pipeline('text-classification', model='ProsusAI/finbert', revision='4556d13015211d73dccd3fdd39d39232506f3e43', top_k=None)"
+
+COPY . .
+RUN mkdir -p /app/data
+ENV PORT=8000
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT} --workers 1 --timeout-keep-alive 120"]

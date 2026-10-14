@@ -1,0 +1,45 @@
+# Isolated rebuild of the 2026-10-06 production environment, tested end to end (see verify/README.md).
+#
+# Runs ONLY on the verify-production-env branch (or by hand). It builds an image from the pinned base
+# digest and the two hash-locked requirement files, then runs verify/verify_production_image.sh inside
+# it with the checkout mounted read-only: installed packages vs the manifest, pip check, the full
+# offline suite, the behavioural snapshots, the oracle suite, the FinBERT baseline, and app startup
+# plus three read-only endpoints.
+#
+# It deploys nothing and touches no production resource: no secrets, no database, no Render.
+
+name: Verify production image
+
+on:
+  push:
+    branches: [verify-production-env]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the verification image (pinned digest, hash-locked, FinBERT pinned)
+        run: |
+          set -o pipefail
+          docker build -f verify/Dockerfile.production-2026-10-06 -t qi-verify backend 2>&1 | tee build.log
+
+      - name: Run the verification inside the image
+        run: |
+          set -o pipefail
+          docker run --rm -v "$PWD:/repo:ro" qi-verify sh /repo/verify/verify_production_image.sh 2>&1 | tee verify.log
+
+      - name: Keep the evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-image-verification
+          path: |
+            build.log
+            verify.log
