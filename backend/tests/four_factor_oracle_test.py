@@ -304,7 +304,8 @@ r1, r2 = run_mom(walk(300, 11)), run_mom(walk(300, 11))
 check("M16", "identical inputs give identical outputs", r1 == r2)
 
 # Out-of-order and duplicate rows. The provider returns a sorted, de-duplicated
-# index; the function does not re-sort, so this records behaviour on bad input.
+# index; since D-08 (2026-10-14) the function sorts and keeps the LAST row the
+# provider returned for a repeated date.
 cl = walk(300, 12)
 dates = list(pd.bdate_range("2025-01-01", periods=300))
 pairs = list(zip(dates, cl))
@@ -313,23 +314,45 @@ sh = frame([p for _, p in pairs], dates=[d for d, _ in pairs])
 set_prices(sh)
 act = A._compute_momentum_factor("X.NS")
 exp = oracle_momentum(cl)
-check("M17", "out-of-order rows give the sorted answer (no defensive sort)",
+check("M17", "out-of-order rows give the sorted answer",
       close(act["score"], exp["score"], 1e-4), f"{act['score']} vs sorted {exp['score']}", defect="D-08")
 dup = frame(cl + cl[-5:], dates=dates + dates[-5:])
 set_prices(dup)
 act = A._compute_momentum_factor("X.NS")
 check("M18", "duplicated dates are not double counted",
       close(act["score"], exp["score"], 1e-4), f"{act['score']} vs {exp['score']}", defect="D-08")
+# A repeated date with a DIFFERENT close: the documented rule keeps the last row.
+cl2 = walk(300, 14)
+k = 150
+conflict = frame(cl2[:k + 1] + [cl2[k] * 1.5] + cl2[k + 1:], dates=dates[:k + 1] + [dates[k]] + dates[k + 1:])
+set_prices(conflict)
+act = A._compute_momentum_factor("X.NS")
+kept_last = cl2[:k] + [cl2[k] * 1.5] + cl2[k + 1:]
+check("M18b", "a repeated date keeps the last row the provider returned (no averaging)",
+      close(act["score"], oracle_momentum(kept_last)["score"], 1e-4)
+      and not close(act["score"], oracle_momentum(cl2)["score"], 1e-4),
+      f"{act['score']} vs last-row oracle {oracle_momentum(kept_last)['score']}", defect="D-08")
+set_prices(conflict)
+check("M18c", "the repeated-date result is deterministic", A._compute_momentum_factor("X.NS") == act)
 
-# The point-in-time research copy must use the same arithmetic as the live score.
+# The point-in-time research copy. Owner decision 2026-10-14 (D-07): the frozen
+# calculation is kept and its docstring corrected, so this pins the DOCUMENTED
+# behaviour exactly: same window and tanh as live, population std instead of
+# sample std. A change to either side fails here.
 import pit_validation as PV  # noqa: E402
 cl = walk(300, 13)
 C = np.array([cl], dtype=np.float64)
 pit = float(PV._momentum_scores(C, 299)[0])
 live = oracle_momentum(cl)["score"]
-check("M19", "PIT backtest momentum equals live momentum (docstring: 'identical arithmetic')",
-      abs(pit - live) < 1e-4, f"pit {pit:.6f} vs live {live:.6f} (pit uses population std, live sample std)",
-      defect="D-07")
+_s, _e = 299 - 252, 299 - 21
+_r = [cl[i] / cl[i - 1] - 1 for i in range(_s + 1, _e + 1)]
+pit_oracle = math.tanh((cl[_e] / cl[_s] - 1) / (statistics.pstdev(_r) * math.sqrt(252)) / 1.5)
+check("M19", "PIT momentum = live window and tanh with population std (documented difference)",
+      abs(pit - pit_oracle) < 1e-9 and abs(pit - live) > 0,
+      f"pit {pit:.9f}, population-std oracle {pit_oracle:.9f}, live (sample std) {live:.6f}", defect="D-07")
+_doc = PV._momentum_scores.__doc__ or ""
+check("M19b", "its docstring states the std difference instead of claiming identical arithmetic",
+      "ddof=0" in _doc and "Identical arithmetic" not in _doc, defect="D-07")
 check("M20", "PIT and live momentum share window constants",
       PV.MOM_LOOKBACK == A.MOMENTUM_LOOKBACK_DAYS and PV.MOM_SKIP == A.MOMENTUM_SKIP_DAYS
       and PV.MOM_TANH_DIV == A.MOMENTUM_TANH_DIVISOR)
@@ -396,6 +419,16 @@ check("S10", "confidence capped at 1 and score bounded", act["confidence"] == 1.
 act = run_sent([{"title": "a", "published_at": iso(1)}, {"published_at": iso(1)}], labels)
 check("S11", "one malformed article (no title) does not discard the others",
       act["confidence"] > 0, act.get("reason"), defect="D-09")
+exp = oracle_sentiment([(1, *labels["a"])])
+check("S11b", "the score is exactly the valid headline's, and the skip is counted",
+      close(act["score"], exp["score"], 2e-4) and act.get("n_articles") == 1
+      and act.get("untitled_articles_skipped") == 1, f"{act['score']} vs {exp['score']}", defect="D-09")
+act = run_sent([{"title": "  ", "published_at": iso(1)}, {"title": None}], labels)
+check("S11c", "only untitled headlines: refused as 'no scorable headlines', not 'no news found'",
+      act["confidence"] == 0 and act.get("reason") == "no scorable headlines"
+      and act.get("untitled_articles_skipped") == 2, act.get("reason"), defect="D-09")
+act = run_sent([{"title": "a", "published_at": iso(1)}], labels)
+check("S11d", "a normal result gains no new field", "untitled_articles_skipped" not in act)
 
 
 # ===========================================================================

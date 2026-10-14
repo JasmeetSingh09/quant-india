@@ -506,7 +506,14 @@ def _momentum_scores(C, col):
     """
     Absolute 12-1 momentum, volatility-adjusted, at one formation column.
 
-    Identical arithmetic to alpha_model._compute_momentum_factor, vectorised.
+    The same window, return and tanh as alpha_model._compute_momentum_factor,
+    vectorised, with ONE known difference: volatility here is np.nanstd, the
+    population standard deviation (ddof=0); the live factor uses pandas .std(),
+    the sample standard deviation (ddof=1). Over the 231 returns of a full
+    window the backtest's volatility is about 0.2% smaller, which moved a
+    measured score by about 0.0002 (audit D-07, 2026-10-14). This text was
+    corrected, not the calculation: the factor tests ran on this code, and
+    aligning it would be a declared methodology change with a re-run.
     Only columns strictly left of `col` are touched.
     """
     a = col - MOM_LOOKBACK
