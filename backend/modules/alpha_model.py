@@ -779,14 +779,18 @@ def _compute_value_factor(ticker: str, peers: list = None) -> dict:
             "sector_pb":    round(pb_mean, 2),
             "pe_z_score":   round(pe_z, 3),
             "pb_z_score":   round(pb_z, 3),
+            # The verdict is parenthesised. Without the brackets a conditional
+            # binds looser than +, so the distress and one-measure notes were
+            # attached only to "Significantly undervalued" and silently dropped
+            # for every other band (230 stocks on 2026-10-14). Text only.
             "interpretation": (
                 (f"{' and '.join(distressed).capitalize()} — " if distressed else "") +
                 ("Valued on one measure only. " if _legs < 2 else "") +
-                "Significantly undervalued vs peers" if score > 0.4 else
-                "Slightly cheap vs peers"            if score > 0.1 else
-                "Significantly overvalued vs peers"  if score < -0.4 else
-                "Slightly expensive vs peers"        if score < -0.1 else
-                "Fairly valued vs peers"
+                ("Significantly undervalued vs peers" if score > 0.4 else
+                 "Slightly cheap vs peers"            if score > 0.1 else
+                 "Significantly overvalued vs peers"  if score < -0.4 else
+                 "Slightly expensive vs peers"        if score < -0.1 else
+                 "Fairly valued vs peers")
             ),
         }
     except Exception as e:
