@@ -34,6 +34,7 @@ HEADLINES = {
     "valid_mixed": "Tata Steel revenue rises but margins fall on higher coking coal costs",
 }
 POISON = "THIS HEADLINE IS FORCED TO FAIL INSIDE THE PIPELINE"
+SILENT = "THIS ONE FAILS WITH AN EMPTY MESSAGE"
 
 import sentiment as S  # noqa: E402  (loads the pinned model)
 
@@ -58,6 +59,8 @@ real_pipe = S._finbert
 def poisoned(text, *a, **k):
     if (text if isinstance(text, str) else "") .startswith(POISON[:20]):
         raise RuntimeError("injected inference failure")
+    if (text if isinstance(text, str) else "").startswith(SILENT[:20]):
+        raise RuntimeError()          # str(e) == "": the case a truthiness check missed
     return real_pipe(text, *a, **k)
 
 
@@ -85,6 +88,12 @@ ok(abs(mixed["score"] - clean["score"]) < 2e-4 and abs(mixed["confidence"] - cle
    "score and coverage equal the run without it (no dilution, no inflated coverage)",
    f"{mixed['score']}/{mixed['confidence']} vs {clean['score']}/{clean['confidence']}")
 ok(mixed["n_articles"] == clean["n_articles"] == len(valid), "only the real headlines are used")
+
+silent = run(valid + [SILENT])
+ok(S.score_headline(SILENT).get("error") == "" and silent.get("inference_failures") == 1
+   and abs(silent["confidence"] - clean["confidence"]) < 2e-3,
+   "a failure with an EMPTY error message is still skipped and counted",
+   f"failures {silent.get('inference_failures')}, conf {silent['confidence']} vs {clean['confidence']}")
 
 print("\n3. EVERY HEADLINE FAILS")
 allfail = run([POISON] * 3)

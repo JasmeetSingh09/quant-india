@@ -366,8 +366,11 @@ def run_sent(arts, labels):
     _news.get_stock_news = lambda ticker, days_back=14: arts
     # A label of "ERROR" models a failed inference exactly as sentiment.score_headline
     # reports one: neutral, confidence 0, and an "error" key.
-    _sent.score_headline = lambda t: ({"label": "neutral", "confidence": 0.0, "error": "inference failed"}
-                                      if labels[t][0] == "ERROR"
+    # "ERROR_EMPTY" is the same with an empty message, as str(e) gives for an
+    # exception raised without one.
+    _sent.score_headline = lambda t: ({"label": "neutral", "confidence": 0.0,
+                                       "error": "" if labels[t][0] == "ERROR_EMPTY" else "inference failed"}
+                                      if labels[t][0] in ("ERROR", "ERROR_EMPTY")
                                       else {"label": labels[t][0], "confidence": labels[t][1]})
     return A._compute_sentiment_factor("X.NS")
 
@@ -462,6 +465,18 @@ act = run_sent([{"title": "a", "published_at": iso(1)}, {"title": "x", "publishe
                 {"title": None, "published_at": iso(1)}], labels_fail)
 check("S15", "untitled and failed headlines are counted separately",
       act.get("untitled_articles_skipped") == 1 and act.get("inference_failures") == 1 and act["n_articles"] == 1)
+labels_fail["e"] = ("ERROR_EMPTY",)
+act = run_sent([{"title": "a", "published_at": iso(1)}, {"title": "e", "published_at": iso(1)}], labels_fail)
+check("S16", "a failure whose error message is empty is still treated as a failure",
+      act.get("inference_failures") == 1 and act["n_articles"] == 1
+      and close(act["confidence"], oracle_sentiment([(1, *labels["a"])])["confidence"], 2e-4))
+act = run_sent([{"title": None, "published_at": iso(1)}, {"title": "x", "published_at": iso(1)}], labels_fail)
+check("S17", "untitled and failed with none scored: 'no scorable headlines', both counts reported",
+      act.get("reason") == "no scorable headlines" and act.get("untitled_articles_skipped") == 1
+      and act.get("inference_failures") == 1)
+act = run_sent([{"title": None, "published_at": iso(1)}], labels_fail)
+check("S18", "a refusal with no failures carries no inference_failures field",
+      "inference_failures" not in act and act.get("reason") == "no scorable headlines")
 
 
 # ===========================================================================

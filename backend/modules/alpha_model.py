@@ -295,7 +295,9 @@ def _compute_sentiment_factor(ticker: str, days_back: int = 14) -> dict:
             # confidence cap bound, diluted the score (oracle S12/S12b). Skip it
             # and count it; a genuine neutral prediction carries no "error" and
             # is counted as before (docs/SPEC_SENTIMENT_FAILURE_POLICY_2026-10-14.md).
-            if s.get("error"):
+            # The KEY is the signal, not its text: score_headline stores
+            # str(e), which is "" for an exception raised without a message.
+            if "error" in s:
                 failed += 1
                 continue
             label = s["label"]
@@ -321,11 +323,15 @@ def _compute_sentiment_factor(ticker: str, days_back: int = 14) -> dict:
         if not weights:
             # Headlines were fetched but none could be scored by the model:
             # sentiment is unavailable, not neutral.
+            # Every fetched headline failed inference -> "sentiment inference
+            # failed". If any were untitled, nothing about the model can be
+            # concluded, so the reason stays "no scorable headlines"; both
+            # counts are reported either way.
             reason = ("sentiment inference failed" if failed and not untitled
                       else "no scorable headlines")
             return {"score": 0.0, "confidence": 0.0, "reason": reason,
                     "n_articles": 0, "untitled_articles_skipped": untitled,
-                    "inference_failures": failed}
+                    **({"inference_failures": failed} if failed else {})}
 
         weighted_avg = sum(weighted_scores) / sum(weights)
         # Confidence = total weight normalised by max possible weight
