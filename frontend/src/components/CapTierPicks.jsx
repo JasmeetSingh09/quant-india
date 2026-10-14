@@ -69,6 +69,17 @@ function PickCard({ r, buy, onOpen }) {
       </div>
       <div className="space-y-1">
         {FACTORS.map(([k, label]) => {
+          // Unmeasured, not zero: the stored 0 is a placeholder the composite weighted.
+          if (r.not_measured?.includes(k)) {
+            return (
+              <div key={k} className="flex items-center gap-2 text-[10px]"
+                   title="Not measured for this stock (for example, too little price history). It adds nothing to the score.">
+                <span className="w-14 text-gray-500 shrink-0">{label}</span>
+                <div className="flex-1 h-1 bg-gray-800/50 rounded-full" />
+                <span className="w-8 text-right text-gray-600 shrink-0">n/a</span>
+              </div>
+            )
+          }
           const v = r.contributions?.[k] ?? 0
           const pos = v >= 0
           const max = FACTOR_MAX[k] || 25

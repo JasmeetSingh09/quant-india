@@ -771,6 +771,25 @@ def top_by_tier(n: int = 10, min_confidence: float = 0.3) -> dict:
         "FROM alpha_scan2 WHERE alpha_score IS NOT NULL AND error IS NULL "
         "  AND cycle = ?", (serve_cycle,)
     ).fetchall()
+    # Which factors could not be measured. alpha_scan2 stores a refusal as the
+    # neutral 0.0 the composite weighted; factor_history stores it as NULL. The
+    # cards printed "+0" for 172 unmeasured momentum scores on 2026-10-14, which
+    # reads as a measurement. Display only: no score or ranking reads this.
+    not_measured = {}
+    try:
+        for t, m, q, v, s in conn.execute(
+                "SELECT ticker, momentum, quality, value, sentiment FROM factor_history "
+                "WHERE model = 'v1' AND cycle_id = ?", (serve_cycle,)).fetchall():
+            nm = [k for k, x in (("momentum", m), ("quality", q), ("value", v),
+                                 ("sentiment", s)) if x is None]
+            if nm:
+                not_measured[t] = nm
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        not_measured = {}
     conn.close()
 
     # Contributions are returned in POINTS (weight x factor score x 100), not as
@@ -788,6 +807,7 @@ def top_by_tier(n: int = 10, min_confidence: float = 0.3) -> dict:
                           "quality":  _pts("quality",  r[6]),
                           "value":    _pts("value",    r[7]),
                           "sentiment": _pts("sentiment", r[8])},
+        "not_measured": not_measured.get(r[0], []),
         "scanned_at": r[9],
     } for r in rows if (r[3] or 0) >= min_confidence]
 

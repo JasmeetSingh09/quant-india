@@ -23,6 +23,7 @@ import StatCard from '../components/StatCard'
 import StockAnalysis from '../components/StockAnalysis'
 import { Search, TrendingUp, TrendingDown, ArrowLeft, ExternalLink, Filter, LayoutList, LayoutGrid } from 'lucide-react'
 import { InfoTip } from '../components/Term'
+import { isRefused } from '../factorRefusal'
 import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -856,7 +857,21 @@ function StockDetail({ ticker, onBack }) {
                     <SignalTrackRecord signal={alpha.signal} />
                   </ErrorBoundary>
                   <div className="mt-5 space-y-3">
-                    {Object.entries(alpha.contributions || {}).map(([factor, contrib]) => (
+                    {Object.entries(alpha.contributions || {}).map(([factor, contrib]) => isRefused(alpha.factors?.[factor]) ? (
+                      // Not measured is not zero: say so, and why, instead of "0.0 pts".
+                      <div key={factor}>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-gray-400 capitalize">
+                            {factor}<InfoTip k={factor} />
+                          </span>
+                          <span className="text-gray-500">not measured</span>
+                        </div>
+                        <div className="h-1 bg-gray-800/50 rounded-full" />
+                        <p className="text-xs text-gray-600 mt-0.5">
+                          {alpha.factors[factor].reason}. Adds nothing to the score.
+                        </p>
+                      </div>
+                    ) : (
                       <div key={factor}>
                         <div className="flex justify-between text-xs mb-1">
                           <span className="text-gray-400 capitalize">

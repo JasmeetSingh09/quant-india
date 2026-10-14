@@ -3,6 +3,7 @@ import { getAlphaScore, getSignalHistory, getPredictionTrack } from '../api'
 import Spinner from './Spinner'
 import { EvidenceBadge } from './Evidence'
 import { signalLabel } from '../signalLabel'
+import { isRefused } from '../factorRefusal'
 
 /**
  * WhySignal — everything behind a BUY or SELL badge, on one screen.
@@ -53,10 +54,12 @@ export default function WhySignal({ ticker }) {
   if (!alpha || alpha.error) return null
 
   const contrib = alpha.contributions || {}
+  // A factor the model could not measure sorts last and is never "the driver".
+  const refused = k => isRefused(alpha.factors?.[k])
   const entries = Object.entries(contrib)
     .filter(([, v]) => v != null)
-    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
-  const driver = entries[0]
+    .sort((a, b) => (refused(a[0]) - refused(b[0])) || (Math.abs(b[1]) - Math.abs(a[1])))
+  const driver = entries.find(([k]) => !refused(k))
   const buy = (alpha.alpha_score ?? 0) > 0
   const horizon = alpha.horizon_days ?? 21
 
@@ -135,6 +138,16 @@ export default function WhySignal({ ticker }) {
         <div className="space-y-1.5">
           {entries.map(([k, v]) => {
             const max = FACTOR_MAX[k] || 25
+            if (refused(k)) {
+              return (
+                <div key={k} className="flex items-center gap-2 text-xs">
+                  <span className="w-20 shrink-0 text-gray-500">{FACTOR_LABEL[k] || k}</span>
+                  <span className="flex-1 text-[11px] text-gray-500 italic">
+                    Not measured: {alpha.factors[k].reason}. Adds nothing to the score.
+                  </span>
+                </div>
+              )
+            }
             const w = Math.min(Math.abs(v) / max * 100, 100)
             const up = v >= 0
             return (
