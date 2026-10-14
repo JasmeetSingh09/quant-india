@@ -387,6 +387,16 @@ def _compute_momentum_factor(ticker: str, peers: list = None) -> dict:
             df = yf.download(ticker, start=start, end=end, progress=False,
                              auto_adjust=True, threads=True, timeout=15)
             s = df["Close"].squeeze().dropna()
+            # Chronological, one close per date, before any window is cut.
+            # Yahoo returns that already, so a normal series is unchanged; an
+            # out-of-order or repeated row would otherwise move the 252/21-day
+            # window onto the wrong dates (audit D-08, owner-approved
+            # 2026-10-14). Rule for a repeated date: a stable sort keeps the
+            # provider's order within the date, and the LAST row it returned
+            # for that date is kept. Nothing is averaged or invented.
+            if hasattr(s, "index") and len(s):
+                s = s.sort_index(kind="mergesort")
+                s = s[~s.index.duplicated(keep="last")]
         except Exception:
             s = None
 
