@@ -260,6 +260,7 @@ def _compute_sentiment_factor(ticker: str, days_back: int = 14) -> dict:
         weights         = []
         undated         = 0
         untitled        = 0
+        failed          = 0
         # The exact article set this score was built from. Appended to, never
         # read by the calculation — a sentiment score whose headlines are gone
         # cannot be checked or explained afterwards, and the headlines cannot
@@ -288,6 +289,15 @@ def _compute_sentiment_factor(ticker: str, days_back: int = 14) -> dict:
             w = np.exp(-lam * age_days)
 
             s = score_headline(title)
+            # An inference failure is not a neutral headline. score_headline
+            # reports it as neutral at confidence 0 with an "error" key; counted
+            # as a zero signal at full weight it inflated coverage and, once the
+            # confidence cap bound, diluted the score (oracle S12/S12b). Skip it
+            # and count it; a genuine neutral prediction carries no "error" and
+            # is counted as before (docs/SPEC_SENTIMENT_FAILURE_POLICY_2026-10-14.md).
+            if s.get("error"):
+                failed += 1
+                continue
             label = s["label"]
             conf  = s["confidence"]
 
@@ -309,8 +319,13 @@ def _compute_sentiment_factor(ticker: str, days_back: int = 14) -> dict:
             weights.append(w)
 
         if not weights:
-            return {"score": 0.0, "confidence": 0.0, "reason": "no scorable headlines",
-                    "n_articles": 0, "untitled_articles_skipped": untitled}
+            # Headlines were fetched but none could be scored by the model:
+            # sentiment is unavailable, not neutral.
+            reason = ("sentiment inference failed" if failed and not untitled
+                      else "no scorable headlines")
+            return {"score": 0.0, "confidence": 0.0, "reason": reason,
+                    "n_articles": 0, "untitled_articles_skipped": untitled,
+                    "inference_failures": failed}
 
         weighted_avg = sum(weighted_scores) / sum(weights)
         # Confidence = total weight normalised by max possible weight
@@ -336,6 +351,7 @@ def _compute_sentiment_factor(ticker: str, days_back: int = 14) -> dict:
             # Present only when a headline was skipped, so a normal result
             # keeps exactly the fields it had.
             **({"untitled_articles_skipped": untitled} if untitled else {}),
+            **({"inference_failures": failed} if failed else {}),
             # Provenance, not an input: the calculation above is already
             # finished. Stored so a sentiment score can be explained by
             # the headlines that produced it, which the news feed will

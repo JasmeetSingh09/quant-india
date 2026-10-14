@@ -339,8 +339,9 @@ def current_spec() -> dict:
                 "max_chars": mc.FINBERT_MAX_CHARS, "task": "text-classification",
                 "top_k": None, "label_rule": "argmax of the three class probabilities",
                 "confidence": "probability of the chosen label, rounded to 4",
-                "failure_policy": ("current: inference error -> neutral at confidence 0, "
-                                   "still weighted by recency (policy change pending owner)")}
+                "failure_policy": ("inference error -> headline skipped and counted "
+                                   "(inference_failures); all fail -> refused, reason "
+                                   "'sentiment inference failed'; genuine neutral unchanged")}
     _cap(spec, "sentiment_model", _sentiment_model)
 
     # The sector map that picks every valuation peer (data_fetcher.NSE_SECTORS
