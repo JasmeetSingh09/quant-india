@@ -380,3 +380,76 @@ checks S12 and S12b pin its exact effect. The sentiment score is
 - the `peer_basis` wording points (4);
 - adopting the FinBERT failure policy (8.4);
 - the FinBERT licence question (8.3).
+
+## 10. Round 5 (2026-10-14): licence facts, production's stack, failure policy, labels
+
+### 10.1 FinBERT licence: facts only, no conclusion
+
+**At the pinned revision `4556d130`:**
+- The repository holds `README.md`, `config.json`, the PyTorch, Flax and TF weight files, and the
+  tokenizer files.
+- It has **no LICENSE file**, and the model card has **no `license` field and no licence text**.
+- The card states the model was fine-tuned on Financial PhraseBank (Malo et al., 2014).
+
+**At upstream `main` (2026-10-12):**
+- The model card declares `license: cc-by-nc-sa-4.0`, with "Copyright © MIH AI B.V.".
+- It states that the licence "restricts commercial use", that adaptations must be shared alike, and
+  that Prosus makes no representation that any use is permitted.
+- It notes Financial PhraseBank as CC BY-NC-SA 3.0.
+
+**The GitHub code repository `ProsusAI/finBERT`:**
+- It is still Apache-2.0; its LICENSE file has been unchanged since 2019-10-30.
+- On 2026-10-12 it merged PR #77, `license-remediation-2026-10-09`, which adds a README notice that
+  the Apache-2.0 licence covers **only the training code and not the pre-trained weights**, and
+  points to the Hugging Face card for the weights' terms.
+
+**What this does not settle:**
+- whether the 2026-10-12 terms apply to weights obtained from the 2023 revision;
+- whether Quant India's use is non-commercial;
+- what follows from the training data's own licence.
+
+These are for the owner and legal advice. The pin is a reproducibility safeguard, not a licence.
+The newer revision is not introduced.
+
+### 10.2 Production's inference stack, from the Render build log of 2026-10-06 (`cf9e3be`)
+
+| Package | Production | Local baseline |
+|---|---|---|
+| torch | **2.14.1+cpu** | 2.12.1 |
+| transformers | **5.18.0** | 5.12.1 |
+| tokenizers | **0.23.2** | 0.22.2 |
+| huggingface-hub | 1.33.0 | — |
+| safetensors | 0.8.0 | — |
+
+The FinBERT pre-download ran at 08:13 UTC on 2026-10-06, before the upstream change. That confirms
+production runs `4556d130`.
+
+**The controlled pin, prepared but not applied:**
+- **What it would add:** `torch==2.14.1` (CPU index) in the Dockerfile; `transformers==5.18.0`,
+  `tokenizers==0.23.2` and `huggingface-hub==1.33.0` in requirements.
+- **What has to happen first:** the FinBERT baseline must be re-run under exactly those versions and
+  compared output by output with the recorded baseline (local 5.12.1 / 2.12.1).
+- **The download:** that comparison needs those versions installed in a scratch environment, about
+  200 MB for torch from download.pytorch.org, plus transformers and tokenizers from PyPI. It waits
+  for the owner's approval of the download.
+
+### 10.3 Sentiment failure policy
+
+- **Specification:** `SPEC_SENTIMENT_FAILURE_POLICY_2026-10-14.md`, written before the code.
+- **Implementation:** branch `sentiment-failure-policy` (one commit, unmerged).
+- **Tests:** oracle S12, S12b and S13–S15; real-FinBERT failure injection 9/9
+  (`research/finbert_failure_injection.py`); CI 69/69; snapshots 339/339.
+- **Open:** the version decision and the merge.
+
+### 10.4 `peer_basis`
+
+`SPEC_PEER_BASIS_DISPLAY_2026-10-14.md` revision 2 carries the owner's five labels, with market
+average per measure. No open points; not implemented.
+
+### 10.5 Factor evidence
+
+`FACTOR_EVIDENCE_VERDICTS_2026-10-14.md`:
+- momentum demonstrated (35% of the score);
+- value, quality and sentiment's predictive power not established (65%);
+- the composite untested.
+
