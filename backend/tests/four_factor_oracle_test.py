@@ -430,6 +430,32 @@ check("S11c", "only untitled headlines: refused as 'no scorable headlines', not 
 act = run_sent([{"title": "a", "published_at": iso(1)}], labels)
 check("S11d", "a normal result gains no new field", "untitled_articles_skipped" not in act)
 
+# FinBERT inference failure: CURRENT policy, pinned so any change is deliberate.
+# sentiment.score_headline turns an exception into neutral at confidence 0, and
+# the headline still enters with full recency weight. Because the score is
+# (weighted mean) x min(1, sum of weights / 7), an added zero-signal headline
+# cancels out while the cap does not bind: the score is unchanged but the
+# reported confidence (data coverage) rises. Once the cap binds (many recent
+# headlines) it dilutes the score. Both effects are pinned. The owner asked
+# (2026-10-14) for an explicit policy instead; it is specified in
+# docs/PEER_METHODOLOGY_DECISION_2026-10-14.md, not made here.
+labels_fail = dict(labels, x=("neutral", 0.0))
+two = [{"title": "a", "published_at": iso(1)}, {"title": "x", "published_at": iso(1)}]
+act = run_sent(two, labels_fail)
+exp_with = oracle_sentiment([(1, *labels["a"]), (1, "neutral", 0.0)])
+exp_skip = oracle_sentiment([(1, *labels["a"])])
+check("S12", "failure, cap not binding: score unchanged, reported confidence inflated",
+      close(act["score"], exp_skip["score"], 2e-4) and close(act["confidence"], exp_with["confidence"], 2e-4)
+      and act["confidence"] > exp_skip["confidence"] + 0.05,
+      f"score {act['score']} (if skipped {exp_skip['score']}), confidence {act['confidence']} vs {exp_skip['confidence']}")
+many_pos = [{"title": "a", "published_at": iso(0)}] * 8
+act = run_sent(many_pos + [{"title": "x", "published_at": iso(0)}] * 4, labels_fail)
+exp_with = oracle_sentiment([(0, *labels["a"])] * 8 + [(0, "neutral", 0.0)] * 4)
+exp_skip = oracle_sentiment([(0, *labels["a"])] * 8)
+check("S12b", "failure, cap binding: the failed headlines dilute the score",
+      close(act["score"], exp_with["score"], 2e-4) and act["score"] < exp_skip["score"] - 0.05,
+      f"score {act['score']} with 4 failures vs {exp_skip['score']} if skipped")
+
 
 # ===========================================================================
 section("3. QUALITY — Piotroski/9, ROE z/3, FCF-yield z/3, distress penalties")
@@ -532,6 +558,30 @@ check("V13", "a one-leg, distressed score says so in its interpretation (score i
       f"score {act['score']}: '{act.get('interpretation')}'", defect="D-04")
 act = run_v(None, None, [(25, 4.0)])
 check("V14", "refusal carries a reason", act.get("reason") == "no valuation data")
+
+# Missing own measure (owner decision 2026-10-14: keep the weight, do not
+# renormalise). The rule, written independently: a missing measure contributes
+# nothing and its 0.6 / 0.4 weight is NOT redistributed.
+peers3 = [(25, 4.0), (30, 5.0), (20, 3.0)]
+pb_mu, pb_sd = statistics.fmean([4.0, 5.0, 3.0]), max(statistics.pstdev([4.0, 5.0, 3.0]), 0.5)
+missing = run_v(None, 2.0, peers3)
+check("V15", "missing P/E contributes nothing and keeps its weight: tanh((-0.4 z_PB)/2)",
+      close(missing["score"], round(math.tanh((-0.4 * (2.0 - pb_mu) / pb_sd) / 2), 4), 1e-4),
+      f"{missing['score']}")
+check("V15b", "the weight is not renormalised onto P/B",
+      not close(missing["score"], round(math.tanh((-(2.0 - pb_mu) / pb_sd) / 2), 4), 1e-3))
+pe_mu = statistics.fmean([25, 30, 20])
+measured_zero = run_v(pe_mu, 2.0, peers3)          # P/E present, exactly at the peer mean: z = 0
+check("V16", "a measured z of 0 and a missing P/E give the same score (both contribute 0)",
+      close(measured_zero["score"], missing["score"], 1e-9))
+check("V16b", "...but are told apart: legs used, 'valued on' and halved confidence",
+      measured_zero["legs_used"] == 2 and missing["legs_used"] == 1
+      and measured_zero["valued_on"] == "P/E and P/B" and missing["valued_on"] == "P/B only"
+      and close(missing["confidence"], measured_zero["confidence"] * 0.5, 1e-9),
+      f"legs {measured_zero['legs_used']}/{missing['legs_used']}, conf {measured_zero['confidence']}/{missing['confidence']}")
+check("V16c", "known reporting gap pinned: a MISSING P/E still reports pe_z_score 0.0 "
+      "(the peer_basis change is to report it as not measured)",
+      missing.get("pe_z_score") == 0.0 and missing.get("pe_ratio") is None)
 
 
 # ===========================================================================
