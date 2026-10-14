@@ -1,9 +1,9 @@
 {
  "suite": "four_factor_oracle_test",
- "generated_utc": "2026-10-14T10:44:59",
+ "generated_utc": "2026-10-14T13:46:26",
  "synthetic_inputs": true,
- "passed": 181,
- "failed": 7,
+ "passed": 191,
+ "failed": 3,
  "checks": [
   {
    "id": "M01",
@@ -248,25 +248,49 @@
   {
    "id": "M17",
    "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
-   "name": "out-of-order rows give the sorted answer (no defensive sort)",
-   "status": "FAIL",
-   "detail": "-0.0588 vs sorted 0.8555",
+   "name": "out-of-order rows give the sorted answer",
+   "status": "PASS",
+   "detail": "0.8555 vs sorted 0.8555",
    "defect": "D-08"
   },
   {
    "id": "M18",
    "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
    "name": "duplicated dates are not double counted",
-   "status": "FAIL",
-   "detail": "0.8236 vs 0.8555",
+   "status": "PASS",
+   "detail": "0.8555 vs 0.8555",
    "defect": "D-08"
+  },
+  {
+   "id": "M18b",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "a repeated date keeps the last row the provider returned (no averaging)",
+   "status": "PASS",
+   "detail": "0.2172 vs last-row oracle 0.2172",
+   "defect": "D-08"
+  },
+  {
+   "id": "M18c",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "the repeated-date result is deterministic",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
   },
   {
    "id": "M19",
    "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
-   "name": "PIT backtest momentum equals live momentum (docstring: 'identical arithmetic')",
-   "status": "FAIL",
-   "detail": "pit 0.978859 vs live 0.978700 (pit uses population std, live sample std)",
+   "name": "PIT momentum = live window and tanh with population std (documented difference)",
+   "status": "PASS",
+   "detail": "pit 0.978859034, population-std oracle 0.978859034, live (sample std) 0.978700",
+   "defect": "D-07"
+  },
+  {
+   "id": "M19b",
+   "section": "1. MOMENTUM \u2014 12-1 return / annualised volatility, tanh(x/1.5)",
+   "name": "its docstring states the std difference instead of claiming identical arithmetic",
+   "status": "PASS",
+   "detail": "",
    "defect": "D-07"
   },
   {
@@ -361,9 +385,33 @@
    "id": "S11",
    "section": "2. SENTIMENT \u2014 decay-weighted FinBERT, shrunk by confidence",
    "name": "one malformed article (no title) does not discard the others",
-   "status": "FAIL",
-   "detail": "'title'",
+   "status": "PASS",
+   "detail": "None",
    "defect": "D-09"
+  },
+  {
+   "id": "S11b",
+   "section": "2. SENTIMENT \u2014 decay-weighted FinBERT, shrunk by confidence",
+   "name": "the score is exactly the valid headline's, and the skip is counted",
+   "status": "PASS",
+   "detail": "0.102 vs 0.102",
+   "defect": "D-09"
+  },
+  {
+   "id": "S11c",
+   "section": "2. SENTIMENT \u2014 decay-weighted FinBERT, shrunk by confidence",
+   "name": "only untitled headlines: refused as 'no scorable headlines', not 'no news found'",
+   "status": "PASS",
+   "detail": "no scorable headlines",
+   "defect": "D-09"
+  },
+  {
+   "id": "S11d",
+   "section": "2. SENTIMENT \u2014 decay-weighted FinBERT, shrunk by confidence",
+   "name": "a normal result gains no new field",
+   "status": "PASS",
+   "detail": "",
+   "defect": null
   },
   {
    "id": "Q01",

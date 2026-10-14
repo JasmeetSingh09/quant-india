@@ -228,7 +228,23 @@ ranking or contribution changed.
 | D-11 | `e117f0f` | local build against the live API shows 2,462 |
 | D-10, D-12 | `cf7f32e` | `behavioural_fixtures` reports 339 cases identical; `version_provenance_audit` reports 102/102 captured |
 
-**After the fixes:**
+**Second round, the same day** (owner: "fix the three defensive bugs, correct M19 … draft the
+sector-map proposal"):
+
+| Defect | Commit | Change | Evidence |
+|---|---|---|---|
+| D-08 | `04a5f1c` | Momentum sorts closes by date; for a repeated date it keeps the last provider row (no averaging) | oracle M17, M18, M18b and M18c pass, and fail on the prior code |
+| D-09 | `6e07521` | Sentiment skips a headline without a title and counts it; "no news found" unchanged | S11–S11d pass and fail on the prior code; never occurred in production (all 2,410 refusals since 2026-09-04 are "no news found") |
+| D-07 | `7b013ba` | Docstring corrected only; the calculation is unchanged | M19 pins the population-std behaviour exactly; M19b checks the text |
+| D-01 | — | Proposal drafted, not implemented: `docs/PROPOSAL_V161_SECTOR_MAP_2026-10-14.md` | 12 stocks and 2 labels would change, reproduced from stored inputs |
+
+**Gates for the second round:**
+- 339/339 behavioural snapshots identical.
+- `run_ci` 67/67.
+- Oracle suite 191 pass, 3 fail. All 3 are D-01, which waits for the proposal decision.
+- These commits are local and not pushed. Deploying is a separate, explicitly authorised step.
+
+**After the first round of fixes:**
 - Oracle suite: 181 pass, 7 fail. The remaining failures are D-01, D-07, D-08 and D-09, which are
   still open by decision.
 - `run_ci.py`: 67/67.

@@ -189,7 +189,7 @@
    "severity": "P1",
    "title": "Sector map gives wrong value peers",
    "score_changing_fix": true,
-   "status": "open"
+   "status": "proposal drafted: docs/PROPOSAL_V161_SECTOR_MAP_2026-10-14.md; not implemented"
   },
   {
    "id": "D-02",
@@ -231,21 +231,21 @@
    "severity": "P3",
    "title": "Backtest momentum uses population std, live uses sample std",
    "score_changing_fix": "research only",
-   "status": "open"
+   "status": "fixed 7b013ba (docstring only; calculation unchanged by owner decision)"
   },
   {
    "id": "D-08",
    "severity": "P3",
    "title": "Momentum assumes sorted, unique dates",
    "score_changing_fix": false,
-   "status": "open"
+   "status": "fixed 04a5f1c"
   },
   {
    "id": "D-09",
    "severity": "P3",
    "title": "One headline without a title voids the sentiment factor",
    "score_changing_fix": "only on malformed input",
-   "status": "open"
+   "status": "fixed 6e07521"
   },
   {
    "id": "D-10",
@@ -275,5 +275,25 @@
   "Provider-side completeness (records Yahoo/news actually hold vs received): no independent source for Yahoo's side",
   "Database concurrency, locking and outage injection against Postgres: not run; production must not be used and no isolated Postgres exists",
   "Two network-bound legacy suites stopped at the 400 s cap"
- ]
+ ],
+ "second_round": {
+  "commits": [
+   "04a5f1c",
+   "6e07521",
+   "7b013ba"
+  ],
+  "behavioural_snapshots": "339/339 identical",
+  "run_ci": "67/67",
+  "oracle": {
+   "passed": 191,
+   "failed": 3,
+   "failing": [
+    "U02",
+    "U03",
+    "U04"
+   ],
+   "defect": "D-01"
+  },
+  "pushed": false
+ }
 }
