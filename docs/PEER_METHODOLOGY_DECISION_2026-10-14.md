@@ -453,3 +453,43 @@ average per measure. No open points; not implemented.
 - value, quality and sentiment's predictive power not established (65%);
 - the composite untested.
 
+## 11. Round 6 (2026-10-15): production-matched FinBERT comparison
+
+**Owner decisions:**
+- **Licence:** escalated for legal review. The absence of a declaration at `4556d130` is not proof
+  that the weights are unrestricted; the pin stays and the newer weights stay out.
+- **Download:** production-matched libraries approved for a local comparison only.
+- **Failure policy:** approved as a separate change under the working identifier
+  `sentiment-failure-policy`, with no final model version yet.
+- **Release:** no push, merge into production, or deploy.
+
+**Comparison** (`docs/audit/finbert_prodmatch_comparison_2026-10-15.json`):
+- **Environment:** an isolated scratch venv with torch 2.14.1+cpu, transformers 5.18.0,
+  tokenizers 0.23.2, huggingface-hub 1.33.0 and safetensors 0.8.0, exactly production's (from the
+  2026-10-06 build log).
+- **Model:** revision `4556d130`, read from the local cache with the hub offline, run with
+  `python -I`.
+- **Recorded:** the full 35-package environment.
+
+| Case group | Result against the 2026-10-14 baseline (transformers 5.12.1 / torch 2.12.1) |
+|---|---|
+| Valid: positive, negative, neutral, mixed | identical label and confidence to 4 places |
+| Neutral extras: board meeting, AGM, listing | identical in both environments (0.9408, 0.9418, 0.9525) |
+| Malformed: Hindi, more than 512 characters, empty string | identical |
+| Failed inference: `None`, an integer | both raise `ValueError` in both environments, so the same failure path |
+| Largest raw probability difference | 4.8 × 10⁻⁷, below the 4-decimal rounding the app stores |
+
+**Known mismatches:** Python 3.13.3 here against 3.12.15 in production, because 3.12 is not
+installed and installing it was not part of the approval; and numpy 2.5.4 against 1.26.4, because
+1.26.4 has no build for Python 3.13.
+
+**Conclusion, within those limits:** pinning the libraries at production's versions would not
+change these outputs.
+
+**The pin, prepared, not committed:**
+- Dockerfile: `pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu`.
+- requirements: `transformers==5.18.0`, `tokenizers==0.23.2`, `huggingface-hub==1.33.0` and
+  `safetensors==0.8.0`.
+- It is not applied: the approval covered the comparison, not a dependency change, and committed to
+  `main` it would ship with the next deploy.
+

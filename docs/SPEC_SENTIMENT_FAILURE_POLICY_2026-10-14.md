@@ -73,3 +73,39 @@ This changes sentiment behaviour, though only on failure:
   apart. Bumping it mid-cycle makes the scan treat the cycle as new, so deploy outside the scan window.
 
 Neither bump is made on the branch. Both are the owner's decision, alongside merging.
+
+## 6. Pre-merge review (2026-10-15)
+
+**Working identifier:** `sentiment-failure-policy` (owner, 2026-10-15). No final model version is
+assigned, because the peer methodology may also need one and the release sequence is not settled.
+
+**Evidence for the review:**
+
+| Evidence | Result |
+|---|---|
+| Stub failure injection: oracle S12, S12b and S13–S15 | pass; no dilution, no inflated coverage, all-fail refusal, genuine neutral kept, separate counts |
+| Real pinned FinBERT failure injection (`research/finbert_failure_injection.py`) | 9/9 under local libraries |
+| Production-matched libraries (`finbert_prodmatch_comparison_2026-10-15.json`) | the inference error path behaves the same: non-string input raises `ValueError`, so `score_headline` reports an error, the one library-dependent input the policy reads; valid outputs identical |
+| CI, behavioural snapshots, provenance audit, on the branch | 69/69, 339/339, 106/106 |
+
+**Expected score and coverage impact:**
+- **When no headline fails:** none. This is the only case observed so far: 0 failure signatures in
+  1,005,320 stored scorings.
+- **When some fail:**
+  - **Sentiment coverage** falls to what the scored headlines support: by w ÷ 7 per failed headline
+    while Σw < 7.
+  - **Sentiment score:** unchanged while the cap does not bind; once it binds, it returns to the
+    undiluted value. In S12b, 0.6 becomes 0.9.
+  - **Composite:** alpha moves by 25 × Δsentiment, and coverage by 0.25 × Δsentiment coverage.
+- **When all fail:** a refusal instead of 0 at positive confidence. Alpha is unchanged; coverage
+  falls; history stores NULL.
+- **Stored history:** untouched. The policy applies only to scores computed after it is adopted.
+
+**Review limits:**
+- The real-model injection ran under local libraries. It needs the app's other dependencies, and
+  those were not part of the approved download.
+- About 53% of stocks have no stored headlines (D-02), so the prevalence of failures is known only
+  for the stored half.
+
+**Merge:** awaiting the owner's review of this section. A local merge would not push or deploy.
+

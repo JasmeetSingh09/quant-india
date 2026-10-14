@@ -1,0 +1,161 @@
+{
+ "environment": {
+  "python": "3.13.3",
+  "torch": "2.14.1+cpu",
+  "transformers": "5.18.0",
+  "tokenizers": "0.23.2",
+  "huggingface_hub": "1.33.0",
+  "safetensors": "0.8.0",
+  "numpy": "2.5.4",
+  "revision": "4556d13015211d73dccd3fdd39d39232506f3e43",
+  "threads": 1,
+  "device": "cpu"
+ },
+ "compared_with": {
+  "transformers": "5.12.1",
+  "torch": "2.12.1"
+ },
+ "cases": {
+  "valid_positive": {
+   "label": "positive",
+   "confidence": 0.9047,
+   "baseline_label": "positive",
+   "baseline_confidence": 0.9047,
+   "max_abs_prob_diff": 1.25019073538013e-07,
+   "same_label": true,
+   "same_rounded_confidence": true
+  },
+  "valid_negative": {
+   "label": "negative",
+   "confidence": 0.9684,
+   "baseline_label": "negative",
+   "baseline_confidence": 0.9684,
+   "max_abs_prob_diff": 2.984849214564267e-07,
+   "same_label": true,
+   "same_rounded_confidence": true
+  },
+  "valid_neutral": {
+   "label": "neutral",
+   "confidence": 0.9431,
+   "baseline_label": "neutral",
+   "baseline_confidence": 0.9431,
+   "max_abs_prob_diff": 4.573304653171517e-07,
+   "same_label": true,
+   "same_rounded_confidence": true
+  },
+  "valid_mixed": {
+   "label": "negative",
+   "confidence": 0.972,
+   "baseline_label": "negative",
+   "baseline_confidence": 0.972,
+   "max_abs_prob_diff": 3.9999204873991667e-07,
+   "same_label": true,
+   "same_rounded_confidence": true
+  },
+  "unicode_hindi": {
+   "label": "neutral",
+   "confidence": 0.9151,
+   "baseline_label": "neutral",
+   "baseline_confidence": 0.9151,
+   "max_abs_prob_diff": 4.845747947693213e-07,
+   "same_label": true,
+   "same_rounded_confidence": true
+  },
+  "long_over_512_chars": {
+   "label": "neutral",
+   "confidence": 0.9388,
+   "baseline_label": "neutral",
+   "baseline_confidence": 0.9388,
+   "max_abs_prob_diff": 4.4670128822310584e-07,
+   "same_label": true,
+   "same_rounded_confidence": true
+  },
+  "empty_string": {
+   "label": "neutral",
+   "confidence": 0.4242,
+   "baseline_label": "neutral",
+   "baseline_confidence": 0.4242,
+   "max_abs_prob_diff": 3.4390640257786487e-07,
+   "same_label": true,
+   "same_rounded_confidence": true
+  },
+  "non_string_none": {
+   "raised": true,
+   "error_type": "ValueError",
+   "baseline_raised": true
+  },
+  "non_string_int": {
+   "raised": true,
+   "error_type": "ValueError",
+   "baseline_raised": true
+  }
+ },
+ "extra_neutral": {
+  "neutral_board_meeting": {
+   "label": "neutral",
+   "confidence": 0.9408
+  },
+  "neutral_agm": {
+   "label": "neutral",
+   "confidence": 0.9418
+  },
+  "neutral_listing": {
+   "label": "neutral",
+   "confidence": 0.9525
+  }
+ },
+ "verdict": {
+  "identical_labels_and_rounded_confidence": true,
+  "max_abs_prob_diff": 4.845747947693213e-07
+ },
+ "extra_neutral_local_cross_check": {
+  "environment": {
+   "transformers": "5.12.1",
+   "torch": "2.12.1"
+  },
+  "identical": true,
+  "note": "neutral_board_meeting 0.9408, neutral_agm 0.9418, neutral_listing 0.9525 in both environments"
+ },
+ "environment_full_pip_freeze": [
+  "annotated-doc==0.0.5",
+  "anyio==4.15.1",
+  "certifi==2026.7.22",
+  "click==8.5.0",
+  "colorama==0.4.6",
+  "filelock==3.32.3",
+  "fsspec==2026.7.0",
+  "h11==0.16.0",
+  "hf-xet==1.7.0",
+  "httpcore==1.0.9",
+  "httpx==0.28.1",
+  "huggingface_hub==1.33.0",
+  "idna==3.20",
+  "Jinja2==3.1.6",
+  "markdown-it-py==4.2.0",
+  "MarkupSafe==3.0.3",
+  "mdurl==0.1.2",
+  "mpmath==1.3.0",
+  "networkx==3.6.1",
+  "numpy==2.5.4",
+  "packaging==26.3",
+  "Pygments==2.21.0",
+  "PyYAML==6.0.3",
+  "regex==2026.9.29",
+  "rich==15.0.0",
+  "safetensors==0.8.0",
+  "setuptools==78.1.0",
+  "shellingham==1.5.4",
+  "sympy==1.14.0",
+  "tokenizers==0.23.2",
+  "torch==2.14.1+cpu",
+  "tqdm==4.70.1",
+  "transformers==5.18.0",
+  "typer==0.27.3",
+  "typing_extensions==4.16.0"
+ ],
+ "known_mismatches_with_production": {
+  "python": "3.13.3 here vs 3.12.15 in production (3.12 not installed; installing it was not part of the approval)",
+  "numpy": "2.5.4 here vs 1.26.4 in production (1.26.4 has no build for Python 3.13)"
+ },
+ "method": "Isolated venv in the session scratchpad; torch from download.pytorch.org/whl/cpu, the rest from PyPI; model files from the local Hugging Face cache with HF_HUB_OFFLINE=1, revision 4556d130 throughout; script run with python -I. Compared against docs/audit/finbert_baseline_2026-10-14.json."
+}
