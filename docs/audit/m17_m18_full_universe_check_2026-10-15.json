@@ -1,0 +1,15 @@
+{
+ "started_utc": "2026-10-15T14:18:07",
+ "window": [
+  "2025-08-11",
+  "2026-10-15"
+ ],
+ "n": 2462,
+ "fetched": 2462,
+ "empty_series": [],
+ "failed": [],
+ "unsorted": [],
+ "duplicate_dates": [],
+ "affected_scores": [],
+ "finished_utc": "2026-10-15T14:38:00"
+}
