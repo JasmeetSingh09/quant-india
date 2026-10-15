@@ -44,7 +44,7 @@ from bounded_cache import BoundedCache
 
 # Bumped whenever a change alters what a score means. Stamped on every
 # result so a stored signal records which model produced it.
-MODEL_VERSION = "alpha-v5-statement-inputs"
+MODEL_VERSION = "v1.6.1-sentiment-failure-policy"
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 

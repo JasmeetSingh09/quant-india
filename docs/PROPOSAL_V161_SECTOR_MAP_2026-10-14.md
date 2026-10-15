@@ -1,4 +1,9 @@
-# Proposal v1.6.1: correct the sector map that picks valuation peers
+# Proposal v1.6.2 (was v1.6.1): correct the sector map that picks valuation peers
+
+> **Renumbered 2026-10-15: this draft is now v1.6.2.** The owner assigned v1.6.1 to the sentiment
+> failure-policy release (`docs/V161_METHODOLOGY_2026-10-15.md`). The file name and the earlier
+> references to "v1.6.1" in the 2026-10-14 audit records are left as written. Nothing in this draft
+> is approved.
 
 **Superseded for decision purposes by `docs/PEER_METHODOLOGY_DECISION_2026-10-14.md`** (owner, 2026-10-14: prioritise a universe-wide methodology over isolated sector corrections).
 That document corrects revision 2's census: 2,151 fallback stocks, not 479/440/376/226 peer-set

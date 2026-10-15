@@ -45,7 +45,7 @@ classified, and the evidence required for its class is gathered.
 |---|---|---|
 | **Scoring methodology version** | **v1.6.1:** "v1.6.0 plus the sentiment failure policy, S11, M17/M18 and the pinned FinBERT revision" | The rules that produce a score. It is frozen in `strategy_versions` at deploy, which is a production write and needs approval then |
 | **Software release identifier** | **`release-2026-10-A`**, mapped to the backend commit that is deployed | The code shipped, including the changes in section 1 that are not methodology changes: rights code (inert), provenance retry, scan de-duplication, `not_measured`, text |
-| `MODEL_VERSION` stamp (on every score; now `v1.5.0-statement-inputs`) | The owner's choice. Proposed: **`v1.6.1-sentiment-failure-policy`** | Which methodology produced a stored score |
+| `MODEL_VERSION` stamp | **Decided 2026-10-15** (see `V161_METHODOLOGY_2026-10-15.md`): `alpha_model.MODEL_VERSION` (per score, was `alpha-v5-statement-inputs`) becomes `v1.6.1-sentiment-failure-policy`. `universe_scan.MODEL_VERSION` (`v1.5.0-statement-inputs`) is **unchanged**: bumping it re-scores every stock, and no stored score is invalidated. This row first merged the two constants; that was an error | Which methodology produced a stored score |
 
 **Consequences:**
 - The draft sector-map proposal, currently titled "v1.6.1", would be renamed **v1.6.2** before it is

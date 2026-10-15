@@ -26,6 +26,13 @@ import strategy_version as SV   # noqa: E402
 PASS, FAIL = [], []
 
 
+# The spec hash includes captured_at, stamped to the minute, so two captures a
+# minute boundary apart hash differently with nothing changed (this suite failed
+# that way once, 2026-10-15). Every comparison here fixes it, so only the map counts.
+def _h(spec):
+    return SV._hash({**spec, "captured_at": "fixed for comparison"})
+
+
 def ok(cond, label, detail=""):
     (PASS if cond else FAIL).append(label)
     print(f"  [{'ok  ' if cond else 'FAIL'}] {label}" + (f"  {detail}" if detail else ""))
@@ -44,29 +51,29 @@ import alpha_model as AM  # noqa: E402
 ok(sm.get("value_peers_used") == AM.VALUE_PEERS_USED == 3, "peers compared in value (3) is captured")
 ok(sm.get("yahoo_sector_fallback") == DF.YAHOO_SECTOR_FALLBACK and len(DF.YAHOO_SECTOR_FALLBACK) == 11,
    "the Yahoo-sector fallback table is captured (11 entries)")
-base = SV._hash(spec)
+base = _h(spec)
 
 original = copy.deepcopy(DF.NSE_SECTORS)
 try:
     print("\n2. ANY EDIT MOVES THE HASH")
     DF.NSE_SECTORS["Steel_Metal"] = [t for t in original["Steel_Metal"] if t != "KALYANKJIL.NS"]
-    ok(SV._hash(SV.current_spec()) != base, "removing one member changes the hash")
+    ok(_h(SV.current_spec()) != base, "removing one member changes the hash")
     DF.NSE_SECTORS.clear(); DF.NSE_SECTORS.update(copy.deepcopy(original))
     DF.NSE_SECTORS["Infra"] = list(reversed(original["Infra"]))
-    ok(SV._hash(SV.current_spec()) != base, "reordering a sector's members changes the hash")
+    ok(_h(SV.current_spec()) != base, "reordering a sector's members changes the hash")
     DF.NSE_SECTORS.clear()
     for k in reversed(list(original)):
         DF.NSE_SECTORS[k] = list(original[k])
-    ok(SV._hash(SV.current_spec()) != base, "reordering the sectors (first match wins) changes the hash")
+    ok(_h(SV.current_spec()) != base, "reordering the sectors (first match wins) changes the hash")
     DF.NSE_SECTORS.clear(); DF.NSE_SECTORS.update(copy.deepcopy(original))
     DF.SECTOR_PEER_FETCH_LIMIT = 4
-    ok(SV._hash(SV.current_spec()) != base, "changing the peer fetch limit changes the hash")
+    ok(_h(SV.current_spec()) != base, "changing the peer fetch limit changes the hash")
     DF.SECTOR_PEER_FETCH_LIMIT = 5
     AM.VALUE_PEERS_USED = 2
-    ok(SV._hash(SV.current_spec()) != base, "changing the peers compared changes the hash")
+    ok(_h(SV.current_spec()) != base, "changing the peers compared changes the hash")
     AM.VALUE_PEERS_USED = 3
     DF.YAHOO_SECTOR_FALLBACK["Financial Services"] = "NBFC"
-    ok(SV._hash(SV.current_spec()) != base, "changing one fallback entry changes the hash")
+    ok(_h(SV.current_spec()) != base, "changing one fallback entry changes the hash")
     DF.YAHOO_SECTOR_FALLBACK["Financial Services"] = "Banking"
 finally:
     DF.NSE_SECTORS.clear(); DF.NSE_SECTORS.update(original)
@@ -83,7 +90,7 @@ ok(DF.get_sector_peers("NOTMAPPED.NS") == ["HDFCBANK.NS", "ICICIBANK.NS", "SBIN.
 DF.get_info = _gi
 
 print("\n3. RESTORED, THE HASH RETURNS")
-ok(SV._hash(SV.current_spec()) == base, "the unchanged map gives the same hash")
+ok(_h(SV.current_spec()) == base, "the unchanged map gives the same hash")
 
 print("\n" + "=" * 60)
 print(f"passed {len(PASS)}, failed {len(FAIL)}")
