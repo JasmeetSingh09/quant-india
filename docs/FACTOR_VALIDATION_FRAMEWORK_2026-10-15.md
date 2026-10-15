@@ -105,20 +105,25 @@ test before that is measured would test the matcher, not sentiment.
 
 ## 4. Recommendation per factor (order of work)
 
-1. **Momentum: run the net-of-costs test** once the owner approves the draft pre-registration.
+1. **Momentum: run the net-of-costs test** once the owner approves the draft pre-registration
+   (revision 2). The owner chose a local, read-only run (mode L), with no deployment.
    - It is the only factor whose data supports a full point-in-time test, and it carries 35% of the
      score.
    - The honest expectation is stated in the draft: the 2011–2026 answer is largely predictable from
      results already seen. The new information is:
-     - the break-even cost;
+     - the break-even cost multiple;
+     - both portfolios charged at one cost schedule;
      - drift-aware turnover;
      - the liquid-only result.
-2. **Momentum, independent evidence.** This is blocked on an owner decision, because no new prices
-   are being stored. The last archive day is still 2026-09-07 (checked 2026-10-15). The options:
-   - resume NSE end-of-day collection, which gives a forward window;
-   - fetch pre-2011 NSE history, which gives an unseen past period and needs permission plus an
-     integrity check first;
-   - use Yahoo for the forward window with stated limits.
+
+   Every 2011–2026 verdict is "historical, partly seen".
+2. **Momentum, independent evidence.** No new prices are being stored: the last archive day is
+   still 2026-09-07 (checked 2026-10-15).
+   - **Owner decision (2026-10-15):** resume the **existing approved NSE pipeline**, after verifying
+     collection, parsing, corporate-action handling and persistence. Do not switch sources, and do
+     not mix Yahoo prices into the series.
+   - The rules for the prospective window are fixed in the draft pre-registration, section 12.
+   - Pre-2011 NSE history remains a separate option, not requested.
 3. **Sentiment.** Two separate pre-registrations, in order:
    - **(a) a measurement gate:** hand- or blind-labelled precision of the GDELT company matcher on
      a random sample, with a fixed pass threshold, and with known leaks (OIL, the SBIN-type
@@ -155,7 +160,9 @@ test before that is measured would test the matcher, not sentiment.
      with STT on one side only.
    - Delivery STT is charged on both sides. At the itemised rates a round trip is about 0.29%, or
      0.39% with 0.05% slippage each side.
-   - The draft pre-registration keeps 0.415% as the frozen central figure and tests sensitivity at
-     2× and 3×.
+   - Revision 2 of the draft pre-registration states the derivation. It keeps the frozen 0.415%
+     round trip and itemises it per side: 0.215% on the buy (statutory and broker 0.1546%, plus a
+     0.0604% spread and impact allowance) and 0.200% on the sell (0.1396% plus 0.0604%).
+   - The "per side" reading (2×) is reported.
 
 These corrections are proposed; none is applied in this commit.
