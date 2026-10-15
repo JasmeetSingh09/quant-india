@@ -106,7 +106,7 @@ test before that is measured would test the matcher, not sentiment.
 ## 4. Recommendation per factor (order of work)
 
 1. **Momentum: run the net-of-costs test** once the owner approves the draft pre-registration
-   (revision 2). The owner chose a local, read-only run (mode L), with no deployment.
+   (revision 3). The owner chose a local, read-only run (mode L), with no deployment.
    - It is the only factor whose data supports a full point-in-time test, and it carries 35% of the
      score.
    - The honest expectation is stated in the draft: the 2011–2026 answer is largely predictable from
@@ -163,6 +163,7 @@ test before that is measured would test the matcher, not sentiment.
    - Revision 2 of the draft pre-registration states the derivation. It keeps the frozen 0.415%
      round trip and itemises it per side: 0.215% on the buy (statutory and broker 0.1546%, plus a
      0.0604% spread and impact allowance) and 0.200% on the sell (0.1396% plus 0.0604%).
-   - The "per side" reading (2×) is reported.
+   - Revision 3 treats "0.415% per side" (0.415% on each side, 0.83% a round trip) as a separate,
+     named scenario with its own gate.
 
 These corrections are proposed; none is applied in this commit.
