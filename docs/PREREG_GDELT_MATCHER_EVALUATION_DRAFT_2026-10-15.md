@@ -27,7 +27,7 @@ it runs only if this one passes.
 | Strict matcher, attempts 0 and 1 | 1, 11, 21 (development) | Withdrawn **before labelling**: an organisation-list rule and a coding bug |
 | Strict attempt 2 (seed 20260928) | 6, 16, 26 | **Failed:** 78.3% (95% CI 73.3–82.6) |
 | Strict attempt 3 (seed 20260929) | 3, 13, 23 | **Failed:** 88.0% (83.8–91.2) |
-| Strict attempt 4 (seed 20260930), commit `00bb4e0` | 9, 19, 29 | **Failed narrowly:** 89.3% (85.3–92.3). Errors: 12 clear rule gaps, 9 not about the business, 6 passing or industry mentions, 5 separate relatives |
+| Strict attempt 4 (seed 20260930), commit `00bb4e0` | 9, 19, 29 | **Failed narrowly:** 89.3% (85.3–92.3). The lower bound (85.3%) cleared the 85% requirement; the point estimate (89.3%) missed the 90% requirement. Errors: 12 clear rule gaps, 9 not about the business, 6 passing or industry mentions, 5 separate relatives |
 
 **The gate those attempts used,** committed before each was labelled: precision ≥ 90% **and** a 95%
 Wilson lower bound ≥ 85%, on 300 random matches.
@@ -41,21 +41,20 @@ Wilson lower bound ≥ 85%, on 300 random matches.
 labelled errors. Further revise-and-retest cycles would eventually pass by chance alone. This
 evaluation is therefore designated the **final attempt** (section 9).
 
-## 2. The matcher under evaluation (owner chooses one before freezing)
+## 2. The matcher under evaluation: M-4 (owner decision, 2026-10-15)
 
-- **M-4:** the attempt-4 matcher exactly as committed (`00bb4e0`). It gets no further change.
-- **M-5:** M-4 plus fixes for the **12 errors labelled "rule_gap_clear" in attempt 4**, and nothing
-  else.
-  - The fixes are written, committed and listed in section 10 **before** any evaluation day is read.
-  - They may use only the attempt-4 labelled file. No evaluation-day headline may be looked at.
-
-**Recommendation: M-5.** The 12 gaps were identified as mechanical misses before this protocol
-existed. Fixing them and then testing once on untouched days, with a hard stop, is a single
-development step. It is not iterating toward a pass. M-4 is the more conservative choice if the
-owner prefers no change at all.
-
-**Whichever is chosen, the matcher is frozen by commit hash.** The evaluation script refuses to run
-if `research/gdelt_strict.py` differs from that commit.
+- **M-4** is the attempt-4 matcher **exactly as committed** in `00bb4e0` (`research/gdelt_strict.py`,
+  unchanged since; checked 2026-10-15).
+- **It gets no change of any kind.** That includes the 12 known rule gaps, which are documented in
+  section 10 and **not** fixed.
+- **The matcher is frozen by commit hash.** The evaluation script refuses to run if
+  `research/gdelt_strict.py` differs from `00bb4e0`.
+- **M-4 is never turned into a revised matcher during or after this evaluation.**
+  - If M-4 fails, the evaluation stops.
+  - Whether a new matcher design deserves a study is a separate decision. Such a study would get its
+    own independent specification and new untouched days, and would be reported alongside every
+    earlier failure.
+- **M-5** (M-4 plus fixes for the 12 gaps) was considered and **not chosen**.
 
 ## 3. Evaluation data
 
@@ -67,9 +66,14 @@ if `research/gdelt_strict.py` differs from that commit.
   once.
 - **Missing GDELT files are missing, not zero.** Known gaps include 2025-06-15 to 07-01. The run
   reports which evaluation days have no files.
-- **Company list:** the 204 names in `~/quant_data/gdelt_names.json` (sha256 recorded at freeze).
-  - These are **current** listings, so a company that delisted during 2019–2026 is absent. That
-    survivorship limit carries into any return test and is stated there.
+- **Company list:** the 204 names in `~/quant_data/gdelt_names.json`. Its sha256 begins
+  `a3c5cb00f700bb73`, and the script checks it.
+  - 195 companies are `active`. **9 stopped trading** between 2021-06-11 and 2026-02-25 (DRREDDY's
+    entry, HDFC, RELCAPITAL, PEL, DHFL, MINDTREE, NAUKRI's entry, PCJEWELLER, ANGELONE, as the file
+    records them). 195 names come from Yahoo and 9 were hand-entered.
+  - The list carries a per-company `ranked` field of years. Whether the list as a whole is free of
+    survivorship bias is **not** claimed here. It is the return test's question, to be argued in that
+    pre-registration.
 
 ## 4. The three samples (drawn by script, seed 20261016, written to files before any labelling)
 
@@ -93,11 +97,11 @@ Every company is placed in **exactly one** of these categories, in this order of
 rule in the script. The list of which company is in which category is written to a file and frozen
 with the samples.
 
-| Category | Rule |
+| Category | Rule (all lists are read from frozen code, not restated) |
 |---|---|
-| **A. Common-word names** | The full name or ticker contains an ordinary English word that a headline could use with its everyday meaning (for example Oil India, Idea, Trent, Titan, Indigo). Assigned by a fixed word list, frozen with the script |
-| **B. Group-name companies** | The name starts with a group name shared by several listed companies (Tata, Adani, Reliance, Bajaj, Mahindra, Birla, Godrej, Hindustan, Hero, Aditya) |
-| **C. Short tickers and acronyms** | Matched mainly through a ticker or acronym of 4 characters or fewer (SBI, HAL, BEL, LIC, TCS...) |
+| **A. Common-word names** | The company's lower-cased ticker is in M-4's `DROP_TICKER` (tickers that are ordinary words or mean something else) **and** that ticker is not a key of M-4's `UPPER_ONLY` (acronyms) |
+| **B. Group-name companies** | The first word of the company's name, lower-cased, is in the frozen spec's `news_matching.group_tokens` (adani, aditya, bajaj, birla, godrej, hero, hindustan, mahindra, reliance, tata) |
+| **C. Short tickers and acronyms** | Among the terms M-4's `build()` produces for the company, at least one is 4 characters or fewer, ignoring spaces and punctuation. Keys of `UPPER_ONLY` fall here |
 | **D. Distinctive names** | Everything else |
 
 **Each headline in P and C also gets two mechanical flags:**
@@ -186,10 +190,37 @@ its category.
   - FinBERT at the pinned revision with the approved failure policy;
   - the measured precision and recall carried into the interpretation.
 
-## 10. Matcher changes for M-5 (to be filled before freezing, only if M-5 is chosen)
+## 10. Known rule gaps in M-4 (documented, deliberately NOT fixed)
 
-(empty)
+These are the 12 attempt-4 errors labelled `rule_gap_clear`, from
+`quant_data/gdelt_match/strict_label_300_days9-19-29_seed20260930_labelled.tsv`. Headlines are
+abbreviated.
+
+| # | Matched | Headline (abbreviated) | Gap |
+|---|---|---|---|
+| 7 | VEDL | "Semiconductor business not to 'short circuit' Vedanta Resou…" | Another group entity (Vedanta Resources, the parent), not the listed company |
+| 88 | ITC | "Fertiliser business faces ITC pile-up…" | "ITC" here is input tax credit |
+| 151 | SAIL | "Vedanta readies for post-Covid… former Secretar…" | The term is matched inside unrelated text |
+| 169 | BATAINDIA | "Q4 Results 2024 LIVE Updates: Cummins India, Tata Steel, GMR…, Bata India, Liberty Shoe…" | A list headline the list cue misses |
+| 198 | HDFC | "HDFC Pharma & Healthcare Fund delivers…" | A mutual-fund scheme ("Fund" is not a relative word) |
+| 212 | SBIN | "SBI's credit card arm files offer document…" | A relative named through "credit card arm" |
+| 223 | PAYTM | "Paytm banking arm inks Visa deal…" | A relative ("banking arm") |
+| 238 | PAYTM | "Paytm Payments Bank disables…" | A separately regulated relative (Payments Bank) |
+| 243 | SBIN | "SBI-ETF Nifty share price…" | An ETF, not the bank |
+| 248 | LT | "…Reliance tops list of companies…, Larsen & Toubro, Tata M…" | A list headline |
+| 266 | WIPRO | "Top Events Of The Day: Reliance Ind, Wipro, JSW Steel Q1 Results…" | A list or digest headline |
+| 291 | RECLTD | "Oil flirting with $70 challenges world's economic rec…" | "rec" inside "recovery" |
+
+**These gaps appear in the error analysis by category and flag. They are expected to cost precision,
+and nothing in the evaluation compensates for them.**
 
 ## 11. Changes before approval
 
-(none yet)
+**2026-10-15 (owner):**
+- **M-4 chosen;** M-5 not chosen.
+- The 12 rule gaps are documented, not fixed.
+- The category rules are made mechanical from frozen lists.
+- The name-list facts are corrected (9 stopped-trading companies are included).
+- The attempt-4 bounds are stated precisely.
+
+Nothing has been sampled or labelled.
