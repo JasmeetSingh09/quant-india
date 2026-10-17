@@ -134,3 +134,28 @@ the site down.
 - **Dependency vulnerabilities.** The locked set has not been scanned against advisories.
 
 Each is a candidate for a follow-up review.
+
+## 6. Status: implemented locally 2026-10-17 (owner: "Security first"); not deployed
+
+- **A.** `auth.require_admin` is built as proposed. It reads `ADMIN_TOKEN` (32 or more
+  characters) and `ADMIN_USER_IDS` per request, compares the token in constant time, accepts only a
+  login that verifies, and fails closed.
+- **B.** All 15 admin write routes take the guard. The corporate-action `part=apply` checks it
+  inline, and its docstring and the CORS comment are corrected.
+- **C.** `current_user_email` falls back to unverified claims only when no verification is
+  configured at all.
+- **D.** `/digest`, `/alerts`, `/screener/refresh`, `/alpha/retrain` and `/alpha/universe/scan` are
+  moved to "heavy". A limiter failure is logged, and the limiter still fails open.
+  - **Found on the way:** the heavy entry `/universe/scan` never matched the real route
+    `/alpha/universe/scan`, because matching is by prefix, so the scan had been "medium".
+- **E.** `tests/access_control_test.py` runs in CI with a floor of 30 checks. It passes 30/30.
+  - **Mutation check:** with the guard removed from `/strategy/freeze`, 6 checks fail, and the
+    route answers 200 to anyone.
+- **Gates:**
+  - `run_ci` 70/70 (170,397 checks);
+  - 339/339 snapshots identical;
+  - oracle 204/3 (D-01 only).
+
+**Operational consequence.** After deploy, every admin route stays **locked until the owner sets
+`ADMIN_TOKEN`** (or `ADMIN_USER_IDS`) in Render. That includes the v1.6.1 freeze. `GET /` will show
+`auth.admin_configured: true` once it is set, with the value never shown.

@@ -23,7 +23,7 @@ import os
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query, Depends
+from fastapi import FastAPI, HTTPException, Query, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 from pydantic import BaseModel
@@ -53,6 +53,7 @@ from news import get_stock_news, get_macro_news, get_market_wide_news, start_new
 from sentiment import score_headline, summarise_sentiment
 from watchlist import add_to_watchlist, remove_from_watchlist, get_watchlist
 from auth import current_user_id, current_user_email   # per-user data (returns 'public'/None when anonymous)
+from auth import require_admin   # owner-only actions; fails closed when no admin is configured
 from alerts import send_test_alert, send_multi_signal_alert, start_alert_scheduler, run_watchlist_alert_check
 from alpha_model import compute_alpha_score, scan_alpha, retrain_weights, explain_signal, top_picks, warm_top_picks
 from prediction_tracker import snapshot as log_predictions_snapshot, evaluate as evaluate_predictions
@@ -103,7 +104,9 @@ _ALLOWED_ORIGINS = list(filter(None, [
 
 app.add_middleware(
     CORSMiddleware,
-    # Public read-only API, no cookies/credentials → safe to allow any origin.
+    # No cookies/credentials → any origin is fine for CORS. CORS is NOT access
+    # control: owner-only routes use Depends(require_admin), user data uses
+    # Depends(current_user_id) (access-control audit, 2026-10-17).
     # This avoids fragile exact-URL matching with Vercel's production + preview URLs.
     # (FRONTEND_URL is still honoured above for documentation/clarity.)
     allow_origins=["*"],
@@ -132,8 +135,11 @@ async def _rate_limit(request, call_next):
                 status_code=429,
                 content={"detail": hit["detail"]},
                 headers={"Retry-After": str(hit["retry_after"])})
-    except Exception:
-        pass
+    except Exception as e:
+        # Still fails open, but no longer silently: a limiter that has stopped
+        # working should be visible in the logs (access-control audit, 2026-10-17).
+        print(f"[rate_limit] WARNING: limiter failed, request served unthrottled: "
+              f"{type(e).__name__}")
     return await call_next(request)
 
 
@@ -982,7 +988,7 @@ def alerts_test(user_email: str | None = Depends(current_user_email)):
 
 
 @app.post("/alerts/run-check")
-def alerts_run_check():
+def alerts_run_check(_admin: str = Depends(require_admin)):
     """
     Manually trigger the watchlist alert check right now (same logic the
     background scheduler runs every 30 min). Returns what was sent or skipped.
@@ -1170,7 +1176,7 @@ def screener_status():
     return get_screener_status()
 
 @app.post("/screener/refresh")
-def screener_refresh():
+def screener_refresh(_admin: str = Depends(require_admin)):
     """Force-rebuild the screener metrics cache (slow, ~5-10 min)."""
     return build_screener_cache()
 
@@ -1225,7 +1231,8 @@ def stock_universe_list(
 
 
 @app.post("/stock/universe/refresh")
-def stock_universe_refresh(exchange: str = Query("NSE", description="NSE | BSE | ALL")):
+def stock_universe_refresh(exchange: str = Query("NSE", description="NSE | BSE | ALL"),
+                           _admin: str = Depends(require_admin)):
     """Force-refresh the stock universe from NSE/BSE. Normally auto-refreshed daily."""
     results = {}
     if exchange.upper() in ("NSE", "ALL"):
@@ -1851,7 +1858,7 @@ class RetractRequest(BaseModel):
 
 
 @app.post("/strategy/retract")
-def strategy_retract(req: RetractRequest):
+def strategy_retract(req: RetractRequest, _admin: str = Depends(require_admin)):
     """
     Withdraw a frozen version without deleting it.
 
@@ -1927,7 +1934,8 @@ def scan_provenance_gap(cycle: str = Query(...)):
 
 @app.post("/actions/backfill")
 def actions_backfill(start_year: int = Query(2011, ge=2000, le=2030),
-                     start_month: int = Query(7, ge=1, le=12)):
+                     start_month: int = Query(7, ge=1, le=12),
+                     _admin: str = Depends(require_admin)):
     """
     Walk NSE's corporate-action feed from the given month to now.
 
@@ -2233,7 +2241,7 @@ class FreezeRequest(BaseModel):
 
 
 @app.post("/strategy/freeze")
-def strategy_freeze(req: FreezeRequest):
+def strategy_freeze(req: FreezeRequest, _admin: str = Depends(require_admin)):
     """
     Record the complete strategy specification under a version name.
 
@@ -2439,7 +2447,8 @@ def portfolio_scenarios_ep(req: AdviseRequest):
 
 @app.post("/simulator/seed-demos")
 def simulator_seed_demos(days_back: int = Query(30, ge=1, le=365),
-                         replace: bool = Query(False)):
+                         replace: bool = Query(False),
+                         _admin: str = Depends(require_admin)):
     """Create the example portfolios shown on the leaderboard. Idempotent
     unless `replace` is set. Entries are priced from real history `days_back`
     ago so each example has genuine performance immediately."""
@@ -2467,7 +2476,7 @@ def events_funnel(days: int = Query(42, ge=1, le=365)):
 
 
 @app.post("/predictions/seal")
-def predictions_seal():
+def predictions_seal(_admin: str = Depends(require_admin)):
     """Seal any unsealed days into the tamper-evident chain. Idempotent."""
     from integrity import seal
     return seal()
@@ -2481,14 +2490,14 @@ def predictions_integrity():
 
 
 @app.post("/bhavcopy/fetch")
-def bhavcopy_fetch(days: int = Query(1, ge=1, le=30)):
+def bhavcopy_fetch(days: int = Query(1, ge=1, le=30), _admin: str = Depends(require_admin)):
     """Pull NSE's own end-of-day file(s) — the independent second source."""
     from bhavcopy import fetch_day, backfill
     return fetch_day() if days == 1 else backfill(days)
 
 
 @app.post("/bhavcopy/backfill")
-def bhavcopy_backfill(days: int = Query(30, ge=1, le=1200)):
+def bhavcopy_backfill(days: int = Query(30, ge=1, le=1200), _admin: str = Depends(require_admin)):
     """
     Build real history in the background. Thirty days of files outlives any HTTP
     request, so this starts the work and returns; progress shows in /coverage.
@@ -2499,7 +2508,8 @@ def bhavcopy_backfill(days: int = Query(30, ge=1, le=1200)):
 
 @app.post("/bhavcopy/backfill-range")
 def bhavcopy_backfill_range(start: str = Query(..., description="YYYY-MM-DD"),
-                            end: str = Query(..., description="YYYY-MM-DD")):
+                            end: str = Query(..., description="YYYY-MM-DD"),
+                            _admin: str = Depends(require_admin)):
     """
     Fill an explicit date range in the background.
 
@@ -2607,9 +2617,11 @@ def health_resolver_ambiguous():
 def health_corporate_action_audit(part: str = Query("taxonomy"),
                                   symbol: str = Query(None),
                                   ex_date: str = Query(None),
-                                  confirm: str = Query("")):
+                                  confirm: str = Query(""),
+                                  authorization: Optional[str] = Header(default=None),
+                                  x_admin_token: Optional[str] = Header(default=None)):
     """
-    Read-only. What the unparsed corporate actions actually are.
+    Read-only, except part=apply. What the unparsed corporate actions actually are.
 
     `parsed = 0` means the subject line was not recognised, NOT that the action
     is inert -- an Annual General Meeting is unparsed and harmless, a bonus in
@@ -2621,7 +2633,9 @@ def health_corporate_action_audit(part: str = Query("taxonomy"),
     part=event      one event taken apart (needs symbol and ex_date)
     part=boundaries the three indeterminate transitions from Step 3B
 
-    Nothing here writes, reparses into storage, or recalculates a score.
+    Every part except `apply` is read-only. part=apply writes the reparse (additive
+    inserts only) and needs administrator access; the confirm token alone guards
+    against accidents, not people (audit F5, 2026-10-17).
     """
     import corporate_action_audit as CAA
     if part == "event":
@@ -2637,6 +2651,7 @@ def health_corporate_action_audit(part: str = Query("taxonomy"),
     if part == "postwrite":
         return CAA.post_write_verify()
     if part == "apply":
+        require_admin(authorization, x_admin_token)
         # The only writing path in this endpoint. It refuses without the token,
         # and every insert is ON CONFLICT DO NOTHING, so an existing corporate
         # action cannot be altered by it under any circumstance.
@@ -2773,7 +2788,7 @@ def me_email_opt_out(user_id: str = Depends(current_user_id)):
 
 
 @app.post("/digest/run-now")
-def digest_run_now():
+def digest_run_now(_admin: str = Depends(require_admin)):
     """Run the weekly pass immediately — for testing the schedule, not a blast."""
     from weekly_digest import send_all_digests
     return send_all_digests()
@@ -2857,7 +2872,7 @@ def alpha_universe_status():
 
 
 @app.post("/alpha/universe/scan")
-def alpha_universe_scan(force: bool = Query(False)):
+def alpha_universe_scan(force: bool = Query(False), _admin: str = Depends(require_admin)):
     """Start the background scan. No-op if one is already running."""
     from universe_scan import start_scan
     return start_scan(force=force)
@@ -2881,7 +2896,7 @@ def alpha_top_picks():
 
 
 @app.post("/predictions/snapshot")
-def predictions_snapshot():
+def predictions_snapshot(_admin: str = Depends(require_admin)):
     """Log today's alpha picks (ticker, score, signal, price) to grade later."""
     return log_predictions_snapshot()
 
@@ -2903,6 +2918,7 @@ def alpha_retrain(
     tickers: list = None,
     start_date: str = Query("2019-01-01"),
     end_date:   str = Query("2022-12-31"),
+    _admin: str = Depends(require_admin),
 ):
     """
     Refit factor weights using OLS regression on historical NSE data.

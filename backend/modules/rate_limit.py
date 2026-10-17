@@ -47,7 +47,14 @@ IP_CEILING = {
 # not listed at all and falls through to "light".
 _ROUTES = {
     "heavy": ("/universe/scan", "/scan/start", "/backtest", "/momentum/backtest",
-              "/bhavcopy/fetch", "/overfitting", "/digest/send"),
+              "/bhavcopy/fetch", "/overfitting", "/digest/send",
+              # Anything that sends mail or starts a long rebuild (access-control
+              # audit, 2026-10-17). /alpha/retrain overrides the "/alpha" medium
+              # prefix because the longest prefix wins.
+              "/digest", "/alerts", "/screener/refresh", "/alpha/retrain",
+              # The real scan route. "/universe/scan" above never matched it,
+              # because matching is by prefix, so the scan sat in "medium".
+              "/alpha/universe/scan"),
     "medium": ("/portfolio/advise", "/portfolio/scenarios", "/portfolio/what-if",
                "/optimize", "/montecarlo", "/monte-carlo", "/simulate",
                "/alpha", "/options", "/pairs", "/regime", "/factors",

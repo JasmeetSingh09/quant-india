@@ -11,9 +11,10 @@ Setup: set SUPABASE_JWT_SECRET on the backend (Supabase → Settings → API →
 If it is not set, auth is effectively disabled and everyone is "public" (safe default).
 """
 
+import hmac
 import os
 import time
-from fastapi import Header
+from fastapi import Header, HTTPException
 from bounded_cache import BoundedCache
 
 _JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "").strip()
@@ -152,7 +153,12 @@ def current_user_email(authorization: str | None = Header(default=None)) -> str 
     if anonymous. Used to route alert emails to the logged-in user."""
     token = _bearer(authorization)
     payload = _decode_payload(token)
-    if payload is None and not _JWT_SECRET and jwt and token:
+    # The address is where alert and digest mail is sent, so it must come from a
+    # token that verified. The unverified fallback is kept only for a server with
+    # no verification configured at all (the same stopgap as _decode); it used to
+    # apply whenever the HS256 secret alone was unset, so with JWKS configured a
+    # forged token could choose the recipient (audit F8, 2026-10-17).
+    if payload is None and not _verification_configured() and jwt and token:
         try:
             payload = jwt.decode(token, options={"verify_signature": False})
         except Exception:
@@ -217,12 +223,64 @@ def _email_from_supabase(token: str) -> str | None:
     return email
 
 
+ADMIN_TOKEN_MIN_LEN = 32
+
+
+def _admin_token() -> str:
+    """ADMIN_TOKEN, if set and long enough to be a secret rather than a word."""
+    t = os.getenv("ADMIN_TOKEN", "").strip()
+    return t if len(t) >= ADMIN_TOKEN_MIN_LEN else ""
+
+
+def _admin_user_ids() -> set:
+    return {x.strip() for x in os.getenv("ADMIN_USER_IDS", "").split(",") if x.strip()}
+
+
+def admin_configured() -> bool:
+    return bool(_admin_token() or _admin_user_ids())
+
+
+def require_admin(authorization: str | None = Header(default=None),
+                  x_admin_token: str | None = Header(default=None)) -> str:
+    """
+    FastAPI dependency for actions only the owner may take: freezing or
+    retracting a strategy version, sealing the track record, mailing every user,
+    starting the heavy background jobs, writing corporate actions.
+
+    Admin is either a token that VERIFIES and whose `sub` is in ADMIN_USER_IDS,
+    or an X-Admin-Token header equal to ADMIN_TOKEN (constant-time comparison).
+    The unverified-`sub` stopgap never grants admin.
+
+    Fails closed: with neither variable set every admin route is refused, so a
+    deploy that forgets the configuration is locked, not open. Settings are read
+    per request, so a change in the environment needs no code change.
+    """
+    token, ids = _admin_token(), _admin_user_ids()
+    if not (token or ids):
+        raise HTTPException(status_code=403,
+                            detail="Admin actions are not configured on this server.")
+    if token and x_admin_token and hmac.compare_digest(
+            x_admin_token.strip().encode(), token.encode()):
+        return "admin:token"
+    if ids:
+        payload = _decode_payload(_bearer(authorization))
+        sub = payload.get("sub") if payload else None
+        if sub and sub in ids:
+            return f"admin:{sub}"
+    raise HTTPException(status_code=403, detail="This action needs administrator access.")
+
+
 def auth_enabled() -> bool:
     return bool(_JWT_SECRET and jwt)
 
 
 def auth_status() -> dict:
-    """Surfaced on / so a misconfigured deploy is visible instead of silent."""
+    """Surfaced on / so a misconfigured deploy is visible instead of silent.
+    `admin_configured` is a yes/no only; no admin setting's value is ever shown."""
+    return {**_auth_status(), "admin_configured": admin_configured()}
+
+
+def _auth_status() -> dict:
     if not jwt:
         return {"verified": False,
                 "detail": "PyJWT not installed — users cannot be told apart"}
