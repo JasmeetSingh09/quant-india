@@ -1,0 +1,1583 @@
+{
+ "seed": 20261017,
+ "rule": "by company, shuffled, alternate assignment",
+ "populations": {
+  "FACE": {
+   "company_years": 108,
+   "companies": 50,
+   "development": {
+    "companies": [
+     "ABAN",
+     "ADANIENSOL",
+     "ADANIENT",
+     "ADANIPOWER",
+     "BEL",
+     "BHARTIARTL",
+     "BHEL",
+     "DELTACORP",
+     "DIVISLAB",
+     "DRREDDY",
+     "EDUCOMP",
+     "EICHERMOT",
+     "GAIL",
+     "GRASIM",
+     "HINDPETRO",
+     "INDUSTOWER",
+     "IOC",
+     "IRB",
+     "JETAIRWAYS",
+     "JSWSTEEL",
+     "OIL",
+     "SUNPHARMA",
+     "TATASTEEL",
+     "TCS",
+     "UPL"
+    ],
+    "cases": [
+     {
+      "symbol": "ABAN",
+      "fy": 2012,
+      "files": [
+       "ABAN\\ABAN_FY2012_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "ABAN",
+      "fy": 2014,
+      "files": [
+       "ABAN\\ABAN_FY2014_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "ABAN",
+      "fy": 2015,
+      "files": [
+       "ABAN\\ABAN_FY2015_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "ADANIENSOL",
+      "fy": 2023,
+      "files": [
+       "ADANIENSOL\\ADANIENSOL_FY2023_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "ADANIENT",
+      "fy": 2016,
+      "files": [
+       "ADANIENT\\ADANIENT_FY2016_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "ADANIENT",
+      "fy": 2018,
+      "files": [
+       "ADANIENT\\ADANIENT_FY2018_companysite_CHECK_name.pdf"
+      ]
+     },
+     {
+      "symbol": "ADANIPOWER",
+      "fy": 2022,
+      "files": [
+       "ADANIPOWER\\ADANIPOWER_FY2022_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "BEL",
+      "fy": 2016,
+      "files": [
+       "BEL\\BEL_FY2016_companysite_CHECK_name.pdf"
+      ]
+     },
+     {
+      "symbol": "BEL",
+      "fy": 2022,
+      "files": [
+       "BEL\\BEL_FY2022_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "BEL",
+      "fy": 2023,
+      "files": [
+       "BEL\\BEL_FY2023_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "BHARTIARTL",
+      "fy": 2016,
+      "files": [
+       "BHARTIARTL\\BHARTIARTL_FY2016_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "BHEL",
+      "fy": 2012,
+      "files": [
+       "BHEL\\BHEL_FY2012_companysite_CHECK_name.pdf"
+      ]
+     },
+     {
+      "symbol": "BHEL",
+      "fy": 2014,
+      "files": [
+       "BHEL\\BHEL_FY2014_companysite_CHECK_name.pdf"
+      ]
+     },
+     {
+      "symbol": "BHEL",
+      "fy": 2015,
+      "files": [
+       "BHEL\\BHEL_FY2015_companysite_CHECK_name.pdf",
+       "BHEL\\BHEL_FY2016_companysite_CHECK_textFY2015.pdf"
+      ]
+     },
+     {
+      "symbol": "BHEL",
+      "fy": 2016,
+      "files": [
+       "BHEL\\BHEL_FY2016_companysite_CHECK_textFY2015.pdf"
+      ]
+     },
+     {
+      "symbol": "DELTACORP",
+      "fy": 2018,
+      "files": [
+       "DELTACORP\\DELTACORP_FY2018_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "DIVISLAB",
+      "fy": 2021,
+      "files": [
+       "DIVISLAB\\DIVISLAB_FY2021_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "DIVISLAB",
+      "fy": 2022,
+      "files": [
+       "DIVISLAB\\DIVISLAB_FY2022_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "DRREDDY",
+      "fy": 2021,
+      "files": [
+       "DRREDDY\\DRREDDY_FY2020_archive_CHECK_textFY2021.pdf",
+       "DRREDDY\\DRREDDY_FY2021_archive.pdf",
+       "DRREDDY\\DRREDDY_FY2021_archive_CHECK_textFY2020.pdf"
+      ]
+     },
+     {
+      "symbol": "EDUCOMP",
+      "fy": 2012,
+      "files": [
+       "EDUCOMP\\EDUCOMP_FY2012_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "EICHERMOT",
+      "fy": 2020,
+      "files": [
+       "EICHERMOT\\EICHERMOT_FY2020_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "GAIL",
+      "fy": 2012,
+      "files": [
+       "GAIL\\GAIL_FY2012_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "GAIL",
+      "fy": 2015,
+      "files": [
+       "GAIL\\GAIL_FY2015_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "GAIL",
+      "fy": 2018,
+      "files": [
+       "GAIL\\GAIL_FY2018_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "GRASIM",
+      "fy": 2021,
+      "files": [
+       "GRASIM\\GRASIM_FY2021_archive.pdf",
+       "GRASIM\\GRASIM_FY2021_archive_CHECK_textFY2022.pdf"
+      ]
+     },
+     {
+      "symbol": "GRASIM",
+      "fy": 2022,
+      "files": [
+       "GRASIM\\GRASIM_FY2021_archive_CHECK_textFY2022.pdf",
+       "GRASIM\\GRASIM_FY2022_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "HINDPETRO",
+      "fy": 2013,
+      "files": [
+       "HINDPETRO\\HINDPETRO_FY2013_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "INDUSTOWER",
+      "fy": 2024,
+      "files": [
+       "INDUSTOWER\\INDUSTOWER_FY2024_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "IOC",
+      "fy": 2019,
+      "files": [
+       "IOC\\IOC_FY2019_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "IRB",
+      "fy": 2012,
+      "files": [
+       "IRB\\IRB_FY2012_archive_CHECK_textFY2013.pdf",
+       "IRB\\IRB_FY2012_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "IRB",
+      "fy": 2013,
+      "files": [
+       "IRB\\IRB_FY2012_archive_CHECK_textFY2013.pdf",
+       "IRB\\IRB_FY2013_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "IRB",
+      "fy": 2015,
+      "files": [
+       "IRB\\IRB_FY2015_archive.pdf",
+       "IRB\\IRB_FY2015_archive_CHECK_textFY2016.pdf"
+      ]
+     },
+     {
+      "symbol": "JETAIRWAYS",
+      "fy": 2016,
+      "files": [
+       "JETAIRWAYS\\JETAIRWAYS_FY2016_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "JSWSTEEL",
+      "fy": 2012,
+      "files": [
+       "JSWSTEEL\\JSWSTEEL_FY2012_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "JSWSTEEL",
+      "fy": 2013,
+      "files": [
+       "JSWSTEEL\\JSWSTEEL_FY2013_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "JSWSTEEL",
+      "fy": 2014,
+      "files": [
+       "JSWSTEEL\\JSWSTEEL_FY2014_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "JSWSTEEL",
+      "fy": 2015,
+      "files": [
+       "JSWSTEEL\\JSWSTEEL_FY2015_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "JSWSTEEL",
+      "fy": 2016,
+      "files": [
+       "JSWSTEEL\\JSWSTEEL_FY2016_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "JSWSTEEL",
+      "fy": 2017,
+      "files": [
+       "JSWSTEEL\\JSWSTEEL_FY2017_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "JSWSTEEL",
+      "fy": 2018,
+      "files": [
+       "JSWSTEEL\\JSWSTEEL_FY2018_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "JSWSTEEL",
+      "fy": 2019,
+      "files": [
+       "JSWSTEEL\\JSWSTEEL_FY2019_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "JSWSTEEL",
+      "fy": 2020,
+      "files": [
+       "JSWSTEEL\\JSWSTEEL_FY2020_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "JSWSTEEL",
+      "fy": 2021,
+      "files": [
+       "JSWSTEEL\\JSWSTEEL_FY2021_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "JSWSTEEL",
+      "fy": 2022,
+      "files": [
+       "JSWSTEEL\\JSWSTEEL_FY2022_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "JSWSTEEL",
+      "fy": 2023,
+      "files": [
+       "JSWSTEEL\\JSWSTEEL_FY2023_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "OIL",
+      "fy": 2025,
+      "files": [
+       "OIL\\OIL_FY2025_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "SUNPHARMA",
+      "fy": 2015,
+      "files": [
+       "SUNPHARMA\\SUNPHARMA_FY2015_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "SUNPHARMA",
+      "fy": 2017,
+      "files": [
+       "SUNPHARMA\\SUNPHARMA_FY2017_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "TATASTEEL",
+      "fy": 2017,
+      "files": [
+       "TATASTEEL\\TATASTEEL_FY2017_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "TCS",
+      "fy": 2012,
+      "files": [
+       "TCS\\TCS_FY2012_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "TCS",
+      "fy": 2013,
+      "files": [
+       "TCS\\TCS_FY2013_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "UPL",
+      "fy": 2015,
+      "files": [
+       "UPL\\UPL_FY2015_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "UPL",
+      "fy": 2017,
+      "files": [
+       "UPL\\UPL_FY2017_archive.pdf"
+      ]
+     }
+    ]
+   },
+   "held_out": {
+    "companies": [
+     "ADANIGREEN",
+     "APOLLOTYRE",
+     "ASHOKLEY",
+     "BFUTILITIE",
+     "CGPOWER",
+     "CIPLA",
+     "HCLTECH",
+     "HDIL",
+     "HEROMOTOCO",
+     "IDEA",
+     "INFY",
+     "IRCTC",
+     "ITC",
+     "LUPIN",
+     "MOTHERSON",
+     "NTPC",
+     "POWERGRID",
+     "SRF",
+     "TATAPOWER",
+     "TMPV",
+     "UNITDSPR",
+     "UNITECH",
+     "WIPRO",
+     "WOCKPHARMA",
+     "ZEEL"
+    ],
+    "cases": [
+     {
+      "symbol": "ADANIGREEN",
+      "fy": 2024,
+      "files": [
+       "ADANIGREEN\\ADANIGREEN_FY2024_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "ADANIGREEN",
+      "fy": 2025,
+      "files": [
+       "ADANIGREEN\\ADANIGREEN_FY2025_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "APOLLOTYRE",
+      "fy": 2015,
+      "files": [
+       "APOLLOTYRE\\APOLLOTYRE_FY2015_archive_CHECK_textFY2016.pdf"
+      ]
+     },
+     {
+      "symbol": "ASHOKLEY",
+      "fy": 2018,
+      "files": [
+       "ASHOKLEY\\ASHOKLEY_FY2017_archive_CHECK_textFY2018.pdf",
+       "ASHOKLEY\\ASHOKLEY_FY2018_companysite_CHECK_name.pdf"
+      ]
+     },
+     {
+      "symbol": "BFUTILITIE",
+      "fy": 2016,
+      "files": [
+       "BFUTILITIE\\BFUTILITIE_FY2016_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "CGPOWER",
+      "fy": 2013,
+      "files": [
+       "CGPOWER\\CGPOWER_FY2013_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "CGPOWER",
+      "fy": 2014,
+      "files": [
+       "CGPOWER\\CGPOWER_FY2014_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "CIPLA",
+      "fy": 2015,
+      "files": [
+       "CIPLA\\CIPLA_FY2015_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "CIPLA",
+      "fy": 2016,
+      "files": [
+       "CIPLA\\CIPLA_FY2016_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "CIPLA",
+      "fy": 2022,
+      "files": [
+       "CIPLA\\CIPLA_FY2022_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "CIPLA",
+      "fy": 2024,
+      "files": [
+       "CIPLA\\CIPLA_FY2024_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "HCLTECH",
+      "fy": 2020,
+      "files": [
+       "HCLTECH\\HCLTECH_FY2020_companysite_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "HCLTECH",
+      "fy": 2024,
+      "files": [
+       "HCLTECH\\HCLTECH_FY2024_companysite_CHECK_name.pdf"
+      ]
+     },
+     {
+      "symbol": "HDIL",
+      "fy": 2016,
+      "files": [
+       "HDIL\\HDIL_FY2015_archive_CHECK_textFY2016.pdf",
+       "HDIL\\HDIL_FY2016_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "HEROMOTOCO",
+      "fy": 2015,
+      "files": [
+       "HEROMOTOCO\\HEROMOTOCO_FY2015_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "HEROMOTOCO",
+      "fy": 2016,
+      "files": [
+       "HEROMOTOCO\\HEROMOTOCO_FY2016_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "HEROMOTOCO",
+      "fy": 2020,
+      "files": [
+       "HEROMOTOCO\\HEROMOTOCO_FY2020_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "IDEA",
+      "fy": 2018,
+      "files": [
+       "IDEA\\IDEA_FY2018_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "IDEA",
+      "fy": 2019,
+      "files": [
+       "IDEA\\IDEA_FY2019_companysite_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "IDEA",
+      "fy": 2020,
+      "files": [
+       "IDEA\\IDEA_FY2020_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "INFY",
+      "fy": 2012,
+      "files": [
+       "INFY\\INFY_FY2012_archive.org.pdf"
+      ]
+     },
+     {
+      "symbol": "INFY",
+      "fy": 2013,
+      "files": [
+       "INFY\\INFY_FY2013_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "INFY",
+      "fy": 2014,
+      "files": [
+       "INFY\\INFY_FY2014_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "INFY",
+      "fy": 2015,
+      "files": [
+       "INFY\\INFY_FY2015_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "IRCTC",
+      "fy": 2022,
+      "files": [
+       "IRCTC\\IRCTC_FY2022_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "ITC",
+      "fy": 2025,
+      "files": [
+       "ITC\\ITC_FY2025_companysite_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "LUPIN",
+      "fy": 2020,
+      "files": [
+       "LUPIN\\LUPIN_FY2019_archive_CHECK_textFY2020.pdf",
+       "LUPIN\\LUPIN_FY2020_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "MOTHERSON",
+      "fy": 2025,
+      "files": [
+       "MOTHERSON\\MOTHERSON_FY2020_archive_CHECK_textFY2025.pdf",
+       "MOTHERSON\\MOTHERSON_FY2025_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "NTPC",
+      "fy": 2021,
+      "files": [
+       "NTPC\\NTPC_FY2020_archive_CHECK_textFY2021.pdf",
+       "NTPC\\NTPC_FY2021_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "POWERGRID",
+      "fy": 2015,
+      "files": [
+       "POWERGRID\\POWERGRID_FY2015_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "POWERGRID",
+      "fy": 2018,
+      "files": [
+       "POWERGRID\\POWERGRID_FY2018_companysite_CHECK_textFY2019.pdf"
+      ]
+     },
+     {
+      "symbol": "POWERGRID",
+      "fy": 2024,
+      "files": [
+       "POWERGRID\\POWERGRID_FY2024_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "POWERGRID",
+      "fy": 2025,
+      "files": [
+       "POWERGRID\\POWERGRID_FY2025_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "SRF",
+      "fy": 2020,
+      "files": [
+       "SRF\\SRF_FY2020_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "TATAPOWER",
+      "fy": 2012,
+      "files": [
+       "TATAPOWER\\TATAPOWER_FY2012_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "TATAPOWER",
+      "fy": 2013,
+      "files": [
+       "TATAPOWER\\TATAPOWER_FY2013_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "TATAPOWER",
+      "fy": 2014,
+      "files": [
+       "TATAPOWER\\TATAPOWER_FY2014_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "TATAPOWER",
+      "fy": 2022,
+      "files": [
+       "TATAPOWER\\TATAPOWER_FY2022_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "TATAPOWER",
+      "fy": 2023,
+      "files": [
+       "TATAPOWER\\TATAPOWER_FY2023_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "TMPV",
+      "fy": 2014,
+      "files": [
+       "TMPV\\TMPV_FY2014_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "TMPV",
+      "fy": 2025,
+      "files": [
+       "TMPV\\TMPV_FY2025_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "UNITDSPR",
+      "fy": 2015,
+      "files": [
+       "UNITDSPR\\UNITDSPR_FY2014_companysite_CHECK_textFY2015.pdf",
+       "UNITDSPR\\UNITDSPR_FY2015_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "UNITDSPR",
+      "fy": 2016,
+      "files": [
+       "UNITDSPR\\UNITDSPR_FY2016_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "UNITECH",
+      "fy": 2012,
+      "files": [
+       "UNITECH\\UNITECH_FY2012_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "UNITECH",
+      "fy": 2013,
+      "files": [
+       "UNITECH\\UNITECH_FY2013_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "UNITECH",
+      "fy": 2014,
+      "files": [
+       "UNITECH\\UNITECH_FY2014_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "UNITECH",
+      "fy": 2015,
+      "files": [
+       "UNITECH\\UNITECH_FY2015_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "WIPRO",
+      "fy": 2013,
+      "files": [
+       "WIPRO\\WIPRO_FY2013_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "WIPRO",
+      "fy": 2018,
+      "files": [
+       "WIPRO\\WIPRO_FY2018_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "WOCKPHARMA",
+      "fy": 2014,
+      "files": [
+       "WOCKPHARMA\\WOCKPHARMA_FY2013_archive_CHECK_textFY2014.pdf",
+       "WOCKPHARMA\\WOCKPHARMA_FY2014_archive.pdf",
+       "WOCKPHARMA\\WOCKPHARMA_FY2014_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "WOCKPHARMA",
+      "fy": 2015,
+      "files": [
+       "WOCKPHARMA\\WOCKPHARMA_FY2015_archive_CHECK_textFY2016.pdf",
+       "WOCKPHARMA\\WOCKPHARMA_FY2015_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "WOCKPHARMA",
+      "fy": 2016,
+      "files": [
+       "WOCKPHARMA\\WOCKPHARMA_FY2015_archive_CHECK_textFY2016.pdf",
+       "WOCKPHARMA\\WOCKPHARMA_FY2016_archive.pdf",
+       "WOCKPHARMA\\WOCKPHARMA_FY2016_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "ZEEL",
+      "fy": 2014,
+      "files": [
+       "ZEEL\\ZEEL_FY2014_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "ZEEL",
+      "fy": 2015,
+      "files": [
+       "ZEEL\\ZEEL_FY2015_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "ZEEL",
+      "fy": 2016,
+      "files": [
+       "ZEEL\\ZEEL_FY2016_archive.pdf"
+      ]
+     }
+    ]
+   }
+  },
+  "OCR": {
+   "company_years": 91,
+   "companies": 58,
+   "development": {
+    "companies": [
+     "ADANIENSOL",
+     "ADANIENT",
+     "AMBUJACEM",
+     "APOLLOTYRE",
+     "BIOCON",
+     "CAIRN",
+     "CEATLTD",
+     "COALINDIA",
+     "COCHINSHIP",
+     "GLENMARK",
+     "HINDALCO",
+     "INFY",
+     "IRCTC",
+     "JINDALSTEL",
+     "KAYNES",
+     "M&M",
+     "NBCC",
+     "NESTLEIND",
+     "NTPC",
+     "ONGC",
+     "PATANJALI",
+     "POLYCAB",
+     "RPOWER",
+     "STAR",
+     "TATAELXSI",
+     "TATAPOWER",
+     "UNITDSPR",
+     "VEDL",
+     "ZEEL"
+    ],
+    "cases": [
+     {
+      "symbol": "ADANIENSOL",
+      "fy": 2025,
+      "files": [
+       "ADANIENSOL\\ADANIENSOL_FY2025_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "ADANIENT",
+      "fy": 2012,
+      "files": [
+       "ADANIENT\\ADANIENT_FY2012_companysite_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "AMBUJACEM",
+      "fy": 2023,
+      "files": [
+       "AMBUJACEM\\AMBUJACEM_FY2023_archive_CHECK_textFY2022.pdf",
+       "AMBUJACEM\\AMBUJACEM_FY2023_archive_CHECK_textFY2024.pdf"
+      ]
+     },
+     {
+      "symbol": "APOLLOTYRE",
+      "fy": 2018,
+      "files": [
+       "APOLLOTYRE\\APOLLOTYRE_FY2018_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "BIOCON",
+      "fy": 2019,
+      "files": [
+       "BIOCON\\BIOCON_FY2019_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "CAIRN",
+      "fy": 2012,
+      "files": [
+       "CAIRN\\CAIRN_FY2012_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "CEATLTD",
+      "fy": 2018,
+      "files": [
+       "CEATLTD\\CEATLTD_FY2018_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "COALINDIA",
+      "fy": 2012,
+      "files": [
+       "COALINDIA\\COALINDIA_FY2012_companysite_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "COCHINSHIP",
+      "fy": 2024,
+      "files": [
+       "COCHINSHIP\\COCHINSHIP_FY2024_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "COCHINSHIP",
+      "fy": 2025,
+      "files": [
+       "COCHINSHIP\\COCHINSHIP_FY2025_archive_CHECK_textFY2026.pdf"
+      ]
+     },
+     {
+      "symbol": "GLENMARK",
+      "fy": 2021,
+      "files": [
+       "GLENMARK\\GLENMARK_FY2021_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "HINDALCO",
+      "fy": 2023,
+      "files": [
+       "HINDALCO\\HINDALCO_FY2023_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "HINDALCO",
+      "fy": 2024,
+      "files": [
+       "HINDALCO\\HINDALCO_FY2024_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "HINDALCO",
+      "fy": 2025,
+      "files": [
+       "HINDALCO\\HINDALCO_FY2025_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "INFY",
+      "fy": 2018,
+      "files": [
+       "INFY\\INFY_FY2018_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "INFY",
+      "fy": 2022,
+      "files": [
+       "INFY\\INFY_FY2022_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "INFY",
+      "fy": 2025,
+      "files": [
+       "INFY\\INFY_FY2025_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "IRCTC",
+      "fy": 2020,
+      "files": [
+       "IRCTC\\IRCTC_FY2020_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "IRCTC",
+      "fy": 2024,
+      "files": [
+       "IRCTC\\IRCTC_FY2024_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "JINDALSTEL",
+      "fy": 2012,
+      "files": [
+       "JINDALSTEL\\JINDALSTEL_FY2012_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "JINDALSTEL",
+      "fy": 2013,
+      "files": [
+       "JINDALSTEL\\JINDALSTEL_FY2013_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "JINDALSTEL",
+      "fy": 2017,
+      "files": [
+       "JINDALSTEL\\JINDALSTEL_FY2017_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "JINDALSTEL",
+      "fy": 2022,
+      "files": [
+       "JINDALSTEL\\JINDALSTEL_FY2022_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "KAYNES",
+      "fy": 2025,
+      "files": [
+       "KAYNES\\KAYNES_FY2025_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "M&M",
+      "fy": 2023,
+      "files": [
+       "M&M\\M&M_FY2022_archive_CHECK_textFY2023.pdf",
+       "M&M\\M&M_FY2023_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "NBCC",
+      "fy": 2025,
+      "files": [
+       "NBCC\\NBCC_FY2025_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "NESTLEIND",
+      "fy": 2020,
+      "files": [
+       "NESTLEIND\\NESTLEIND_FY2020_archive_CHECK_textFY2025.pdf",
+       "NESTLEIND\\NESTLEIND_FY2020_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "NTPC",
+      "fy": 2012,
+      "files": [
+       "NTPC\\NTPC_FY2012_archive.pdf",
+       "NTPC\\NTPC_FY2012_archive_CHECK_textFY2013.pdf"
+      ]
+     },
+     {
+      "symbol": "NTPC",
+      "fy": 2016,
+      "files": [
+       "NTPC\\NTPC_FY2016_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "NTPC",
+      "fy": 2017,
+      "files": [
+       "NTPC\\NTPC_FY2017_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "NTPC",
+      "fy": 2018,
+      "files": [
+       "NTPC\\NTPC_FY2018_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "ONGC",
+      "fy": 2014,
+      "files": [
+       "ONGC\\ONGC_FY2014_archive_CHECK_textFY2015.pdf",
+       "ONGC\\ONGC_FY2014_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "ONGC",
+      "fy": 2016,
+      "files": [
+       "ONGC\\ONGC_FY2016_companysite_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "PATANJALI",
+      "fy": 2023,
+      "files": [
+       "PATANJALI\\PATANJALI_FY2023_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "POLYCAB",
+      "fy": 2025,
+      "files": [
+       "POLYCAB\\POLYCAB_FY2025_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "RPOWER",
+      "fy": 2012,
+      "files": [
+       "RPOWER\\RPOWER_FY2012_archive_CHECK_textFY2013.pdf",
+       "RPOWER\\RPOWER_FY2012_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "STAR",
+      "fy": 2013,
+      "files": [
+       "STAR\\STAR_FY2013_archive_CHECK_textFY2014.pdf",
+       "STAR\\STAR_FY2013_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "TATAELXSI",
+      "fy": 2017,
+      "files": [
+       "TATAELXSI\\TATAELXSI_FY2017_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "TATAPOWER",
+      "fy": 2021,
+      "files": [
+       "TATAPOWER\\TATAPOWER_FY2021_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "TATAPOWER",
+      "fy": 2024,
+      "files": [
+       "TATAPOWER\\TATAPOWER_FY2024_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "UNITDSPR",
+      "fy": 2013,
+      "files": [
+       "UNITDSPR\\UNITDSPR_FY2013_companysite_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "VEDL",
+      "fy": 2024,
+      "files": [
+       "VEDL\\VEDL_FY2024_archive_CHECK_textFY2023.pdf"
+      ]
+     },
+     {
+      "symbol": "ZEEL",
+      "fy": 2017,
+      "files": [
+       "ZEEL\\ZEEL_FY2017_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "ZEEL",
+      "fy": 2018,
+      "files": [
+       "ZEEL\\ZEEL_FY2018_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "ZEEL",
+      "fy": 2019,
+      "files": [
+       "ZEEL\\ZEEL_FY2019_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "ZEEL",
+      "fy": 2020,
+      "files": [
+       "ZEEL\\ZEEL_FY2020_archive_CHECK_textFY2003.pdf",
+       "ZEEL\\ZEEL_FY2020_archive_CHECK_textFYNone.pdf"
+      ]
+     }
+    ]
+   },
+   "held_out": {
+    "companies": [
+     "ADANIGREEN",
+     "ADANIPOWER",
+     "AMBER",
+     "APOLLOHOSP",
+     "BHARATFORG",
+     "BPCL",
+     "DRREDDY",
+     "ESCORTS",
+     "FORTIS",
+     "GRSE",
+     "HAVELLS",
+     "HDIL",
+     "HEG",
+     "HINDPETRO",
+     "INDIGO",
+     "IOC",
+     "IRCON",
+     "KALYANKJIL",
+     "LUPIN",
+     "MAZDOCK",
+     "NATIONALUM",
+     "PERSISTENT",
+     "POWERGRID",
+     "SAIL",
+     "SRF",
+     "SUNPHARMA",
+     "TCS",
+     "VIPIND",
+     "WOCKPHARMA"
+    ],
+    "cases": [
+     {
+      "symbol": "ADANIGREEN",
+      "fy": 2023,
+      "files": [
+       "ADANIGREEN\\ADANIGREEN_FY2023_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "ADANIPOWER",
+      "fy": 2023,
+      "files": [
+       "ADANIPOWER\\ADANIPOWER_FY2023_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "ADANIPOWER",
+      "fy": 2024,
+      "files": [
+       "ADANIPOWER\\ADANIPOWER_FY2024_archive.pdf",
+       "ADANIPOWER\\ADANIPOWER_FY2024_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "AMBER",
+      "fy": 2025,
+      "files": [
+       "AMBER\\AMBER_FY2025_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "APOLLOHOSP",
+      "fy": 2023,
+      "files": [
+       "APOLLOHOSP\\APOLLOHOSP_FY2022_archive_CHECK_textFY2023.pdf",
+       "APOLLOHOSP\\APOLLOHOSP_FY2023_archive_CHECK_textFY2024.pdf",
+       "APOLLOHOSP\\APOLLOHOSP_FY2023_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "BHARATFORG",
+      "fy": 2015,
+      "files": [
+       "BHARATFORG\\BHARATFORG_FY2015_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "BHARATFORG",
+      "fy": 2016,
+      "files": [
+       "BHARATFORG\\BHARATFORG_FY2016_archive_CHECK_textFY2017.pdf"
+      ]
+     },
+     {
+      "symbol": "BHARATFORG",
+      "fy": 2017,
+      "files": [
+       "BHARATFORG\\BHARATFORG_FY2016_archive_CHECK_textFY2017.pdf",
+       "BHARATFORG\\BHARATFORG_FY2017_archive.pdf",
+       "BHARATFORG\\BHARATFORG_FY2017_archive_CHECK_textFY2018.pdf"
+      ]
+     },
+     {
+      "symbol": "BPCL",
+      "fy": 2022,
+      "files": [
+       "BPCL\\BPCL_FY2022_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "DRREDDY",
+      "fy": 2023,
+      "files": [
+       "DRREDDY\\DRREDDY_FY2023_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "ESCORTS",
+      "fy": 2018,
+      "files": [
+       "ESCORTS\\ESCORTS_FY2018_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "ESCORTS",
+      "fy": 2019,
+      "files": [
+       "ESCORTS\\ESCORTS_FY2019_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "ESCORTS",
+      "fy": 2022,
+      "files": [
+       "ESCORTS\\ESCORTS_FY2022_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "FORTIS",
+      "fy": 2018,
+      "files": [
+       "FORTIS\\FORTIS_FY2018_archive_CHECK_textFY2019.pdf",
+       "FORTIS\\FORTIS_FY2018_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "GRSE",
+      "fy": 2025,
+      "files": [
+       "GRSE\\GRSE_FY2025_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "HAVELLS",
+      "fy": 2021,
+      "files": [
+       "HAVELLS\\HAVELLS_FY2021_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "HDIL",
+      "fy": 2017,
+      "files": [
+       "HDIL\\HDIL_FY2017_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "HEG",
+      "fy": 2018,
+      "files": [
+       "HEG\\HEG_FY2018_archive.pdf",
+       "HEG\\HEG_FY2018_archive_CHECK_textFY2019.pdf"
+      ]
+     },
+     {
+      "symbol": "HEG",
+      "fy": 2019,
+      "files": [
+       "HEG\\HEG_FY2018_archive_CHECK_textFY2019.pdf",
+       "HEG\\HEG_FY2019_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "HINDPETRO",
+      "fy": 2012,
+      "files": [
+       "HINDPETRO\\HINDPETRO_FY2012_companysite_CHECK_name.pdf"
+      ]
+     },
+     {
+      "symbol": "HINDPETRO",
+      "fy": 2017,
+      "files": [
+       "HINDPETRO\\HINDPETRO_FY2017_archive.pdf",
+       "HINDPETRO\\HINDPETRO_FY2017_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "HINDPETRO",
+      "fy": 2018,
+      "files": [
+       "HINDPETRO\\HINDPETRO_FY2018_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "HINDPETRO",
+      "fy": 2019,
+      "files": [
+       "HINDPETRO\\HINDPETRO_FY2019_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "HINDPETRO",
+      "fy": 2024,
+      "files": [
+       "HINDPETRO\\HINDPETRO_FY2024_archive_CHECK_textFY2025.pdf"
+      ]
+     },
+     {
+      "symbol": "INDIGO",
+      "fy": 2016,
+      "files": [
+       "INDIGO\\INDIGO_FY2016_archive.pdf",
+       "INDIGO\\INDIGO_FY2016_archive_CHECK_textFY2017.pdf"
+      ]
+     },
+     {
+      "symbol": "INDIGO",
+      "fy": 2019,
+      "files": [
+       "INDIGO\\INDIGO_FY2019_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "IOC",
+      "fy": 2020,
+      "files": [
+       "IOC\\IOC_FY2020_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "IRCON",
+      "fy": 2024,
+      "files": [
+       "IRCON\\IRCON_FY2024_archive.pdf",
+       "IRCON\\IRCON_FY2024_archive_CHECK_textFY2025.pdf"
+      ]
+     },
+     {
+      "symbol": "KALYANKJIL",
+      "fy": 2025,
+      "files": [
+       "KALYANKJIL\\KALYANKJIL_FY2025_archive.pdf",
+       "KALYANKJIL\\KALYANKJIL_FY2025_archive_CHECK_textFY2024.pdf"
+      ]
+     },
+     {
+      "symbol": "LUPIN",
+      "fy": 2015,
+      "files": [
+       "LUPIN\\LUPIN_FY2015_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "MAZDOCK",
+      "fy": 2023,
+      "files": [
+       "MAZDOCK\\MAZDOCK_FY2023_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "MAZDOCK",
+      "fy": 2024,
+      "files": [
+       "MAZDOCK\\MAZDOCK_FY2024_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "MAZDOCK",
+      "fy": 2025,
+      "files": [
+       "MAZDOCK\\MAZDOCK_FY2025_archive.pdf",
+       "MAZDOCK\\MAZDOCK_FY2025_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "NATIONALUM",
+      "fy": 2022,
+      "files": [
+       "NATIONALUM\\NATIONALUM_FY2022_archive_CHECK_textFY2023.pdf",
+       "NATIONALUM\\NATIONALUM_FY2022_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "PERSISTENT",
+      "fy": 2025,
+      "files": [
+       "PERSISTENT\\PERSISTENT_FY2025_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "POWERGRID",
+      "fy": 2012,
+      "files": [
+       "POWERGRID\\POWERGRID_FY2012_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "POWERGRID",
+      "fy": 2013,
+      "files": [
+       "POWERGRID\\POWERGRID_FY2013_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "POWERGRID",
+      "fy": 2014,
+      "files": [
+       "POWERGRID\\POWERGRID_FY2014_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "SAIL",
+      "fy": 2020,
+      "files": [
+       "SAIL\\SAIL_FY2020_archive_CHECK_textFY2007.pdf",
+       "SAIL\\SAIL_FY2020_archive_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "SAIL",
+      "fy": 2021,
+      "files": [
+       "SAIL\\SAIL_FY2021_companysite_CHECK_textFYNone.pdf"
+      ]
+     },
+     {
+      "symbol": "SRF",
+      "fy": 2023,
+      "files": [
+       "SRF\\SRF_FY2023_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "SUNPHARMA",
+      "fy": 2014,
+      "files": [
+       "SUNPHARMA\\SUNPHARMA_FY2014_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "TCS",
+      "fy": 2017,
+      "files": [
+       "TCS\\TCS_FY2017_companysite.pdf"
+      ]
+     },
+     {
+      "symbol": "VIPIND",
+      "fy": 2012,
+      "files": [
+       "VIPIND\\VIPIND_FY2012_archive.pdf"
+      ]
+     },
+     {
+      "symbol": "WOCKPHARMA",
+      "fy": 2013,
+      "files": [
+       "WOCKPHARMA\\WOCKPHARMA_FY2013_archive_CHECK_textFY2014.pdf",
+       "WOCKPHARMA\\WOCKPHARMA_FY2013_archive_CHECK_textFYNone.pdf"
+      ]
+     }
+    ]
+   }
+  }
+ },
+ "sha256_16": "654456353d056d4d"
+}
