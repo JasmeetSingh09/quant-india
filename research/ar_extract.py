@@ -43,7 +43,10 @@ logging.disable(logging.CRITICAL)
 
 NUM = re.compile(r"\(?-?\d[\d,]*(?:\.\d+)?\)?")
 FACES = (1, 2, 5, 10)
-TO_CRORE = {"crore": 1.0, "lakh": 0.01, "million": 0.1, "billion": 100.0, "thousand": 1e-4}
+TO_CRORE = {"crore": 1.0, "lakh": 0.01, "million": 0.1, "billion": 100.0, "thousand": 1e-4,
+            # Reports kept in whole rupees (IRB development cases) could never pass the
+            # face check because their unit had no entry (reader fix A, 2026-10-17).
+            "rupees": 1e-7}
 
 TITLE = {
     "bs": re.compile(r"\bbalance\s*sheet\b", re.I),

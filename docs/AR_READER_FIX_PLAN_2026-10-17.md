@@ -78,3 +78,43 @@ OCR'd figures are tagged `ocr` in `accepted.json` so they can always be told apa
    independent confirmation.
 3. Commit and freeze. Then run the held-out cases once, the no-regression check and the audit draw.
 4. Report.
+
+## 5. Phasing and development results (added before any held-out case was run)
+
+**Phasing.** The fixes are frozen and judged in two phases:
+- **phase 1:** FACE fixes A and B;
+- **phase 2:** OCR.
+
+The two populations and their held-out halves are disjoint, so freezing phase 1 first changes nothing
+for phase 2. No OCR case has been examined.
+
+**Phase 1 fixes, diagnosed on development cases only:**
+- **A. Units.**
+  - Readers' spellings of one unit ("Lakhs", "lacs", "crores", "millions") are merged before voting.
+    Agreeing readers had been split, the report's unit came out undetermined, and no check ran.
+  - "rupees" is added to the unit table, so reports kept in whole rupees can be checked at all.
+- **B. The equity line.** `research/ar_equity_capital.py` reads the equity share capital line from the
+  share-capital note. Two conditions apply:
+  - it must be internally consistent: count × face value = amount, within 0.5%, with magnitude
+    guards;
+  - it is used only when the face check fails with the voted figure **and** the implied face value
+    then equals the face value that line prints, within the face check's own tolerance.
+
+  That is stricter than the face check. The development cases behind it are TCS and JSW Steel
+  (preference capital, forfeited shares, treasury shares) and UPL (a wrong voted figure).
+
+**Unchanged:** the face-value tolerance, the standard face values, the balance tolerance, grounding,
+the majority rule and the gross-revenue refusal.
+
+**Development result** (`research/ar_reader_fix_eval.py development`):
+- **No regression:** 474 complete company-years, 0 problems; every accepted value is identical.
+- **Gain:** **11 of 53** development company-years became complete: DELTACORP 2018, DIVISLAB 2021 and
+  2022, INDUSTOWER 2024, and JSWSTEEL 2013, 2014, 2015, 2016, 2018, 2019 and 2022.
+- **Equity-line substitutions:** 11.
+- **Spot-checked on development:**
+  - Divi's share capital is Rs 53.09 crore (Rs 2 shares);
+  - Indus Towers is Rs 2,694.9 crore (Rs 10);
+  - JSW Steel's implied face values are 0.998–1.003 (Re 1) and 9.82 (Rs 10).
+- **Still failing, correctly:** Aban (EPS is after preference dividends), Tata Steel FY2017 (EPS after
+  perpetual-bond coupons), and wrong voted figures the check rightly rejects (Grasim FY2022, BHEL
+  FY2016).

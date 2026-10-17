@@ -27,6 +27,22 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ar_extract as A  # noqa: E402
+import ar_equity_capital as EQ  # noqa: E402
+
+# Reader fix A (2026-10-17): readers spell one unit several ways ("Lakhs", "lacs",
+# "crores", "millions"). Voting keyed on the raw string split agreeing readers, the
+# report's unit came out undetermined and no check could run. The same unit is merged;
+# different units still disagree.
+UNIT_ALIASES = {"crores": "crore", "cr": "crore", "lakhs": "lakh", "lacs": "lakh",
+                "lac": "lakh", "millions": "million", "mn": "million", "billions": "billion",
+                "thousands": "thousand", "rupee": "rupees", "rs": "rupees", "inr": "rupees"}
+
+
+def canon_unit(u):
+    if not isinstance(u, str) or not u.strip():
+        return None
+    k = u.strip().lower().rstrip(".")
+    return UNIT_ALIASES.get(k, k)
 
 FIELDS = ("revenue", "profit_for_year", "eps_basic", "share_capital", "total_equity",
           "total_assets", "total_equity_and_liabilities", "borrowings", "operating_cash_flow")
@@ -145,7 +161,7 @@ def rule_reading(r):
     out["total_equity_and_liabilities"] = None
     if ta and ta.get("balanced") and not ta.get("net_of_current_liabilities"):
         out["total_equity_and_liabilities"] = {"current": ta["current"], "previous": ta["previous"]}
-    return {"unit": r.get("unit"), "figures": out}
+    return {"unit": canon_unit(r.get("unit")), "figures": out}
 
 
 def report_checks(fig, unit):
@@ -161,9 +177,44 @@ def report_checks(fig, unit):
     return ok
 
 
-def check(root, extract, review_dir, cache):
+def equity_line_substitute(final, unit, pages, r):
+    """
+    Reader fix B (2026-10-17). When the face check fails, the voted share capital may
+    include preference or other capital (TCS, JSW Steel development cases), though the
+    field is defined as EQUITY share capital. If the share-capital note prints an equity
+    line that is internally consistent (count x face value = amount; ar_equity_capital),
+    use it, but only if the implied face value then matches the face value THAT LINE
+    PRINTS, within the face check's own tolerance. That is stricter than the face check,
+    which accepts any standard face value; no tolerance or threshold is changed.
+    """
+    k_cr = A.TO_CRORE.get(unit)
+    p = (final.get("profit_for_year") or {}).get("current")
+    e = (final.get("eps_basic") or {}).get("current")
+    if not (k_cr and p and e):
+        return None
+    bs = ((r.get("statement_pages") or {}).get("bs") or 1) - 1
+    note = EQ.read_equity_capital([A.decode_cids(x) for x in pages], unit, bs)
+    if not note or note.get("current") is None:
+        return None
+    fv, tol = note["face_value"], 0.04 + 0.005 / abs(e)
+    shares = p * k_cr * 1e7 / e
+    caps = [c for c in (note["current"], note.get("previous")) if c]
+    if not any(abs(c * k_cr * 1e7 / shares - fv) / fv < tol for c in caps):
+        return None
+    old = final.get("share_capital") or {}
+    return {"current": note["current"], "previous": note.get("previous"), "unit": unit,
+            "readers": ["equity_note"], "agreed": False, "disputed": False,
+            "outvoted": sorted(old.get("readers") or []), "source": "equity line, share-capital note",
+            "page": note["page"], "quote": note["quote"], "printed_face_value": fv}
+
+
+def check(root, extract, review_dir, cache, out_path=None, only=None):
+    """out_path: where accepted.json goes (default review_dir); only: a set of report
+    names to check, so a development run cannot touch held-out reports."""
     accepted, summary = {}, []
     for name, r in sorted(extract.items()):
+        if only is not None and name not in only:
+            continue
         sid = safe_id(name)
         readers = {f.split(".")[-2]: os.path.join(review_dir, f) for f in os.listdir(review_dir)
                    if f.startswith(sid + ".") and f.endswith(".json") and not f.endswith(".form.json")}
@@ -189,7 +240,7 @@ def check(root, extract, review_dir, cache):
                 else:
                     clean[k] = None
                     problems.append(f"{who}: {k} not found on page {fig.get('page')} as quoted")
-            reads[who] = {"unit": d.get("unit"), "figures": clean, "notes": d.get("notes", "")}
+            reads[who] = {"unit": canon_unit(d.get("unit")), "figures": clean, "notes": d.get("notes", "")}
         final = {}
         for k in FIELDS:
             votes = {}
@@ -215,6 +266,13 @@ def check(root, extract, review_dir, cache):
         units = {v["unit"] for v in final.values()}
         unit = units.pop() if len(units) == 1 else None
         chk = report_checks(final, unit) if unit else {}
+        if unit and chk.get("face_value") is not True:
+            sub = equity_line_substitute(final, unit, pages, r)
+            if sub:
+                final["share_capital"] = sub
+                chk = report_checks(final, unit)
+                problems.append("share capital taken from the equity line of the share-capital note "
+                                f"(p{sub['page']}); the voted figure includes other capital")
         # A reader who finds the pages are the wrong statements (another company's, a
         # subsidiary's) writes notes starting "reject:". That vetoes the whole report,
         # because a balance check passes just as well on the wrong company's accounts.
@@ -236,7 +294,7 @@ def check(root, extract, review_dir, cache):
         n_acc = sum(1 for v in final.values() if v["accepted"])
         summary.append(f"{name[:48]:48} readers {'+'.join(sorted(reads)):20} accepted {n_acc}/{len(final)} "
                        f"checks {chk} {'; '.join(problems)[:120]}")
-    json.dump(accepted, open(os.path.join(review_dir, "accepted.json"), "w"), indent=1)
+    json.dump(accepted, open(out_path or os.path.join(review_dir, "accepted.json"), "w"), indent=1)
     print("\n".join(summary) or "no reader files found")
 
 
