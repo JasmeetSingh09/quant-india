@@ -118,3 +118,24 @@ the majority rule and the gross-revenue refusal.
 - **Still failing, correctly:** Aban (EPS is after preference dividends), Tata Steel FY2017 (EPS after
   perpetual-bond coupons), and wrong voted figures the check rightly rejects (Grasim FY2022, BHEL
   FY2016).
+
+## 6. Phase 1 held-out result (run once, after the freeze at `7f6a709`)
+
+- **No regression:** 474 complete company-years, 0 problems.
+- **Held-out gain:** **3 of 55** company-years became complete (CIPLA 2022 and 2024, ZEEL 2014).
+  There was 1 equity-line substitution.
+- **Development showed 11 of 53. The held-out result is the honest estimate.** Most of the
+  development gain was one company: JSW Steel accounts for 7 of the 11. On companies the fixes never
+  saw, the equity-line fix triggered once.
+- **Whole collection, frozen fixes** (a scratch run; `review_v11/accepted.json` is **unchanged**):
+  - **489 / 1,033 (47.3%)**, up from 474;
+  - 15 newly complete: 11 development, 3 held-out, and 1 outside both groups (COALINDIA 2017, via
+    the unit merge). List: `docs/audit/reader_fix_phase1_newly_complete_2026-10-17.json`.
+- **Correctness audit.**
+  - All 15 are audited, since that is under the cap of 20 (seed 20261018).
+  - The packet has 105 figures, each with page and printed line:
+    `quant_data/annual_reports/manifest/phase1_audit_packet_2026-10-17.md`.
+  - **Awaiting the owner, or a reader the owner approves.** Until it passes, the official coverage
+    stays 474 and `accepted.json` is not replaced. Any wrong figure withdraws the fix that produced
+    it.
+- **Phase 2 (OCR):** not started. Its 91 cases are untouched.
