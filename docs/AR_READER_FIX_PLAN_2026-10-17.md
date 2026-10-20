@@ -139,3 +139,46 @@ the majority rule and the gross-revenue refusal.
     stays 474 and `accepted.json` is not replaced. Any wrong figure withdraws the fix that produced
     it.
 - **Phase 2 (OCR):** not started. Its 91 cases are untouched.
+
+## 7. Phase 1 correctness audit and promotion (2026-10-20)
+
+**Auditor (owner's choice, 2026-10-20):** a blind image re-read. A fresh Claude reader saw only the
+51 cited page images, rendered at 150 dpi, and a list of items with their definitions. It **never saw
+the accepted values**, quotes or earlier readings. It worked in an isolated folder and listed every
+file it opened: `tasks.json` and the images only.
+
+This is an independent channel: the page image, not the extracted text. It is still an AI reader,
+not the owner's own check.
+
+**Round 1 (values).**
+- **All 105 blind readings equal the accepted figures**, current and previous year, with 0
+  disagreements.
+- 78 figures were correct outright. 27 were unresolved only because the image does not say
+  "standalone" or "consolidated".
+
+**Round 2 (statement type from context, the reviewer's rule).**
+- The nearest earlier and later pages naming a statement type were shown.
+- 14 pages were settled as standalone: they sit between pages marked standalone, or follow a
+  standalone auditor's report with no consolidated section in between.
+- **The reader's two weak calls** (JSW FY2013 cases 21 and 23, resting only on a consolidated report
+  36–40 pages later) **are treated as unclear**, as are the two JSW FY2013 pages with no context.
+
+**Final.**
+- **98 correct, 0 incorrect, 7 unresolved** (all JSW Steel FY2013).
+- **No fix is withdrawn.**
+- 14 of 15 company-years are confirmed. JSW Steel FY2013 stays incomplete.
+- Record: `docs/audit/reader_fix_phase1_audit_record_2026-10-20.csv`.
+
+**Promotion.**
+- `review_v11/accepted.json` now holds the frozen phase-1 readings, with JSW Steel FY2013's pre-fix
+  record kept.
+- Backup: `review_v11/accepted_before_phase1_2026-10-20.json`.
+- **Coverage: 488 / 1,033 (47.2%)**, up from 474. The gate needs 827, so it is **short by 339**.
+- **No-regression on the promoted file:** 474 baseline company-years, 0 problems.
+
+**Notes for the next value/quality pre-registration:**
+- **JSW Steel share capital is net of treasury shares** (owner, 2026-10-18).
+- **The total-equity subtotal includes preference capital** for JSW Steel FY2013–16 and Zee FY2014.
+  For P/B, the pre-registration should say whether preference capital is excluded from book value.
+- **Revenue where excise is shown only as an expense line** (Coal India FY2017, JSW Steel FY2018) is
+  the printed revenue line, unadjusted.
