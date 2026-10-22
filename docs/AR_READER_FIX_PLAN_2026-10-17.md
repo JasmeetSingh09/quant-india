@@ -224,7 +224,7 @@ India file, resume next. **Tata Power FY2024 stays unresolved.** `accepted.json`
 
 ## 9. Phase 2 development result (2026-10-22): no gain
 
-**The OCR run.** All 12 selected development files were OCR'd and checked complete (5,994 pages; the
+**The OCR run.** All 12 selected development files were OCR'd and checked complete (4,994 pages; the
 3 NTPC files account for 3,694). Statements were then located in 4 OCR'd files, plus Tata Power
 FY2024 via fix 2B.
 
