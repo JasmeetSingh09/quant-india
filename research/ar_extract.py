@@ -76,6 +76,32 @@ def head_of(text, n=12):
     return "\n".join(l for l in text.splitlines()[:n] if not NAV_BANNER.search(l))
 
 
+# Reader fix 2B (2026-10-17, development case Tata Power FY2021/FY2024): a running banner above
+# the statement title names the report's sections ("Stakeholder ... Statutory", "at a glance ...
+# value creation ... Financial Statements"). Its "at a glance" made every real statement page
+# look like a summary page to SKIP_HEAD. A line ABOVE the title that names two or more sections is
+# a banner and is ignored for the skip test only. The title line and everything below it are still
+# tested, so "Consolidated Balance Sheet" or "Notes to ..." still skip.
+SECTION_WORD = re.compile(r"at\s+a\s+glance|overview|governance|statutory|value\s+creation|stakeholder|"
+                          r"integrated\s+report|financial\s+statements", re.I)
+
+
+# A running header that says what the PAGE is ("Notes forming part of the standalone financial
+# statements", an auditor's report) is never a banner, even when it names two sections
+# (development side effect, JUBLFOOD FY2023 p99: a notes page was taken as a balance sheet).
+PAGE_KIND = re.compile(r"notes?\s+(to|forming)|auditor", re.I)
+
+
+def head_for_skip(head):
+    lines = head.split("\n")
+    t = next((i for i, l in enumerate(lines) if any(TITLE[k].search(l) for k in TITLE)), None)
+    if t is None:
+        return head
+    keep = [l for l in lines[:t] if PAGE_KIND.search(l)
+            or len({m.group(0).lower() for m in SECTION_WORD.finditer(l)}) < 2]
+    return "\n".join(keep + lines[t:])
+
+
 # Font-encoded text. pdfplumber returns "(cid:N)" for glyphs whose font has no
 # Unicode map. Two shapes occur:
 #   ligatures only: "Pro(cid:191) t", "bene(cid:191) ts" (DLF FY2013) -- one code
@@ -184,7 +210,7 @@ def find_statements(pages):
     titled_pl = []
     for i, text in enumerate(pages):
         head = head_of(text)
-        if SKIP_HEAD.search(head) or len(re.findall(r"\d[\d,]{3,}", text)) < 15:
+        if SKIP_HEAD.search(head_for_skip(head)) or len(re.findall(r"\d[\d,]{3,}", text)) < 15:
             continue
         # A statement can run onto the next page (HUL FY2018 prints its EPS on
         # the P&L's second page), so the required caption may be on either.

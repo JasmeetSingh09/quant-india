@@ -1,0 +1,51 @@
+{
+ "part1_reports": 794,
+ "part1_changed": [
+  {
+   "file": "GRASIM\\GRASIM_FY2017_archive.pdf",
+   "old": {
+    "bs": 30,
+    "pl": 132
+   },
+   "new": {
+    "bs": 131,
+    "pl": 132
+   }
+  },
+  {
+   "file": "ONGC\\ONGC_FY2025_companysite.pdf",
+   "old": {
+    "bs": 673,
+    "pl": 674
+   },
+   "new": {
+    "bs": 270,
+    "pl": 272,
+    "cf": 275
+   }
+  },
+  {
+   "file": "TATAPOWER\\TATAPOWER_FY2024_archive.pdf",
+   "old": {},
+   "new": {
+    "bs": 299,
+    "pl": 301,
+    "cf": 303
+   }
+  },
+  {
+   "file": "TMPV\\TMPV_FY2013_companysite.pdf",
+   "old": {
+    "bs": 41,
+    "cf": 123
+   },
+   "new": {
+    "bs": 121,
+    "pl": 122,
+    "cf": 123
+   }
+  }
+ ],
+ "part2_files": 489,
+ "part2_problems": []
+}

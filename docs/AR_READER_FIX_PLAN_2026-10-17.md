@@ -182,3 +182,42 @@ not the owner's own check.
   For P/B, the pre-registration should say whether preference capital is excluded from book value.
 - **Revenue where excise is shown only as an expense line** (Coal India FY2017, JSW Steel FY2018) is
   the printed revenue line, unadjusted.
+
+## 8. Phase 2 development log (not frozen; no held-out case examined)
+
+**What the OCR population really is.** Diagnosis on the 54 development files (`ocr_dev_diag`):
+- **Scanned or partly scanned:** 3 files. OCR helps.
+- **Garbled text layer:** 3 files (Adani Ent FY2012, Coal India FY2012, ONGC FY2014). Under 10% of the
+  words are common English. OCR helps.
+- **Short extracts, notices or results:** 17 files. These need the full report, which means a download.
+- **Text layer present but the statements not located:** 21 files. Most of these were wrong-year
+  files or consolidated or auditor pages, correctly skipped. A few were genuine locator misses.
+- **Text present, but no balance-sheet text** at all: 13 files.
+
+**Scope of phase 2, fixed here before any freeze.**
+- **2A, OCR** (`research/ar_ocr.py`). It runs on pages with no text layer, and on whole files whose
+  text layer is garbled. Garbled means fewer than 10% of words are common English **and** no page
+  says "balance sheet". Tesseract 5.4 at 300 dpi, psm 6. It writes to a separate cache,
+  `ar_cache_ocr`; the original cache is never modified. Every OCR'd page is listed. Writes are
+  atomic and the run resumes, after a 2026-10-20 run was stopped and left one truncated file, now
+  quarantined.
+- **2B, banner lines** (`ar_extract.head_for_skip`). A line above a statement title that names two
+  or more report sections is a running banner (Tata Power: "… at a glance … value creation …
+  Financial Statements"). It is ignored by the skip test. A line saying the page is a notes or
+  auditor's page is never treated as a banner. That refinement came from a development side effect:
+  Jubilant FY2023 p99.
+
+**Locator regression (2026-10-22, after the refinement):**
+- **Part 2:** all 489 files behind the 488 complete company-years were re-extracted and re-checked,
+  with **0 problems**.
+- **Part 1:** 794 non-held-out reports were re-located, and **4 selections changed, all checked by
+  page heading and all corrections:**
+  - Tata Power FY2024: nothing → its standalone statements;
+  - Grasim FY2017: a five-year summary → the balance sheet;
+  - ONGC FY2025: a consolidated reconciliation note → the "Standalone Balance Sheet";
+  - Tata Motors FY2013: a "summarised balance sheet" → the balance sheet.
+- None of them is accepted without an independent reading or passing accounting checks.
+- Record: `docs/audit/reader_fix_phase2_locator_regression_2026-10-22.json`.
+
+**OCR development run:** 5 of 12 files complete and verified. The rest, plus the quarantined Coal
+India file, resume next. **Tata Power FY2024 stays unresolved.** `accepted.json` is unchanged.
