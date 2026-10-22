@@ -221,3 +221,32 @@ not the owner's own check.
 
 **OCR development run:** 5 of 12 files complete and verified. The rest, plus the quarantined Coal
 India file, resume next. **Tata Power FY2024 stays unresolved.** `accepted.json` is unchanged.
+
+## 9. Phase 2 development result (2026-10-22): no gain
+
+**The OCR run.** All 12 selected development files were OCR'd and checked complete (5,994 pages; the
+3 NTPC files account for 3,694). Statements were then located in 4 OCR'd files, plus Tata Power
+FY2024 via fix 2B.
+
+**Independent check.** A fresh blind reader read those statement pages from their images, with
+values withheld. Record: `docs/audit/reader_fix_phase2_dev_blind_readings_2026-10-22.json`.
+
+| Report | Image vs OCR/rule figures | Outcome |
+|---|---|---|
+| Coal India FY2012 (OCR) | **7 of 7 agree**; balance and face checks pass | **Unresolved on statement type.** The context page is the end of the auditor's report on the *consolidated* statements, while the pages carry no "Consolidated" title and a different signing date. The reader judged it unclear. No further pages were sought, to avoid shopping for evidence |
+| ONGC FY2016 (OCR, scanned) | 5 agree. Revenue differs (765,652 vs 783,681). Total equity: no subtotal is printed, and the OCR previous-year figure is garbage | Incomplete |
+| Adani Ent FY2012 (OCR) | 2 agree. The OCR misread profit (0.0) and EPS (48 vs 3.29); 3 items missing | Incomplete |
+| Zee "FY2020" (OCR) | — | **The file is the 2005 report** (columns 2005/2004, auditors signed 26 August 2005). Excluded |
+| Tata Power FY2024 (fix 2B) | 5 agree. EPS (41 vs 6.97) and total assets differ | Incomplete; **stays unresolved** |
+
+**Not OCR-fixable:**
+- **NTPC FY2016–18** are almost entirely Hindi. OCR with English found no "balance sheet" anywhere.
+- **ONGC FY2014** has no balance sheet at all.
+
+**What this shows.**
+- OCR makes a few reports *readable*. The blind image check then caught the OCR misreadings (Adani
+  Ent, ONGC, Tata Power) that agreement on OCR text alone would have let through.
+- With **0 company-years gained on development**, there is no gain for a held-out run to confirm.
+- Whether to run the held-out half anyway is left to the owner (see the report).
+
+`accepted.json` is unchanged. The OCR and banner tools stay committed: they are regression-clean.

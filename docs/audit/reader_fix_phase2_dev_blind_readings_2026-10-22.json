@@ -1,0 +1,88 @@
+{
+ "files_opened": [
+  "tasks.json",
+  "pages/p2_01.png", "pages/p2_02.png", "pages/p2_03.png", "pages/p2_04.png", "pages/p2_05.png", "pages/p2_06.png",
+  "pages/p2_07.png", "pages/p2_08.png", "pages/p2_09.png", "pages/p2_10.png",
+  "pages/p2_11.png", "pages/p2_12.png", "pages/p2_13.png",
+  "pages/p2_14.png", "pages/p2_15.png", "pages/p2_16.png",
+  "pages/p2_17.png", "pages/p2_18.png", "pages/p2_19.png", "pages/p2_20.png", "pages/p2_21.png", "pages/p2_22.png"
+ ],
+ "reports": {
+  "case_1": {
+   "company": "COALINDIA",
+   "statement_type": "standalone",
+   "statement_type_note": "Titles read 'Balance Sheet', 'Statement of Profit & Loss', 'The Cash Flow Statement (Indirect Method)' with no 'Consolidated'; Minority Interest line is '-'.",
+   "current_year_heading": "As at 31-03-12 (balance sheet); For the Year ended 31.03.12 (P&L); For the Year ended 31.03.2012 (cash flow)",
+   "items": {
+    "revenue": {"current": 415.86, "previous": 409.46, "image": "p2_03.png", "line": "(I) Revenue from Operations", "unit": "crore", "note": "Already net of Excise Duty and Other Levies (Sale of Coal 486.56 less 70.70)."},
+    "profit_for_year": {"current": 8065.10, "previous": 4696.10, "image": "p2_04.png", "line": "(XVI) Profit for the Period (XII + XV)", "unit": "crore", "note": "Same figure as (XII) on p2_03.png; no discontinued operations."},
+    "eps_basic": {"current": 12.83, "previous": 7.42, "image": "p2_04.png", "line": "(XVII) Earnings per share (in Rs) - (1) Basic", "unit": "rupees per share", "note": ""},
+    "share_capital": {"current": 6316.36, "previous": 6316.36, "image": "p2_01.png", "line": "(a) Share Capital", "unit": "crore", "note": "Note 1 (p2_06.png) confirms equity only: 6316364400 equity shares of Rs 10 = 6316.36."},
+    "total_equity": {"current": 19564.75, "previous": 17816.01, "image": "p2_01.png", "line": "(1) Shareholders' Fund (subtotal)", "unit": "crore", "note": ""},
+    "total_assets": {"current": 30712.20, "previous": 27675.98, "image": "p2_01.png", "line": "II ASSETS - Total", "unit": "crore", "note": ""},
+    "operating_cash_flow": {"current": 5474.67, "previous": 120.93, "image": "p2_05.png", "line": "Net Cash Flow from Operating Activities (A)", "unit": "crore", "note": ""}
+   }
+  },
+  "case_2": {
+   "company": "ONGC",
+   "statement_type": "standalone",
+   "statement_type_note": "Titles read 'Balance Sheet', 'Statement of Profit & Loss', 'Cash Flow Statement' with no 'Consolidated'; cash flow shows loans to Subsidiary.",
+   "current_year_heading": "As at 31st March, 2016 (balance sheet); 2015-16 (P&L); Year Ended 31st March, 2016 (cash flow)",
+   "items": {
+    "revenue": {"current": 783680.70, "previous": 828709.61, "image": "p2_08.png", "line": "Revenue from operations (Net)", "unit": "million", "note": "Gross 785,651.87 / 830,934.67 less Excise Duty 1,971.17 / 2,225.06."},
+    "profit_for_year": {"current": 160036.46, "previous": 177329.54, "image": "p2_08.png", "line": "Profit after Tax", "unit": "million", "note": ""},
+    "eps_basic": {"current": 18.71, "previous": 20.73, "image": "p2_08.png", "line": "Earnings per Equity Share - Basic and Diluted (Rs) (Face Value Rs 5/- Per Share)", "unit": "rupees per share", "note": "Single combined basic-and-diluted line."},
+    "share_capital": {"current": 42777.60, "previous": 42777.60, "image": "p2_07.png", "line": "1 Shareholders' funds (a) Share capital", "unit": "million", "note": "No share capital note among the images to confirm equity-only composition."},
+    "total_equity": {"current": null, "previous": null, "image": "p2_07.png", "line": "1 Shareholders' funds", "unit": "million", "note": "No Shareholders' funds subtotal is printed; only components Share capital 42,777.60 / 42,777.60 and Reserves and surplus 1,475,749.40 / 1,403,232.15. Not added up per instructions."},
+    "total_assets": {"current": 2201057.72, "previous": 2080798.81, "image": "p2_07.png", "line": "II. ASSETS - TOTAL", "unit": "million", "note": ""},
+    "operating_cash_flow": {"current": 397250.96, "previous": 249638.44, "image": "p2_09.png", "line": "Net Cash Flow from Operating Activities 'A'", "unit": "million", "note": "After prior period cash items (557.10) / (524.60)."}
+   }
+  },
+  "case_3": {
+   "company": "ADANIENT",
+   "statement_type": "standalone",
+   "statement_type_note": "Titles read 'Balance Sheet', 'Statement of Profit & Loss', 'Cash Flow Statement' with no 'Consolidated'; cash flow shows 'Loans to Subsidiary Companies'.",
+   "current_year_heading": "As at 31st March, 2012 (balance sheet); For the year ended 31st March, 2012 (P&L and cash flow)",
+   "items": {
+    "revenue": {"current": 5282.20, "previous": 2926.85, "image": "p2_12.png", "line": "I. Revenue from Operations", "unit": "crore", "note": "No excise line shown on the face of the statement."},
+    "profit_for_year": {"current": 361.72, "previous": 269.11, "image": "p2_12.png", "line": "IX. Profit (Loss) for the year (VII - VIII)", "unit": "crore", "note": ""},
+    "eps_basic": {"current": 3.29, "previous": 2.53, "image": "p2_12.png", "line": "X Earning per Equity Share of Rs 1/- each - Basic & Diluted", "unit": "rupees per share", "note": "Single combined basic-and-diluted line."},
+    "share_capital": {"current": 109.98, "previous": 109.98, "image": "p2_11.png", "line": "(1) Shareholders' Funds (a) Share Capital", "unit": "crore", "note": "No share capital note among the images to confirm equity-only composition."},
+    "total_equity": {"current": 10002.06, "previous": 9768.16, "image": "p2_11.png", "line": "(1) SHAREHOLDERS' FUNDS (subtotal)", "unit": "crore", "note": ""},
+    "total_assets": {"current": 14172.22, "previous": 11613.82, "image": "p2_11.png", "line": "II ASSETS - TOTAL", "unit": "crore", "note": ""},
+    "operating_cash_flow": {"current": -258.41, "previous": -407.47, "image": "p2_13.png", "line": "Net Cash from Operating Activities A", "unit": "crore", "note": "Printed in brackets (outflow)."}
+   }
+  },
+  "case_4": {
+   "company": "ZEEL",
+   "statement_type": "standalone",
+   "statement_type_note": "Titles read 'Balance Sheet as at March 31,' and 'Profit and Loss Account for the year ended March 31,' with no 'Consolidated'; schedules are the company's own. Not explicitly labelled standalone.",
+   "current_year_heading": "2005 (title 'Balance Sheet as at March 31,'; columns headed 2005 and 2004)",
+   "year_mismatch_note": "EXPECTED YEAR NOT CONFIRMED: tasks.json expects year ending March 2020, but every image shows columns 2005 and 2004 (balance sheet as at March 31; P&L for year ended March 31; auditor date August 26, 2005). These are FY2004-05 statements. Figures below are what is printed for 2005/2004, not for 2020.",
+   "items": {
+    "revenue": {"current": 6472507, "previous": 5052901, "image": "p2_15.png", "line": "Income - Sales and Services", "unit": "Rs. in '000 (thousands)", "note": "No line called 'Revenue from operations'; 'Sales and Services' is the operating revenue line. No excise duty shown. YEAR IS 2005/2004, not 2020."},
+    "profit_for_year": {"current": 1622725, "previous": 1183739, "image": "p2_15.png", "line": "Net Profit After Tax", "unit": "Rs. in '000 (thousands)", "note": "Net Profit After Tax includes 'Add/(Less) - Provision for Taxation earlier years' (nil / 30,600). The line above, 'Profit After Tax', reads 1,622,725 / 1,153,139. YEAR IS 2005/2004, not 2020."},
+    "eps_basic": {"current": 3.93, "previous": 2.87, "image": "p2_15.png", "line": "Basic Earnings Per Share after Exceptional Item (Rs.)", "unit": "rupees per share", "note": "Basic EPS before Exceptional Item is 4.06 / 2.87. YEAR IS 2005/2004, not 2020."},
+    "share_capital": {"current": 412438, "previous": 412438, "image": "p2_14.png", "line": "Shareholders' Funds - Share Capital", "unit": "Rs. in '000 (thousands)", "note": "Schedule 1 (p2_16.png): 412,505 equity less calls in arrears 67 = 412,438; equity only (no preference shares issued). YEAR IS 2005/2004, not 2020."},
+    "total_equity": {"current": 21367606, "previous": 20465613, "image": "p2_14.png", "line": "Shareholders' Funds (unlabelled subtotal below Reserves and Surplus)", "unit": "Rs. in '000 (thousands)", "note": "YEAR IS 2005/2004, not 2020."},
+    "total_assets": {"current": null, "previous": null, "image": "p2_14.png", "line": "", "unit": "Rs. in '000 (thousands)", "note": "Old 'Sources of Funds / Application of Funds' layout (TOTAL 26,588,521 / 23,160,901 is total funds, net of current liabilities), so null per instructions."},
+    "operating_cash_flow": {"current": null, "previous": null, "image": "", "line": "", "unit": "", "note": "No cash flow statement among the images (p2_14 balance sheet, p2_15 P&L, p2_16 schedules 1-2)."}
+   }
+  },
+  "case_5": {
+   "company": "TATAPOWER",
+   "statement_type": "standalone",
+   "statement_type_note": "Titles read 'Standalone Balance Sheet', 'Standalone Statement of Profit and Loss', 'Standalone Cash Flow Statement'.",
+   "current_year_heading": "As at March 31, 2024 (balance sheet); For the year ended March 31, 2024 (P&L and cash flow)",
+   "items": {
+    "revenue": {"current": 20093.36, "previous": 17727.78, "image": "p2_19.png", "line": "I Revenue from Operations", "unit": "crore", "note": ""},
+    "profit_for_year": {"current": 2229.86, "previous": 3267.90, "image": "p2_19.png", "line": "XI Profit/(Loss) for the year", "unit": "crore", "note": ""},
+    "eps_basic": {"current": 6.97, "previous": 10.22, "image": "p2_20.png", "line": "XIV Basic and Diluted Earnings Per Equity Share (of Rs 1/- each) - (ii) After net movement in regulatory deferral balances", "unit": "rupees per share", "note": "Combined basic-and-diluted. Line (i) Before net movement in regulatory deferral balances reads 6.49 / 7.60."},
+    "share_capital": {"current": 319.56, "previous": 319.56, "image": "p2_17.png", "line": "Equity (a) Equity Share Capital", "unit": "crore", "note": ""},
+    "total_equity": {"current": 15787.66, "previous": 13699.59, "image": "p2_17.png", "line": "Total Equity", "unit": "crore", "note": ""},
+    "total_assets": {"current": 50488.95, "previous": 48172.71, "image": "p2_17.png", "line": "TOTAL ASSETS", "unit": "crore", "note": "Includes Regulatory Deferral Account - Assets; 'Total Assets before Regulatory Deferral Account' is 48,243.51 / 46,259.49."},
+    "operating_cash_flow": {"current": 5881.49, "previous": 500.05, "image": "p2_22.png", "line": "Net Cash Flows from/(used in) Operating Activities A", "unit": "crore", "note": ""}
+   }
+  }
+ }
+}
