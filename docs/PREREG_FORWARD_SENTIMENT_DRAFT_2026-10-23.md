@@ -125,9 +125,18 @@ Either can pass or fail without the other.
 ## 9. Decisions needed before approval
 
 1. **Start the window after v1.6.1 is deployed** (recommended), or now.
-2. **The timing check** in section 3 is run and passes.
+2. ~~The timing check~~: done 2026-10-23, passed (section 10).
 3. **The sealed monthly export** is approved (shared with value/quality).
 
 ## 10. Changes before approval
 
-(none yet)
+**2026-10-23: the section 3 timing check was run, and passed.**
+- **Sample:** 50 stocks drawn at random (md5 order with seed `timing20261023`) × 11 nights, 2026-10-13
+  to 2026-10-23, giving 550 stored prices compared with Yahoo daily closes.
+- **Result:** **469** equal the previous trading day's close, and **68** equal both closes because the
+  price did not change. So **537 of 550 (97.6%)** are consistent with the previous close.
+- **The rest:** 1 equals the same-day close. **12 (2.2%) match neither**; all 12 are very thinly
+  traded stocks (for example Consolidated Finvest, MFML, DCM), where Yahoo's closes are unreliable.
+- **Conclusion:** the stored price is the previous close, so section 3's timing stands. Entry at the
+  next cycle's stored price, which is that day's close, is the rule.
+- **Note:** `captured_at` holds a date only, with no time, so the check used the date of the cycle.
