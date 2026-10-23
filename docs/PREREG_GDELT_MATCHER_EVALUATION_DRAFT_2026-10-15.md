@@ -216,6 +216,31 @@ and nothing in the evaluation compensates for them.**
 
 ## 11. Changes before approval
 
+**2026-10-23 (before approval; nothing sampled from the evaluation days):**
+- **The loose candidate term (section 4) is made exact.** A word counts if it is 3+ characters, from
+  the company's full name, its hand-listed short names or its ticker. It must not be one of M-4's
+  `LEGAL` words (limited, ltd, corporation, …), and not one of `india`, `indian`, `the`, `of`, `and`,
+  `company`.
+  - Without the exclusions, "Coal India" would make almost every headline a candidate, and the C
+    and R samples would be meaningless.
+- **The tool is `research/gdelt_matcher_eval.py`.**
+  - It refuses `--final` unless the matcher is byte-identical to `00bb4e0`, the name list's hash is
+    `a3c5cb00f700bb73`, and the approved pre-registration's commit is given.
+  - The reserve days (2/12/22) can never be read.
+  - It was dry-run on the already-seen development days (1/11/21) only.
+- **Categories assigned by the frozen rules:** A 21, B 27, C 49, D 107.
+- **Dry run on the already-seen development days (1/11/21), 2026-10-23.**
+  - Populations: P 47,279; C 467,837; R 1,267,883.
+  - The blind packet holds 2,200 headlines, shuffled, showing only number, date, source and text,
+    with no leak of sample, category or matcher decision.
+  - **Design weakness found:** C is dominated by ordinary name words ("consumer", "energy", "state"),
+    so each of 600 C draws stands for about 780 headlines and the recall estimate would be very
+    noisy.
+  - **Proposed for the owner's decision before freezing:** split C into C-strong and C-weak.
+    - C-strong: a ticker, a two-word name fragment, or a one-word company name.
+    - C-weak: only an ordinary name word.
+    - Draw 400 and 200.
+
 **2026-10-15 (owner):**
 - **M-4 chosen;** M-5 not chosen.
 - The 12 rule gaps are documented, not fixed.
