@@ -60,7 +60,15 @@ library upgrade has to be a reviewed change to the lock files.
 
 ## Before deploy (each needs the owner)
 
-1. `verify-production-env` passes on GitHub's Linux runner.
+1. ~~`verify-production-env` passes on GitHub's Linux runner.~~ **PASSED 2026-10-23.**
+   - Run 39971464918, branch pushed by the owner's instruction, commit `0c0eda4`.
+   - Every step succeeded, including the in-image verification, whose script exits non-zero on any
+     failed check. That covers Python 3.12.15, the 93 hash-locked packages, `pip check`, the test
+     suites, the FinBERT baseline, and app startup with its endpoints.
+   - Evidence artifact `production-image-verification` (sha256 `5cf5fc0a…`) can be downloaded while
+     signed in. Annotations: only the Node 20 deprecation and the runner-label notice.
+   - **Note:** this verified the locked environment with `d9b474a`'s code; `main`'s code has passed the
+     same suites locally.
 2. A deploy window: outside 00:02–03:00 UTC, after the nightly scan finishes (about 03:30 UTC), and
    no backfill running.
 3. After deploy, the v1.6.1 freeze. Then check `/strategy/drift/v1.6.1` (`behavioural_drift: false`)
