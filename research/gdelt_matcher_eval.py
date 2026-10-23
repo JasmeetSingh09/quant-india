@@ -5,7 +5,8 @@ Subcommands
   categories                  assign every company to A/B/C/D by the frozen rules (section 5)
   sample  --dev | --final     draw the three samples (section 4):
                                 P  600 matched headlines
-                                C  600 headlines with a loose candidate term but no match
+                                Cs 400 not matched, with a strong (distinctive) candidate term
+                                Cw 200 not matched, with only an ordinary candidate word
                                 R 1000 headlines with no candidate term
                               --dev    reads ONLY already-seen days (1, 11, 21) to test this tool
                               --final  reads the evaluation days (5, 15, 25); refuses unless the
@@ -41,7 +42,11 @@ NAMES_SHA16 = "a3c5cb00f700bb73"
 SEED = 20261016
 DEV_DAYS, FINAL_DAYS, RESERVE_DAYS = {1, 11, 21}, {5, 15, 25}, {2, 12, 22}
 TITLES_FROM = "20190922"
-N_P, N_C, N_R = 600, 600, 1000
+N_P, N_R = 600, 1000
+# C is split (owner, 2026-10-23) so the labelling effort goes where misses are likely:
+#   Cs (strong): the headline contains a distinctive identifier of a listed company
+#   Cw (weak):   only an ordinary word from a company's name
+N_CS, N_CW = 400, 200
 GROUP_TOKENS = {"adani", "aditya", "bajaj", "birla", "godrej", "hero", "hindustan", "mahindra", "reliance", "tata"}
 # Candidate words exclude legal words (the matcher's own LEGAL list), words under 3 characters and this
 # fixed stoplist; otherwise "india" in "Coal India" would make almost every headline a candidate.
@@ -92,6 +97,32 @@ def candidate_words(table):
     return words
 
 
+def strong_terms(table):
+    """Distinctive identifiers: the ticker, the hand-listed short names, every two-word fragment of the
+    company's core name, and a one-word core name. Ordinary-word tickers and names (M-4's DROP_TICKER)
+    are never strong."""
+    out = {}
+    for sym, v in table.items():
+        ts = set()
+        tick = re.sub(r"[^a-z0-9]", "", sym.lower())
+        if len(tick) >= 3 and tick not in G.DROP_TICKER:
+            ts.add(tick)
+        for a in G.ALIASES.get(sym, []):
+            a = G.norm(a)
+            if a and a not in G.DROP_TICKER and len(a.replace(" ", "")) >= 3:
+                ts.add(a)
+        core = G.core(G.NAME_OVERRIDE.get(sym, v.get("name")) or v.get("name") or "")
+        words = core.split()
+        for i in range(len(words) - 1):
+            pair = words[i:i + 2]
+            if not all(w in STOP or w in G.LEGAL for w in pair):
+                ts.add(" ".join(pair))
+        if len(words) == 1 and words[0] not in G.DROP_TICKER and len(words[0]) >= 3:
+            ts.add(words[0])
+        out[sym] = ts
+    return out
+
+
 def headlines(days):
     """Unique titled headlines on the given days of the month, from TITLES_FROM on."""
     seen = set()
@@ -122,9 +153,10 @@ def sample(mode, out_dir, prereg_commit=None):
     table = json.load(open(NAMES))
     rx, confirm, _ = G.build(NAMES)
     cw = candidate_words(table)
-    word_rx = {sym: re.compile(r"(?<![a-z0-9&])(" + "|".join(sorted(map(re.escape, ws), key=len, reverse=True)) + r")(?![a-z0-9&])")
-               for sym, ws in cw.items() if ws}
-    P, C, R = [], [], []
+    alt = lambda ws: re.compile(r"(?<![a-z0-9&])(" + "|".join(sorted(map(re.escape, ws), key=len, reverse=True)) + r")(?![a-z0-9&])")
+    word_rx = {sym: alt(ws) for sym, ws in cw.items() if ws}
+    strong_rx = {sym: alt(ws) for sym, ws in strong_terms(table).items() if ws}
+    P, Cs, Cw, R = [], [], [], []
     for d, src, title, orgs in headlines(days):
         m = G.match(title, orgs, rx, confirm)
         if m:
@@ -132,11 +164,13 @@ def sample(mode, out_dir, prereg_commit=None):
             continue
         t = G.norm(html.unescape(title))
         cands = sorted(sym for sym, r in word_rx.items() if r.search(t))
-        (C if cands else R).append({"day": d, "source": src, "title": title, "candidates": cands})
+        strong = sorted(sym for sym, r in strong_rx.items() if r.search(t))
+        row = {"day": d, "source": src, "title": title, "candidates": cands, "strong": strong}
+        (Cs if strong else Cw if cands else R).append(row)
     rnd = random.Random(SEED)
-    pops = {"P": len(P), "C": len(C), "R": len(R)}
-    picks = {"P": rnd.sample(P, min(N_P, len(P))), "C": rnd.sample(C, min(N_C, len(C))),
-             "R": rnd.sample(R, min(N_R, len(R)))}
+    pops = {"P": len(P), "Cs": len(Cs), "Cw": len(Cw), "R": len(R)}
+    picks = {"P": rnd.sample(P, min(N_P, len(P))), "Cs": rnd.sample(Cs, min(N_CS, len(Cs))),
+             "Cw": rnd.sample(Cw, min(N_CW, len(Cw))), "R": rnd.sample(R, min(N_R, len(R)))}
     os.makedirs(out_dir, exist_ok=True)
     json.dump({"mode": mode, "days": sorted(days), "seed": SEED, "populations": pops,
                "prereg_commit": prereg_commit, "samples": picks},
@@ -147,7 +181,7 @@ def sample(mode, out_dir, prereg_commit=None):
 
 def packet(out_dir):
     s = json.load(open(os.path.join(out_dir, "samples.json"), encoding="utf-8"))
-    rows = [(k, r) for k in ("P", "C", "R") for r in s["samples"][k]]
+    rows = [(k, r) for k in s["samples"] for r in s["samples"][k]]
     random.Random(SEED + 1).shuffle(rows)
     key, blind = [], []
     for i, (k, r) in enumerate(rows, 1):
@@ -180,7 +214,7 @@ def score(out_dir, labels_csv):
     pops, drawn = s["populations"], {k: len(v) for k, v in s["samples"].items()}
     tp = fp = 0
     by_cat = collections.defaultdict(lambda: [0, 0])
-    miss = {"C": 0, "R": 0}
+    miss = {k: 0 for k in s["populations"] if k != "P"}
     pairs = []
     for n, k in key.items():
         if n not in lab:
@@ -198,7 +232,7 @@ def score(out_dir, labels_csv):
             miss[k["sample"]] += len(truth)
     w = lambda k: pops[k] / max(drawn[k], 1)
     tp_pop, fp_pop = tp * w("P"), fp * w("P")
-    fn_pop = miss["C"] * w("C") + miss["R"] * w("R")
+    fn_pop = sum(miss[k] * w(k) for k in miss)
     total = sum(pops.values())
     out = {
         "precision": tp / max(tp + fp, 1),

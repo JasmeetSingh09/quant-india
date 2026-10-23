@@ -124,7 +124,9 @@ Either can pass or fail without the other.
 
 ## 9. Decisions needed before approval
 
-1. **Start the window after v1.6.1 is deployed** (recommended), or now.
+1. ~~Start the window after v1.6.1 is deployed~~. **Decided (owner, 2026-10-23): the window starts after v1.6.1
+   is deployed and frozen.** The first formation date is the first complete weekly cycle after the v1.6.1
+   freeze.
 2. ~~The timing check~~: done 2026-10-23, passed (section 10).
 3. **The sealed monthly export** is approved (shared with value/quality).
 
@@ -140,3 +142,5 @@ Either can pass or fail without the other.
 - **Conclusion:** the stored price is the previous close, so section 3's timing stands. Entry at the
   next cycle's stored price, which is that day's close, is the rule.
 - **Note:** `captured_at` holds a date only, with no time, so the check used the date of the cycle.
+
+**2026-10-23 (owner):** the window starts after v1.6.1 is deployed and frozen (section 9, item 1).

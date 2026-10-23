@@ -249,3 +249,13 @@ and nothing in the evaluation compensates for them.**
 - The attempt-4 bounds are stated precisely.
 
 Nothing has been sampled or labelled.
+
+**2026-10-23: APPROVED AND FROZEN (owner: "approve the split and freeze").**
+- **The C stratification is adopted.** Cs, strong, is a ticker, a hand-listed short name, a two-word
+  name fragment or a one-word company name, excluding M-4's ordinary-word tickers. Cw, weak, is only
+  an ordinary name word.
+- **Draws:** P 600, **Cs 400, Cw 200**, R 1000. Recall weights the strata by their populations.
+- **Dev dry run with the split (days 1/11/21):** Cs 12,547, Cw 455,290, so each Cs draw now stands for
+  about 31 headlines instead of 780.
+- **Frozen at this commit.** The tool's `--final` run on days 5/15/25 is next. Labelling is as
+  section 6: two independent blind readers, with the owner adjudicating disagreements.
