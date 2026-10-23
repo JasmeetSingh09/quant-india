@@ -1,0 +1,10 @@
+{
+ "kappa": 0.9609220639848894,
+ "both_yes": 591,
+ "r1_only": 29,
+ "r2_only": 19,
+ "decisions": 448800,
+ "identical_headlines": 2161,
+ "disagreements": 39,
+ "problems": []
+}

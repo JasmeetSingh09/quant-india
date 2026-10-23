@@ -221,8 +221,10 @@ def score(out_dir, labels_csv):
             continue
         truth = parse(lab[n]["final"])
         r1, r2 = parse(lab[n]["reader1"]), parse(lab[n]["reader2"])
-        for sym in set(cat):
-            pairs.append((sym in r1, sym in r2)) if (sym in r1 or sym in r2) else None
+        # Kappa over EVERY headline x company decision. The first version kept only pairs one reader
+        # named, which drops the both-no cases kappa needs (fixed 2026-10-23, before any scoring).
+        for sym in cat:
+            pairs.append((sym in r1, sym in r2))
         if k["sample"] == "P":
             for sym in k["matched"]:
                 ok = sym in truth
