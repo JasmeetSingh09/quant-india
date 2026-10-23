@@ -65,17 +65,29 @@ stocks by their **next month's return**?
 **Return:** from the formation date's close to the next formation date's close, adjusted for splits,
 bonuses and dividends.
 
-**Price source.** Decided **once, before the first grading**, and never switched mid-window:
-- **(P1) NSE end-of-day files with the stored corporate actions.** Only if NSE grants written
-  permission before the first grading date. Collection is paused pending NSE's reply.
-- **(P2) Yahoo adjusted closes.** Fetched at grading time, cross-checked against the price the app
-  stored in `factor_history.price` on the formation date. A stock whose two prices differ by more
-  than 5% on the formation date is reported, and **excluded that month**.
+**Price source: the app's own nightly record.**
+- **Primary: (P0) the price stored with the scores in `factor_history`, every night, for every
+  scored stock.**
+  - It already accrues without NSE. For example, October 2026 cycles are all complete, with prices
+    for about 2,480 stocks a night (2,482 on 2026-10-23).
+  - It is point-in-time by construction: written on the night, never fetched later.
+  - A stock that later delists keeps every price recorded while it traded. This removes most of the
+    survivor bias a later Yahoo fetch would have.
+- **Splits, bonuses and dividends.** Stored prices are as quoted, so a split inside a month would
+  look like a crash. Each month's return is therefore adjusted with the corporate actions known for
+  that month, from:
+  - the stored NSE corporate actions, if collection is permitted; otherwise
+  - Yahoo's split and dividend events, fetched at grading time.
 
-**Delistings (both sources).** A stock with no price at the month's end is exited at its **last
-stored price** (`factor_history`). This rule is the primary one, and the count is reported. A
-sensitivity re-grades those exits at **−100%**.
-- Yahoo drops delisted companies, which biases P2 toward survivors. This is stated, not corrected.
+  A stock with a price change beyond ±50% in a month and **no** recorded action is excluded that
+  month, and reported.
+- **Cross-check (reported, not deciding):** Yahoo adjusted closes for the same dates. Monthly
+  returns that differ by more than 5 percentage points are listed.
+- **NSE end-of-day files** replace nothing. If NSE grants written permission, they are a second
+  cross-check.
+
+**Delistings.** A stock that stops being scored is exited at its **last stored price**. This rule is
+the primary one, and the count is reported. A sensitivity re-grades those exits at **−100%**.
 
 ## 4. Statistics, fixed now
 
@@ -152,8 +164,7 @@ pre-registration.
 
 1. **Methodology:** hold value/quality changes (the v1.6.2 sector map, the Piotroski inputs) until
    the 24-month look, or accept graded segments.
-2. **Price source rule (section 3):** confirm "NSE if permitted before the first grading, otherwise
-   Yahoo for the whole window".
+2. **Price source (section 3):** confirm the app's own nightly stored prices (P0) as the primary source.
 3. **Integrity:** approve the monthly read-only export and its hash commit (section 7).
 
 ## 10. Relation to the historical route
@@ -164,4 +175,6 @@ it.
 
 ## 11. Changes before approval
 
-(none yet)
+**2026-10-23:** the primary price source is now the app's own nightly stored prices (P0), not NSE or a later Yahoo
+fetch. This was prompted by the owner ("collect data so we can validate after 2 years") and checked
+against the stored record. NSE becomes an optional cross-check.
