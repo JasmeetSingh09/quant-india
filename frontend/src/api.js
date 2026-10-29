@@ -120,6 +120,7 @@ export const getTopPicks    = () => api.get('/alpha/top-picks', { timeout: 15000
 export const getEmailPref  = () => api.get('/me/email-pref')
 export const optInEmail    = () => api.post('/me/email-pref')
 export const optOutEmail   = () => api.delete('/me/email-pref')
+export const deleteAccount = () => api.delete('/me/account', { data: { confirm: 'DELETE' } })
 
 export const createShare = sim_name => api.post('/share/create', { sim_name })
 export const revokeShare = sim_name => api.post('/share/revoke', { sim_name })

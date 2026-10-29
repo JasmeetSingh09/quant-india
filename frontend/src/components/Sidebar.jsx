@@ -7,6 +7,7 @@ import {
   PanelLeftClose, PanelLeftOpen, X, GitCompareArrows, NotebookPen,
 } from 'lucide-react'
 import { useAuth } from '../AuthContext'
+import DeleteAccount from './DeleteAccount'
 
 const links = [
   { to: '/',            icon: LayoutDashboard, label: 'Dashboard'  },
@@ -203,6 +204,7 @@ export default function Sidebar({ isMobile, open, collapsed, onClose, onToggleCo
               </div>
             )
           )}
+          {user && showLabels && <DeleteAccount />}
           {showLabels && (
             <div>
               <p className="text-[11px] text-gray-600">Data via NSE · NewsAPI</p>

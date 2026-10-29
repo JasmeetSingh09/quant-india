@@ -2787,6 +2787,19 @@ def me_email_opt_out(user_id: str = Depends(current_user_id)):
     return opt_out(user_id)
 
 
+@app.delete("/me/account")
+def me_delete_account(body: dict, user_id: str = Depends(current_user_id)):
+    """Erase the signed-in user's data and sign-in record (DPDP right to erasure).
+    The body must be {"confirm": "DELETE"}, so a stray request cannot do it."""
+    from account_deletion import delete_account
+    if (body or {}).get("confirm") != "DELETE":
+        raise HTTPException(status_code=400, detail='Send {"confirm": "DELETE"} to delete your account.')
+    r = delete_account(user_id)
+    if "error" in r:
+        raise HTTPException(status_code=401, detail=r["error"])
+    return r
+
+
 @app.post("/digest/run-now")
 def digest_run_now(_admin: str = Depends(require_admin)):
     """Run the weekly pass immediately — for testing the schedule, not a blast."""

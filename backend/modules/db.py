@@ -132,6 +132,14 @@ class _PgCursor:
         return self._cur.fetchall()
 
     @property
+    def rowcount(self):
+        # Missing until 2026-10-29: watchlist/holding removal, share revoke and
+        # email opt-out all read it after commit, so on Postgres the change was
+        # saved and the user still got a 500 (and opt-out/revoke leaked the
+        # pooled connection, since close() came after it).
+        return self._cur.rowcount
+
+    @property
     def lastrowid(self):
         # psycopg2 has no lastrowid; lastval() returns this session's most recent
         # auto-generated (BIGSERIAL) id, which is what the app uses it for.
