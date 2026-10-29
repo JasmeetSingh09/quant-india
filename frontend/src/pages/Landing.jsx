@@ -21,7 +21,7 @@ const FEATURES = [
   { icon: PlayCircle, title: '5. Paper-trade it, risk-free',
     desc: 'Track your portfolio against real prices with no real money. Come back in a week and find out what actually happened.' },
   { icon: History, title: 'And we show our own scorecard',
-    desc: "Our model's past calls are published with their real returns — including where the evidence is weak or missing. Nobody else does this, and it is the reason you can trust the other numbers." },
+    desc: "Our model's past calls are published with their real returns — including where the evidence is weak or missing. That is so you can judge the other numbers yourself." },
 ]
 
 export default function Landing() {
@@ -65,7 +65,7 @@ export default function Landing() {
           Quantitative portfolio research for the NSE
         </p>
         <h1 className="text-4xl sm:text-5xl font-bold text-white leading-tight">
-          The maths quant desks use, across the NSE
+          The maths behind quant portfolios, applied to the NSE
         </h1>
         <p className="mt-5 text-lg text-gray-400">
           A four-factor alpha model scoring thousands of NSE stocks daily. Nine portfolio
@@ -136,7 +136,7 @@ export default function Landing() {
             ['Risk & simulation', 'Monte Carlo by normal, Student-t, i.i.d. and block bootstrap. VaR and CVaR, GARCH(1,1) volatility forecasting, risk decomposition by contribution, and Kelly-based position sizing.'],
             ['Factor research', 'Fama-French three-factor regressions with t-stats, cointegration testing for pairs, seasonality studies, and a market-risk reading tested on five markets (it replaced a regime model that a test found followed single days).'],
             ['Options', 'Black-Scholes-Merton pricing with the full Greeks and risk-neutral probabilities — verified against the textbook case at 10.4506 versus 10.45.'],
-            ['Honesty by construction', 'Momentum tested point-in-time on 2011-2026 prices, delisted stocks included, with the rules written down before the run: the top fifth beat the bottom fifth by 1.5% a month. Its edge did not show among the largest, most liquid stocks, and our other factors are not yet tested. We publish all of it.'],
+            ['Honesty by construction', 'Momentum tested point-in-time on 2011-2026 prices, delisted stocks included, with the rules written down before the run: the top fifth beat the bottom fifth by 1.5% a month before trading costs (a net-of-costs test is pre-registered and not yet run). Its edge did not show among the largest, most liquid stocks, and our other factors are not yet tested. We publish all of it.'],
           ].map(([title, desc]) => (
             <div key={title} className="card space-y-2">
               <h3 className="font-semibold text-white text-sm">{title}</h3>

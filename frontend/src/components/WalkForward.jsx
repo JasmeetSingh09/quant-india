@@ -22,6 +22,7 @@ export default function WalkForward() {
     staleTime: 60 * 60 * 1000,
     retry: false,
   })
+  const sig = data?.significance?.significant_at_5pct === true
 
   return (
     <div className="card space-y-3">
@@ -61,12 +62,14 @@ export default function WalkForward() {
 
       {data && !data.error && (
         <>
+          {/* Green only when the panel's own significance test passes: a 56% win
+              rate over a handful of windows is not a result, and colour reads as one. */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[['Windows', data.windows, null],
               ['Mean spread', `${data.mean_spread_pct > 0 ? '+' : ''}${data.mean_spread_pct}%`,
-               data.mean_spread_pct > 0],
-              ['Win rate', `${data.win_rate_pct}%`, data.win_rate_pct > 55],
-              ['Info ratio', data.information_ratio, data.information_ratio > 0.5]]
+               sig && data.mean_spread_pct > 0],
+              ['Win rate', `${data.win_rate_pct}%`, sig && data.win_rate_pct > 55],
+              ['Info ratio', data.information_ratio, sig && data.information_ratio > 0.5]]
               .map(([label, val, good]) => (
               <div key={label} className="card-sm">
                 <p className="text-[11px] text-gray-500">{label}</p>

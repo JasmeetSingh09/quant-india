@@ -53,7 +53,7 @@ export default function RiskLab() {
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2"><ShieldAlert size={24} className="text-green-400"/> Risk Lab</h1>
         <p className="text-gray-400 text-sm mt-0.5">
-          Institutional-grade rigor: is a result real or luck, and how much should you bet?
+          Is a result real or luck, and how much should you bet?
         </p>
       </div>
 

@@ -1,7 +1,11 @@
 # Launch readiness: database security and claims review (2026-10-29)
 
-Both checks were read-only. Nothing was changed in Supabase, the code, or production.
-Every fix below needs the owner's approval.
+Both checks were read-only. **Owner approved all fixes 2026-10-29.**
+- C1–C9 applied locally (not pushed).
+- F1 + F2: my migration call was blocked by the session's permission check, so the SQL is in
+  `docs/sql/2026-10-29_launch_hardening.sql` for the owner to run in the SQL Editor.
+- F2 precondition checked: the only non-system login role is `postgres`, owner of all 31 tables.
+- F3 is the owner's dashboard toggle.
 
 ## 1. Supabase database security (project uoiielbtcfasjzpflimz)
 
@@ -21,7 +25,7 @@ Every fix below needs the owner's approval.
 | S4 | `anon` and `authenticated` still hold table privileges (SELECT, INSERT, …) on the `public` tables. RLS is the only barrier | Low today. If someone ever adds a careless policy, or turns RLS off on one table, that table opens to the internet | Privilege query |
 | S5 | Leaked-password protection is **off**: sign-up accepts passwords already published in breaches | Medium for user accounts | Advisor (WARN) |
 
-### Proposed fixes (none applied)
+### Fixes (approved 2026-10-29)
 
 **F1 (S3):** a one-line migration. The function keeps working as an event trigger.
 ```sql

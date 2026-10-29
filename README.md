@@ -2,10 +2,12 @@
 
 A full-stack NSE stock intelligence platform. Combines live market data, quantitative alpha scoring, news sentiment analysis, and portfolio tools in a single dark-mode dashboard.
 
-**Validation:** the quantitative models are covered by **~168,000 property/edge-case
+**Correctness tests:** the quantitative models are covered by **~168,000 property/edge-case
 assertions** (currently passing) — put-call parity, optimiser weight constraints,
 Black-Litterman view responsiveness, HRP clustering behaviour, Monte Carlo
-percentile ordering, and more. The suites are deterministic and offline:
+percentile ordering, and more. These check that the implementations compute what they claim;
+they do not show that any signal predicts returns (see the app's Evidence panel and the research
+write-ups for that). The suites are deterministic and offline:
 
 ```bash
 cd backend
@@ -25,18 +27,18 @@ validated, its assumptions, and its known limitations — and
 
 | Section | What it does |
 |---|---|
-| **Dashboard** | Live Nifty 50 prices, MCX commodities, market news, top picks (alpha model), regime analysis, and prediction track record |
+| **Dashboard** | Live Nifty 50 prices, MCX commodities, market news, top picks (alpha model), market-risk reading, and prediction track record |
 | **Stocks** | Screener table across the NSE universe with P/E / ROE / market cap / sector filters — click any row for full analysis |
-| **Stock Detail** | Company intro, 52-week range, intraday chart, full valuation & balance sheet metrics, 4-factor alpha score with AI explanation, GARCH volatility forecast, news sentiment |
+| **Stock Detail** | Company intro, 52-week range, intraday chart, full valuation & balance sheet metrics, 4-factor score (fixed, hand-set weights) with each factor's contribution shown, GARCH volatility forecast, news sentiment |
 | **My Stocks** | Personal watchlist with live prices and P&L |
 | **Simulator** | Paper-trade against real NSE prices (realtime) or replay historical data |
 | **Portfolio Lab** | Mean-variance optimisation, Black-Litterman, HRP, efficient frontier |
 | **Research** | Sentiment-alpha backtest, mean-reversion, momentum studies, pairs trading |
-| **Markets** | MCX commodities, macro news, market regime (3-state Gaussian HMM) |
+| **Markets** | MCX commodities, macro news, market-risk reading (the earlier HMM regime model failed its test and is retired) |
 | **Calculators** | SIP, lumpsum, STCG/LTCG tax |
 
 ### Alpha model
-Ranks every large liquid NSE stock on four quantitative factors — **momentum**, **quality**, **value**, and **sentiment** — then explains each signal with a Fama-French reality check.
+Ranks NSE stocks on four quantitative factors — **momentum**, **quality**, **value**, and **sentiment** — then explains each signal with a Fama-French reality check. Only momentum has been tested so far; see [RESEARCH_momentum.md](RESEARCH_momentum.md).
 
 ---
 
@@ -139,10 +141,10 @@ quant-india/
 │   ├── Dockerfile
 │   ├── .env.example
 │   └── modules/
-│       ├── alpha_model.py       # 4-factor alpha scoring + XGBoost
+│       ├── alpha_model.py       # 4-factor alpha scoring (fixed weights)
 │       ├── metrics.py           # Valuation, Piotroski, DuPont, health score
 │       ├── sentiment.py         # FinBERT news sentiment
-│       ├── regime_detector.py   # Gaussian HMM market regime
+│       ├── regime_detector.py   # Gaussian HMM market regime (retired: failed its test)
 │       ├── garch_vol.py         # GARCH volatility forecasting
 │       ├── screener.py          # NSE universe screener
 │       ├── portfolio_optimizer.py  # MVO, Black-Litterman, HRP
