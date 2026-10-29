@@ -2,8 +2,14 @@
 
 Both checks were read-only. **Owner approved all fixes 2026-10-29.**
 - C1–C9 applied locally (not pushed).
-- F1 + F2: my migration call was blocked by the session's permission check, so the SQL is in
-  `docs/sql/2026-10-29_launch_hardening.sql` for the owner to run in the SQL Editor.
+- F1 + F2: **applied 2026-10-29** as migration `launch_hardening_revoke_api_roles_2026_10_29`,
+  after the owner confirmed (the first attempt was blocked by the session's permission check).
+  Verified afterwards:
+  - table grants are now postgres 31 and service_role 31 only;
+  - anon and authenticated can no longer execute `rls_auto_enable`;
+  - postgres keeps insert on `factor_history`;
+  - the advisor's SECURITY DEFINER warning is gone.
+  SQL kept in `docs/sql/2026-10-29_launch_hardening.sql`.
 - F2 precondition checked: the only non-system login role is `postgres`, owner of all 31 tables.
 - F3 is the owner's dashboard toggle.
 
