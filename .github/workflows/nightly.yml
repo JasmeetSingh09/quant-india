@@ -23,8 +23,27 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Its own job so the failure email names it: "Production is up" failing means the
+  # app is unreachable (down, suspended, or crashing), not a data warning.
+  up:
+    name: Production is up
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Reach the API
+        run: |
+          for i in 1 2 3; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60                    -A quant-india-nightly https://quant-india.onrender.com/ || true)
+            echo "attempt $i: HTTP $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 60
+          done
+          echo "::error::Production API is unreachable (last HTTP $code). Check the Render dashboard: suspended, crashed or deploying."
+          exit 1
+
   production:
-    name: Last night's scan, and Portfolio Lab on production
+    name: Data checks (last night's scan, Portfolio Lab)
+    needs: up
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
