@@ -207,7 +207,7 @@ export default function Sidebar({ isMobile, open, collapsed, onClose, onToggleCo
           {user && showLabels && <DeleteAccount />}
           {showLabels && (
             <div>
-              <p className="text-[11px] text-gray-600">Data via NSE · NewsAPI</p>
+              <p className="text-[11px] text-gray-600">Data: Yahoo Finance, NSE, news publishers</p>
               <p className="text-[11px] text-gray-600 mt-0.5">Not financial advice</p>
             </div>
           )}

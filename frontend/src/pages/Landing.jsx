@@ -161,7 +161,7 @@ export default function Landing() {
       </section>
 
       <footer className="border-t border-gray-800 py-6 text-center text-xs text-gray-600">
-        Quant India · Data via NSE &amp; NewsAPI · Not financial advice
+        Quant India · Data: Yahoo Finance, NSE &amp; news publishers · Not financial advice
       </footer>
     </div>
   )
