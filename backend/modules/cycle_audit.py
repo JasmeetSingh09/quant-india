@@ -163,15 +163,30 @@ def _audit(cycle: str = None) -> dict:
         check("coverage meets the completeness bar",
               coverage >= BAR * 100,
               f"{scored}/{universe} = {coverage}% (bar {BAR:.0%})")
-        check("cycle marked complete matches measured coverage",
-              marked_complete == (coverage >= BAR * 100),
-              f"marked={marked_complete}, measured={coverage >= BAR * 100}")
-
         # ------------------------------------------ 7-11. factor history
         fh_rows, t = _q(conn, "SELECT COUNT(*) FROM factor_history WHERE cycle_id = ?",
                         (cycle,)); timings["factor_history"] = t
         fh_graded, _ = _q(conn, "SELECT COUNT(*) FROM factor_history WHERE cycle_id = ? "
                                 "AND cycle_complete = 1", (cycle,))
+
+        # Did the scan mark this cycle complete? alpha_scan_state only remembers
+        # the LATEST completed cycle, so until 2026-11-16 every older cycle read
+        # as "not marked" and failed this check and the grading check below
+        # (11 Nov did, although the scan had promoted all 2,344 of its rows).
+        # For an older cycle the scan's mark is the one it leaves in the data:
+        # mark_cycle_complete grades that cycle's factor-history rows.
+        if st[2] == cycle:
+            mark_source = "scan state (latest completed cycle)"
+        elif st[0] == cycle and st[1] != "complete":
+            marked_complete, mark_source = False, "scan state (cycle in progress)"
+        else:
+            marked_complete = (fh_graded or 0) > 0
+            mark_source = "factor-history grading (older cycle)"
+
+        check("cycle marked complete matches measured coverage",
+              marked_complete == (coverage >= BAR * 100),
+              f"marked={marked_complete} (from {mark_source}), "
+              f"measured={coverage >= BAR * 100}")
         fh_prov = fh_rows - fh_graded
         fh_inputs, _ = _q(conn, "SELECT COUNT(*) FROM factor_history WHERE cycle_id = ? "
                                 "AND raw_inputs_available = 1", (cycle,))
@@ -340,6 +355,7 @@ def _audit(cycle: str = None) -> dict:
             "universe_that_day": universe, "coverage_pct": coverage,
             "completeness_bar_pct": round(BAR * 100, 1),
             "marked_complete": marked_complete,
+            "marked_complete_source": mark_source,
             "first_write": str(first_w)[:19] if first_w else None,
             "last_write": str(last_w)[:19] if last_w else None,
         },

@@ -242,6 +242,26 @@ ok(r["provenance"]["pre_provenance_cycle"] is True,
 ok(r["verdict"] == "PASS",
    "and is NOT failed for it — it predates the deployment, which is not a fault")
 
+print("\n9. An OLDER cycle is judged by its own grading (2026-11-16 fix)")
+# The scan state remembers only the latest completed cycle. Before the fix an
+# older, perfectly good cycle read as "not marked" and failed two checks.
+build()
+c = sqlite3.connect(DB)
+c.execute("UPDATE alpha_scan_state SET cycle = '2026-09-10', "
+          "last_complete_cycle = '2026-09-10' WHERE id = 1")
+c.commit(); c.close()
+r = run()
+ok(r["verdict"] == "PASS", f"a good older cycle passes (got {r['verdict']}: {r['anomalies']})")
+ok("grading" in str(r["scan"].get("marked_complete_source")),
+   f"and says where its mark came from ({r['scan'].get('marked_complete_source')})")
+c = sqlite3.connect(DB)
+c.execute("UPDATE factor_history SET cycle_complete = 0 WHERE rowid IN "
+          "(SELECT rowid FROM factor_history WHERE cycle_id = ? LIMIT 10)", (CYCLE,))
+c.commit(); c.close()
+r = run()
+ok(any("graded consistently" in a for a in r["anomalies"]),
+   f"an older cycle graded only partly still FAILS ({r['anomalies'][:1]})")
+
 try:
     os.remove(DB)
 except Exception:
