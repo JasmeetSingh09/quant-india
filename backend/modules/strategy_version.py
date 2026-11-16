@@ -265,6 +265,7 @@ def current_spec() -> dict:
             "MOMENTUM_MIN_OBSERVATIONS", "MOMENTUM_MIN_RETURNS",
             "MOMENTUM_VOL_EPSILON", "MOMENTUM_CONFIDENCE_BASE",
             "MOMENTUM_CONFIDENCE_SPAN", "SENTIMENT_HALF_LIFE_DAYS",
+            "SENTIMENT_MIN_TOTAL_WEIGHT",
             "MOMENTUM_INTERP_STRONG", "MOMENTUM_INTERP_MILD"])
     _cap(mom, "top_picks_universe_size",
          lambda: len(__import__("alpha_model").TOP_PICKS_UNIVERSE))
@@ -341,7 +342,12 @@ def current_spec() -> dict:
                 "confidence": "probability of the chosen label, rounded to 4",
                 "failure_policy": ("inference error -> headline skipped and counted "
                                    "(inference_failures); all fail -> refused, reason "
-                                   "'sentiment inference failed'; genuine neutral unchanged")}
+                                   "'sentiment inference failed'; genuine neutral unchanged"),
+                # v1.6.2 (owner-approved 2026-11-17)
+                "zero_weight_policy": ("total headline weight <= SENTIMENT_MIN_TOTAL_WEIGHT "
+                                       "-> score 0, confidence 0, reason 'no recent headlines'"),
+                "non_finite_policy": ("composite not a number -> error row "
+                                      "'No score produced', never NEUTRAL")}
     _cap(spec, "sentiment_model", _sentiment_model)
 
     # The sector map that picks every valuation peer (data_fetcher.NSE_SECTORS

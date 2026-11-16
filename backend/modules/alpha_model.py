@@ -44,7 +44,7 @@ from bounded_cache import BoundedCache
 
 # Bumped whenever a change alters what a score means. Stamped on every
 # result so a stored signal records which model produced it.
-MODEL_VERSION = "v1.6.1-sentiment-failure-policy"
+MODEL_VERSION = "v1.6.2-sentiment-zero-weight"
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
@@ -207,6 +207,9 @@ def _sanitize(obj):
 
 # Decay half-life for sentiment (days) — older headlines count less
 SENTIMENT_HALF_LIFE_DAYS = 3
+# Below this total headline weight there is no evidence to average: one headline
+# 14 days old weighs exp(-ln2/3*14) = 0.039, so 1e-9 means "nothing within years".
+SENTIMENT_MIN_TOTAL_WEIGHT = 1e-9
 
 
 # ---------------------------------------------------------------------------
@@ -333,7 +336,22 @@ def _compute_sentiment_factor(ticker: str, days_back: int = 14) -> dict:
                     "n_articles": 0, "untitled_articles_skipped": untitled,
                     **({"inference_failures": failed} if failed else {})}
 
-        weighted_avg = sum(weighted_scores) / sum(weights)
+        # Headlines this old carry no weight at all: exp(-ln2/3 * age) is 0.0
+        # for anything ~3,000 days back, and the news source does return
+        # 2017 chart pages for some symbols despite the 14-day window. 0/0 in
+        # numpy is NaN, not an error, and a NaN sentiment emptied the whole
+        # composite into a NULL score labelled NEUTRAL (36 rows, 13 stocks by
+        # 2026-11-16). No recent evidence is what it means, so say that.
+        # docs/PROPOSAL_SENTIMENT_ZERO_WEIGHT_2026-11-17.md (owner-approved).
+        total_w = float(sum(weights))
+        if not np.isfinite(total_w) or total_w <= SENTIMENT_MIN_TOTAL_WEIGHT:
+            return {"score": 0.0, "confidence": 0.0, "reason": "no recent headlines",
+                    "n_articles": 0, "stale_articles": len(weights),
+                    "days_back": days_back, "articles_used": used_articles,
+                    **({"untitled_articles_skipped": untitled} if untitled else {}),
+                    **({"inference_failures": failed} if failed else {})}
+
+        weighted_avg = sum(weighted_scores) / total_w
         # Confidence = total weight normalised by max possible weight
         confidence   = min(1.0, sum(weights) / (days_back * 0.5))
 
@@ -945,6 +963,16 @@ def compute_alpha_score(
         w["quality"]   * quality_f["score"]   +
         w["value"]     * value_f["score"]
     )
+
+    # A factor that is not a number makes the composite NaN, which _sanitize
+    # turns into NULL and signal_for_score files as NEUTRAL: a row that looks
+    # scored and was promoted to research-grade. Refuse instead (2026-11-17).
+    if not np.isfinite(raw_score):
+        bad = [k for k, f in (("sentiment", sentiment_f), ("momentum", momentum_f),
+                              ("quality", quality_f), ("value", value_f))
+               if not np.isfinite(f.get("score", float("nan")))]
+        return {"error": f"No score produced for '{ticker}': factor(s) not a number: "
+                         f"{', '.join(bad) or 'composite'}."}
 
     # Scale to [-100, +100]
     alpha_score = round(raw_score * 100, 2)

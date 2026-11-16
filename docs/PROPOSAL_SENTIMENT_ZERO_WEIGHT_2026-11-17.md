@@ -1,6 +1,6 @@
 # Proposal: a stock whose only headlines are years old gets "no recent news", not an empty score (2026-11-17)
 
-**Status:** awaiting the owner's approval. Nothing is changed. This changes model behaviour for a
+**Status:** APPROVED 2026-11-17 ("full fix") and implemented: items 1, 2 and 4, as v1.6.2. This changes model behaviour for a
 handful of stocks, so if approved it ships as a new version (v1.6.2) with its own freeze.
 
 ## The defect
