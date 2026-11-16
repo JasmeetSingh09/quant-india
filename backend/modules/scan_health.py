@@ -76,14 +76,18 @@ def cycles(limit: int = 30) -> dict:
         # Read here, inside the connection's life. Written after the finally
         # block first time round, where it silently failed and fell back to the
         # denominator it was meant to replace.
+        # One shared count with the scan and the cycle audit
+        # (universe_scan.scannable_universe_size), read while the connection
+        # is open. Cached per cycle date; most recent cycles share one
+        # bhavcopy day while the NSE archive is paused.
+        from universe_scan import scannable_universe_size
         pit = {}
-        try:
-            for day, n in conn.execute(
-                    "SELECT day, COUNT(DISTINCT symbol) FROM bhavcopy_eod "
-                    "GROUP BY day").fetchall():
-                pit[str(day)[:10]] = int(n)
-        except Exception:
-            pit = {}
+        for r in rows[:limit]:
+            try:
+                pit[r[0]] = scannable_universe_size(conn, r[0])
+            except Exception:
+                pit = {}
+                break
     except Exception as e:
         conn.close()
         return {"available": False, "reason": f"{type(e).__name__}: {e}"}
@@ -99,11 +103,8 @@ def cycles(limit: int = 30) -> dict:
     for cyc, total, scored, errored, first, last in rows[:limit]:
         # Nearest stored trading day at or before the cycle, so a Sunday cycle
         # is measured against Friday's universe rather than against nothing.
-        denom = pit.get(cyc)
-        if denom is None and pit:
-            earlier = [d for d in pit if d <= str(cyc)]
-            denom = pit[max(earlier)] if earlier else None
-        denom = denom or peak
+        u = pit.get(cyc) or {}
+        denom = u.get("n") or peak
         span = None
         if first and last:
             try:
@@ -119,6 +120,8 @@ def cycles(limit: int = 30) -> dict:
             "scored": scored or 0,
             "errored": errored or 0,
             "universe_that_day": denom,
+            "universe_from_day": u.get("day"),
+            "funds_excluded": bool(u.get("exclusions_applied")),
             "coverage_pct": round(frac * 100, 1),
             "complete_by_coverage": frac >= COMPLETE_FRACTION,
             "first_write": str(first)[:19] if first else None,
@@ -132,8 +135,10 @@ def cycles(limit: int = 30) -> dict:
     return {
         "available": True,
         "peak_universe": peak,
-        "denominator": ("the exchange universe on each cycle's own day, "
-                        "from bhavcopy" if pit else
+        "denominator": ("the securities the scan sets out to cover: the "
+                        "exchange's list on the latest stored day at or before "
+                        "the cycle (universe_from_day), without funds, ETFs and "
+                        "rights lines from 2026-10-05" if pit else
                         "the largest universe any cycle attempted "
                         "(bhavcopy unavailable, so older cycles are "
                         "understated)"),
@@ -148,8 +153,8 @@ def cycles(limit: int = 30) -> dict:
         "missing_days": days["missing"],
         "cycles": out,
         "threshold": (f"A cycle counts as complete when it scored at least "
-                      f"{COMPLETE_FRACTION:.0%} of the securities the exchange "
-                      f"listed that day. The status column is not used: it is "
+                      f"{COMPLETE_FRACTION:.0%} of the securities it set out to "
+                      f"cover (see denominator). The status column is not used: it is "
                       f"set when the worker pool drains, whether the stocks "
                       f"scored or errored."),
     }

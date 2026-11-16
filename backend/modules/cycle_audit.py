@@ -135,9 +135,11 @@ def _audit(cycle: str = None) -> dict:
                        (cycle,))
 
         # The universe as the exchange listed it THAT DAY, not today's.
-        universe, _ = _q(conn, "SELECT COUNT(DISTINCT symbol) FROM bhavcopy_eod "
-                               "WHERE day = (SELECT MAX(day) FROM bhavcopy_eod "
-                               "WHERE day <= ?)", (cycle,))
+        # Shared with the scan and scan_health, so the three cannot disagree.
+        from universe_scan import scannable_universe_size
+        _t0 = time.time()
+        universe = scannable_universe_size(conn, cycle)["n"]
+        timings["universe"] = round(time.time() - _t0, 3)
         universe = universe or attempted or 1
         coverage = round(scored / universe * 100, 2) if universe else 0.0
 

@@ -59,11 +59,11 @@ def build(scored=2600, failed=200, universe=2872, complete=True,
     c.execute("""CREATE TABLE factor_input_articles (ticker TEXT, cycle_id TEXT,
         title_hash TEXT, title TEXT, published_at TEXT, finbert_label TEXT,
         finbert_confidence REAL, weight REAL, observed_at TEXT)""")
-    c.execute("CREATE TABLE bhavcopy_eod (symbol TEXT, day TEXT, close REAL)")
+    c.execute("CREATE TABLE bhavcopy_eod (symbol TEXT, day TEXT, close REAL, isin TEXT)")
     c.execute("CREATE TABLE predictions (ticker TEXT, snapshot_date TEXT)")
 
     for i in range(universe):
-        c.execute("INSERT INTO bhavcopy_eod VALUES (?,?,?)",
+        c.execute("INSERT INTO bhavcopy_eod (symbol, day, close) VALUES (?,?,?)",
                   (f"S{i:05d}.NS", CYCLE, 100.0))
 
     risk_adj = 0.45

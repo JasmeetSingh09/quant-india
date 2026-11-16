@@ -45,7 +45,7 @@ _c.execute("""CREATE TABLE alpha_scan_state (
     id INTEGER PRIMARY KEY, cycle TEXT, started_at TEXT, finished_at TEXT,
     done INTEGER, total INTEGER, status TEXT, last_complete_cycle TEXT)""")
 _c.execute("""CREATE TABLE bhavcopy_eod (
-    symbol TEXT, day TEXT, close REAL, PRIMARY KEY (symbol, day))""")
+    symbol TEXT, day TEXT, close REAL, isin TEXT, PRIMARY KEY (symbol, day))""")
 
 
 def add_cycle(cycle, scored, errored, universe, start_hour=9, gap_at=None):
@@ -62,7 +62,7 @@ def add_cycle(cycle, scored, errored, universe, start_hour=9, gap_at=None):
                     "Timeout" if is_err else None, cycle,
                     t.isoformat(), "test-model"))
     for i in range(universe):
-        _c.execute("INSERT OR IGNORE INTO bhavcopy_eod VALUES (?,?,?)",
+        _c.execute("INSERT OR IGNORE INTO bhavcopy_eod (symbol, day, close) VALUES (?,?,?)",
                    (f"S{i:05d}.NS", cycle, 100.0))
 
 
@@ -101,7 +101,7 @@ ok(by["2026-08-12"]["universe_that_day"] == 2401,
    "the August 12 pass is measured against 2,401, not against a later market")
 ok(by["2026-08-24"]["universe_that_day"] == 2600,
    "the August 24 pass is measured against 2,600")
-ok(r["denominator"].startswith("the exchange universe"),
+ok(r["denominator"].startswith("the securities the scan sets out to cover"),
    "and the report says which denominator it used")
 
 print("\n3. A degraded pass drags the completion rate down")

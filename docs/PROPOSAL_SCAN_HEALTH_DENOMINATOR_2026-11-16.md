@@ -1,6 +1,6 @@
 # Proposal: count the same stocks when measuring scan completeness (2026-11-16)
 
-**Status:** awaiting the owner's approval. Nothing is changed until then.
+**Status:** APPROVED by the owner 2026-11-16 and implemented (items 1-5). Item 6 was corrected; see below.
 
 ## The defect
 
@@ -48,10 +48,10 @@ differs.
    score funds, so for those cycles the old, unfiltered denominator was the right one. The shared
    function applies the fund exclusion only from 2026-10-05.
 5. **A test.** A suite that fails if the three completeness numbers ever differ on the same cycle.
-6. **The audit timeout, separately.** `/scan/cycle-audit` timed out twice today. Its universe count
-   is a `COUNT(DISTINCT symbol)` with a subquery over the 6.6M-row archive. The shared function
-   would read the scan's stored universe size instead, which also fixes the timeout. It still needs
-   confirming by timing after the change.
+6. **The audit timeout, separately.** `/scan/cycle-audit` timed out twice today. *Correction,
+   2026-11-16, after timing on production:* its universe query takes 0.05 s (the day index is used),
+   so it is not the cause. The timeout is a separate problem and still to be found; the audit now
+   records how long the universe count takes (`timings.universe`).
 
 ## What it affects
 

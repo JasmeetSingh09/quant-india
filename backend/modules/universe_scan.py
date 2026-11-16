@@ -54,6 +54,10 @@ EXCLUDED_ISIN_PREFIXES = ("INF",)
 # Rights-entitlement lines (VINNY-RE, INDO-RE2): short-lived tradeable rights, not
 # shares. They carry INE ISINs, so the prefix rule above does not catch them.
 EXCLUDED_SYMBOL_PATTERN = r"-RE\d*(?:\.NS)?$"
+# First cycle scanned without funds and rights lines (the 2026-10-04 pass scored
+# 2,793 securities, 2026-10-05 scored 2,482). Earlier cycles scored them, so they
+# are measured against the unfiltered list.
+EXCLUSIONS_FROM_CYCLE = "2026-10-05"
 
 _LOCK    = threading.Lock()
 _THREAD  = None
@@ -399,6 +403,43 @@ def _bhavcopy_symbols() -> list:
         return [r[0] for r in rows if r and r[0] and not rx.search(str(r[0]))]
     except Exception:
         return []
+
+
+def scannable_universe_size(conn, cycle: str) -> dict:
+    """
+    How many securities a cycle set out to cover: the exchange's list on the
+    latest stored day at or before the cycle, minus what the scan leaves out.
+
+    The one count the scan's completeness is measured against, shared by
+    scan_health and cycle_audit. Until 2026-11-16 those two counted every
+    bhavcopy symbol, funds included, so every cycle since v1.5.0 read about 87%
+    "complete" while the scan itself scored 99.8% (2,509 of 2,514). The 90% bar
+    did not change; only what it is a share of. Exclusions apply from
+    EXCLUSIONS_FROM_CYCLE, the first cycle that ran without funds.
+
+    Stocks the scan skips as persistently unpriceable are NOT subtracted here:
+    this measures against what the exchange listed, so it stays slightly
+    stricter than the scan's own count.
+    """
+    row = conn.execute("SELECT MAX(day) FROM bhavcopy_eod WHERE day <= ?",
+                       (str(cycle)[:10],)).fetchone()
+    day = str(row[0])[:10] if row and row[0] else None
+    if not day:
+        return {"n": None, "day": None, "exclusions_applied": False}
+    filtered = str(cycle)[:10] >= EXCLUSIONS_FROM_CYCLE
+    import re as _re
+    rx = _re.compile(EXCLUDED_SYMBOL_PATTERN, _re.I)
+    syms = set()
+    for sym, isin in conn.execute(
+            "SELECT DISTINCT symbol, isin FROM bhavcopy_eod WHERE day = ?",
+            (day,)).fetchall():
+        if not sym:
+            continue
+        if filtered and ((isin and str(isin).startswith(EXCLUDED_ISIN_PREFIXES))
+                         or rx.search(str(sym))):
+            continue
+        syms.add(str(sym))
+    return {"n": len(syms), "day": day, "exclusions_applied": filtered}
 
 
 def _universe() -> list:
