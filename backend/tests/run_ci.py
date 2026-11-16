@@ -109,6 +109,7 @@ SUITES = [
     ("rights_adjustment_test.py",            7, 60),
     ("access_control_test.py",              30, 300),
     ("account_deletion_test.py",            36, 300),
+    ("memory_release_test.py",               5,  60),
     ("sector_map_spec_test.py",             15, 60),
     ("finbert_pin_test.py",                 13, 60),
     ("reparse_external_test.py",             4, 60),

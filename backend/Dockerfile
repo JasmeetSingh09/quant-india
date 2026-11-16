@@ -36,6 +36,11 @@ COPY . .
 # Render sets $PORT; default to 8000 for local runs
 ENV PORT=8000
 
+# Two glibc malloc arenas instead of one per thread: fewer half-empty arenas
+# for the scan threads to fragment, so memory freed after a scan can be
+# returned (see universe_scan.release_memory).
+ENV MALLOC_ARENA_MAX=2
+
 # Persistent data lives at /app/data when a Render disk is mounted
 # (watchlist.json, portfolio.json, simulations DB, screener cache).
 # Modules use relative paths from /app, so create the dir unconditionally.

@@ -470,6 +470,30 @@ def _scan_loop():
         except Exception:
             pass
         raise
+    finally:
+        release_memory()
+
+
+def release_memory() -> dict:
+    """
+    Hand memory freed by the scan back to the operating system.
+
+    Each nightly scan left resident memory higher than it found it and never
+    gave it back (1.62 GB to 1.82 GB over 15-29 Oct 2026, against the 2 GB
+    limit). Python frees the objects, but glibc keeps the pages in its arenas;
+    malloc_trim(0) returns them. MALLOC_ARENA_MAX=2 (Dockerfile) limits how
+    many arenas there are to fragment in the first place. Never raises: on a
+    system without glibc (Windows, musl) only the gc pass runs.
+    """
+    import gc
+    out = {"gc_collected": gc.collect(), "malloc_trim": None}
+    try:
+        import ctypes
+        out["malloc_trim"] = bool(ctypes.CDLL("libc.so.6").malloc_trim(0))
+    except Exception:
+        pass
+    print(f"[scan] memory released: {out}")
+    return out
 
 
 def _scan_loop_inner():
