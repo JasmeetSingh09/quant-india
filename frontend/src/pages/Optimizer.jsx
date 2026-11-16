@@ -90,9 +90,13 @@ export default function Optimizer() {
       // Turnover discipline: penalise straying from an equal-weight starting
       // point (the neutral no-information prior). lambda 0 = ignore.
       const eq = 100 / tickers.length
-      const current_weights = turnoverLambda > 0 ? Object.fromEntries(tickers.map(t => [t, eq])) : null
+      // Omit current_weights when unused rather than sending null: MVORequest
+      // types it `dict = None`, and pydantic rejects an explicit null (422), so
+      // Markowitz failed at the default penalty of 0 (found 16 Nov 2026).
+      const current_weights = turnoverLambda > 0 ? Object.fromEntries(tickers.map(t => [t, eq])) : undefined
       mvoMut.mutate({ tickers, target, max_weight: maxWeight / 100, ...rf,
-                      current_weights, turnover_lambda: Number(turnoverLambda) })
+                      ...(current_weights ? { current_weights } : {}),
+                      turnover_lambda: Number(turnoverLambda) })
     }
     if (tab === 'hrp')      hrpMut.mutate({ tickers, ...rf })
     if (tab === 'frontier') frontierMut.mutate({ tickers, n_points: 50, ...rf })
@@ -117,17 +121,40 @@ export default function Optimizer() {
     <div className="p-4 sm:p-6 space-y-6">
       <h1 className="text-2xl font-bold">Portfolio Optimizer</h1>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Left panel */}
-        <div className="card space-y-5">
-          <div>
+      <div className="space-y-6">
+        {/* Setup runs across the page: stocks | algorithm | settings. Until 16 Nov
+            2026 it was a tall left column beside a results area that stays empty
+            until Run, which left most of the screen blank. */}
+        <div className="card grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-6 items-start">
+          <div className="xl:col-span-3">
             <label className="label">Tickers</label>
             <TickerList tickers={tickers} setTickers={setTickers} />
+          {/* Amount and horizon: the optimisers solve for weights, not rupees, but
+              the coach below needs both for its downside figures. Moved here from
+              a separate "Your plan" card (16 Nov 2026) so the setup reads as one row. */}
+          <div className="grid grid-cols-2 xl:grid-cols-1 gap-4 mt-5">
+              <div>
+                <label className="label">How much are you investing?</label>
+                <input type="number" min="1000" step="1000" className="input"
+                       value={amount} onChange={e => setAmount(Number(e.target.value))} />
+                <p className="text-[11px] text-gray-600 mt-1">
+                  ₹{Math.round(amount).toLocaleString('en-IN')}
+                </p>
+              </div>
+              <div>
+                <label className="label">For how long?</label>
+                <input type="range" min="3" max="60" step="3" className="w-full"
+                       value={months} onChange={e => setMonths(Number(e.target.value))} />
+                <p className="text-[11px] text-gray-600 mt-1">
+                  {horizonLabel(months)}
+                </p>
+              </div>
+          </div>
           </div>
 
-          <div>
+          <div className="md:col-span-2 md:order-last xl:order-none xl:col-span-5">
             <label className="label">Algorithm</label>
-            <div className="space-y-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {[
                 ['mvo',      'Markowitz (classic)',     'Best return for the risk — but can pile into one stock'],
                 ['hrp',      'Smart Diversify (HRP)',   'Hierarchical Risk Parity (Lopez de Prado, 2016): clusters stocks that move together, then splits risk between the clusters. It never inverts the covariance matrix, so it avoids the extreme weights a Sharpe optimiser produces from tiny differences in estimated return.'],
@@ -138,19 +165,20 @@ export default function Optimizer() {
                 ['frontier', 'Risk-vs-Return Map',      'Shows every best risk/return combo on a curve'],
                 ['auto',     'AI-Guided Mix',           'Uses news sentiment to tilt the portfolio'],
               ].map(([v, l, d]) => (
-                <label key={v} className={`flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                <label key={v} title={d} className={`flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors h-full ${
                   tab===v ? 'bg-green-900/20 border border-green-700' : 'bg-gray-800 hover:bg-gray-750 border border-transparent'
                 }`}>
                   <input type="radio" checked={tab===v} onChange={() => setTab(v)} className="mt-0.5 accent-green-500" />
                   <div>
                     <p className="text-sm font-medium">{l}</p>
-                    <p className="text-xs text-gray-500">{d}</p>
+                    <p className="text-xs text-gray-500 line-clamp-2">{d}</p>
                   </div>
                 </label>
               ))}
             </div>
           </div>
 
+          <div className="xl:col-span-4 space-y-5">
           {tab === 'mvo' && (
             <>
               <div>
@@ -244,9 +272,10 @@ export default function Optimizer() {
             {isLoading ? 'Optimising...' : 'Run Optimiser'}
           </button>
         </div>
+        </div>
 
         {/* Results */}
-        <div className="col-span-2 space-y-4">
+        <div className="space-y-4">
           {isLoading && <div className="card"><Spinner /></div>}
 
           {/* Warn if any ticker was dropped for lack of price data (e.g. an
@@ -506,35 +535,6 @@ export default function Optimizer() {
               <BlackLitterman bl={autoResult.bl_result} />
             </div>
           )}
-        </div>
-      </div>
-
-      {/* The Optimizer holds a TICKER LIST, not weights, so an applied scenario
-          changes which stocks are in play and the optimiser re-derives the
-          weights itself. Equal weights are assumed for the analysis since the
-          user has not chosen sizing on this page. */}
-      <div className="card">
-        <h2 className="font-semibold mb-1">Your plan</h2>
-        <p className="text-xs text-gray-500 mb-4">
-          Used to work out what these stocks could do for you, and what the bad case looks like.
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <div>
-            <label className="label">How much are you investing?</label>
-            <input type="number" min="1000" step="1000" className="input"
-                   value={amount} onChange={e => setAmount(Number(e.target.value))} />
-            <p className="text-[11px] text-gray-600 mt-1">
-              ₹{Math.round(amount).toLocaleString('en-IN')}
-            </p>
-          </div>
-          <div>
-            <label className="label">For how long?</label>
-            <input type="range" min="3" max="60" step="3" className="w-full"
-                   value={months} onChange={e => setMonths(Number(e.target.value))} />
-            <p className="text-[11px] text-gray-600 mt-1">
-              {horizonLabel(months)}
-            </p>
-          </div>
         </div>
       </div>
 

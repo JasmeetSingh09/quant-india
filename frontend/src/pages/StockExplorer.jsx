@@ -751,8 +751,10 @@ function StockDetail({ ticker, onBack }) {
             </div>
           )}
 
-          {/* Three-column analysis */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Overview: three short summaries side by side. Until 16 Nov 2026 the
+              middle column also held every analysis panel, so it ran about three
+              times longer than Valuation and News and left two empty columns. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
 
             {/* Column 1 — Valuation & Health */}
             <div className="space-y-3">
@@ -818,35 +820,11 @@ function StockDetail({ ticker, onBack }) {
               )}
             </div>
 
-            {/* Column 2 — Alpha score, then this stock's own signal over time */}
+            {/* Column 2 — the score and what drives it */}
             <div className="space-y-3">
               <h2 className="font-semibold text-sm text-gray-400 uppercase tracking-wider">
                 Alpha Score<InfoTip k="alpha_score" />
               </h2>
-              {/* Renders nothing until the universe scan has recorded this
-                  ticker, so a stock the scan has not reached yet simply shows
-                  no history rather than an empty placeholder. */}
-              <ErrorBoundary name="signal history"><SignalHistory ticker={ticker} /></ErrorBoundary>
-              {/* Everything behind the badge, on one screen: the score and what
-                  it is not, data coverage, the driving factor, this stock's own
-                  recent signals, and how signals of this kind have actually
-                  performed — including when that record is too thin to mean
-                  anything. */}
-              {/* One boundary per panel, each named. A page-level catch tells you
-                  the page broke; these tell you WHICH panel, which is the
-                  difference between a fix and a search. */}
-              <ErrorBoundary name="what's happening"><StockContext ticker={ticker} /></ErrorBoundary>
-              <ErrorBoundary name="alpha vs fit"><AlphaVsFit ticker={ticker} /></ErrorBoundary>
-              <ErrorBoundary name="what's changing"><FactorChange ticker={ticker} /></ErrorBoundary>
-              <ErrorBoundary name="bull base bear"><ScenarioValuation ticker={ticker} /></ErrorBoundary>
-              <ErrorBoundary name="six-factor view"><SixFactor ticker={ticker} /></ErrorBoundary>
-              <ErrorBoundary name="why this signal"><WhySignal ticker={ticker} /></ErrorBoundary>
-              {/* What the model actually read, and what it could not. The
-                  scan has recorded this all along and nothing displayed it. */}
-              <ErrorBoundary name="factor inputs"><FactorInputs ticker={ticker} /></ErrorBoundary>
-              {/* Two questions, kept apart: is the arithmetic sound, and
-                  does the signal predict. Only the first has answers. */}
-              <ErrorBoundary name="evidence"><EvidencePanel /></ErrorBoundary>
               {alphaLoading ? <Spinner size="sm" /> : alpha && (
                 <div className="card">
                   <AlphaMeter score={alpha.alpha_score} />
@@ -995,6 +973,41 @@ function StockDetail({ ticker, onBack }) {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Analysis: two columns grouped by question on wide screens, one
+              column below 1280px where the tables need the width. Left is the
+              signal (its history, context, reasons, evidence); right is the
+              factors behind it. Fixed groups, not CSS columns: auto-flow left
+              RELIANCE at 2,476px vs 1,845px (16 Nov 2026), because the large
+              panels cannot split; these groups came out within about 150px. */}
+          <div className="space-y-3">
+            <h2 className="font-semibold text-sm text-gray-400 uppercase tracking-wider">Signal analysis</h2>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+              <div className="space-y-6 min-w-0">
+                {/* Renders nothing until the universe scan has recorded this
+                    ticker, so a stock the scan has not reached yet simply shows
+                    no history rather than an empty placeholder. */}
+                {/* One boundary per panel, each named. A page-level catch tells you
+                    the page broke; these tell you WHICH panel, which is the
+                    difference between a fix and a search. */}
+                <ErrorBoundary name="signal history"><SignalHistory ticker={ticker} /></ErrorBoundary>
+                <ErrorBoundary name="what's happening"><StockContext ticker={ticker} /></ErrorBoundary>
+                <ErrorBoundary name="why this signal"><WhySignal ticker={ticker} /></ErrorBoundary>
+                {/* Two questions, kept apart: is the arithmetic sound, and
+                    does the signal predict. Only the first has answers. */}
+                <ErrorBoundary name="evidence"><EvidencePanel /></ErrorBoundary>
+              </div>
+              <div className="space-y-6 min-w-0">
+                <ErrorBoundary name="what's changing"><FactorChange ticker={ticker} /></ErrorBoundary>
+                <ErrorBoundary name="alpha vs fit"><AlphaVsFit ticker={ticker} /></ErrorBoundary>
+                <ErrorBoundary name="six-factor view"><SixFactor ticker={ticker} /></ErrorBoundary>
+                {/* What the model actually read, and what it could not. The
+                    scan has recorded this all along and nothing displayed it. */}
+                <ErrorBoundary name="factor inputs"><FactorInputs ticker={ticker} /></ErrorBoundary>
+                <ErrorBoundary name="bull base bear"><ScenarioValuation ticker={ticker} /></ErrorBoundary>
+              </div>
             </div>
           </div>
         </>

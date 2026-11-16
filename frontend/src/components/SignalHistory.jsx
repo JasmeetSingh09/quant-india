@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getSignalHistory } from '../api'
 import { signalLabel, rankColorClass } from '../signalLabel'
@@ -29,8 +30,13 @@ export default function SignalHistory({ ticker }) {
     staleTime: 10 * 60 * 1000,
   })
 
+  // 10 rows by default: the full 30-day table (RELIANCE, 16 Nov 2026: 42 rows)
+  // made this one panel about three times taller than everything beside it.
+  const [showAll, setShowAll] = useState(false)
   const rows = data?.history ?? []
   if (isLoading || rows.length === 0) return null
+  const PREVIEW = 10
+  const shown = showAll ? rows : rows.slice(0, PREVIEW)
 
   const latest = rows[0]
 
@@ -52,7 +58,7 @@ export default function SignalHistory({ ticker }) {
           {latest.alpha_score > 0 ? '+' : ''}{latest.alpha_score}
         </span>
         <span className="text-xs text-gray-500">
-          <span title={latest.date}>{latest.date}</span> <span className="text-gray-600">({daysAgoLabel(latest.date)})</span> · {Math.round((latest.confidence || 0) * 100)}% data coverage
+          <span title={latest.date}>{String(latest.date).slice(0, 10)}</span> <span className="text-gray-600">({daysAgoLabel(latest.date)})</span> · {Math.round((latest.confidence || 0) * 100)}% data coverage
         </span>
       </div>
 
@@ -68,7 +74,7 @@ export default function SignalHistory({ ticker }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => (
+            {shown.map((r, i) => (
               <tr key={r.date + i} className="border-b border-gray-900 last:border-0">
                 <td className="py-1.5 text-gray-400">{daysAgoLabel(r.date)}</td>
                 <td>
@@ -102,6 +108,14 @@ export default function SignalHistory({ ticker }) {
           </tbody>
         </table>
       </div>
+
+      {rows.length > PREVIEW && (
+        <button type="button" onClick={() => setShowAll(v => !v)}
+          aria-expanded={showAll}
+          className="mt-2 text-xs text-green-400 hover:text-green-300">
+          {showAll ? 'Show fewer' : `Show all ${rows.length} readings`}
+        </button>
+      )}
 
       <p className="text-[11px] text-gray-600 mt-3">
         Recorded once per daily universe scan. “Close” is what the stock ended at

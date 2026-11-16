@@ -51,68 +51,70 @@ export default function FactorEvidence() {
         {data.headline}
       </p>
 
-      <div className="table-wrap">
-        <table className="w-full text-sm min-w-[34rem]">
-          <thead>
-            <tr className="text-[11px] uppercase tracking-wide text-gray-500">
-              <th className="text-left py-1">Factor</th>
-              <th className="text-right py-1" title="Weight in the live four-factor model, which produces every score and ranking on the site; the six-factor model's weight in brackets.">Weight</th>
-              <th className="text-left py-1 pl-3">Evidence</th>
-              <th className="text-left py-1 pl-3">Result</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.factors.map(f => {
-              const sig = f.result?.significant_at_5pct
-              const st = STATUS[sig === true ? 'passed' : sig === false ? 'failed' : f.status]
-                         || STATUS.untested
-              return (
-                <tr key={f.factor} className="border-t border-gray-800 align-top">
-                  <td className="py-2">
-                    <span className="capitalize text-gray-200">{f.factor.replace(/_/g, ' ')}</span>
-                    <span className="block text-[11px] text-gray-500">{f.plain}</span>
-                  </td>
-                  <td className="py-2 text-right font-mono text-gray-300">
+      {/* One card per factor: name, weight and status at a glance, the long
+          result text one click away. Replaced a four-column table whose Result
+          column carried a paragraph per row (16 Nov 2026 review: "too
+          technical"). A passed factor's caveat stays visible: momentum passed,
+          but not among the largest stocks, and folding that away would read as
+          a stronger result than the record supports. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+        {data.factors.map(f => {
+          const sig = f.result?.significant_at_5pct
+          const st = STATUS[sig === true ? 'passed' : sig === false ? 'failed' : f.status]
+                     || STATUS.untested
+          const detail = f.result?.summary || f.why
+          const extra = f.result?.summary ? null : f.idea_evidence
+          return (
+            <div key={f.factor} className="rounded-lg border border-gray-800 bg-gray-900/40 p-3 flex flex-col gap-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="capitalize text-gray-200 font-medium">{f.factor.replace(/_/g, ' ')}</p>
+                  <p className="text-[11px] text-gray-500">{f.plain}</p>
+                </div>
+                <div className="text-right shrink-0"
+                     title="Weight in the live four-factor model, which produces every score and ranking on the site; the six-factor model's weight in brackets.">
+                  <p className="font-mono text-lg text-gray-200 leading-none">
                     {f.weight_v1_pct == null ? '—' : `${f.weight_v1_pct}%`}
-                    {f.weight_pct != null && (
-                      <span className="block text-[10px] text-gray-600">({f.weight_pct}%)</span>
-                    )}
-                  </td>
-                  <td className="py-2 pl-3">
-                    <span className={`text-[11px] px-1.5 py-0.5 rounded border ${st.cls}`}>
-                      {st.label}
-                    </span>
-                  </td>
-                  <td className="py-2 pl-3 text-[11px] text-gray-400 leading-relaxed max-w-md">
-                    {f.result?.summary
-                      ? <>
-                          {f.result.summary}
-                          {f.result.caveat &&
-                            <span className="block text-amber-200/80 mt-1">{f.result.caveat}</span>}
-                        </>
-                      : <>
-                          {f.why}
-                          {f.idea_evidence &&
-                            <span className="block text-gray-300/80 mt-1">{f.idea_evidence}</span>}
-                        </>}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+                  </p>
+                  {f.weight_pct != null && (
+                    <p className="text-[10px] text-gray-600 mt-0.5">({f.weight_pct}% in 6-factor)</p>
+                  )}
+                </div>
+              </div>
+              <span className={`self-start text-[11px] px-1.5 py-0.5 rounded border ${st.cls}`}>
+                {st.label}
+              </span>
+              {f.result?.caveat && (
+                <p className="text-[11px] text-amber-200/80 leading-relaxed">{f.result.caveat}</p>
+              )}
+              {detail && (
+                <details className="group mt-auto">
+                  <summary className="cursor-pointer select-none text-[11px] text-green-400 hover:text-green-300 list-none">
+                    <span className="group-open:hidden">Details</span>
+                    <span className="hidden group-open:inline">Hide details</span>
+                  </summary>
+                  <p className="mt-1.5 text-[11px] text-gray-400 leading-relaxed">{detail}</p>
+                  {extra && <p className="mt-1 text-[11px] text-gray-300/80 leading-relaxed">{extra}</p>}
+                </details>
+              )}
+            </div>
+          )
+        })}
       </div>
 
-      <p className="text-[11px] text-gray-500 leading-relaxed">
-        {data.why_this_table_exists}
-      </p>
-
-      {/* Not a promise that it will be tested — a computed date for when it
-          could be, and why it cannot be sooner. */}
-      {data.unblocking?.note && (
-        <p className="text-[11px] text-gray-500 border-t border-gray-800 pt-2 leading-relaxed">
-          {data.unblocking.note}
-        </p>
+      {(data.why_this_table_exists || data.unblocking?.note) && (
+        <details className="group">
+          <summary className="cursor-pointer select-none text-[11px] text-gray-500 hover:text-gray-300 list-none">
+            <span className="group-open:hidden">Why this table exists, and when the rest can be tested ▸</span>
+            <span className="hidden group-open:inline">Hide ▾</span>
+          </summary>
+          <p className="mt-1.5 text-[11px] text-gray-500 leading-relaxed">{data.why_this_table_exists}</p>
+          {/* Not a promise that it will be tested — a computed date for when it
+              could be, and why it cannot be sooner. */}
+          {data.unblocking?.note && (
+            <p className="mt-1.5 text-[11px] text-gray-500 leading-relaxed">{data.unblocking.note}</p>
+          )}
+        </details>
       )}
     </div>
   )
