@@ -1,4 +1,4 @@
--- Proposed 2026-11-16, NOT applied: indexes so per-cycle reads stop scanning whole tables.
+-- APPLIED 2026-11-16 15:21-15:23 UTC (owner: "apply indexes"); all 5 valid, 44 MB total; factor_inputs count 63.6 s -> 1.2 s, cycle audit answers in 6 s: indexes so per-cycle reads stop scanning whole tables.
 --
 -- Why: /scan/cycle-audit times out. Each table below is keyed (ticker, cycle_id, ...), so a
 -- query "WHERE cycle_id = ?" cannot use the key: the column it filters on is second. Measured

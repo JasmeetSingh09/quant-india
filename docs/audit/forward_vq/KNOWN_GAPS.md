@@ -14,6 +14,10 @@ evidence. Each monthly seal (`research/sealed_export.py`) shows the same gaps as
 - **Partial cycle 2026-11-11:** the scan ran after the resume (07:16 UTC), not at its usual
   00:02 UTC, and stored 2,346 rows against the usual ~2,510. Treat it as incomplete and as
   captured at a different time of day than every other cycle.
+  *Checked 2026-11-16:* the scan marked it research-grade (all 2,344 factor_history rows have
+  cycle_complete = 1; 2,344 of the 2,540 scannable stocks is 92.3%, over the 90% bar). So the
+  forward tests will treat it as a normal cycle unless excluded. Recommendation: exclude it, or
+  flag it in every result that uses it, because it was captured hours later than the others.
 - **First normal cycle after:** 2026-11-12 (2,512 rows), confirmed in factor_history on 2026-11-16.
 - **Detection:** the nightly production check failed every run from 2026-10-29 to 2026-11-10,
   and its emails reached the owner, but a failure email looks the same whatever the cause, so
