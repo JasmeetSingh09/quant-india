@@ -66,6 +66,13 @@ from fastapi.testclient import TestClient   # noqa: E402
 
 rate_limit.check = lambda request: None     # measure access control, not throttling
 
+# The admin routes below really run, so the tables they read must exist. On a
+# developer machine db.py copies the old local database into the data dir and
+# they happen to be there; on CI the data dir starts empty, and /predictions/seal
+# failed with "no such table: predictions" (red from 2026-11-11 to 2026-11-16).
+import prediction_tracker       # noqa: E402
+prediction_tracker.init_table()
+
 PASS, FAIL = [], []
 
 
