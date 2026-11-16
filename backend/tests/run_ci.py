@@ -233,6 +233,15 @@ def main(argv=None):
           f"{total:,} checks counted.")
     for r in failed:
         print(f"\n----- {r['suite']}: {'; '.join(r['reasons'])} -----\n{r['tail']}")
+        # Also as a GitHub annotation. A run's log needs a sign-in to read, but
+        # its annotations are public, so the failing suite and its last lines
+        # can be read without one (CI was red for days in Nov 2026 with nobody
+        # able to see why).
+        if os.environ.get("GITHUB_ACTIONS"):
+            last = "\n".join(str(r["tail"]).strip().splitlines()[-15:])
+            msg = f"{'; '.join(r['reasons'])}\n{last}"
+            msg = msg.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+            print(f"::error title={r['suite']} failed::{msg}", flush=True)
 
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
