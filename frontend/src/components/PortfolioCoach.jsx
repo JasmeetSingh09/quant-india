@@ -355,28 +355,29 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
 
   return (
     <div className="card space-y-4">
+      {/* Heading and action on one line; the level switch on its own row
+          below, three equal segments at 12px (18 Nov 2026: squeezed beside
+          them at 390 it clipped "Advanced" at 10px). */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="font-semibold flex items-center gap-2">
           <Lightbulb size={18} className="text-yellow-400" />
           {mode.heading}
         </h2>
-        <div className="flex items-center gap-2">
-          <div className="flex rounded-md overflow-hidden border border-gray-700 text-[10px]">
-            {['beginner', 'intermediate', 'advanced'].map(m => (
-              <button key={m} onClick={() => setDetail(m)}
-                title={m === 'beginner' ? 'The verdict and what drives it'
-                     : m === 'intermediate' ? 'Adds the index comparison, tax and every finding'
-                     : 'Adds risk attribution, sector exposure and the method'}
-                className={`px-2 py-1 capitalize transition-colors ${
-                  level === m ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-gray-200'}`}>
-                {m}
-              </button>
-            ))}
-          </div>
         <button onClick={run} disabled={busy} className="btn-ghost text-xs">
           {busy ? 'Analysing…' : advice.data ? 'Re-analyse' : 'Analyse my portfolio'}
         </button>
-        </div>
+      </div>
+      <div className="grid grid-cols-3 w-full sm:max-w-sm rounded-md overflow-hidden border border-gray-700 text-xs">
+        {['beginner', 'intermediate', 'advanced'].map(m => (
+          <button key={m} onClick={() => setDetail(m)} aria-pressed={level === m}
+            title={m === 'beginner' ? 'The verdict and what drives it'
+                 : m === 'intermediate' ? 'Adds the index comparison, tax and every finding'
+                 : 'Adds risk attribution, sector exposure and the method'}
+            className={`px-2 py-1.5 capitalize transition-colors ${
+              level === m ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-gray-200'}`}>
+            {m}
+          </button>
+        ))}
       </div>
 
       {!advice.data && !busy && (
@@ -546,7 +547,7 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
               <div className="flex h-2 rounded-full overflow-hidden bg-gray-800">
                 {Object.entries(advice.data.sector_exposure).map(([sec, pct], i) => (
                   <div key={sec} title={`${sec} ${pct}%`} style={{ width: `${pct}%` }}
-                       className={['bg-green-500','bg-blue-500','bg-amber-500','bg-purple-500',
+                       className={['bg-green-500','bg-blue-500','bg-amber-500','bg-slate-400',
                                    'bg-pink-500','bg-cyan-500'][i % 6]} />
                 ))}
                 {/* Not every listed company maps to a known sector. Naming the
@@ -567,7 +568,7 @@ export default function PortfolioCoach({ holdings, initialValue = 100000,
                 {Object.entries(advice.data.sector_exposure).slice(0, 6).map(([sec, pct], i) => (
                   <span key={sec} className="text-[11px] text-gray-400 flex items-center gap-1">
                     <span className={`w-2 h-2 rounded-sm ${['bg-green-500','bg-blue-500','bg-amber-500',
-                      'bg-purple-500','bg-pink-500','bg-cyan-500'][i % 6]}`} />
+                      'bg-slate-400','bg-pink-500','bg-cyan-500'][i % 6]}`} />
                     {sec.replace(/_/g, ' & ')} {pct}%
                   </span>
                 ))}

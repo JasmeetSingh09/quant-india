@@ -4,7 +4,7 @@ import { getTopPicks } from '../api'
 import { signalLabel, SIGNAL_TITLE, rankBadgeClass, scoreTextClass } from '../signalLabel'
 import Spinner from '../components/Spinner'
 import Explainer from '../components/Explainer'
-import { Sparkles, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 
 const FACTORS = [
   ['momentum',  'Momentum'],
@@ -82,7 +82,7 @@ export default function TopPicks() {
     <div className="p-4 sm:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Sparkles size={24} className="text-green-400" /> Top Picks
+          Top Picks
         </h1>
         <p className="text-gray-400 text-sm mt-0.5">
           Stocks ranked by our 4-factor alpha model right now — an idea screen, not a guarantee.

@@ -12,6 +12,7 @@ one thing worth checking. If there is nothing to say, it does not send —
 a weekly email that says "no change" trains people to ignore the sender.
 """
 
+import html as _html   # user-typed simulation names go into the e-mail HTML (18 Nov 2026)
 from datetime import datetime, timedelta
 
 MIN_DAYS = 5          # nothing meaningful to report before a week of trading
@@ -60,22 +61,22 @@ def build_digest(user_id: str = "public") -> dict:
                                             (x.get("allocation_pct") or 0)))
         blocks.append(f"""
         <div style="border:1px solid #1f2937;border-radius:10px;padding:16px;margin:12px 0">
-          <div style="font-weight:600;color:#e5e7eb">{a['name']}</div>
+          <div style="font-weight:600;color:#e5e7eb">{_html.escape(str(a['name']))}</div>
           <div style="font-size:26px;font-weight:700;font-family:monospace;
                       color:{'#4ade80' if total >= 0 else '#f87171'};margin:6px 0">
             {_fmt_pct(total)}
           </div>
           <div style="color:#9ca3af;font-size:13px">after {a['days']} days</div>
           <div style="color:#9ca3af;font-size:13px;margin-top:10px">
-            Best: <b style="color:#4ade80">{best['ticker'].replace('.NS','')}</b>
+            Best: <b style="color:#4ade80">{_html.escape(best['ticker'].replace('.NS',''))}</b>
             {_fmt_pct(best.get('pnl_pct') or 0)} &nbsp;·&nbsp;
-            Worst: <b style="color:#f87171">{worst['ticker'].replace('.NS','')}</b>
+            Worst: <b style="color:#f87171">{_html.escape(worst['ticker'].replace('.NS',''))}</b>
             {_fmt_pct(worst.get('pnl_pct') or 0)}
           </div>
           <div style="color:#6b7280;font-size:12px;margin-top:10px;
                       border-left:2px solid #374151;padding-left:10px">
             Most of that move came from
-            <b>{driver['ticker'].replace('.NS','')}</b> — it is
+            <b>{_html.escape(driver['ticker'].replace('.NS',''))}</b> — it is
             {driver.get('allocation_pct', 0):.0f}% of the portfolio and moved
             {_fmt_pct(driver.get('pnl_pct') or 0)}. Worth asking whether that is
             a position size you meant to take.

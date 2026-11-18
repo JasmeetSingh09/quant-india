@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { buildPortfolio, startSimulation } from '../api'
 import PageHeader from './PageHeader'
 import Spinner from './Spinner'
-import { Wand2, ShieldCheck, AlertTriangle, PlayCircle } from 'lucide-react'
+import { ShieldCheck, AlertTriangle, PlayCircle } from 'lucide-react'
 import { horizonLabel } from '../horizonLabel'
 
 const RISKS = [
@@ -113,7 +113,7 @@ export default function PortfolioBuilder({ embedded = false }) {
 
         <button onClick={() => mut.mutate(form)} disabled={mut.isPending}
                 className="btn-primary flex items-center gap-2">
-          <Wand2 size={15} />{mut.isPending ? 'Building…' : 'Build my portfolio'}
+          {mut.isPending ? 'Building…' : 'Build my portfolio'}
         </button>
 
         {mut.isError && <p className="banner-error">{String(mut.error)}</p>}

@@ -23,8 +23,8 @@ const LABELS = {
 
 const tooltipCls = `
   pointer-events-none absolute z-50
-  left-1/2 -translate-x-1/2 bottom-full mb-2
-  w-64 p-3 rounded-lg
+  bottom-full mb-2
+  w-52 sm:w-64 p-3 rounded-lg
   bg-gray-800 border border-gray-700
   text-gray-200 text-xs font-normal leading-relaxed
   normal-case tracking-normal
@@ -54,20 +54,29 @@ export function Term({ k, children, className = '' }) {
   return (
     <span className={`relative group inline-block ${className}`}>
       <span className="border-b border-dotted border-gray-500 cursor-help">{text}</span>
-      <span className={tooltipCls}><TipBody k={k} /></span>
+      <span className={`${tooltipCls} ${TIP_POS.center}`}><TipBody k={k} /></span>
     </span>
   )
 }
 
-export function InfoTip({ k }) {
+// Where the tip opens. Centred by default; in a two-column grid on a phone the
+// left tile opens it to the right and the right tile to the left, so it stays
+// on screen (18 Nov 2026: centred tips ran up to 65px past a 320px screen).
+const TIP_POS = {
+  center: 'left-1/2 -translate-x-1/2',
+  start:  'left-0 sm:left-1/2 sm:-translate-x-1/2',
+  end:    'right-0 sm:right-auto sm:left-1/2 sm:-translate-x-1/2',
+}
+
+export function InfoTip({ k, align = 'center' }) {
   const def = GLOSSARY[k]
   if (!def) return null
   return (
     <span className="relative group inline-block ml-1 align-middle">
       <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full
-                       bg-gray-700 hover:bg-gray-600 text-gray-400 hover:text-gray-200
+                       bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white
                        text-[9px] cursor-help leading-none transition-colors">?</span>
-      <span className={tooltipCls}><TipBody k={k} /></span>
+      <span className={`${tooltipCls} ${TIP_POS[align] || TIP_POS.center}`}><TipBody k={k} /></span>
     </span>
   )
 }

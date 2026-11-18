@@ -18,10 +18,10 @@ import Spinner from './Spinner'
  */
 
 const C = {
-  revenue: '#38bdf8', profit: '#34d399', operating: '#a78bfa', debt: '#f59e0b',
+  revenue: '#38bdf8', profit: '#34d399', operating: '#cbd5e1', debt: '#f59e0b',
   ocf: '#38bdf8', capex: '#f87171', fcf: '#34d399', eps: '#e5e7eb',
   up: '#34d399', down: '#f87171', sma20: '#f59e0b', sma50: '#38bdf8', sma200: '#f472b6',
-  ema20: '#e5e7eb', band: '#a78bfa', macd: '#38bdf8', signal: '#f59e0b',
+  ema20: '#e5e7eb', band: '#94a3b8', macd: '#38bdf8', signal: '#f59e0b',
 }
 const GRID = <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" />
 const TIP = { background: '#111827', border: '1px solid #374151', fontSize: 12, borderRadius: 8 }
@@ -56,7 +56,7 @@ export default function StockAnalysis({ ticker }) {
         {tabs.map(([k, label]) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
             className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-              tab === k ? 'bg-green-600 text-white' : 'bg-gray-800 hover:bg-gray-700 text-gray-300'}`}>
+              tab === k ? 'bg-green-700 text-white' : 'bg-gray-800 hover:bg-gray-700 text-gray-300'}`}>
             {label}
           </button>
         ))}
@@ -296,7 +296,7 @@ function Technicals({ ticker }) {
   })
 
   const btn = active => `shrink-0 px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-    active ? 'bg-green-600 text-white' : 'bg-gray-800 hover:bg-gray-700 text-gray-300'}`
+    active ? 'bg-green-700 text-white' : 'bg-gray-800 hover:bg-gray-700 text-gray-300'}`
 
   const bars = (data?.bars || []).map(b => ({
     ...b,

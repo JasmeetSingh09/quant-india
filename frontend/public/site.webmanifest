@@ -1,7 +1,7 @@
 {
-  "name": "Quant India — AI Stock Intelligence for the NSE",
+  "name": "Quant India — Quantitative Portfolio Research for the NSE",
   "short_name": "Quant India",
-  "description": "Institutional quant tools for Indian markets: alpha model, FinBERT sentiment, portfolio optimisation, Monte Carlo and risk analytics.",
+  "description": "The maths behind quant portfolios, applied to the NSE. Signals & research only — not financial advice.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#030712",

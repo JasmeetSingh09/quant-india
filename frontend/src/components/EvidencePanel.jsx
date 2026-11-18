@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getIntegrityEvidence } from '../api'
 import { useEvidence } from './Evidence'
+import { DateText } from './Dates'
 
 /**
  * EvidencePanel — two questions, kept apart on purpose.
@@ -102,7 +103,7 @@ export default function EvidencePanel() {
             {open && (
               <div className="mt-1 border-l border-gray-800 pl-3">
                 {claims.map(c => <Claim key={c.id} c={c} />)}
-                <p className="text-[11px] text-gray-600 mt-2">{integ.note}</p>
+                <p className="text-[11px] text-gray-600 mt-2"><DateText text={integ.note} /></p>
               </div>
             )}
           </>

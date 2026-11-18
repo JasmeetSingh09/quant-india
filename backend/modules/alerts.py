@@ -14,6 +14,7 @@ Uses SMTP_SSL on port 465. Credentials from .env:
 """
 
 import os
+import html as _html
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -26,6 +27,22 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 GMAIL_SENDER   = os.getenv("GMAIL_ADDRESS")
 GMAIL_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 GMAIL_RECEIVER = os.getenv("GMAIL_RECEIVER", GMAIL_SENDER)
+
+
+# ---------------------------------------------------------------------------
+# Escaping
+# ---------------------------------------------------------------------------
+
+def _esc(value) -> str:
+    """Text for an HTML email body. Ticker, company name and headline can come
+    from a request (/alerts/send) or a news feed; unescaped they could carry the
+    sender's own markup and links in mail from this account (V4-03, 18 Nov 2026)."""
+    return _html.escape("" if value is None else str(value), quote=True)
+
+
+def _one_line(value) -> str:
+    """Text for a mail header: no line breaks, so nothing can add a header."""
+    return " ".join(("" if value is None else str(value)).split())
 
 
 # ---------------------------------------------------------------------------
@@ -49,7 +66,7 @@ def send_email(subject: str, body_html: str, to_email: str = None) -> dict:
         return {"error": "No recipient: sign in, or set GMAIL_RECEIVER."}
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
+    msg["Subject"] = _one_line(subject)
     msg["From"]    = GMAIL_SENDER
     msg["To"]      = recipient
 
@@ -62,8 +79,13 @@ def send_email(subject: str, body_html: str, to_email: str = None) -> dict:
         return {"status": "sent", "to": recipient, "subject": subject}
     except smtplib.SMTPAuthenticationError:
         return {"error": "Gmail authentication failed. Check GMAIL_ADDRESS and GMAIL_APP_PASSWORD in .env."}
+    except smtplib.SMTPRecipientsRefused:
+        return {"error": "The mail server refused the recipient."}
     except Exception as e:
-        return {"error": str(e)}
+        # Never the exception text: SMTP errors quote addresses (Codex review
+        # R6, 18 Nov 2026). The type is enough to diagnose from the logs.
+        print(f"[mail] send failed: {type(e).__name__}")
+        return {"error": f"Sending failed ({type(e).__name__})."}
 
 
 # ---------------------------------------------------------------------------
@@ -79,6 +101,8 @@ def _build_price_alert_html(
     threshold_pct: float,
     valuation: dict,
 ) -> str:
+    ticker, company_name = _esc(ticker), _esc(company_name)
+    valuation = {k: _esc(v) for k, v in (valuation or {}).items()}
     direction = "risen" if change_pct > 0 else "fallen"
     color     = "#16a34a" if change_pct > 0 else "#dc2626"
     pe_str    = f"{valuation.get('pe_ratio', 'N/A')}"
@@ -118,6 +142,8 @@ def _build_sentiment_alert_html(
     headline: str,
     current_price: float,
 ) -> str:
+    ticker, company_name, headline = _esc(ticker), _esc(company_name), _esc(headline)
+    sentiment_label = _esc(sentiment_label)
     color = "#dc2626" if sentiment_label == "negative" else "#16a34a"
     icon  = "&#128308;" if sentiment_label == "negative" else "&#128994;"
     return f"""
@@ -155,6 +181,9 @@ def _build_multi_signal_alert_html(
     headline: str,
     valuation: dict,
 ) -> str:
+    ticker, company_name, headline = _esc(ticker), _esc(company_name), _esc(headline)
+    sentiment_label = _esc(sentiment_label)
+    valuation = {k: _esc(v) for k, v in (valuation or {}).items()}
     price_color = "#16a34a" if price_change_pct > 0 else "#dc2626"
     sent_color  = "#dc2626" if sentiment_label == "negative" else "#16a34a"
 

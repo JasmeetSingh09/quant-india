@@ -104,10 +104,10 @@ function StudyResult({ data }) {
 }
 
 const STUDIES = [
-  { id: 'sentiment', label: 'Sentiment Alpha',   desc: 'Does FinBERT sentiment predict NSE returns?',    icon: '🧠' },
-  { id: 'momentum',  label: 'Momentum Factor',   desc: 'Do past winners keep winning on NSE?',           icon: '📈' },
-  { id: 'reversion', label: 'Mean Reversion',    desc: 'Do large moves reverse within 5 days?',          icon: '↩️' },
-  { id: 'corr',      label: 'Diversification',   desc: 'Which stock pairs reduce portfolio risk?',       icon: '🔗' },
+  { id: 'sentiment', label: 'Sentiment Alpha',   desc: 'Does FinBERT sentiment predict NSE returns?' },
+  { id: 'momentum',  label: 'Momentum Factor',   desc: 'Do past winners keep winning on NSE?' },
+  { id: 'reversion', label: 'Mean Reversion',    desc: 'Do large moves reverse within 5 days?' },
+  { id: 'corr',      label: 'Diversification',   desc: 'Which stock pairs reduce portfolio risk?' },
 ]
 
 export default function Research() {
@@ -152,7 +152,7 @@ export default function Research() {
                 }`}>
                   <input type="radio" checked={study===s.id} onChange={() => { setStudy(s.id); sentMut.reset?.(); momMut.reset?.() }} className="mt-0.5 accent-green-500" />
                   <div>
-                    <p className="text-sm font-medium">{s.icon} {s.label}</p>
+                    <p className="text-sm font-medium">{s.label}</p>
                     <p className="text-xs text-gray-500">{s.desc}</p>
                   </div>
                 </label>

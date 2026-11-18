@@ -36,7 +36,9 @@ const RANK_CLASS = {
   'Ranked high':   'bg-sky-950/60 text-sky-400/90 border-sky-800/60',
   'Middle':        'bg-gray-800 text-gray-400 border-gray-700',
   'Ranked low':    'bg-slate-800/70 text-slate-400 border-slate-700',
-  'Bottom ranked': 'bg-slate-900 text-slate-500 border-slate-700',
+  // slate-400, not slate-500 (3.8 : 1 at 12px, under AA; 18 Nov 2026). The
+  // darker fill still tells it apart from 'Ranked low'.
+  'Bottom ranked': 'bg-slate-900 text-slate-400 border-slate-700',
 }
 
 // Colours only, for places that set their own size.

@@ -24,7 +24,10 @@ export default function Leaderboard({ n = 5 }) {
   })
 
   const rows = data?.top ?? []
-  if (isLoading || rows.length === 0) return null
+  // Held at its loaded height while loading, so the dashboard below it does
+  // not jump when it arrives (18 Nov 2026, measured 390/640/768/1024+ px).
+  if (isLoading) return <div aria-busy="true" className="card min-h-[466px] sm:min-h-[457px] md:min-h-[441px] lg:min-h-[417px]" />
+  if (rows.length === 0) return null
 
   return (
     <div className="card">

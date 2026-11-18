@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { getFactorEvidence } from '../api'
+import { EVIDENCE_CLASS } from '../evidenceStatus'
 
 /**
  * Evidence — what is known about whether a score predicts anything.
@@ -24,27 +25,27 @@ const STATUS = {
   tested_significant: {
     short: 'Passed',
     long: 'Passed a pre-registered point-in-time test',
-    cls: 'text-emerald-300 border-emerald-800/60 bg-emerald-950/25',
+    cls: EVIDENCE_CLASS.passed,
   },
   tested_not_significant: {
     short: 'Did not pass',
     long: 'Tested; no statistically significant edge found',
-    cls: 'text-amber-300 border-amber-800/60 bg-amber-950/25',
+    cls: EVIDENCE_CLASS.failed,
   },
   tested_unknown: {
     short: 'Tested',
     long: 'Has been tested; open the validation page for the result',
-    cls: 'text-amber-300 border-amber-800/60 bg-amber-950/25',
+    cls: EVIDENCE_CLASS.tested,
   },
   testable_now: {
     short: 'Untested',
     long: 'Reconstructible from prices, not yet tested',
-    cls: 'text-sky-300 border-sky-800/60 bg-sky-950/25',
+    cls: EVIDENCE_CLASS.untested,
   },
   cannot_test_yet: {
     short: 'Untested',
     long: 'Not yet testable as we compute it (needs accounts or news as first published)',
-    cls: 'text-gray-400 border-gray-700 bg-gray-900/50',
+    cls: EVIDENCE_CLASS.untested,
   },
 }
 
@@ -115,7 +116,7 @@ export function SignalEvidenceNote({ className = '' }) {
   const untested = live.filter(f => f.status === 'cannot_test_yet')
   const pct = rows => rows.reduce((a, f) => a + (f.weight_v1_pct || 0), 0)
   return (
-    <div className={`text-[11px] leading-snug text-gray-400 ${className}`}>
+    <div className={`text-xs leading-relaxed text-gray-400 ${className}`}>
       <span className="text-gray-300 font-medium">Model ranking</span>
       {' — the combined score is '}
       <span className="text-amber-300/90">not yet tested</span>.
@@ -140,6 +141,22 @@ export function SignalEvidenceNote({ className = '' }) {
  * universe list serves the last completed nightly cycle. Without this the
  * difference reads as unreliability.
  */
+// A stamp as one unbreakable value (display only; the data is unchanged).
+// The scan writes naive ISO times from the server clock, which runs on UTC
+// (Render; the nightly scan starts 00:02 UTC), e.g. "2026-11-18T02:01:15.368799"
+// -> "2026-11-18 02:01 UTC". A stamp that carries its own zone is converted to
+// UTC; anything else is shown as it came.
+function fmtStamp(v) {
+  if (v == null) return v
+  const s = String(v)
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/)
+  if (!m) return s
+  if (!m[3]) return `${m[1]} ${m[2]} UTC`
+  const d = new Date(s)
+  return isNaN(d) ? s : `${d.toISOString().slice(0, 10)} ${d.toISOString().slice(11, 16)} UTC`
+}
+const Stamp = ({ v }) => <span className="font-mono whitespace-nowrap text-gray-300">{fmtStamp(v)}</span>
+
 export function ScoreProvenance({ mode, asOf, cycle, className = '' }) {
   const live = mode === 'live'
   return (
@@ -148,8 +165,8 @@ export function ScoreProvenance({ mode, asOf, cycle, className = '' }) {
         {live ? 'Live' : 'Nightly cycle'}
       </span>
       {live
-        ? asOf && <> — computed {asOf}</>
-        : cycle && <> {cycle}{asOf && <> — completed {asOf}</>}</>}
+        ? asOf && <> — computed <Stamp v={asOf} /></>
+        : cycle && <> <span className="font-mono whitespace-nowrap">{cycle}</span>{asOf && <> — completed <Stamp v={asOf} /></>}</>}
       <span className="block text-gray-600 mt-0.5">
         {live
           ? 'Other views may show the last completed nightly cycle instead, so scores can differ.'

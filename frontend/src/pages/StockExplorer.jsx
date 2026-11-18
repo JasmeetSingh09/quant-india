@@ -11,7 +11,7 @@ import {
   runScreener, getScreenerSectors, getScreenerStatus,
 } from '../api'
 import Spinner from '../components/Spinner'
-import AlphaMeter from '../components/AlphaMeter'
+import { SignalEvidenceNote } from '../components/Evidence'
 import SignalHistory from '../components/SignalHistory'
 import WhySignal from '../components/WhySignal'
 import SixFactor from '../components/SixFactor'
@@ -21,9 +21,11 @@ import SignalTrackRecord from '../components/SignalTrackRecord'
 import StockContext from '../components/StockContext'
 import StatCard from '../components/StatCard'
 import StockAnalysis from '../components/StockAnalysis'
+import { DateRange } from '../components/Dates'
 import { Search, TrendingUp, TrendingDown, ArrowLeft, ExternalLink, Filter, LayoutList, LayoutGrid } from 'lucide-react'
 import { InfoTip } from '../components/Term'
 import { isRefused } from '../factorRefusal'
+import { signalLabel, SIGNAL_TITLE, rankBadgeClass, scoreTextClass } from '../signalLabel'
 import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -144,28 +146,136 @@ function SentimentBar({ label, pct: value, color }) {
 }
 
 // ─── 52-week range bar ────────────────────────────────────────────────────────
+// A plain track and a marker (18 Nov 2026). The red-to-green fill read as a
+// verdict on where the price sits; the range is a fact, not a signal.
 function WeekRange({ low, high, current }) {
   if (!low || !high || !current) return null
   const pct = Math.min(100, Math.max(0, ((current - low) / (high - low)) * 100))
   return (
     <div>
-      <div className="flex justify-between text-xs text-gray-500 mb-1.5">
-        <span>52W Low <span className="text-gray-300 font-mono">₹{num(low, 0)}</span></span>
-        <span>52W High <span className="text-gray-300 font-mono">₹{num(high, 0)}</span></span>
+      <div className="flex justify-between text-xs text-gray-400 mb-2">
+        <span>52W Low <span className="text-gray-200 font-mono">₹{num(low, 0)}</span></span>
+        <span>52W High <span className="text-gray-200 font-mono">₹{num(high, 0)}</span></span>
       </div>
-      <div className="h-2 bg-gray-800 rounded-full relative">
-        <div
-          className="h-2 rounded-full bg-gradient-to-r from-red-600 via-yellow-500 to-green-500"
-          style={{ width: `${pct}%`, minWidth: 8 }}
-        />
+      <div className="h-1.5 bg-gray-800 rounded-full relative">
         <div
           className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white border-2 border-gray-900 shadow"
           style={{ left: `calc(${pct}% - 6px)` }}
         />
       </div>
-      <p className="text-xs text-gray-500 mt-1 text-center">
-        Current at <span className="text-gray-300">{pct.toFixed(0)}%</span> of 52-week range
+      <p className="text-xs text-gray-400 mt-2">
+        Current at <span className="text-gray-200 font-mono">{pct.toFixed(0)}%</span> of 52-week range
       </p>
+    </div>
+  )
+}
+
+/**
+ * ModelReading — the one score on the page, beside the price (18 Nov 2026).
+ * It was the second of three scores (−4.73 here, a red "−5 / 100" in Why this
+ * signal, −1.5 in the five-factor view), in the middle of a column of
+ * fundamentals. Same data, same words, same evidence line: it now leads, and
+ * the five-factor view below is the labelled research view.
+ */
+function ModelReading({ alpha, ticker, explain }) {
+  const score = alpha.alpha_score
+  const clamped = Math.max(-100, Math.min(100, score ?? 0))
+  const pos = ((clamped + 100) / 200) * 100
+  return (
+    <div className="card flex-1 flex flex-col gap-5">
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="font-semibold text-base text-white">
+          Alpha Score<InfoTip k="alpha_score" />
+        </h2>
+        {alpha.signal && (
+          <span className={rankBadgeClass(alpha.signal)} title={SIGNAL_TITLE}>{signalLabel(alpha.signal)}</span>
+        )}
+      </div>
+
+      {/* Score beside its factors on a tablet; above them, on one line with
+          its scale, beside the price (1024+), so the reading is about as tall
+          as the price card and chart next to it. */}
+      <div className="grid gap-6 sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)] lg:grid-cols-1">
+        <div className="lg:flex lg:items-end lg:gap-8">
+          <p className={`font-mono font-medium text-[30px] leading-none tabular-nums ${scoreTextClass(score)}`}>
+            {score > 0 ? '+' : ''}{score}
+          </p>
+          <div className="mt-4 lg:mt-0 lg:flex-1">
+            <div className="h-1.5 bg-gray-800 rounded-full relative">
+              <span className="absolute inset-y-0 left-1/2 w-px bg-gray-600" />
+              <span className="absolute top-1/2 -translate-y-1/2 w-1 h-3 rounded-sm bg-gray-200"
+                    style={{ left: `calc(${pos}% - 2px)` }} />
+            </div>
+            <div className="flex justify-between mt-2 text-xs text-gray-400">
+              <span>−100 Lower</span>
+              <span>Higher +100</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3 min-w-0">
+          {Object.entries(alpha.contributions || {}).map(([factor, contrib]) => isRefused(alpha.factors?.[factor]) ? (
+            // Not measured is not zero: say so, and why, instead of "0.0 pts".
+            <div key={factor}>
+              <div className="flex justify-between gap-3 text-sm mb-1">
+                <span className="text-gray-200 capitalize">{factor}<InfoTip k={factor} /></span>
+                <span className="text-xs text-gray-400">not measured</span>
+              </div>
+              <div className="h-1.5 bg-gray-800/50 rounded-full" />
+              <p className="text-xs text-gray-400 mt-1">
+                {alpha.factors[factor].reason}. Adds nothing to the score.
+              </p>
+            </div>
+          ) : (
+            <div key={factor}>
+              <div className="flex items-baseline justify-between gap-3 mb-1.5">
+                <span className="min-w-0 text-sm">
+                  <span className="text-gray-200 capitalize">{factor}</span><InfoTip k={factor} />
+                  <span className="ml-2 text-xs text-gray-400">{alpha.factors?.[factor]?.interpretation}</span>
+                </span>
+                <span className={`shrink-0 font-mono text-sm tabular-nums ${scoreTextClass(contrib)}`}>
+                  {contrib > 0 ? '+' : ''}{contrib?.toFixed(1)} pts
+                </span>
+              </div>
+              {/* From the middle: right in sky for a positive contribution,
+                  left in slate for a negative one (signalLabel.js colours). */}
+              <div className="h-1.5 bg-gray-800 rounded-full relative overflow-hidden">
+                <span className={`bar-grow absolute inset-y-0 rounded-full ${contrib >= 0 ? 'left-1/2 bg-sky-400 origin-left' : 'right-1/2 bg-slate-500 origin-right'}`}
+                      style={{ width: `${Math.min(50, Math.abs(contrib))}%` }} />
+              </div>
+              {/* Momentum skips the latest month by design. Without saying so, a stock
+                  that just fell (SBIN, Oct 2026) looks wrongly ranked. */}
+              {factor === 'momentum' && alpha.factors?.momentum?.skipped_month_return_pct != null && (
+                <SkippedMonth m={alpha.factors.momentum} />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* How this label has actually done. A signal shown without
+          its record invites the reader to supply one, and the one
+          they supply is always better than the truth. */}
+      <ErrorBoundary name="signal track record">
+        <SignalTrackRecord signal={alpha.signal} />
+      </ErrorBoundary>
+
+      {/* What is known about whether the score predicts anything, in the
+          same eyeline as the score. */}
+      <SignalEvidenceNote />
+
+      <div className="mt-auto flex items-center justify-between gap-3 pt-3 border-t border-gray-800">
+        <p className="text-xs text-gray-400">
+          Data coverage: <span className="font-mono text-gray-200">{(alpha.confidence * 100)?.toFixed(0)}%</span>
+        </p>
+        <button
+          onClick={() => explain.mutate(ticker)}
+          disabled={explain.isPending}
+          className="btn-ghost text-sm"
+        >
+          {explain.isPending ? 'Analysing (30-60s)…' : 'Why this signal?'}
+        </button>
+      </div>
     </div>
   )
 }
@@ -189,7 +299,7 @@ function StockBoxCard({ r, onSelect }) {
   // sector → short colour pill
   const sectorColor = {
     'Financial Services': 'bg-blue-950/60 text-blue-300 border-blue-800/40',
-    'Technology':         'bg-violet-950/60 text-violet-300 border-violet-800/40',
+    'Technology':         'bg-slate-800/70 text-slate-300 border-slate-600/40',
     'Energy':             'bg-orange-950/60 text-orange-300 border-orange-800/40',
     'Healthcare':         'bg-pink-950/60 text-pink-300 border-pink-800/40',
     'Consumer Cyclical':  'bg-yellow-950/60 text-yellow-300 border-yellow-800/40',
@@ -198,7 +308,7 @@ function StockBoxCard({ r, onSelect }) {
     'Basic Materials':    'bg-lime-950/60 text-lime-300 border-lime-800/40',
     'Utilities':          'bg-cyan-950/60 text-cyan-300 border-cyan-800/40',
     'Real Estate':        'bg-rose-950/60 text-rose-300 border-rose-800/40',
-    'Communication Services': 'bg-indigo-950/60 text-indigo-300 border-indigo-800/40',
+    'Communication Services': 'bg-stone-800/70 text-stone-300 border-stone-600/40',
   }
   const pill = sectorColor[r.sector] || 'bg-gray-800/60 text-gray-400 border-gray-700/40'
 
@@ -383,7 +493,7 @@ function StocksList({ onSelect }) {
           <Filter size={12} className="text-gray-600 shrink-0" /> Sort by:
           {[['market_cap','Market Cap'],['pe_ratio','P/E'],['roe','ROE'],['revenue_growth','Rev Growth'],['dividend_yield','Div Yield']].map(([v, l]) => (
             <button key={v} onClick={() => { setSortBy(v); run(v) }}
-              className={`px-2.5 py-1 rounded-md transition-colors ${sortBy === v ? 'bg-green-600 text-white' : 'bg-gray-800 hover:bg-gray-700 text-gray-300'}`}>
+              className={`px-2.5 py-1 rounded-md transition-colors ${sortBy === v ? 'bg-green-700 text-white' : 'bg-gray-800 hover:bg-gray-700 text-gray-300'}`}>
               {l}
             </button>
           ))}
@@ -485,9 +595,9 @@ function SkippedMonth({ m }) {
   const signed = v => `${v >= 0 ? '+' : ''}${Number(v).toFixed(1)}%`
   return (
     <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-      Measured {m.window_from} to {m.window_to}: {signed(m.mom_12_1_pct)}.{' '}
+      Measured <DateRange from={m.window_from} to={m.window_to} />: {signed(m.mom_12_1_pct)}.{' '}
       <span className={sk < 0 ? 'text-amber-300/90' : 'text-gray-400'}>
-        The latest month ({m.window_to} to {m.latest_close_date}, {signed(sk)}) is not counted
+        The latest month (<DateRange from={m.window_to} to={m.latest_close_date} />, {signed(sk)}) is not counted
       </span>{' '}
       by design: the most recent month tends to reverse, and this is the version that passed the
       2011–2026 test. It enters the score as the window moves forward.
@@ -551,18 +661,21 @@ function StockDetail({ ticker, onBack }) {
           <ArrowLeft size={15} /> Stocks
         </button>
         <span className="text-gray-700">/</span>
-        <span className="font-mono font-bold text-green-400">{ticker.replace('.NS', '')}</span>
+        <span className="font-mono font-medium text-gray-200">{ticker.replace('.NS', '')}</span>
         {m.company_name && <span className="text-gray-400 text-sm">{m.company_name}</span>}
       </div>
 
       {/* Company intro */}
       {!metricsLoading && m.company_name && (
         <div className="card space-y-4">
-          <div className="flex items-start justify-between gap-6">
-            <div className="flex-1">
+          {/* Phones: the profile takes the full width and the four figures
+              sit under it as a 2×2 grid (18 Nov 2026: the text ran in a
+              ≈190px column beside them). */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+            <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="text-xl font-bold">{m.company_name}</h1>
-                <span className="font-mono text-green-400 text-sm font-semibold bg-green-950/40 border border-green-800/50 px-2 py-0.5 rounded">
+                <span className="font-mono text-gray-200 text-sm font-medium bg-gray-800 border border-gray-700 px-2 py-0.5 rounded">
                   {ticker.replace('.NS', '')}
                 </span>
               </div>
@@ -578,7 +691,7 @@ function StockDetail({ ticker, onBack }) {
               </div>
               {m.description && <CompanyBrief text={m.description} />}
             </div>
-            <div className="shrink-0 grid grid-cols-1 sm:grid-cols-2 gap-3 text-right">
+            <div className="shrink-0 grid grid-cols-2 gap-3 sm:text-right">
               {m.market_cap_fmt && (
                 <div>
                   <p className="text-xs text-gray-500">Market Cap</p>
@@ -608,13 +721,6 @@ function StockDetail({ ticker, onBack }) {
             </div>
           </div>
 
-          {/* 52-week range */}
-          {(m.week_52_low || m.week_52_high) && (
-            <div className="pt-3 border-t border-gray-800">
-              <WeekRange low={m.week_52_low} high={m.week_52_high} current={price?.price} />
-            </div>
-          )}
-
           {/* Website */}
           {m.website && (
             <a
@@ -632,31 +738,82 @@ function StockDetail({ ticker, onBack }) {
       {/* Price header */}
       {priceLoading ? <Spinner /> : price && (
         <>
-          <div className="card">
-            <div className="flex items-start justify-between">
+          {/* Price and the model's reading of it, side by side from 1024px,
+              with the price chart under the price. The price card is as tall
+              as its content (18 Nov 2026: stretched to the reading's height it
+              had an empty foot); the chart takes the rest of the column.
+              Phones: price, reading, chart. */}
+          <div className="grid gap-6 lg:grid-cols-2 lg:grid-rows-[auto_1fr]">
+            <div className="card space-y-5 lg:col-start-1 lg:row-start-1">
               <div>
-                <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Current Price</p>
-                <p className="text-4xl font-bold font-mono">
+                <p className="text-gray-400 text-xs uppercase tracking-wider mb-1">Current Price</p>
+                <p className="text-4xl font-medium font-mono tabular-nums text-white">
                   ₹{price.price?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </p>
                 <div className={`flex items-center gap-2 mt-1 ${pos ? 'text-green-400' : 'text-red-400'}`}>
                   {pos ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-                  <span className="font-semibold">{pos ? '+' : ''}{price.change?.toFixed(2)}</span>
-                  <span>({pos ? '+' : ''}{price.change_pct?.toFixed(2)}%)</span>
-                  <span className="text-gray-500 text-sm">today</span>
+                  <span className="font-semibold font-mono">{pos ? '+' : ''}{price.change?.toFixed(2)}</span>
+                  <span className="font-mono">({pos ? '+' : ''}{price.change_pct?.toFixed(2)}%)</span>
+                  <span className="text-gray-400 text-sm">today</span>
                 </div>
               </div>
-              <div className="text-right text-xs text-gray-500 space-y-0.5">
-                {m.pe_ratio && <p>P/E <span className="text-gray-300 font-mono">{num(m.pe_ratio)}</span></p>}
-                {m.price_to_book && <p>P/B <span className="text-gray-300 font-mono">{num(m.price_to_book, 2)}</span></p>}
-                {m.total_revenue_fmt && <p>Revenue <span className="text-gray-300 font-mono">{m.total_revenue_fmt}</span></p>}
-              </div>
+              {(m.pe_ratio || m.price_to_book || m.total_revenue_fmt) && (
+                <dl className="flex flex-wrap gap-x-8 gap-y-3">
+                  {m.pe_ratio && <div><dt className="text-xs text-gray-400">P/E</dt><dd className="font-mono text-gray-200">{num(m.pe_ratio)}</dd></div>}
+                  {m.price_to_book && <div><dt className="text-xs text-gray-400">P/B</dt><dd className="font-mono text-gray-200">{num(m.price_to_book, 2)}</dd></div>}
+                  {m.total_revenue_fmt && <div><dt className="text-xs text-gray-400">Revenue</dt><dd className="font-mono text-gray-200">{m.total_revenue_fmt}</dd></div>}
+                </dl>
+              )}
+              {(m.week_52_low || m.week_52_high) && (
+                <div className="pt-4 border-t border-gray-800">
+                  <WeekRange low={m.week_52_low} high={m.week_52_high} current={price?.price} />
+                </div>
+              )}
             </div>
-          </div>
+
+            <div className="min-w-0 flex flex-col gap-3 lg:col-start-2 lg:row-start-1 lg:row-span-2">
+              {alphaLoading ? <div className="card"><Spinner size="sm" /></div> : alpha && !alpha.error && (
+                <ModelReading alpha={alpha} ticker={ticker} explain={explain} />
+              )}
+              {explain.data && explain.data.ticker === ticker && (
+                <div className="card space-y-3">
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">Verdict</p>
+                    <p className="text-sm text-gray-200 mt-1 leading-relaxed">{explain.data.verdict}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Reasons</p>
+                    <div className="space-y-1.5">
+                      {explain.data.reasons?.map((r, i) => (
+                        <div key={i} className="flex gap-2 text-xs">
+                          <span className={r.direction === 'positive' ? 'text-sky-300' : 'text-slate-400'}>
+                            {r.direction === 'positive' ? '▲' : '▼'}
+                          </span>
+                          <span className="text-gray-300 leading-snug">{r.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {explain.data.factor_validation && (
+                    <div className={`p-3 rounded-lg border text-xs leading-relaxed ${
+                      explain.data.factor_validation.status === 'confirmed' ? 'border-green-700 bg-green-900/20 text-green-200' :
+                      explain.data.factor_validation.status === 'warning'   ? 'border-red-700 bg-red-900/20 text-red-200' :
+                      'border-gray-700 bg-gray-800 text-gray-300'
+                    }`}>
+                      <p className="font-semibold mb-1">Fama-French reality check</p>
+                      {explain.data.factor_validation.text}
+                    </div>
+                  )}
+                </div>
+              )}
+              {explain.isError && (
+                <p className="text-xs text-red-400">{String(explain.error)}</p>
+              )}
+            </div>
 
           {/* Price chart — intraday through multi-year */}
           {intraday?.candles?.length > 0 && (
-            <div className="card">
+            <div className="card flex flex-col lg:col-start-1 lg:row-start-2">
               <div className="flex flex-wrap items-center gap-2 mb-3">
                 <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
                   {CHART_RANGES.map(r => (
@@ -665,7 +822,7 @@ function StockDetail({ ticker, onBack }) {
                       onClick={() => setRange(r.key)}
                       className={`shrink-0 px-2.5 py-1 rounded text-xs font-medium transition-colors ${
                         range === r.key
-                          ? 'bg-green-600 text-white'
+                          ? 'bg-green-700 text-white'
                           : 'bg-gray-800 hover:bg-gray-700 text-gray-300'
                       }`}
                     >
@@ -674,26 +831,33 @@ function StockDetail({ ticker, onBack }) {
                   ))}
                 </div>
               </div>
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="font-semibold text-sm">
+              {/* Title and feed status each stay whole: side by side when they
+                  fit, else on two clean lines (18 Nov 2026: at 1024 they broke
+                  into fragments). */}
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 mb-2">
+                <h2 className="font-semibold text-sm whitespace-nowrap">
                   Price Chart{' '}
                   <span className="text-xs text-gray-500 font-normal">
                     ({intraday.resolution}{price?.market_open && ['1D','5D'].includes(range) ? ' · updates every 30s' : ''})
                   </span>
                 </h2>
                 {price?.market_open ? (
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-gray-500 whitespace-nowrap">
                     <span className="inline-block w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse mr-1" />
                     live · {intraday.fetched_at} · ~15 min delayed
                   </span>
                 ) : (
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-gray-500 whitespace-nowrap">
                     <span className="inline-block w-1.5 h-1.5 bg-gray-500 rounded-full mr-1" />
                     Market closed · showing last close
                   </span>
                 )}
               </div>
-              <ResponsiveContainer width="100%" height={220}>
+              {/* Fills what the Alpha Score leaves beside it: 220px on phones,
+                  at least 160px beside the reading, so the two columns end
+                  together without a tall chart opening a gap in the reading. */}
+              <div className="flex-1 min-h-[220px] lg:min-h-[160px]">
+              <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={intraday.candles}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
                   <XAxis dataKey="time" stroke="#6b7280" fontSize={9} minTickGap={50}
@@ -708,8 +872,10 @@ function StockDetail({ ticker, onBack }) {
                     dot={false} strokeWidth={1.5} />
                 </LineChart>
               </ResponsiveContainer>
+              </div>
             </div>
           )}
+          </div>
 
           {/* Results over the years, and price indicators. Both describe;
               neither recommends. */}
@@ -721,12 +887,14 @@ function StockDetail({ ticker, onBack }) {
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
                 Balance Sheet Snapshot
               </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 sm:grid-cols-5 gap-4 divide-x divide-gray-800">
+              {/* Phones: a 2-column grid without the column rules (they drew an
+                  indented border down a single stacked column). */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 sm:divide-x sm:divide-gray-800">
                 <BalanceItem label="Total Revenue"  value={m.total_revenue_fmt}  />
-                <div className="pl-4"><BalanceItem label="EBITDA"         value={m.ebitda_fmt}         /></div>
-                <div className="pl-4"><BalanceItem label="Total Debt"     value={m.total_debt_fmt}     highlight="text-red-300" /></div>
-                <div className="pl-4"><BalanceItem label="Cash & Equiv."  value={m.cash_fmt}           highlight="text-green-300" /></div>
-                <div className="pl-4"><BalanceItem label="Free Cash Flow" value={m.free_cashflow_fmt}  highlight={m.free_cashflow_fmt?.startsWith('-') ? 'text-red-300' : 'text-green-300'} /></div>
+                <div className="sm:pl-4"><BalanceItem label="EBITDA"         value={m.ebitda_fmt}         /></div>
+                <div className="sm:pl-4"><BalanceItem label="Total Debt"     value={m.total_debt_fmt}     /></div>
+                <div className="sm:pl-4"><BalanceItem label="Cash & Equiv."  value={m.cash_fmt}           /></div>
+                <div className="sm:pl-4"><BalanceItem label="Free Cash Flow" value={m.free_cashflow_fmt}  /></div>
               </div>
               {(m.revenue_growth != null || m.earnings_growth != null) && (
                 <div className="flex gap-6 mt-4 pt-3 border-t border-gray-800 text-xs">
@@ -754,12 +922,15 @@ function StockDetail({ ticker, onBack }) {
           {/* Overview: three short summaries side by side. Until 16 Nov 2026 the
               middle column also held every analysis panel, so it ran about three
               times longer than Valuation and News and left two empty columns. */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
 
             {/* Column 1 — Valuation & Health */}
             <div className="space-y-3">
               <h2 className="font-semibold text-sm text-gray-400 uppercase tracking-wider">Valuation</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {/* Two columns on phones too: one tile per row ran the 14 ratios
+                  ~1,100px down a 390 screen (18 Nov 2026). Values size to their
+                  tile (.stat-value, cqi). */}
+              <div className="grid grid-cols-2 gap-2">
                 {[
                   // `pct` is a helper rather than `x ? ... : null` on purpose:
                   // a truthiness check treats a real 0 as absent, which is how
@@ -778,8 +949,8 @@ function StockDetail({ ticker, onBack }) {
                   ['D/E Ratio',      m.debt_to_equity?.toFixed(2),   'debt_to_equity', 'debt_to_equity'],
                   ['Current Ratio',  m.current_ratio?.toFixed(2),    null,        'current_ratio'],
                   ['Quick Ratio',    m.quick_ratio?.toFixed(2),      null,        'quick_ratio'],
-                ].map(([l, v, tip, key]) => (
-                  <StatCard key={l} label={l} value={v} tip={tip}
+                ].map(([l, v, tip, key], i) => (
+                  <StatCard key={l} label={l} value={v} tip={tip} tipAlign={i % 2 ? 'end' : 'start'}
                             na={key ? naReason[key] : null} naShort={naShort} />
                 ))}
               </div>
@@ -820,112 +991,7 @@ function StockDetail({ ticker, onBack }) {
               )}
             </div>
 
-            {/* Column 2 — the score and what drives it */}
-            <div className="space-y-3">
-              <h2 className="font-semibold text-sm text-gray-400 uppercase tracking-wider">
-                Alpha Score<InfoTip k="alpha_score" />
-              </h2>
-              {alphaLoading ? <Spinner size="sm" /> : alpha && (
-                <div className="card">
-                  <AlphaMeter score={alpha.alpha_score} />
-                  {/* How this label has actually done. A signal shown without
-                      its record invites the reader to supply one, and the one
-                      they supply is always better than the truth. */}
-                  <ErrorBoundary name="signal track record">
-                    <SignalTrackRecord signal={alpha.signal} />
-                  </ErrorBoundary>
-                  <div className="mt-5 space-y-3">
-                    {Object.entries(alpha.contributions || {}).map(([factor, contrib]) => isRefused(alpha.factors?.[factor]) ? (
-                      // Not measured is not zero: say so, and why, instead of "0.0 pts".
-                      <div key={factor}>
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-gray-400 capitalize">
-                            {factor}<InfoTip k={factor} />
-                          </span>
-                          <span className="text-gray-500">not measured</span>
-                        </div>
-                        <div className="h-1 bg-gray-800/50 rounded-full" />
-                        <p className="text-xs text-gray-600 mt-0.5">
-                          {alpha.factors[factor].reason}. Adds nothing to the score.
-                        </p>
-                      </div>
-                    ) : (
-                      <div key={factor}>
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-gray-400 capitalize">
-                            {factor}<InfoTip k={factor} />
-                          </span>
-                          <span className={contrib >= 0 ? 'text-green-400' : 'text-red-400'}>
-                            {contrib > 0 ? '+' : ''}{contrib?.toFixed(1)} pts
-                          </span>
-                        </div>
-                        <div className="h-1 bg-gray-800 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${contrib >= 0 ? 'bg-green-500' : 'bg-red-500'}`}
-                            style={{ width: `${Math.min(100, Math.abs(contrib) * 2)}%` }}
-                          />
-                        </div>
-                        <p className="text-xs text-gray-600 mt-0.5">
-                          {alpha.factors?.[factor]?.interpretation}
-                        </p>
-                        {/* Momentum skips the latest month by design. Without saying so, a stock
-                            that just fell (SBIN, Oct 2026) looks wrongly ranked. */}
-                        {factor === 'momentum' && alpha.factors?.momentum?.skipped_month_return_pct != null && (
-                          <SkippedMonth m={alpha.factors.momentum} />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-xs text-gray-600 mt-3">
-                    Data coverage: {(alpha.confidence * 100)?.toFixed(0)}%
-                  </p>
-                  <button
-                    onClick={() => explain.mutate(ticker)}
-                    disabled={explain.isPending}
-                    className="btn-ghost w-full mt-3 text-xs"
-                  >
-                    {explain.isPending ? 'Analysing (30-60s)…' : '🔍 Why this signal?'}
-                  </button>
-                </div>
-              )}
-
-              {explain.data && explain.data.ticker === ticker && (
-                <div className="card space-y-3">
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase tracking-wider">Verdict</p>
-                    <p className="text-sm text-gray-200 mt-1 leading-relaxed">{explain.data.verdict}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Reasons</p>
-                    <div className="space-y-1.5">
-                      {explain.data.reasons?.map((r, i) => (
-                        <div key={i} className="flex gap-2 text-xs">
-                          <span className={r.direction === 'positive' ? 'text-green-400' : 'text-red-400'}>
-                            {r.direction === 'positive' ? '▲' : '▼'}
-                          </span>
-                          <span className="text-gray-300 leading-snug">{r.text}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  {explain.data.factor_validation && (
-                    <div className={`p-3 rounded-lg border text-xs leading-relaxed ${
-                      explain.data.factor_validation.status === 'confirmed' ? 'border-green-700 bg-green-900/20 text-green-200' :
-                      explain.data.factor_validation.status === 'warning'   ? 'border-red-700 bg-red-900/20 text-red-200' :
-                      'border-gray-700 bg-gray-800 text-gray-300'
-                    }`}>
-                      <p className="font-semibold mb-1">Fama-French reality check</p>
-                      {explain.data.factor_validation.text}
-                    </div>
-                  )}
-                </div>
-              )}
-              {explain.isError && (
-                <p className="text-xs text-red-400">{String(explain.error)}</p>
-              )}
-            </div>
-
-            {/* Column 3 — Sentiment & News */}
+            {/* Column 2 — Sentiment & News (the score moved up beside the price) */}
             <div className="space-y-3">
               <h2 className="font-semibold text-sm text-gray-400 uppercase tracking-wider">News Sentiment</h2>
               {sentLoading ? <Spinner size="sm" /> : s.total_articles > 0 && (
@@ -1019,14 +1085,25 @@ function StockDetail({ ticker, onBack }) {
 // ═════════════════════════════════════════════════════════════════════════════
 // MAIN EXPORT — routes between list & detail
 // ═════════════════════════════════════════════════════════════════════════════
+// A bare symbol in the address ("?ticker=RELIANCE") is an NSE symbol: Yahoo
+// reads "RELIANCE" as nothing (the page showed "Unknown · ₹0.00") and "INFY" as
+// the US listing (prices in dollars). Same rule the simulator and the
+// optimiser already use when a ticker is typed (18 Nov 2026).
+export function nseTicker(t) {
+  const s = (t || '').trim().toUpperCase()
+  if (!s) return ''
+  return (s.endsWith('.NS') || s.endsWith('.BO') || s.includes('=') || s.startsWith('^')) ? s : `${s}.NS`
+}
+
 export default function StockExplorer() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const [ticker, setTicker] = useState(searchParams.get('ticker') || '')
+  const [ticker, setTicker] = useState(nseTicker(searchParams.get('ticker')))
 
   const selectTicker = (t) => {
-    if (!t) return
-    setTicker(t)
-    setSearchParams({ ticker: t }, { replace: true })
+    const full = nseTicker(t)
+    if (!full) return
+    setTicker(full)
+    setSearchParams({ ticker: full }, { replace: true })
   }
 
   const goBack = () => {
@@ -1036,7 +1113,7 @@ export default function StockExplorer() {
 
   // Follow URL changes (deep-links from dashboard, etc.)
   useEffect(() => {
-    const p = searchParams.get('ticker')
+    const p = nseTicker(searchParams.get('ticker'))
     if (p && p !== ticker) setTicker(p)
     if (!p && ticker) setTicker('')
   }, [searchParams])

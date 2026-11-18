@@ -73,22 +73,23 @@ export default function ScenarioValuation({ ticker }) {
       <div className="grid grid-cols-3 gap-2">
         <div>
           <label className="label text-[11px]">Years</label>
-          <input type="number" min="1" max="10" className="input text-xs"
+          <input type="number" min="1" max="10" className="input text-xs" aria-label="Years"
                  value={years} onChange={e => setYears(Number(e.target.value) || 1)} />
         </div>
         <div>
           <label className="label text-[11px]">Base growth %</label>
-          <input type="number" className="input text-xs" placeholder={a.base_growth_pct}
+          <input type="number" className="input text-xs" aria-label="Base growth %" placeholder={a.base_growth_pct}
                  value={growth} onChange={e => setGrowth(e.target.value)} />
         </div>
         <div>
           <label className="label text-[11px]">Base exit P/E</label>
-          <input type="number" className="input text-xs" placeholder={a.base_multiple}
+          <input type="number" className="input text-xs" aria-label="Base exit P/E" placeholder={a.base_multiple}
                  value={multiple} onChange={e => setMultiple(e.target.value)} />
         </div>
       </div>
 
-      <div className="table-wrap">
+      {/* Focusable so a keyboard can scroll it sideways on a phone (axe). */}
+      <div className="table-wrap" tabIndex={0} role="region" aria-label="Bull / base / bear">
         <table className="w-full text-sm min-w-[30rem]">
           <thead>
             <tr className="text-[11px] uppercase tracking-wide text-gray-500">

@@ -63,6 +63,9 @@ export default function Advanced() {
 
   return (
     <div className="flex flex-col h-full">
+      {/* The page had no H1 (pixel_check, 18 Nov 2026); the tab row is its
+          visible heading, so the H1 is for screen readers, in the nav's word. */}
+      <h1 className="sr-only">Advanced</h1>
       <div className="px-4 sm:px-6 pt-4 sm:pt-5">
         <div role="tablist" aria-label="Advanced tools"
              className="inline-flex flex-wrap max-w-full gap-1 p-1 rounded-xl bg-gray-900 border border-gray-800">
@@ -71,7 +74,7 @@ export default function Advanced() {
               onClick={() => setGroupLabel(g.label)}
               className={`shrink-0 whitespace-nowrap px-3 sm:px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${
                 g.label === group.label
-                  ? 'bg-green-600 text-white'
+                  ? 'bg-green-700 text-white'
                   : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
               }`}>
               {g.label}

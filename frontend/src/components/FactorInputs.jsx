@@ -41,7 +41,8 @@ const CATEGORY = {
   },
   assumption: {
     label: 'assumption',
-    cls: 'text-violet-300 border-violet-800/60 bg-violet-950/30',
+    // Grey: an assumption is neither measured nor tested (no purple in the palette, 18 Nov 2026).
+    cls: 'text-gray-300 border-gray-700 bg-gray-800/60',
   },
 }
 

@@ -72,17 +72,19 @@ export default function Login() {
 
         <form onSubmit={submit} className="space-y-3">
           <div>
-            <label className="text-xs text-gray-400">Email</label>
+            {/* Labels tied to their fields, so a screen reader announces
+                "Email" and "Password", not the placeholders (V4-09). */}
+            <label htmlFor="login-email" className="text-xs text-gray-400">Email</label>
             <input
-              type="email" required value={email} onChange={e => setEmail(e.target.value)}
+              id="login-email" type="email" required value={email} onChange={e => setEmail(e.target.value)}
               className="input w-full" placeholder="you@example.com" autoComplete="email"
             />
           </div>
           <div>
-            <label className="text-xs text-gray-400">Password</label>
+            <label htmlFor="login-password" className="text-xs text-gray-400">Password</label>
             <div className="relative">
               <input
-                type={showPw ? 'text' : 'password'} required
+                id="login-password" type={showPw ? 'text' : 'password'} required
                 minLength={isSignup ? 8 : undefined}
                 value={pw} onChange={e => setPw(e.target.value)}
                 className="input w-full pr-9" placeholder="••••••••"
@@ -90,8 +92,9 @@ export default function Login() {
               />
               <button
                 type="button" onClick={() => setShowPw(s => !s)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 rounded text-gray-500 hover:text-gray-300"
                 title={showPw ? 'Hide password' : 'Show password'}
+                aria-label={showPw ? 'Hide password' : 'Show password'}
               >
                 {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
               </button>
@@ -140,7 +143,7 @@ export default function Login() {
           {mode === 'signup' ? 'Already have an account?' : "Don't have an account?"}{' '}
           <button
             onClick={() => { setMode(mode === 'signup' ? 'signin' : 'signup'); setErr(null); setMsg(null) }}
-            className="text-blue-400 hover:text-blue-300 underline"
+            className="text-gray-300 hover:text-white underline underline-offset-4"
           >
             {mode === 'signup' ? 'Sign in' : 'Sign up'}
           </button>

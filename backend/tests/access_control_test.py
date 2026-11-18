@@ -140,7 +140,10 @@ unclassified, wrong_admin, wrong_user = [], [], []
 for m, r in writes:
     calls = dep_calls(r)
     is_admin = auth.require_admin in calls
-    is_user = auth.current_user_id in calls or auth.current_user_email in calls
+    # require_mail_identity: the strict identity for routes that send mail or
+    # store an address (Codex review R2/R3, 18 Nov 2026).
+    is_user = (auth.current_user_id in calls or auth.current_user_email in calls
+               or auth.require_mail_identity in calls)
     if (m, r.path) in ADMIN:
         if not is_admin:
             wrong_admin.append(f"{m} {r.path}")

@@ -49,7 +49,7 @@ export default function Calculators() {
       <div className="flex bg-gray-800 rounded-lg p-1 w-fit">
         {tabs.map(([v,l])=>(
           <button key={v} onClick={()=>setTab(v)}
-            className={`px-4 py-1.5 rounded text-sm font-medium ${tab===v?'bg-green-600 text-white':'text-gray-400 hover:text-gray-200'}`}>{l}</button>
+            className={`px-4 py-1.5 rounded text-sm font-medium ${tab===v?'bg-green-700 text-white':'text-gray-400 hover:text-gray-200'}`}>{l}</button>
         ))}
       </div>
 

@@ -16,7 +16,10 @@ The honest limitation: a restart clears the counters, and the fix if this ever
 runs on two instances is a shared store, not a bigger dictionary.
 """
 
+import asyncio
+import threading
 import time
+import weakref
 from collections import defaultdict, deque
 
 # (requests, seconds) per CALLER. Expensive work gets a tight budget; reads get
@@ -62,6 +65,9 @@ _ROUTES = {
 }
 
 _hits: dict = defaultdict(deque)
+# Budgets are checked and charged as one step under this lock, so two requests
+# can never both take the last slot.
+_LOCK = threading.Lock()
 
 
 def bucket_for(path: str) -> str:
@@ -73,13 +79,146 @@ def bucket_for(path: str) -> str:
 
 
 def _ip(request) -> str:
+    """
+    The caller's address, from a source the caller cannot set (V4-16, 18 Nov
+    2026). The first X-Forwarded-For hop is whatever the client wrote, so
+    rotating it bought a fresh network budget per request.
+
+    Render is served through Cloudflare (responses carry `server: cloudflare`
+    and a CF-Ray id), and Cloudflare sets CF-Connecting-IP to the address it
+    accepted the connection from, replacing any value the client sent. Without
+    it (local runs, another host) the right-most X-Forwarded-For hop is the one
+    the nearest proxy appended, and the socket address is the last resort.
+    """
+    cf = (request.headers.get("cf-connecting-ip") or "").strip()
+    if cf:
+        return cf
     fwd = request.headers.get("x-forwarded-for") or ""
-    if fwd:
-        return fwd.split(",")[0].strip()
+    hops = [h.strip() for h in fwd.split(",") if h.strip()]
+    if hops:
+        return hops[-1]
     return request.client.host if getattr(request, "client", None) else "unknown"
 
 
-def client_key(request) -> str:
+# ---------------------------------------------------------------- verification
+# A token is checked before its caller is treated as signed in (V4-16), and the
+# checking must not become the outage (Codex review R1, 18 Nov 2026):
+#   * it runs in a worker thread, never on the event loop, because a key-server
+#     fetch can block for seconds;
+#   * at most VERIFY_CONCURRENCY run at once; a request that cannot get a slot
+#     quickly is simply treated as unverified (network ceiling applies);
+#   * each network may start VERIFY_ADMIT new verifications a minute; beyond
+#     that, tokens are not checked at all and the network ceiling applies;
+#   * when the key server is unreachable, verification pauses for
+#     VERIFY_BACKOFF seconds instead of retrying on every request;
+#   * results are cached by the full token, positive ones only until the
+#     token's own expiry (Codex review R5).
+_VERIFIED: dict = {}                     # token -> (sub or None, valid_until)
+_VERIFIED_TTL = 300
+_VERIFIED_MAX = 5000
+VERIFY_CONCURRENCY = 4
+VERIFY_WAIT = 0.5                        # seconds to wait for a slot
+VERIFY_ADMIT = (30, 60)                  # new verifications per network per window
+VERIFY_BACKOFF = 60
+_backoff_until = 0.0
+_SEMAPHORES = weakref.WeakKeyDictionary()   # one per event loop
+
+
+def _bearer_token(request) -> str | None:
+    auth_header = request.headers.get("authorization") or ""
+    if not auth_header.lower().startswith("bearer "):
+        return None
+    token = auth_header.split(" ", 1)[1].strip()
+    return token if len(token) >= 20 else None
+
+
+def _cached(token: str, now: float):
+    """(True, sub) when the cache has a live answer for this token."""
+    with _LOCK:
+        hit = _VERIFIED.get(token)
+        if hit and hit[1] > now:
+            return True, hit[0]
+        if hit:
+            _VERIFIED.pop(token, None)
+    return False, None
+
+
+def _remember(token: str, sub, payload, now: float) -> None:
+    until = now + _VERIFIED_TTL
+    exp = (payload or {}).get("exp")
+    if sub and isinstance(exp, (int, float)):
+        until = min(until, float(exp))          # never past the token's own expiry
+    with _LOCK:
+        if len(_VERIFIED) >= _VERIFIED_MAX:
+            for k in [k for k, v in _VERIFIED.items() if v[1] <= now]:
+                _VERIFIED.pop(k, None)
+            if len(_VERIFIED) >= _VERIFIED_MAX:
+                _VERIFIED.clear()
+        _VERIFIED[token] = (sub, until)
+
+
+def _admit_verification(request, now: float) -> bool:
+    """Charge this network's verification budget; False when it is spent."""
+    limit, window = VERIFY_ADMIT
+    with _LOCK:
+        q = _hits[f"verify|{network_key(request)}"]
+        while q and now - q[0] > window:
+            q.popleft()
+        if len(q) >= limit:
+            return False
+        q.append(now)
+        return True
+
+
+def _semaphore():
+    loop = asyncio.get_running_loop()
+    sem = _SEMAPHORES.get(loop)
+    if sem is None:
+        sem = asyncio.Semaphore(VERIFY_CONCURRENCY)
+        _SEMAPHORES[loop] = sem
+    return sem
+
+
+def _verify_blocking(token: str):
+    """Runs in a worker thread. ("ok"|"invalid"|"unavailable", payload)."""
+    try:
+        from auth import verify_status
+        return verify_status(token)
+    except Exception:
+        return ("unavailable", None)
+
+
+async def verified_sub(request) -> str | None:
+    """The `sub` of a token that VERIFIES, else None. Never blocks the loop."""
+    global _backoff_until
+    token = _bearer_token(request)
+    if not token:
+        return None
+    now = time.time()
+    found, sub = _cached(token, now)
+    if found:
+        return sub
+    if now < _backoff_until or not _admit_verification(request, now):
+        return None
+    sem = _semaphore()
+    try:
+        await asyncio.wait_for(sem.acquire(), timeout=VERIFY_WAIT)
+    except asyncio.TimeoutError:
+        return None
+    try:
+        status, payload = await asyncio.get_running_loop().run_in_executor(
+            None, _verify_blocking, token)
+    finally:
+        sem.release()
+    if status == "unavailable":
+        _backoff_until = time.time() + VERIFY_BACKOFF
+        return None                              # not cached: it was not checked
+    sub = payload.get("sub") if (status == "ok" and payload) else None
+    _remember(token, sub, payload, time.time())
+    return sub
+
+
+def client_key(request, sub: str | None = None) -> str:
     """
     Identify the caller as narrowly as is honest.
 
@@ -95,9 +234,11 @@ def client_key(request) -> str:
     finely honest users are separated, not how much total damage one machine can
     do.
     """
-    auth = request.headers.get("authorization") or ""
-    if auth.startswith("Bearer ") and len(auth) > 40:
-        return "u:" + auth[-24:]
+    # Only a token that verifies makes a caller "signed in" (V4-16, 18 Nov
+    # 2026): `sub` comes from verified_sub(). Any long Bearer header used to
+    # count, which let a made-up token skip the network ceiling below.
+    if sub:
+        return "u:" + sub
 
     cid = (request.headers.get("x-client-id") or "").strip()
     if 8 <= len(cid) <= 64 and all(c.isalnum() or c in "-_" for c in cid):
@@ -108,11 +249,12 @@ def client_key(request) -> str:
 
 
 def network_key(request) -> str:
-    """The address itself, for the ceiling. Not spoofable by a header we trust."""
+    """The address itself, for the ceiling. From _ip, which reads only headers
+    the caller cannot set."""
     return "net:" + _ip(request)
 
 
-def check(request) -> dict | None:
+async def check(request) -> dict | None:
     """
     None when allowed. When over the limit, returns what the caller needs to
     know: which budget, and how long until it frees up. An error that does not
@@ -123,14 +265,20 @@ def check(request) -> dict | None:
     # the health check down defeats its own purpose.
     if path in ("/", "/health", "/healthz", "/docs", "/openapi.json"):
         return None
+    # CORS preflights carry no token or client id, so throttling them put every
+    # signed-in user behind one address into the anonymous budget, and a 429 on
+    # a preflight is a CORS failure in the browser. CORSMiddleware answers them
+    # without running any route (Codex review R7, 18 Nov 2026).
+    if getattr(request, "method", "GET") == "OPTIONS":
+        return None
 
     bucket = bucket_for(path)
-    now = time.time()
 
     # Both budgets must allow the request: the caller's own, and the network's.
     # Checked before either is charged, so a request rejected by one does not
     # consume the other.
-    key = client_key(request)
+    key = client_key(request, await verified_sub(request))
+    now = time.time()
     gates = [(f"{key}|{bucket}", *LIMITS[bucket], "caller")]
 
     # The network ceiling exists because an anonymous caller's identity is a
@@ -143,6 +291,12 @@ def check(request) -> dict | None:
     if not key.startswith("u:"):
         gates.append((f"{network_key(request)}|{bucket}", *IP_CEILING[bucket], "network"))
 
+    with _LOCK:
+        return _charge(gates, bucket, now)
+
+
+def _charge(gates, bucket, now) -> dict | None:
+    """Check every gate, then charge them all; called under _LOCK."""
     for key, limit, window, scope in gates:
         q = _hits[key]
         while q and now - q[0] > window:

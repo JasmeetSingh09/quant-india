@@ -6,9 +6,10 @@ import Explainer from '../components/Explainer'
 import CapTierPicks from '../components/CapTierPicks'
 import Leaderboard from '../components/Leaderboard'
 import EmailOptIn from '../components/EmailOptIn'
-import { TrendingUp, TrendingDown, Sparkles, ArrowUpRight, ArrowDownRight, RefreshCw, History } from 'lucide-react'
+import { TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, RefreshCw, History } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import ErrorBoundary from '../components/ErrorBoundary'
+import { DateText } from '../components/Dates'
 import Term from '../components/Term'
 import { signalLabel, SIGNAL_TITLE, rankBadgeClass, scoreTextClass } from '../signalLabel'
 
@@ -75,6 +76,20 @@ function PickCard({ r, buy }) {
   )
 }
 
+// Loading placeholders hold each block at its measured loaded height (18 Nov
+// 2026, mid phone): the page used to grow as every panel filled in, a layout
+// shift of 0.70-0.87 (live 1.24-1.47) that moved Top picks under the reader.
+// Heights: 390 / 640 / 768 / 1024 / 1280+ px, measured on the built page.
+const HOLD = {
+  strip:   'h-[87px] sm:h-[95px] lg:h-[111px] xl:h-[95px]',
+  commod:  'min-h-[500px] sm:min-h-[508px] lg:min-h-0',
+  news:    'min-h-[640px] sm:min-h-[610px]',
+  regime:  'min-h-[410px] sm:min-h-[307px] md:min-h-[257px] xl:min-h-[191px]',
+}
+function Holding({ className = '' }) {
+  return <div aria-busy="true" className={`card ${className}`} />
+}
+
 function PriceTag({ ticker }) {
   const { data, isLoading } = useQuery({
     queryKey: ['price', ticker],
@@ -83,19 +98,23 @@ function PriceTag({ ticker }) {
     refetchInterval: q => (q.state.data?.feed_active ? 60000 : false),
   })
   if (isLoading) return (
-    <div className="card-sm h-[72px] animate-pulse bg-gray-800/40" />
+    <div className={`card-sm ${HOLD.strip} animate-pulse bg-gray-800/40`} />
   )
   const pos = (data?.change_pct ?? 0) >= 0
+  // No price, no change: a green "+0.00%" under a dash read as a flat day (V4-10).
+  const known = data?.price != null && data?.change_pct != null
   return (
     <div className="card-sm">
       <p className="text-xs text-gray-500">{ticker.replace('.NS', '')}</p>
       <p className="text-lg font-bold font-mono leading-tight mt-0.5">
         {data?.price != null ? `₹${data.price.toLocaleString('en-IN')}` : '—'}
       </p>
-      <p className={`text-xs font-medium flex items-center gap-1 mt-1 ${pos ? 'text-green-400' : 'text-red-400'}`}>
-        {pos ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-        {pos ? '+' : ''}{data?.change_pct?.toFixed(2) ?? '0.00'}%
-      </p>
+      {known ? (
+        <p className={`text-xs font-medium flex items-center gap-1 mt-1 ${pos ? 'text-green-400' : 'text-red-400'}`}>
+          {pos ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+          {pos ? '+' : ''}{data.change_pct.toFixed(2)}%
+        </p>
+      ) : <p className="text-xs text-gray-400 mt-1">—</p>}
     </div>
   )
 }
@@ -109,20 +128,23 @@ function NiftyIndexCard() {
     refetchInterval: q => (q.state.data?.feed_active ? 60000 : false),
   })
   if (isLoading) return (
-    <div className="card-sm h-[72px] animate-pulse bg-gray-800/40" />
+    <div className={`card-sm ${HOLD.strip} animate-pulse bg-gray-800/40`} />
   )
   const pos = (data?.change_pct ?? 0) >= 0
+  const known = data?.price != null && data?.change_pct != null
   return (
     <div className="card-sm border border-green-900/40">
       <p className="text-xs text-gray-400 font-semibold">NIFTY 50</p>
       <p className="text-lg font-bold font-mono leading-tight mt-0.5">
         {data?.price != null ? data.price.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '—'}
       </p>
-      <p className={`text-xs font-medium flex items-center gap-1 mt-1 ${pos ? 'text-green-400' : 'text-red-400'}`}>
-        {pos ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-        {data?.change != null && `${pos ? '+' : ''}${data.change.toFixed(2)} `}
-        ({pos ? '+' : ''}{data?.change_pct?.toFixed(2) ?? '0.00'}%)
-      </p>
+      {known ? (
+        <p className={`text-xs font-medium flex items-center gap-1 mt-1 ${pos ? 'text-green-400' : 'text-red-400'}`}>
+          {pos ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+          {data?.change != null && `${pos ? '+' : ''}${data.change.toFixed(2)} `}
+          ({pos ? '+' : ''}{data.change_pct.toFixed(2)}%)
+        </p>
+      ) : <p className="text-xs text-gray-400 mt-1">—</p>}
     </div>
   )
 }
@@ -230,7 +252,8 @@ function TrackRecord() {
           <span className="text-gray-500 mr-1">Horizon</span>
           {[3, 7, 14, 21].map(d => (
             <button key={d} onClick={() => setDays(d)}
-              className={`px-2 py-1 rounded ${days === d ? 'bg-blue-600 text-white' : 'bg-gray-800 hover:bg-gray-700 text-gray-300'}`}>
+              aria-pressed={days === d}
+              className={`px-2 py-1 rounded ${days === d ? 'bg-green-700 text-white' : 'bg-gray-800 hover:bg-gray-700 text-gray-300'}`}>
               {d}d
             </button>
           ))}
@@ -316,7 +339,7 @@ function TrackRecord() {
           </div>
 
           {sc.by_signal?.note && (
-            <p className="text-[11px] text-gray-500 leading-relaxed">{sc.by_signal.note}</p>
+            <p className="text-[11px] text-gray-500 leading-relaxed"><DateText text={sc.by_signal.note} /></p>
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -361,14 +384,14 @@ function TrackRecord() {
                 ))}
               </div>
               <p className="text-[10px] text-gray-500 mt-2 leading-relaxed">
-                {sc.independent_sample.note}
+                <DateText text={sc.independent_sample.note} />
               </p>
             </div>
           )}
 
           {sc.independence?.overlapping && (
             <div className="rounded-lg p-3 text-xs border border-amber-800/60 bg-amber-900/10 text-amber-200/90 leading-relaxed">
-              <b>Sample size:</b> {sc.independence.note}
+              <b>Sample size:</b> <DateText text={sc.independence.note} />
             </div>
           )}
 
@@ -385,7 +408,7 @@ function TrackRecord() {
               )}
               {sc.independence?.period && (
                 <span className="block text-gray-500 mb-1">
-                  {sc.independence.period} · {sc.independence.distinct_stocks} stocks · {days}-day horizon
+                  <DateText text={sc.independence.period} /> · {sc.independence.distinct_stocks} stocks · {days}-day horizon
                 </span>
               )}
               {sc.matured_predictions} signal observations
@@ -396,28 +419,31 @@ function TrackRecord() {
             </span>
           </div>
 
-          <div className="overflow-x-auto">
-            <div className="table-wrap">
-              {/* Cap tier. A model that works only on the largest hundred
-                  names is a different product from one that works across the
-                  market, and a pooled table cannot show you which you have. */}
-              <div className="flex items-center gap-1 text-xs mb-2 flex-wrap">
-                <span className="text-gray-500 mr-1">Size:</span>
-                {[['all', 'All'], ['large', 'Large cap'], ['mid', 'Mid cap'],
-                  ['small', 'Small cap'], ['unknown', 'Unclassified']].map(([k, label]) => {
-                  const n = k === 'all' ? preds.length : (tierCounts[k] || 0)
-                  if (k !== 'all' && n === 0) return null
-                  return (
-                    <button key={k} onClick={() => setTier(k)}
-                      className={`px-2 py-1 rounded ${tier === k
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-800 hover:bg-gray-700 text-gray-300'}`}>
-                      {label} <span className="opacity-60">{n}</span>
-                    </button>
-                  )
-                })}
-              </div>
-              <table className="w-full min-w-[34rem] text-sm">
+          {/* Cap tier. A model that works only on the largest hundred
+              names is a different product from one that works across the
+              market, and a pooled table cannot show you which you have. */}
+          <div className="flex items-center gap-1 text-xs flex-wrap">
+            <span className="text-gray-500 mr-1">Size:</span>
+            {[['all', 'All'], ['large', 'Large cap'], ['mid', 'Mid cap'],
+              ['small', 'Small cap'], ['unknown', 'Unclassified']].map(([k, label]) => {
+              const n = k === 'all' ? preds.length : (tierCounts[k] || 0)
+              if (k !== 'all' && n === 0) return null
+              return (
+                <button key={k} onClick={() => setTier(k)} aria-pressed={tier === k}
+                  className={`px-2 py-1 rounded ${tier === k
+                    ? 'bg-green-700 text-white'
+                    : 'bg-gray-800 hover:bg-gray-700 text-gray-300'}`}>
+                  {label} <span className="opacity-60">{n}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          {/* From 640px: the table. Below it, one stacked row per pick (18 Nov
+              2026): the six columns needed 544px and scrolled sideways inside
+              a 358px card, so the returns were off screen on every phone. */}
+          <div className="hidden sm:block table-wrap">
+            <table className="w-full text-sm">
               <thead>
                 <tr className="text-gray-500 text-xs border-b border-gray-800">
                   <th className="text-left py-2">Stock</th>
@@ -429,26 +455,37 @@ function TrackRecord() {
                 </tr>
               </thead>
               <tbody>
-                {shown.map((r, i) => {
-                  const isBuy = r.signal && r.signal.includes('BUY')
-                  const isSell = r.signal && r.signal.includes('SELL')
-                  return (
-                    <tr key={i}
-                        onClick={() => navigate(`/stock?ticker=${encodeURIComponent(r.ticker)}`)}
-                        className="border-b border-gray-800 last:border-0 hover:bg-gray-800/50 cursor-pointer">
-                      <td className="py-1.5 font-mono text-green-400 hover:underline">{r.ticker.replace('.NS','')}</td>
-                      <td><span className={rankBadgeClass(r.signal)} title={SIGNAL_TITLE}>{signalLabel(r.signal)}</span></td>
-                      <td className={`text-right font-mono ${col(r.forward_return_pct)}`}>{pct(r.forward_return_pct)}</td>
-                      <td className={`text-right font-mono ${col(r.excess_pct)}`}>{pct(r.excess_pct)}</td>
-                      <td className="text-right text-gray-400">{r.days_held}d</td>
-                      <td className="text-right text-gray-500 text-xs">{r.date}</td>
-                    </tr>
-                  )
-                })}
+                {shown.map((r, i) => (
+                  <tr key={i}
+                      onClick={() => navigate(`/stock?ticker=${encodeURIComponent(r.ticker)}`)}
+                      className="border-b border-gray-800 last:border-0 hover:bg-gray-800/50 cursor-pointer">
+                    <td className="py-1.5 font-mono text-gray-200 hover:underline">{r.ticker.replace('.NS','')}</td>
+                    <td><span className={rankBadgeClass(r.signal)} title={SIGNAL_TITLE}>{signalLabel(r.signal)}</span></td>
+                    <td className={`text-right font-mono ${col(r.forward_return_pct)}`}>{pct(r.forward_return_pct)}</td>
+                    <td className={`text-right font-mono ${col(r.excess_pct)}`}>{pct(r.excess_pct)}</td>
+                    <td className="text-right text-gray-400">{r.days_held}d</td>
+                    <td className="text-right text-gray-500 text-xs font-mono whitespace-nowrap">{r.date}</td>
+                  </tr>
+                ))}
               </tbody>
-              </table>
-            </div>
+            </table>
           </div>
+          <ul className="sm:hidden divide-y divide-gray-800 border-y border-gray-800">
+            {shown.map((r, i) => (
+              <li key={i}>
+                <Link to={`/stock?ticker=${encodeURIComponent(r.ticker)}`}
+                      className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 py-2.5 text-sm">
+                  <span className="font-mono text-gray-200 truncate">{r.ticker.replace('.NS','')}</span>
+                  <span className={`${rankBadgeClass(r.signal)} justify-self-end`} title={SIGNAL_TITLE}>{signalLabel(r.signal)}</span>
+                  <span className="col-span-2 text-xs text-gray-400">
+                    <span className="whitespace-nowrap">Actual return <span className={`font-mono ${col(r.forward_return_pct)}`}>{pct(r.forward_return_pct)}</span></span>
+                    {' · '}<span className="whitespace-nowrap">vs Nifty <span className={`font-mono ${col(r.excess_pct)}`}>{pct(r.excess_pct)}</span></span>
+                  </span>
+                  <span className="col-span-2 text-xs text-gray-400">Held {r.days_held}d · Logged <span className="font-mono whitespace-nowrap">{r.date}</span></span>
+                </Link>
+              </li>
+            ))}
+          </ul>
 
           {/* Row budget. Says how many of how many, so a truncated list never
               reads as the whole record — the count is the honest part. */}
@@ -502,7 +539,7 @@ function TrackRecord() {
  * next month. It says nothing about direction, and the banner says so.
  */
 export function MarketRiskBanner({ risk, loading, error }) {
-  if (loading) return null
+  if (loading) return <Holding className={HOLD.regime} />
   if (error || !risk?.state) {
     return <p className="text-xs text-gray-500 text-center py-2">The market-risk reading is unavailable right now.</p>
   }
@@ -519,7 +556,9 @@ export function MarketRiskBanner({ risk, loading, error }) {
             <Term k="market_risk">Market regime</Term>: {elevated ? 'VOLATILE' : 'CALM'}
           </span>
           <span className="text-sm text-gray-400 font-mono">
-            20-day volatility {risk.volatility_20d_pct}% · typical {risk.typical_volatility_pct}%
+            <span className="whitespace-nowrap">20-day volatility {risk.volatility_20d_pct}%</span>
+            {' · '}
+            <span className="whitespace-nowrap">typical {risk.typical_volatility_pct}%</span>
           </span>
         </div>
         <span className="text-[11px] text-gray-500 uppercase tracking-wide">
@@ -623,7 +662,7 @@ export default function Dashboard() {
       {/* Commodities and news sit directly under the market row: asked for on
           the dashboard itself, not behind a "market context" toggle. */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="card col-span-1">
+        <div className={`card col-span-1 ${mcxLoading ? HOLD.commod : ''}`}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold">Commodities</h2>
             <Link to="/markets" className="text-xs text-green-400 hover:text-green-300">View all →</Link>
@@ -640,7 +679,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        <div className="card lg:col-span-2">
+        <div className={`card lg:col-span-2 ${newsLoading ? HOLD.news : ''}`}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold">Market News</h2>
             <Link to="/markets" className="text-xs text-green-400 hover:text-green-300">View all →</Link>

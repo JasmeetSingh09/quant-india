@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getFactorDivergence } from '../api'
 import Spinner from './Spinner'
+import { DateText } from './Dates'
 
 /**
  * FactorChange — what moved, and what did not.
@@ -61,7 +62,7 @@ export default function FactorChange({ ticker }) {
           "nothing is happening", and it is the honest one right now. */}
       {notReady && (
         <p className="text-xs text-gray-500 leading-relaxed">
-          {data.note}
+          <DateText text={data.note} />
         </p>
       )}
 

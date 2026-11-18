@@ -2,8 +2,9 @@ import { useQuery } from '@tanstack/react-query'
 import { getAlphaScore, getSignalHistory, getPredictionTrack } from '../api'
 import Spinner from './Spinner'
 import { EvidenceBadge } from './Evidence'
-import { signalLabel } from '../signalLabel'
+import { signalLabel, rankBadgeClass, scoreTextClass } from '../signalLabel'
 import { isRefused } from '../factorRefusal'
+import { DateText } from './Dates'
 
 /**
  * WhySignal — everything behind a BUY or SELL badge, on one screen.
@@ -84,9 +85,9 @@ export default function WhySignal({ ticker }) {
       {/* The decision, stated before the numbers that produced it. */}
       <div className="flex items-center gap-3 flex-wrap">
         <span className="text-[10px] uppercase tracking-widest text-gray-500">Current signal</span>
-        <span className={`px-2 py-0.5 rounded text-sm font-bold tracking-wide ${
-          buy ? 'bg-green-900/40 text-green-300 border border-green-800'
-              : 'bg-red-900/40 text-red-300 border border-red-800'}`}>
+        {/* His rank colours (signalLabel.js), not buy-green / sell-red: a
+            "Middle" stock was drawn as a red sell badge (18 Nov 2026). */}
+        <span className={rankBadgeClass(alpha.signal)}>
           {signalLabel(alpha.signal)}
         </span>
         <span className="text-xs text-gray-500">over {horizon} trading days</span>
@@ -94,7 +95,7 @@ export default function WhySignal({ ticker }) {
 
       {/* The same warning the six-factor panel carries. A signal shown without
           it reads as a tested recommendation, which this is not. */}
-      <p className="text-[11px] text-amber-200/85 border-l-2 border-amber-700/70 pl-2.5 leading-relaxed">
+      <p className="text-xs text-amber-200/90 leading-relaxed">
         <b>Experimental.</b> The combined score has not been shown to predict
         returns. Momentum, 35% of it, passed pre-registered point-in-time tests,
         but not among the largest, most liquid stocks. Quality, value and
@@ -103,17 +104,9 @@ export default function WhySignal({ ticker }) {
 
       {/* What the score is, stated with what it is not. */}
       <p className="text-[10px] uppercase tracking-widest text-gray-500">Model context</p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="card-sm">
-          <p className="stat-label">Alpha score</p>
-          <p className={`stat-value ${buy ? 'text-green-400' : 'text-red-400'}`}>
-            {alpha.alpha_score > 0 ? '+' : ''}{alpha.alpha_score?.toFixed(0)}
-            <span className="text-sm text-gray-500 font-normal"> / 100</span>
-          </p>
-          <p className="text-[11px] text-gray-500 mt-1">
-            Scale −100 to +100. Not a predicted return.
-          </p>
-        </div>
+      {/* One tile: the score itself is the Alpha Score panel beside the price,
+          so a second "−5 / 100" here was a third score on the page. */}
+      <div>
         <div className="card-sm">
           <p className="stat-label">{alpha.confidence_label || 'Data coverage'}</p>
           <p className="stat-value text-gray-200">
@@ -151,24 +144,24 @@ export default function WhySignal({ ticker }) {
             const w = Math.min(Math.abs(v) / max * 100, 100)
             const up = v >= 0
             return (
-              <div key={k} className="flex items-center gap-2 text-xs">
+              <div key={k} className="flex flex-wrap sm:flex-nowrap items-center gap-x-2 gap-y-1 text-xs">
                 <span className="w-20 shrink-0 text-gray-500">{FACTOR_LABEL[k] || k}</span>
                 <div className="flex-1 h-2 bg-gray-800 rounded-sm overflow-hidden flex">
                   <div className="w-1/2 flex justify-end">
-                    {!up && <div className="bg-red-500 h-full" style={{ width: `${w}%` }} />}
+                    {!up && <div className="bg-slate-500 h-full" style={{ width: `${w}%` }} />}
                   </div>
                   <div className="w-1/2">
-                    {up && <div className="bg-green-500 h-full" style={{ width: `${w}%` }} />}
+                    {up && <div className="bg-sky-400 h-full" style={{ width: `${w}%` }} />}
                   </div>
                 </div>
-                <span className={`w-14 text-right font-mono shrink-0 ${up ? 'text-green-400' : 'text-red-400'}`}>
+                <span className={`w-14 text-right font-mono shrink-0 ${scoreTextClass(v)}`}>
                   {up ? '+' : ''}{Number(v).toFixed(1)}
                 </span>
                 <span className="w-12 text-right text-gray-600 shrink-0 text-[10px]">±{max}</span>
                 {/* Without this a contribution reads as a measured, validated
                     quantity. Momentum is the only one that has been tested at
                     all, and it did not come back significant. */}
-                <span className="shrink-0"><EvidenceBadge factor={k} /></span>
+                <span className="shrink-0 basis-full pl-[5.5rem] sm:basis-auto sm:pl-0"><EvidenceBadge factor={k} /></span>
               </div>
             )
           })}
@@ -187,7 +180,7 @@ export default function WhySignal({ ticker }) {
           <div className="flex flex-wrap gap-2">
             {rows.map((h, i) => (
               <span key={i} className="text-[11px] text-gray-400 bg-gray-900/60 border border-gray-800 rounded px-2 py-1">
-                {h.date} · <span className={h.alpha_score >= 0 ? 'text-green-400' : 'text-red-400'}>
+                <span className="font-mono whitespace-nowrap">{h.date}</span> · <span className={scoreTextClass(h.alpha_score)}>
                   {h.alpha_score >= 0 ? '+' : ''}{h.alpha_score?.toFixed(0)}
                 </span>
                 {h.since_pct != null && <span className="text-gray-500"> · since {pct(h.since_pct)}</span>}
@@ -254,8 +247,8 @@ export default function WhySignal({ ticker }) {
 
       {/* The limitation, next to the numbers rather than in a footnote. */}
       {indep?.note && (
-        <p className="text-[11px] text-amber-200/80 leading-relaxed border-l-2 border-amber-800/60 pl-2">
-          <b>Methodology:</b> {indep.note}
+        <p className="text-xs text-amber-200/85 leading-relaxed">
+          <b>Methodology:</b> <DateText text={indep.note} />
         </p>
       )}
 

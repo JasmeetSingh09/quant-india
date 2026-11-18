@@ -6,11 +6,13 @@
  *     <p>...plain english...</p>
  *   </Explainer>
  */
+import { Lightbulb } from 'lucide-react'
+
 export default function Explainer({ title = 'What this means', children }) {
   return (
     <div className="mt-3 rounded-xl border border-blue-800/40 bg-blue-900/15 p-4">
       <p className="flex items-center gap-2 text-sm font-semibold text-blue-300 mb-2">
-        <span>💡</span> {title}
+        <Lightbulb size={15} aria-hidden="true" className="shrink-0" /> {title}
       </p>
       <div className="text-sm text-gray-300 leading-relaxed space-y-2">
         {children}

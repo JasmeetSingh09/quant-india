@@ -108,6 +108,7 @@ SUITES = [
     ("adjustment_orphan_test.py",            4, 60),
     ("rights_adjustment_test.py",            7, 60),
     ("access_control_test.py",              30, 300),
+    ("mail_and_limiter_test.py",            51, 300),   # V4-03/14/16 + Codex R1-R7, 18 Nov 2026
     ("account_deletion_test.py",            36, 300),
     ("memory_release_test.py",               5,  60),
     ("scan_completeness_test.py",           11, 120),

@@ -16,6 +16,37 @@
   ::-webkit-scrollbar-thumb { @apply bg-gray-700/60 rounded-full; }
   ::-webkit-scrollbar-thumb:hover { @apply bg-gray-600; }
 
+  /* Headings break into even lines and paragraphs avoid a last line of one
+     word ("rupee." stood alone at three widths, 18 Nov 2026 review). The
+     longhand, not the text-wrap shorthand, so it cannot undo a nowrap. */
+  h1, h2, h3, h4 { text-wrap-style: balance; }
+  p, li, dd, dt, summary, label { text-wrap-style: pretty; }
+
+  /* The app is dark only: native controls (slider tracks, select lists,
+     scrollbars) draw their dark variants. With accent-color alone the slider
+     track came out white (18 Nov 2026). */
+  :root { color-scheme: dark; }
+
+  /* Sliders: a green-700 fill and thumb on a dark track in the card-border
+     grey. --fill (0-100%) is kept in step with each slider by main.jsx; the
+     track shows the plain dark grey until it is. */
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none;
+    height: 6px; border-radius: 9999px; cursor: pointer;
+    background: linear-gradient(#15803d, #15803d) 0 / var(--fill, 0%) 100% no-repeat, #1f2937;
+    accent-color: #15803d;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 16px; height: 16px; border-radius: 9999px;
+    background: #15803d; border: 2px solid #f9fafb;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 12px; height: 12px; border-radius: 9999px;
+    background: #15803d; border: 2px solid #f9fafb;
+  }
+  input[type="range"]::-moz-range-track { background: transparent; }
+
   /* Keyboard-visible focus ring on all focusable elements */
   *:focus-visible {
     @apply outline-none ring-2 ring-green-500/70 ring-offset-1 ring-offset-gray-950;
@@ -67,7 +98,7 @@
   .badge-blue   { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-900/50 text-blue-400 border border-blue-800/70; }
 
   .btn-primary {
-    @apply px-4 py-2 bg-green-600 hover:bg-green-500 active:scale-[0.98]
+    @apply px-4 py-2 bg-green-700 hover:bg-green-600 active:scale-[0.98]
            text-white rounded-lg font-medium transition-all text-sm
            shadow-sm shadow-green-900/40
            disabled:opacity-50 disabled:pointer-events-none;
@@ -106,10 +137,15 @@
     overflow-wrap: anywhere;
     font-variant-numeric: tabular-nums;
   }
-  .stat-label   { @apply text-xs text-gray-500 mt-0.5; }
+  .stat-label   { @apply text-xs text-gray-400 mt-0.5; }
   .positive     { @apply text-green-400; }
   .negative     { @apply text-red-400; }
   .neutral      { @apply text-gray-400; }
+
+  /* Factor bars grow from zero once, on first paint. The reduced-motion
+     rule above cuts it to 0.01ms, so those readers get the bars still. */
+  .bar-grow { animation: bar-grow 600ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  @keyframes bar-grow { from { transform: scaleX(0); } }
 
   /* Hide the scrollbar but keep the element scrollable (swipeable tab bars). */
   .scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }

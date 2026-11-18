@@ -12,7 +12,7 @@ const fmt = (n) => {
   if (a >= 1e5) return '₹' + (n / 1e5).toFixed(2) + ' L'
   return '₹' + n.toLocaleString('en-IN', { maximumFractionDigits: 0 })
 }
-const COLORS = ['#22c55e','#3b82f6','#eab308','#f97316','#a855f7','#06b6d4','#ec4899','#84cc16','#ef4444','#14b8a6']
+const COLORS = ['#22c55e','#3b82f6','#eab308','#f97316','#94a3b8','#06b6d4','#ec4899','#84cc16','#ef4444','#14b8a6']
 
 export default function Portfolio() {
   const qc = useQueryClient()

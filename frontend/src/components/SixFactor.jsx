@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getAlphaV2 } from '../api'
-import { signalLabel } from '../signalLabel'
+import { signalLabel, rankBadgeClass, scoreTextClass } from '../signalLabel'
 import Spinner from './Spinner'
 
 /**
@@ -17,13 +17,13 @@ import Spinner from './Spinner'
  * momentum look dominant by construction rather than by evidence.
  */
 
+// His rank colours, not buy-green / sell-red (signalLabel.js, 18 Nov 2026).
 const TONE = v =>
-  v > 0.6 ? 'bg-green-500' : v > 0.15 ? 'bg-green-600/70'
-  : v < -0.6 ? 'bg-red-500' : v < -0.15 ? 'bg-red-600/70' : 'bg-gray-600'
+  v > 0.6 ? 'bg-sky-400' : v > 0.15 ? 'bg-sky-600/80'
+  : v < -0.6 ? 'bg-slate-400' : v < -0.15 ? 'bg-slate-600' : 'bg-gray-600'
 
 export default function SixFactor({ ticker }) {
   const [openFactor, setOpenFactor] = useState(null)
-  const [showMethod, setShowMethod] = useState(false)
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['alphaV2', ticker],
@@ -37,29 +37,26 @@ export default function SixFactor({ ticker }) {
 
   const e = data.explanation
   if (!e?.rows?.length) return null
-  const buy = (data.alpha_score ?? 0) > 0
 
   return (
     <div className="card space-y-4">
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
         <h2 className="font-semibold">Five-factor view</h2>
-        <span className="text-[11px] text-gray-500 uppercase tracking-wide">
+        <span className="text-xs text-gray-400 uppercase tracking-wide">
           {data.horizon_days}-day horizon
         </span>
       </div>
 
       {/* The decision and the score, before any of the working. */}
       <div className="flex items-center gap-3 flex-wrap">
-        <span className={`px-2 py-0.5 rounded text-sm font-bold tracking-wide ${
-          buy ? 'bg-green-900/40 text-green-300 border border-green-800'
-              : 'bg-red-900/40 text-red-300 border border-red-800'}`}>
+        <span className={rankBadgeClass(data.signal)}>
           {signalLabel(data.signal)}
         </span>
-        <span className="text-lg font-bold text-gray-100">
+        <span className="text-lg font-medium font-mono text-gray-100">
           {data.alpha_score > 0 ? '+' : ''}{data.alpha_score}
           <span className="text-sm text-gray-500 font-normal"> / 100</span>
         </span>
-        <span className="text-[11px] text-gray-500">
+        <span className="text-xs text-gray-400">
           Model preference, not a predicted return
         </span>
       </div>
@@ -77,11 +74,22 @@ export default function SixFactor({ ticker }) {
         </div>
       )}
 
+      {/* The working, one click deeper (18 Nov 2026): the live four-factor
+          Alpha Score beside the price leads, and this second score sat open
+          below it as a competing reading. Hidden, not removed; the warning
+          above stays in view. */}
+      <details className="group">
+        <summary className="cursor-pointer select-none list-none text-sm text-gray-200 hover:text-white">
+          <span className="inline-block w-4 text-gray-400 group-open:rotate-90 transition-transform">▸</span>
+          <span className="group-open:hidden">Show model comparison and weights</span>
+          <span className="hidden group-open:inline">Hide model comparison and weights</span>
+        </summary>
+        <div className="mt-4 space-y-4">
       {/* The sentence. This is the part that actually gets read. */}
       <p className="text-sm text-gray-200 leading-relaxed">{e.sentence}</p>
 
       {e.lesson && (
-        <p className="text-xs text-amber-200/85 border-l-2 border-amber-700/70 pl-2.5 leading-relaxed">
+        <p className="text-xs text-amber-200/90 leading-relaxed">
           {e.lesson}
         </p>
       )}
@@ -91,8 +99,8 @@ export default function SixFactor({ ticker }) {
         <span className="text-gray-400">
           <b className="text-gray-100">{e.n_positive} of {e.n_total}</b> factors support this
         </span>
-        {e.strongest && <span className="text-green-400">Strongest: {e.strongest}</span>}
-        {e.biggest_concern && <span className="text-red-400">Concern: {e.biggest_concern}</span>}
+        {e.strongest && <span className="text-sky-300">Strongest: {e.strongest}</span>}
+        {e.biggest_concern && <span className="text-slate-300">Concern: {e.biggest_concern}</span>}
       </div>
 
       {/* Each bar scaled to its own maximum. Click for what it means and what
@@ -121,8 +129,7 @@ export default function SixFactor({ ticker }) {
                     )}
                   </div>
                 </div>
-                <span className={`w-16 text-right font-mono shrink-0 ${
-                  r.points > 0 ? 'text-green-400' : r.points < 0 ? 'text-red-400' : 'text-gray-500'}`}>
+                <span className={`w-16 text-right font-mono shrink-0 ${scoreTextClass(r.points)}`}>
                   {r.points > 0 ? '+' : ''}{r.points}
                 </span>
                 <span className="w-12 text-right text-gray-600 shrink-0 text-[10px]">
@@ -175,23 +182,17 @@ export default function SixFactor({ ticker }) {
 
       {/* Both models, side by side. The comparison is the point of running two. */}
       <div className="pt-2 border-t border-gray-800">
-        <button onClick={() => setShowMethod(m => !m)}
-                aria-expanded={showMethod}
-                className="text-xs text-gray-500 hover:text-gray-300 transition-colors">
-          {showMethod ? 'Hide' : 'Show'} model comparison and weights
-        </button>
-        {showMethod && (
-          <div className="mt-2 space-y-2">
+          <div className="space-y-2">
             <div className="flex items-center gap-4 text-xs">
               <span className="text-gray-400">
                 4-factor: <span className="font-mono text-gray-200">
                   {data.v1_score > 0 ? '+' : ''}{data.v1_score}</span>
-                <span className="text-gray-600"> ({data.v1_signal})</span>
+                <span className="text-gray-600"> ({signalLabel(data.v1_signal)})</span>
               </span>
               <span className="text-gray-400">
                 5-factor: <span className="font-mono text-gray-200">
                   {data.alpha_score > 0 ? '+' : ''}{data.alpha_score}</span>
-                <span className="text-gray-600"> ({data.signal})</span>
+                <span className="text-gray-600"> ({signalLabel(data.signal)})</span>
               </span>
               <span className={`font-mono ${
                 Math.abs(data.disagreement) > 10 ? 'text-amber-400' : 'text-gray-500'}`}>
@@ -208,10 +209,11 @@ export default function SixFactor({ ticker }) {
             </div>
             <p className="text-[10px] text-gray-600 leading-relaxed">{data.note}</p>
           </div>
-        )}
       </div>
 
       <p className="text-[11px] text-gray-600 leading-relaxed">{e.caveat}</p>
+        </div>
+      </details>
     </div>
   )
 }

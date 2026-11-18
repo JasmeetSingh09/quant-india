@@ -19,7 +19,7 @@ import { InfoTip } from './Term'
  * `na` carries the reason from the server, where the accounting judgement is
  * tested, rather than being decided in a template.
  */
-export default function StatCard({ label, value, sub, color = '', tip, na, naShort }) {
+export default function StatCard({ label, value, sub, color = '', tip, tipAlign, na, naShort }) {
   // Only null and undefined are absent. 0 is a value: Maruti's debt-to-equity
   // of zero is one of the more interesting things about Maruti, and it used to
   // render as a dash because a truthiness check treated it as nothing.
@@ -27,7 +27,7 @@ export default function StatCard({ label, value, sub, color = '', tip, na, naSho
 
   return (
     <div className="card-sm">
-      <p className="stat-label">{label}{tip && <InfoTip k={tip} />}</p>
+      <p className="stat-label">{label}{tip && <InfoTip k={tip} align={tipAlign} />}</p>
       {has ? (
         <p className={`stat-value ${color}`}>{value}</p>
       ) : na ? (

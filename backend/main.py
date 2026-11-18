@@ -54,6 +54,7 @@ from sentiment import score_headline, summarise_sentiment
 from watchlist import add_to_watchlist, remove_from_watchlist, get_watchlist
 from auth import current_user_id, current_user_email   # per-user data (returns 'public'/None when anonymous)
 from auth import require_admin   # owner-only actions; fails closed when no admin is configured
+from auth import require_mail_identity   # sends mail / stores an address: verified + confirmed only
 from alerts import send_test_alert, send_multi_signal_alert, start_alert_scheduler, run_watchlist_alert_check
 from alpha_model import compute_alpha_score, scan_alpha, retrain_weights, explain_signal, top_picks, warm_top_picks
 from prediction_tracker import snapshot as log_predictions_snapshot, evaluate as evaluate_predictions
@@ -129,12 +130,23 @@ async def _rate_limit(request, call_next):
     try:
         from rate_limit import check
         hit = check(request)
+        # check() is async (token verification runs off the event loop, Codex
+        # review R1); tests may swap in a plain function.
+        if hasattr(hit, "__await__"):
+            hit = await hit
         if hit:
             from fastapi.responses import JSONResponse
+            # This middleware runs outside CORSMiddleware (registered after
+            # it), so a 429 answered here never got CORS headers and browsers
+            # reported a CORS failure instead of "Too many requests" (18 Nov
+            # 2026). Same policy as CORSMiddleware above: any origin, no
+            # credentials.
             return JSONResponse(
                 status_code=429,
                 content={"detail": hit["detail"]},
-                headers={"Retry-After": str(hit["retry_after"])})
+                headers={"Retry-After": str(hit["retry_after"]),
+                         "Access-Control-Allow-Origin": "*",
+                         "Access-Control-Expose-Headers": "Retry-After"})
     except Exception as e:
         # Still fails open, but no longer silently: a limiter that has stopped
         # working should be visible in the logs (access-control audit, 2026-10-17).
@@ -308,6 +320,15 @@ def _start_picks_scheduler():
         sched.add_job(_warm_dashboard, "date", id="warm_dashboard",
                       replace_existing=True,
                       run_date=_dt.now() + _td(seconds=100))
+        # And keep them fresh. The cache only refreshed when someone asked, so
+        # the first visitor after a quiet spell got the old answer however old
+        # it was: on 16 Nov the picks still served the 29 Oct cycle (bug hunt
+        # V4-05). Asking every 30 minutes makes any stale entry refresh in the
+        # background, so a served answer is at most ~30 minutes behind the
+        # last scan, at the cost of one recompute per half hour.
+        sched.add_job(_warm_dashboard, "interval", minutes=30, id="refresh_dashboard",
+                      replace_existing=True,
+                      next_run_time=_dt.now() + _td(minutes=30))
 
         sched.add_job(_ensure_screener, "interval", minutes=20,
                       id="screener_guard", replace_existing=True,
@@ -978,13 +999,33 @@ def news_market(days_back: int = Query(3, description="Days of news to fetch")):
 # Alert endpoints
 # ---------------------------------------------------------------------------
 
-@app.post("/alerts/test")
-def alerts_test(user_email: str | None = Depends(current_user_email)):
+class MailResult(BaseModel):
+    """
+    What a mail route returns, and nothing else (Codex review R6, 18 Nov 2026):
+    whether it was sent, or why not. Never the recipient, never the transport's
+    own result, never an SMTP message (those quote addresses).
+    """
+    sent: bool
+    skipped: Optional[str] = None
+    n_portfolios: Optional[int] = None
+
+
+def _mail_result(result: dict) -> MailResult:
+    """A transport result -> the public schema; a failure -> a 500 without details."""
+    if not isinstance(result, dict) or result.get("error"):
+        raise HTTPException(status_code=500,
+                            detail="The e-mail could not be sent. Try again later.")
+    return MailResult(sent=True)
+
+
+# The mail routes send only to the caller's own confirmed address, from a token
+# that verifies (V4-03; Codex review R2/R3, 18 Nov 2026). Before, an anonymous
+# caller had current_user_email = None and send_email fell back to
+# GMAIL_RECEIVER, the owner's inbox.
+@app.post("/alerts/test", response_model=MailResult)
+def alerts_test(me: dict = Depends(require_mail_identity)):
     """Send a test Gmail alert to the signed-in user (verifies credentials)."""
-    result = send_test_alert(to_email=user_email)
-    if "error" in result:
-        raise HTTPException(status_code=500, detail=result["error"])
-    return result
+    return _mail_result(send_test_alert(to_email=me["email"]))
 
 
 @app.post("/alerts/run-check")
@@ -996,9 +1037,9 @@ def alerts_run_check(_admin: str = Depends(require_admin)):
     return {"results": run_watchlist_alert_check()}
 
 
-@app.post("/alerts/send")
+@app.post("/alerts/send", response_model=MailResult)
 def alerts_send(req: MultiSignalAlertRequest,
-                user_email: str | None = Depends(current_user_email)):
+                me: dict = Depends(require_mail_identity)):
     """Manually trigger a multi-signal alert email to the signed-in user."""
     result = send_multi_signal_alert(
         ticker=req.ticker,
@@ -1008,11 +1049,9 @@ def alerts_send(req: MultiSignalAlertRequest,
         sentiment_label=req.sentiment_label,
         confidence_pct=req.confidence_pct,
         headline=req.headline,
-        to_email=user_email,
+        to_email=me["email"],
     )
-    if "error" in result:
-        raise HTTPException(status_code=500, detail=result["error"])
-    return result
+    return _mail_result(result)
 
 
 # ---------------------------------------------------------------------------
@@ -1672,6 +1711,18 @@ def anomaly_check(ticker: str):
     """Unusual behaviour for this stock against its own history. Not a signal."""
     from anomaly import detect
     return detect(ticker)
+
+
+# Registered before /events/{ticker}: FastAPI matches in order, and the ticker
+# route used to answer "/events/funnel" as the company events for "FUNNEL", so
+# the pilot scorecard could never be read (V4-14, 18 Nov 2026). Owner-only:
+# with a pilot of a few classmates even aggregate usage can identify someone.
+@app.get("/events/funnel")
+def events_funnel(days: int = Query(42, ge=1, le=365),
+                  _admin: str = Depends(require_admin)):
+    """Pilot scorecard, including % who changed an allocation after simulating."""
+    from analytics import funnel
+    return funnel(days=days)
 
 
 @app.get("/events/{ticker}")
@@ -2468,13 +2519,6 @@ def events_track(req: TrackEventRequest, user_id: str = Depends(current_user_id)
     return track(req.event, user_id=user_id, **(req.props or {}))
 
 
-@app.get("/events/funnel")
-def events_funnel(days: int = Query(42, ge=1, le=365)):
-    """Pilot scorecard, including % who changed an allocation after simulating."""
-    from analytics import funnel
-    return funnel(days=days)
-
-
 @app.post("/predictions/seal")
 def predictions_seal(_admin: str = Depends(require_admin)):
     """Seal any unsealed days into the tamper-evident chain. Idempotent."""
@@ -2769,12 +2813,12 @@ def me_email_pref(user_id: str = Depends(current_user_id)):
 
 
 @app.post("/me/email-pref")
-def me_email_opt_in(user_id: str = Depends(current_user_id),
-                    email: str = Depends(current_user_email)):
-    """Opt in. The address is taken from the verified token, never from the
-    request body, so nobody can subscribe somebody else."""
+def me_email_opt_in(me: dict = Depends(require_mail_identity)):
+    """Opt in. The address is the account's own confirmed e-mail from a token
+    that verifies, never the request body or user-editable metadata, so nobody
+    can subscribe somebody else (Codex review R2/R3, 18 Nov 2026)."""
     from user_prefs import opt_in
-    r = opt_in(user_id, email)
+    r = opt_in(me["user_id"], me["email"])
     if "error" in r:
         raise HTTPException(status_code=400, detail=r["error"])
     return r
@@ -2814,13 +2858,21 @@ def digest_preview(user_id: str = Depends(current_user_id)):
     return build_digest(user_id)
 
 
-@app.post("/digest/send")
-def digest_send(user_id: str = Depends(current_user_id),
-                email: str = Depends(current_user_email)):
+@app.post("/digest/send", response_model=MailResult)
+def digest_send(me: dict = Depends(require_mail_identity)):
     """Send this user's weekly digest to their own address. Skips when there is
     nothing worth saying — a weekly 'no change' trains people to ignore us."""
     from weekly_digest import send_digest
-    return send_digest(user_id, to_email=email)
+    result = send_digest(me["user_id"], to_email=me["email"]) or {}
+    if "skip" in result:
+        return MailResult(sent=False, skipped=str(result.get("skip"))[:200])
+    # send_digest nests the transport result under "result" (with its "to");
+    # only the outcome leaves this route.
+    transport = result.get("result") or {}
+    if not result.get("sent") or transport.get("error"):
+        raise HTTPException(status_code=500,
+                            detail="The e-mail could not be sent. Try again later.")
+    return MailResult(sent=True, n_portfolios=result.get("n_portfolios"))
 
 
 @app.get("/simulator/leaderboard")

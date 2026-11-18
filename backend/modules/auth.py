@@ -47,8 +47,15 @@ def _jwks_client():
         return _JWKS_CACHE["client"]
     try:
         from jwt import PyJWKClient
-        c = PyJWKClient(f"{_SUPABASE_URL}/auth/v1/.well-known/jwks.json",
-                        cache_keys=True, lifespan=_JWKS_TTL)
+        # A short timeout (default 30 s): verification sits on request paths,
+        # and a slow key server must not hold a worker for half a minute
+        # (Codex review R1, 18 Nov 2026).
+        try:
+            c = PyJWKClient(f"{_SUPABASE_URL}/auth/v1/.well-known/jwks.json",
+                            cache_keys=True, lifespan=_JWKS_TTL, timeout=3)
+        except TypeError:       # an older PyJWT without the timeout argument
+            c = PyJWKClient(f"{_SUPABASE_URL}/auth/v1/.well-known/jwks.json",
+                            cache_keys=True, lifespan=_JWKS_TTL)
         _JWKS_CACHE.update(at=now, client=c)
         return c
     except Exception:
@@ -80,6 +87,39 @@ def _decode_payload(token: str) -> dict | None:
         except Exception:
             return None
     return None
+
+
+def verify_status(token: str) -> tuple[str, dict | None]:
+    """
+    Like _decode_payload, but says WHY there is no payload, for the rate
+    limiter (Codex review R1, 18 Nov 2026):
+      ("ok", payload)        the token verified
+      ("invalid", None)      it did not (bad signature, expired, not a JWT)
+      ("unavailable", None)  it could not be checked (key server unreachable)
+    """
+    if not (jwt and token):
+        return ("invalid", None)
+    if _JWT_SECRET:
+        try:
+            return ("ok", jwt.decode(token, _JWT_SECRET, algorithms=["HS256"],
+                                     audience="authenticated", options={"verify_aud": False}))
+        except Exception:
+            pass
+    client = _jwks_client()
+    if not client:
+        return ("invalid", None)
+    try:
+        key = client.get_signing_key_from_jwt(token).key
+    except Exception as e:
+        # PyJWKClientConnectionError: the key set could not be fetched.
+        if type(e).__name__ == "PyJWKClientConnectionError":
+            return ("unavailable", None)
+        return ("invalid", None)
+    try:
+        return ("ok", jwt.decode(token, key, algorithms=["ES256", "RS256"],
+                                 audience="authenticated", options={"verify_aud": False}))
+    except Exception:
+        return ("invalid", None)
 
 
 def _unverified_sub(token: str) -> str | None:
@@ -175,6 +215,85 @@ def current_user_email(authorization: str | None = Header(default=None)) -> str 
     # created — so ask the auth server, using the caller's own token as the
     # credential. No service key, and a user can only ever fetch themselves.
     return _email_from_supabase(token)
+
+
+class _MailIdentity(dict):
+    """{"user_id": ..., "email": ...} for a verified caller with a confirmed address."""
+
+
+def _auth_user(token: str) -> dict | None:
+    """
+    The caller's own Supabase user record (GET /auth/v1/user, with their token
+    as the credential). Separate so tests can replace the network call.
+    """
+    if not (_SUPABASE_URL and token):
+        return None
+    try:
+        import requests
+        headers = {"Authorization": f"Bearer {token}",
+                   "apikey": os.getenv("SUPABASE_ANON_KEY", "").strip() or token}
+        r = requests.get(f"{_SUPABASE_URL}/auth/v1/user", headers=headers, timeout=6)
+        if r.status_code == 200:
+            body = r.json()
+            return body if isinstance(body, dict) else None
+    except Exception:
+        return None
+    return None
+
+
+_CONFIRMED_CACHE = BoundedCache(500, "auth._CONFIRMED_CACHE")
+
+
+def _confirmed_account_email(token: str, sub: str) -> str | None:
+    """
+    The account's own address, only if the account confirmed it.
+
+    From the auth server's user record (`email` + `email_confirmed_at`), never
+    from user_metadata or preferred_username: those the user can set to anyone's
+    address (Codex review R3, 18 Nov 2026). The record must be the same user the
+    token names. Cached briefly so one mail route call is one lookup.
+    """
+    key = token[-32:]
+    hit = _CONFIRMED_CACHE.get(key)
+    now = time.time()
+    if hit and now - hit[0] < 300:
+        return hit[1]
+    email = None
+    user = _auth_user(token)
+    if user and user.get("id") == sub:
+        addr = user.get("email")
+        if (isinstance(addr, str) and "@" in addr
+                and (user.get("email_confirmed_at") or user.get("confirmed_at"))):
+            email = addr.strip()
+    _CONFIRMED_CACHE[key] = (now, email)
+    return email
+
+
+def require_mail_identity(authorization: str | None = Header(default=None)) -> dict:
+    """
+    FastAPI dependency for every route that SENDS mail or STORES an address
+    (/alerts/test, /alerts/send, /digest/send, POST /me/email-pref).
+
+    Strict, unlike current_user_email (Codex review R2/R3, 18 Nov 2026):
+      * the token must verify — never the unverified-claims stopgap, whatever
+        the server's configuration; with no verification configured these
+        routes are closed;
+      * the address is the account's own confirmed e-mail from the auth server;
+        an account without one gets no mail.
+    """
+    if not _verification_configured():
+        raise HTTPException(status_code=503,
+                            detail="E-mail is not available: sign-in verification is not configured.")
+    token = _bearer(authorization)
+    payload = _decode_payload(token) if token else None
+    sub = payload.get("sub") if payload else None
+    if not sub:
+        raise HTTPException(status_code=401, detail="Sign in to use e-mail.")
+    email = _confirmed_account_email(token, sub)
+    if not email:
+        raise HTTPException(status_code=403,
+                            detail="Confirm your account's e-mail address to receive mail.")
+    return _MailIdentity(user_id=sub, email=email)
 
 
 def _email_from_claims(payload: dict) -> str | None:

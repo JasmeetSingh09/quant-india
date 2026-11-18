@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { getFactorEvidence } from '../api'
 import Spinner from './Spinner'
+import { EVIDENCE_CLASS } from '../evidenceStatus'
 
 /**
  * FactorEvidence — one row per factor, saying what is actually known about it.
@@ -18,14 +19,16 @@ import Spinner from './Spinner'
  * be reconstructible from stored prices after all, and collapsing it into
  * either neighbour would misreport it — 'Tested' claims a result that has not
  * been read, 'Cannot test yet' repeats the error that put it there.
+ *
+ * Colours come from the one shared map (evidenceStatus.js, 18 Nov 2026).
  */
 const STATUS = {
-  passed: { label: 'Passed', cls: 'text-emerald-300 border-emerald-800/60 bg-emerald-950/25' },
-  failed: { label: 'Did not pass', cls: 'text-amber-300 border-amber-800/60 bg-amber-950/25' },
-  tested: { label: 'Tested', cls: 'text-yellow-300 border-yellow-800/60 bg-yellow-950/20' },
-  testable_now: { label: 'Testable from prices', cls: 'text-sky-300 border-sky-800/60 bg-sky-950/20' },
-  cannot_test_yet: { label: 'Cannot test yet', cls: 'text-gray-400 border-gray-700 bg-gray-900/40' },
-  untested: { label: 'Untested', cls: 'text-gray-400 border-gray-700 bg-gray-900/40' },
+  passed: { label: 'Passed', cls: EVIDENCE_CLASS.passed },
+  failed: { label: 'Did not pass', cls: EVIDENCE_CLASS.failed },
+  tested: { label: 'Tested', cls: EVIDENCE_CLASS.tested },
+  testable_now: { label: 'Testable from prices', cls: EVIDENCE_CLASS.untested },
+  cannot_test_yet: { label: 'Cannot test yet', cls: EVIDENCE_CLASS.untested },
+  untested: { label: 'Untested', cls: EVIDENCE_CLASS.untested },
 }
 
 export default function FactorEvidence() {

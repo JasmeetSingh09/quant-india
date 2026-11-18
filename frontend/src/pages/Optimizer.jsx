@@ -26,7 +26,7 @@ function TickerList({ tickers, setTickers }) {
     <div>
       <div className="flex gap-2 mb-2">
         <input className="input" placeholder="Add ticker" value={t} onChange={e => setT(e.target.value)} onKeyDown={e => e.key==='Enter'&&add()} />
-        <button onClick={add} className="btn-ghost"><Plus size={14}/></button>
+        <button onClick={add} className="btn-ghost" aria-label="Add ticker"><Plus size={14} aria-hidden="true"/></button>
       </div>
       <div className="flex flex-wrap gap-2">
         {tickers.map(t => (
@@ -124,8 +124,11 @@ export default function Optimizer() {
       <div className="space-y-6">
         {/* Setup runs across the page: stocks | algorithm | settings. Until 16 Nov
             2026 it was a tall left column beside a results area that stays empty
-            until Run, which left most of the screen blank. */}
-        <div className="card grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-6 items-start">
+            until Run, which left most of the screen blank. Below 1280px the three
+            parts stack full width (18 Nov 2026: as two columns at 768/1024 the
+            settings ran ~270px longer than the stocks, leaving a hole under
+            "How much are you investing?"); the settings split into two columns. */}
+        <div className="card grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
           <div className="xl:col-span-3">
             <label className="label">Tickers</label>
             <TickerList tickers={tickers} setTickers={setTickers} />
@@ -135,7 +138,7 @@ export default function Optimizer() {
           <div className="grid grid-cols-2 xl:grid-cols-1 gap-4 mt-5">
               <div>
                 <label className="label">How much are you investing?</label>
-                <input type="number" min="1000" step="1000" className="input"
+                <input type="number" min="1000" step="1000" className="input" aria-label="How much are you investing?"
                        value={amount} onChange={e => setAmount(Number(e.target.value))} />
                 <p className="text-[11px] text-gray-600 mt-1">
                   ₹{Math.round(amount).toLocaleString('en-IN')}
@@ -143,7 +146,7 @@ export default function Optimizer() {
               </div>
               <div>
                 <label className="label">For how long?</label>
-                <input type="range" min="3" max="60" step="3" className="w-full"
+                <input type="range" min="3" max="60" step="3" className="w-full" aria-label="For how long?"
                        value={months} onChange={e => setMonths(Number(e.target.value))} />
                 <p className="text-[11px] text-gray-600 mt-1">
                   {horizonLabel(months)}
@@ -152,7 +155,7 @@ export default function Optimizer() {
           </div>
           </div>
 
-          <div className="md:col-span-2 md:order-last xl:order-none xl:col-span-5">
+          <div className="xl:col-span-5">
             <label className="label">Algorithm</label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {[
@@ -171,19 +174,21 @@ export default function Optimizer() {
                   <input type="radio" checked={tab===v} onChange={() => setTab(v)} className="mt-0.5 accent-green-500" />
                   <div>
                     <p className="text-sm font-medium">{l}</p>
-                    <p className="text-xs text-gray-500 line-clamp-2">{d}</p>
+                    {/* Three lines: two cut "…equal mone…" at 1440 (18 Nov 2026).
+                        The long HRP note still folds; its full text is the title. */}
+                    <p className="text-xs text-gray-500 line-clamp-3">{d}</p>
                   </div>
                 </label>
               ))}
             </div>
           </div>
 
-          <div className="xl:col-span-4 space-y-5">
+          <div className="xl:col-span-4 space-y-5 md:space-y-0 md:grid md:grid-cols-2 md:gap-x-6 md:gap-y-5 md:items-start xl:block xl:space-y-5">
           {tab === 'mvo' && (
             <>
               <div>
                 <label className="label">Objective</label>
-                <select className="input" value={target} onChange={e => setTarget(e.target.value)}>
+                <select className="input" aria-label="Objective" value={target} onChange={e => setTarget(e.target.value)}>
                   <option value="max_sharpe">Maximise Sharpe Ratio</option>
                   <option value="min_variance">Minimise Variance</option>
                   <option value="max_return">Maximise Return</option>
@@ -203,7 +208,7 @@ export default function Optimizer() {
               )}
               <div>
                 <label className="label">Max weight per stock: {maxWeight}%</label>
-                <input type="range" min="10" max="100" step="5" value={maxWeight}
+                <input type="range" min="10" max="100" step="5" aria-label="Max weight per stock" value={maxWeight}
                        onChange={e => setMaxWeight(Number(e.target.value))}
                        className="w-full accent-green-500" />
                 <p className="text-xs text-gray-500 mt-1">
@@ -212,7 +217,7 @@ export default function Optimizer() {
               </div>
               <div>
                 <label className="label">Trading discipline (turnover penalty): {Number(turnoverLambda).toFixed(2)}</label>
-                <input type="range" min="0" max="1" step="0.05" value={turnoverLambda}
+                <input type="range" min="0" max="1" step="0.05" aria-label="Trading discipline (turnover penalty)" value={turnoverLambda}
                        onChange={e => setTurnoverLambda(Number(e.target.value))}
                        className="w-full accent-green-500" />
                 <p className="text-xs text-gray-500 mt-1">
@@ -228,13 +233,13 @@ export default function Optimizer() {
           <div>
             <label className="label">Risk-free rate</label>
             <div className="flex gap-2">
-              <select className="input flex-1" value={[6.5, 6.87].includes(Number(riskFree)) ? String(riskFree) : 'custom'}
+              <select className="input flex-1" aria-label="Risk-free rate" value={[6.5, 6.87].includes(Number(riskFree)) ? String(riskFree) : 'custom'}
                       onChange={e => e.target.value !== 'custom' && setRiskFree(Number(e.target.value))}>
                 <option value="6.5">RBI repo</option>
                 <option value="6.87">10-yr G-Sec</option>
                 <option value="custom">Custom…</option>
               </select>
-              <input type="number" step="0.1" min="0" max="20" className="input w-20"
+              <input type="number" step="0.1" min="0" max="20" className="input w-20" aria-label="Risk-free rate"
                      value={riskFree} onChange={e => setRiskFree(e.target.value)} />
             </div>
             {/* Show the actual values, so if these are ever fetched live the UI
@@ -253,7 +258,7 @@ export default function Optimizer() {
           {tab === 'auto' && (
             <div>
               <label className="label">How much to trust the AI's views</label>
-              <input type="range" min="0.01" max="0.10" step="0.01" value={tau}
+              <input type="range" min="0.01" max="0.10" step="0.01" aria-label="How much to trust the AI's views" value={tau}
                      onChange={e => setTau(Number(e.target.value))}
                      className="w-full accent-green-500" />
               <div className="flex justify-between text-[11px] text-gray-500 -mt-0.5">

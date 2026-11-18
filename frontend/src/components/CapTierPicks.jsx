@@ -1,11 +1,10 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ScoreProvenance } from './Evidence'
-import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { getUniverseTop } from '../api'
-import { signalLabel, SIGNAL_TITLE } from '../signalLabel'
+import { signalLabel, SIGNAL_TITLE, rankBadgeClass, scoreTextClass } from '../signalLabel'
 import Spinner from './Spinner'
-import { ArrowUpRight, ArrowDownRight, Sparkles } from 'lucide-react'
 
 // Each factor's contribution is weight x score x 100, and the weights are not
 // equal — so the bars do NOT share one scale. Momentum can reach +/-35 while
@@ -33,85 +32,105 @@ function dominant(contrib = {}) {
   return e.reduce((a, b) => (Math.abs(b[1]) > Math.abs(a[1]) ? b : a))
 }
 
-/** Same card treatment as the old Top Picks — score, signal, factor bars. */
-function PickCard({ r, buy, onOpen }) {
-  const name = r.ticker.replace('.NS', '')
-  const score = r.alpha_score
-  const dom = dominant(r.contributions)
+// Bars grow from the middle: right in sky for a positive contribution, left in
+// slate for a negative one. Same scale rule as before: each factor against
+// its own maximum.
+function FactorCell({ r, k }) {
+  // Unmeasured, not zero: the stored 0 is a placeholder the composite weighted.
+  if (r.not_measured?.includes(k)) {
+    return (
+      <span className="hidden min-[1400px]:flex items-center gap-2 pt-1.5 text-xs"
+            title="Not measured for this stock (for example, too little price history). It adds nothing to the score.">
+        <span className="relative h-1.5 w-[4.5rem] shrink-0 rounded-full bg-gray-800/50" />
+        <span className="w-8 shrink-0 text-right font-mono text-gray-400">n/a</span>
+      </span>
+    )
+  }
+  const v = r.contributions?.[k] ?? 0
+  const pos = v >= 0
+  // Signed by the figure shown, so +0.3 prints "0", not "+0".
+  const shown = Math.round(v)
+  const max = FACTOR_MAX[k] || 25
+  const w = Math.min(Math.abs(v) / max * 50, 50)
   return (
-    <button
-      onClick={() => onOpen(r.ticker)}
-      className={`text-left w-full rounded-xl border p-3.5 bg-gray-900/60 transition-colors
-                  ${buy ? 'border-green-700/40 hover:border-green-600/70'
-                        : 'border-red-700/40 hover:border-red-600/70'}`}
-    >
-      <div className="flex items-center justify-between mb-1.5">
-        <div className="flex items-center gap-1.5 min-w-0">
-          {buy ? <ArrowUpRight className="text-green-400 shrink-0" size={15} />
-               : <ArrowDownRight className="text-red-400 shrink-0" size={15} />}
-          <span className="font-mono font-bold text-sm truncate">{name}</span>
-        </div>
-        <span title="Alpha score, -100 to +100. Composite of momentum, quality, value and sentiment. Higher means the model prefers it more strongly — it is NOT a predicted return."
-              className={`text-sm font-medium font-mono shrink-0 cursor-help ${buy ? 'text-green-400/80' : 'text-red-400/80'}`}>
-          {score > 0 ? '+' : ''}{score?.toFixed(0)}
-        </span>
-      </div>
-      <div className="flex items-center justify-between text-[11px] mb-2">
-        {/* The decision, not the score, is the thing being communicated. The
-            alpha number was set in bold at a larger size than the signal, so
-            the secondary metric outweighed the call it produced. */}
-        <span title={SIGNAL_TITLE}
-              className={`badge-${buy ? 'green' : 'red'} cursor-help text-xs font-bold tracking-wide`}>
-          {signalLabel(r.signal)}
-        </span>
-        <span className="text-gray-500 text-[10px]">21-day signal</span>
-        <span className="text-gray-500" title="How much of the model's input data was available for this stock — not the chance the signal is right.">{Math.round((r.confidence || 0) * 100)}% data</span>
-      </div>
-      <div className="space-y-1">
-        {FACTORS.map(([k, label]) => {
-          // Unmeasured, not zero: the stored 0 is a placeholder the composite weighted.
-          if (r.not_measured?.includes(k)) {
-            return (
-              <div key={k} className="flex items-center gap-2 text-[10px]"
-                   title="Not measured for this stock (for example, too little price history). It adds nothing to the score.">
-                <span className="w-14 text-gray-500 shrink-0">{label}</span>
-                <div className="flex-1 h-1 bg-gray-800/50 rounded-full" />
-                <span className="w-8 text-right text-gray-600 shrink-0">n/a</span>
-              </div>
-            )
-          }
-          const v = r.contributions?.[k] ?? 0
-          const pos = v >= 0
-          const max = FACTOR_MAX[k] || 25
-          const w = Math.min(Math.abs(v) / max * 100, 100)
+    <span className="hidden min-[1400px]:flex items-center gap-2 pt-1.5 text-xs">
+      <span className="relative h-1.5 w-[4.5rem] shrink-0 rounded-full bg-gray-800">
+        <span className="absolute inset-y-0 left-1/2 w-px bg-gray-600" />
+        <span className={`bar-grow absolute inset-y-0 rounded-full ${pos ? 'left-1/2 bg-sky-400 origin-left' : 'right-1/2 bg-slate-500 origin-right'}`}
+              style={{ width: `${w}%` }} />
+      </span>
+      <span className={`w-8 shrink-0 text-right font-mono tabular-nums ${shown === 0 ? 'text-gray-400' : pos ? 'text-sky-300' : 'text-slate-400'}`}>
+        {shown > 0 ? '+' : ''}{shown === 0 ? 0 : shown}
+      </span>
+    </span>
+  )
+}
+
+// Columns: rank, stock, rank label, score, four factors (from 1400px),
+// driven by (from 1024). Every row shares them through subgrid, so the scores
+// sit on one right edge and the bars line up down the list.
+// Fixed widths for every column but the stock's, so the Top and Lowest lists
+// (two separate grids) put the same column in the same place.
+const COLS = 'grid-cols-[1.25rem_minmax(0,1fr)_6.75rem_2.75rem] ' +
+  'lg:grid-cols-[1.5rem_minmax(0,1fr)_7.5rem_3rem_11rem] ' +
+  'min-[1400px]:grid-cols-[1.5rem_minmax(0,1fr)_7.5rem_3rem_repeat(4,7.5rem)_10rem]'
+
+/**
+ * One ranked list. Rows, not cards (18 Nov 2026): the model orders stocks,
+ * and a list in that order says so better than twenty green and red cards,
+ * which read as buy and sell. The whole row opens the stock's page; "Why
+ * this signal" says what is there.
+ */
+function PickList({ title, rows }) {
+  return (
+    <div>
+      <h3 className="text-sm font-semibold text-gray-200 mb-2">{title}</h3>
+      <ol className={`grid ${COLS} gap-x-3 sm:gap-x-4`}>
+        <li aria-hidden="true"
+            className="col-span-full grid grid-cols-subgrid items-end pb-2 text-xs text-gray-400 border-b border-gray-800">
+          <span>#</span>
+          <span>Stock</span>
+          <span>Rank</span>
+          <span className="text-right">Score</span>
+          {FACTORS.map(([k, label]) => <span key={k} className="hidden min-[1400px]:block">{label}</span>)}
+          <span className="hidden lg:block">Driven by</span>
+        </li>
+        {rows.map((r, i) => {
+          const name = r.ticker.replace('.NS', '')
+          const score = r.alpha_score
+          const dom = dominant(r.contributions)
           return (
-            <div key={k} className="flex items-center gap-2 text-[10px]">
-              <span className="w-14 text-gray-500 shrink-0">{label}</span>
-              <div className="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
-                <div className={`h-full ${pos ? 'bg-green-500' : 'bg-red-500'}`} style={{ width: `${w}%` }} />
-              </div>
-              <span className={`w-8 text-right font-mono shrink-0 ${pos ? 'text-green-400' : 'text-red-400'}`}>
-                {pos ? '+' : ''}{v.toFixed(0)}
-              </span>
-            </div>
+            <li key={r.ticker} className="col-span-full grid grid-cols-subgrid border-b border-gray-800 last:border-0">
+              <Link to={`/stock?ticker=${encodeURIComponent(r.ticker)}`}
+                    className="group col-span-full grid grid-cols-subgrid items-start py-3 -mx-2 px-2 rounded-lg
+                               hover:bg-gray-800/40 focus-visible:bg-gray-800/40 transition-colors">
+                <span className="pt-0.5 font-mono text-xs text-gray-400 tabular-nums">{i + 1}</span>
+                <span className="min-w-0">
+                  <span className="block font-mono font-medium text-sm text-gray-200 truncate">{name}</span>
+                  {/* The row already opens the stock page; saying so turns a
+                      mystery click into an offer. */}
+                  <span className="block mt-1 text-xs text-gray-400 group-hover:text-gray-200 group-focus-visible:text-gray-200">
+                    Why this signal →
+                  </span>
+                </span>
+                <span title={SIGNAL_TITLE} className={`${rankBadgeClass(r.signal)} justify-self-start whitespace-nowrap`}>
+                  {signalLabel(r.signal)}
+                </span>
+                <span title="Alpha score, -100 to +100. Composite of momentum, quality, value and sentiment. Higher means the model prefers it more strongly — it is NOT a predicted return."
+                      className={`pt-0.5 text-right font-mono font-medium text-sm tabular-nums ${scoreTextClass(score)}`}>
+                  {score > 0 ? '+' : ''}{score?.toFixed(0)}
+                </span>
+                {FACTORS.map(([k]) => <FactorCell key={k} r={r} k={k} />)}
+                <span className="hidden lg:block pt-0.5 text-xs text-gray-400"
+                      title={dom ? `${dom[0]} contributed ${dom[1] >= 0 ? '+' : ''}${dom[1].toFixed(1)} points — the largest single component of this score. Each factor's bar is scaled to its own maximum, because the weights differ.` : undefined}>
+                  {dom && <>{dom[0]} ({dom[1] >= 0 ? '+' : ''}{dom[1].toFixed(0)} pts)</>}
+                </span>
+              </Link>
+            </li>
           )
         })}
-      </div>
-      {dom && (
-        <p className="mt-1.5 text-[10px] text-gray-600 cursor-help"
-           title={`${dom[0]} contributed ${dom[1] >= 0 ? '+' : ''}${dom[1].toFixed(1)} points — the largest single component of this score. Each factor's bar is scaled to its own maximum, because the weights differ.`}>
-          Driven by <span className="text-gray-400">{dom[0]}</span>
-          {' '}<span className="text-gray-500">({dom[1] >= 0 ? '+' : ''}{dom[1].toFixed(0)} pts)</span>
-        </p>
-      )}
-      {/* The score's range, stated once per card rather than left to inference. */}
-      <p className="text-[9px] text-gray-700 mt-0.5">
-        bars scaled per factor · momentum ±35, quality/sentiment ±25, value ±15
-      </p>
-      {/* The card already navigates to the stock page; saying so turns a
-          mystery click into an offer. */}
-      <p className="text-[10px] text-green-500/80 mt-1">Why this signal →</p>
-    </button>
+      </ol>
+    </div>
   )
 }
 
@@ -124,7 +143,6 @@ function PickCard({ r, buy, onOpen }) {
  * completed results, and a tier still filling says so on its own.
  */
 export default function CapTierPicks({ n = 10 }) {
-  const navigate = useNavigate()
   const [tier, setTier] = useState('large_cap')
   const { data, isLoading, isError } = useQuery({
     queryKey: ['universeTop', n],
@@ -135,18 +153,16 @@ export default function CapTierPicks({ n = 10 }) {
   if (isLoading) return <div className="card"><Spinner size="sm" /></div>
   if (isError) return null
 
-  const open = t => navigate(`/stock?ticker=${encodeURIComponent(t)}`)
   const block = data?.[tier] || { buys: [], avoids: [], scored: 0 }
   const active = TIERS.find(t => t.key === tier)
 
   return (
     <div className="card space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h2 className="font-semibold flex items-center gap-2">
-          <Sparkles size={18} className="text-green-400" />
+        <h2 className="text-lg font-semibold text-white">
           Top picks by company size
         </h2>
-        <span className="text-xs text-gray-500">
+        <span className="text-xs text-gray-400">
           {(data?.universe_scored ?? 0).toLocaleString('en-IN')} NSE stocks scored
         </span>
       </div>
@@ -158,27 +174,28 @@ export default function CapTierPicks({ n = 10 }) {
                        asOf={data?.scan?.finished_at} />
 
       {/* Tier selector */}
-      <div className="flex gap-1 overflow-x-auto scrollbar-none">
+      <div className="flex flex-wrap gap-1">
         {TIERS.map(t => (
           <button
             key={t.key}
             onClick={() => setTier(t.key)}
+            aria-pressed={tier === t.key}
             className={`shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              tier === t.key ? 'bg-green-600 text-white'
+              tier === t.key ? 'bg-green-700 text-white'
                              : 'bg-gray-800 hover:bg-gray-700 text-gray-300'}`}
           >
             {t.label}
-            <span className="ml-1.5 text-[10px] opacity-70">{data?.[t.key]?.scored ?? 0}</span>
+            <span className="ml-1.5 font-mono text-xs">{data?.[t.key]?.scored ?? 0}</span>
           </button>
         ))}
       </div>
-      <p className="text-[11px] text-gray-600 -mt-2">{active?.note}</p>
+      <p className="text-xs text-gray-400 -mt-2">{active?.note}</p>
 
       {/* Momentum carries 35% of the score and usually decides a large cap's
           rank, and its tested edge did not show among the largest, most liquid
           stocks (docs/MOMENTUM_ROBUSTNESS_RESULT_2026-09-18.md). */}
       {tier === 'large_cap' && (
-        <p className="text-[11px] text-amber-200/85 border-l-2 border-amber-700/70 pl-2.5 leading-relaxed">
+        <p className="text-xs text-amber-200/90 leading-relaxed max-w-[72ch]">
           Large-cap rankings lean mostly on momentum, and momentum&apos;s tested edge
           was not shown among the largest, most liquid stocks. Read these as the
           model&apos;s ordering, not as evidence.
@@ -192,29 +209,18 @@ export default function CapTierPicks({ n = 10 }) {
         </p>
       ) : (
         <>
-          <div>
-            <h3 className="section-title mb-2 text-green-400">
-              Top {Math.min(n, block.buys.length)} by model score
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-              {block.buys.map(r => <PickCard key={r.ticker} r={r} buy onOpen={open} />)}
-            </div>
-          </div>
-
+          <PickList title={`Top ${Math.min(n, block.buys.length)} by model score`} rows={block.buys} />
           {block.avoids.length > 0 && (
-            <div>
-              <h3 className="section-title mb-2 text-red-400">
-                Lowest {block.avoids.length} by model score
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-                {block.avoids.map(r => <PickCard key={r.ticker} r={r} buy={false} onOpen={open} />)}
-              </div>
-            </div>
+            <PickList title={`Lowest ${block.avoids.length} by model score`} rows={block.avoids} />
           )}
+          {/* The score's range, stated once rather than left to inference. */}
+          <p className="hidden min-[1400px]:block text-xs text-gray-400">
+            bars scaled per factor · momentum ±35, quality/sentiment ±25, value ±15
+          </p>
         </>
       )}
 
-      <p className="text-[11px] text-gray-600">
+      <p className="text-xs text-gray-400 leading-relaxed">
         Ranked by alpha score within each tier. Only momentum, one of four
         factors, has passed a historical test; the combined score has not been
         tested. Tiers follow the SEBI convention, by market-cap rank. Not

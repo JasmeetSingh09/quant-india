@@ -10,7 +10,7 @@ import { trackEvent, createShare } from '../api'
 import StarterHelp from '../components/StarterHelp'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend, BarChart, Bar, Cell, ReferenceLine } from 'recharts'
 import { InfoTip } from '../components/Term'
-import { Plus, Trash2, RefreshCw, TrendingUp, TrendingDown, Share2, Check } from 'lucide-react'
+import { Plus, Trash2, RefreshCw, TrendingUp, TrendingDown, Share2, Check, LineChart as LineChartIcon } from 'lucide-react'
 import Methodology from '../components/Methodology'
 
 // Commodities you can add to a simulation (friendly name → yfinance futures ticker)
@@ -66,10 +66,12 @@ function HoldingsInput({ holdings, setHoldings, capital = 100000 }) {
 
   return (
     <div>
-      <div className="flex gap-2 mb-2">
-        <input className="input" placeholder="Stock e.g. HDFCBANK" value={ticker} onChange={e => setTicker(e.target.value)} />
-        <input className="input w-24" type="number" placeholder="%" value={pct} onChange={e => setPct(e.target.value)} min="1" max="100" />
-        <button onClick={add} className="btn-primary"><Plus size={14}/></button>
+      {/* The stock field gets its own full row below 1280px, so its hint is
+          never cut ("Stock e.g. HDFCBAN…" at 390–1024, 18 Nov 2026). */}
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] xl:grid-cols-[minmax(0,1fr)_6rem_auto] gap-2 mb-2">
+        <input className="input col-span-2 xl:col-span-1" placeholder="Stock e.g. HDFCBANK" value={ticker} onChange={e => setTicker(e.target.value)} />
+        <input className="input" type="number" placeholder="%" value={pct} onChange={e => setPct(e.target.value)} min="1" max="100" />
+        <button onClick={add} className="btn-primary" aria-label="Add holding"><Plus size={14} aria-hidden="true"/></button>
       </div>
       {/* Commodity quick-add */}
       <div className="flex flex-wrap gap-1.5 mb-2">
@@ -274,8 +276,8 @@ export default function Simulator() {
           {TABS.map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-1.5 rounded text-sm font-medium transition-colors capitalize ${
-                tab===t ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-gray-200'
-              }`}>{t === 'realtime' ? '⚡ Real-time' : '📈 Historic'}</button>
+                tab===t ? 'bg-green-700 text-white' : 'text-gray-400 hover:text-gray-200'
+              }`}>{t === 'realtime' ? 'Real-time' : 'Historic'}</button>
           ))}
         </div>
       </div>
@@ -291,7 +293,7 @@ export default function Simulator() {
             </div>
             <div>
               <label className="label">Capital (₹)</label>
-              <input className="input" type="number" value={rtCapital} onChange={e => setRtCapital(Number(e.target.value))} />
+              <input className="input" type="number" aria-label="Capital (₹)" value={rtCapital} onChange={e => setRtCapital(Number(e.target.value))} />
             </div>
             <div>
               <label className="label">Holdings</label>
@@ -314,9 +316,19 @@ export default function Simulator() {
             {startMut.isError && <p className="text-red-400 text-xs">{String(startMut.error)}</p>}
           </div>
 
-          {/* Active simulations */}
-          <div className="space-y-3">
+          {/* Active simulations. With none yet, a quiet panel as tall as
+              the form beside it rather than a bare heading over nothing
+              (18 Nov 2026 review). */}
+          <div className="flex flex-col gap-3 min-w-0">
             <h2 className="font-semibold">Active Simulations</h2>
+            {/* Also when the list cannot be read (signed out, API down):
+                the same quiet panel, never a heading over nothing. */}
+            {!simList?.simulations?.length && (
+              <div aria-hidden="true"
+                   className="flex-1 min-h-[12rem] rounded-xl border border-dashed border-gray-800 bg-gray-900/30 flex items-center justify-center">
+                <LineChartIcon size={28} className="text-gray-700" />
+              </div>
+            )}
             {simList?.simulations?.map(s => (
               <div key={s.name}
                 className={`card-sm cursor-pointer transition-colors ${activeSimName===s.name?'border-green-500':'hover:border-gray-600'}`}
@@ -426,7 +438,7 @@ export default function Simulator() {
                       </div>
                     ) : (
                       <p className="text-xs text-gray-600 italic">
-                        📈 Value chart builds as the simulation auto-refreshes (every 60s). Check back to watch it grow.
+                        Value chart builds as the simulation auto-refreshes (every 60s). Check back to watch it grow.
                       </p>
                     )}
 

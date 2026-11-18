@@ -75,7 +75,7 @@ export default function Screener() {
         Sort by:
         {[['market_cap','Market Cap'],['pe_ratio','P/E'],['roe','ROE'],['revenue_growth','Rev Growth'],['dividend_yield','Div Yield']].map(([v,l])=>(
           <button key={v} onClick={()=>{ setSortBy(v); setTimeout(run,0) }}
-            className={`px-2 py-1 rounded ${sortBy===v?'bg-green-600 text-white':'bg-gray-800 hover:bg-gray-700'}`}>{l}</button>
+            className={`px-2 py-1 rounded ${sortBy===v?'bg-green-700 text-white':'bg-gray-800 hover:bg-gray-700'}`}>{l}</button>
         ))}
       </div>
 
