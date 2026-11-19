@@ -358,7 +358,6 @@ import sqlite_local
 from apscheduler.schedulers.background import BackgroundScheduler
 
 _DB_PATH = Path(os.environ.get("QUANT_DATA_DIR", str(Path(__file__).parent.parent))) / "quant_platform.db"
-_COOLDOWN_HOURS = 6   # don't re-alert the same user about the same stock more than once per 6h
 _alert_scheduler = None
 _alert_scheduler_started = False
 
@@ -391,6 +390,14 @@ def threshold_ok(pct) -> bool:
     return math.isfinite(v) and v > 0
 
 
+# Once per crossing (review fix, 19 Nov 2026). The threshold is measured from
+# the price when the stock was added, which never moves, so a stock that stays
+# past it used to be mailed again every 6 hours, around the clock. Now a row in
+# alert_log_user means "this user was told about this stock's current move":
+# no more mail while it stays past the threshold, and the row is cleared
+# (re-armed) only when a live price shows the move back INSIDE the threshold.
+# A check without a live price changes nothing.
+
 def _init_alert_log():
     conn = sqlite_local.connect(_DB_PATH)
     # Per user and stock. The old alert_log (one row per ticker for the single
@@ -407,16 +414,21 @@ def _init_alert_log():
     conn.close()
 
 
-def _recently_alerted(user_id: str, ticker: str) -> bool:
-    """True if this user was alerted about this ticker within the cooldown window."""
+def _already_alerted(user_id: str, ticker: str) -> bool:
+    """True if this user was already told about this stock's current move."""
     conn = sqlite_local.connect(_DB_PATH)
-    row = conn.execute("SELECT last_sent_at FROM alert_log_user WHERE user_id = ? AND ticker = ?",
+    row = conn.execute("SELECT 1 FROM alert_log_user WHERE user_id = ? AND ticker = ?",
                        (user_id, ticker)).fetchone()
     conn.close()
-    if not row:
-        return False
-    last = datetime.fromisoformat(row[0])
-    return (datetime.now() - last).total_seconds() < _COOLDOWN_HOURS * 3600
+    return bool(row)
+
+
+def _rearm(user_id: str, ticker: str):
+    """The move is back inside the threshold: the next crossing alerts again."""
+    conn = sqlite_local.connect(_DB_PATH)
+    conn.execute("DELETE FROM alert_log_user WHERE user_id = ? AND ticker = ?", (user_id, ticker))
+    conn.commit()
+    conn.close()
 
 
 def _mark_alerted(user_id: str, ticker: str):
@@ -427,6 +439,22 @@ def _mark_alerted(user_id: str, ticker: str):
     )
     conn.commit()
     conn.close()
+
+
+def forget_user(user_id: str) -> int:
+    """Delete this user's alert history (account deletion, 19 Nov 2026). The
+    table lives in the server's local SQLite file, not the main database, so
+    account_deletion calls this after its own transaction. Returns rows deleted."""
+    if not eligible_user_id(user_id):
+        return 0
+    _init_alert_log()
+    conn = sqlite_local.connect(_DB_PATH)
+    try:
+        cur = conn.execute("DELETE FROM alert_log_user WHERE user_id = ?", (user_id,))
+        conn.commit()
+        return cur.rowcount
+    finally:
+        conn.close()
 
 
 def _load_recipients() -> list:
@@ -464,9 +492,10 @@ def _sentiment_for(ticker: str) -> tuple:
 def run_watchlist_alert_check() -> list:
     """
     The automatic job: for each user who opted in to alerts, read THEIR
-    watchlist with live prices and, for any stock that breached its threshold
-    (and isn't in cooldown for that user), send a multi-signal email
-    (price + current sentiment + valuation) to THEIR address.
+    watchlist with live prices and, for any stock that has CROSSED its
+    threshold since they were last told, send a multi-signal email
+    (price + current sentiment + valuation) to THEIR address. Once per
+    crossing: re-armed only when a live price is back inside the threshold.
 
     Returns a list of what was sent or skipped (used by the scheduler log and
     the owner-only /alerts/run-check endpoint). It never contains an address;
@@ -499,9 +528,14 @@ def run_watchlist_alert_check() -> list:
             if not ticker or not threshold_ok(entry.get("price_alert_pct")):
                 continue
             if not entry.get("alert_triggered"):
+                # Back inside the threshold on a LIVE price: re-arm. With no
+                # live price (change_from_add_pct None) nothing is known, so
+                # nothing changes.
+                if entry.get("change_from_add_pct") is not None and _already_alerted(user_id, ticker):
+                    _rearm(user_id, ticker)
                 continue
-            if _recently_alerted(user_id, ticker):
-                sent.append({"user": who, "ticker": ticker, "status": "skipped (cooldown)"})
+            if _already_alerted(user_id, ticker):
+                sent.append({"user": who, "ticker": ticker, "status": "skipped (already alerted for this move)"})
                 continue
 
             if ticker not in sentiment_cache:
@@ -556,7 +590,7 @@ def start_alert_scheduler(interval_minutes: int = 30):
     _alert_scheduler.start()
     _alert_scheduler_started = True
     print(f"[Alerts] Auto-alert scheduler started ({interval_minutes}-min checks, "
-          f"{_COOLDOWN_HOURS}h cooldown per stock).")
+          f"one alert per threshold crossing).")
 
 
 def send_test_alert(to_email: str = None) -> dict:

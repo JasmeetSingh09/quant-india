@@ -37,7 +37,8 @@ git push -u origin main
      (512 MB) will crash on model load.
 4. Add your secrets under **Environment** (these are NOT in the repo):
    - `NEWS_API_KEY` = your NewsAPI key
-   - `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`, `GMAIL_RECEIVER` (optional, for alerts)
+   - `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD` (optional, for alerts; mail goes only to each
+     user's own confirmed, opted-in address — `GMAIL_RECEIVER` is no longer read)
    - `FRONTEND_URL` = leave blank for now; fill in after Step 3
 5. Click **Create**. First build takes ~10 min (it downloads FinBERT).
 6. When live, copy the URL, e.g. `https://quant-india-backend.onrender.com`.

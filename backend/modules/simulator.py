@@ -1149,8 +1149,14 @@ def remove_position(sim_name: str, ticker: str, user_id: str = "public") -> dict
 
 
 def delete_simulation(name: str, user_id: str = "public") -> dict:
-    """Delete a simulation and all its positions/snapshots (only if owned by this user)."""
+    """Delete a simulation and all its positions/snapshots (only if owned by this user).
+
+    Its share links go too (19 Nov 2026): a share row outliving its simulation
+    let a NEW simulation with the same name appear behind the old public link.
+    """
     _init_db()
+    from share import _init_db as _init_share_db
+    _init_share_db()            # the table may not exist yet on a fresh database
     conn = get_conn()
     count = conn.execute("SELECT COUNT(*) FROM simulations WHERE name = ? AND user_id = ?",
                          (name, user_id)).fetchone()[0]
@@ -1168,6 +1174,7 @@ def delete_simulation(name: str, user_id: str = "public") -> dict:
     conn.execute("DELETE FROM sim_positions WHERE sim_name = ? AND user_id = ?", (name, user_id))
     conn.execute("DELETE FROM sim_snapshots WHERE sim_name = ? AND user_id = ?", (name, user_id))
     conn.execute("DELETE FROM simulations WHERE name = ? AND user_id = ?", (name, user_id))
+    conn.execute("DELETE FROM shared_portfolios WHERE sim_name = ? AND user_id = ?", (name, user_id))
     conn.commit()
     conn.close()
     return {"status": "deleted", "name": name}

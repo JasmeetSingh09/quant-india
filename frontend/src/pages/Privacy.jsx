@@ -23,13 +23,14 @@ export default function Privacy({ standalone = false }) {
           </li>
           <li>
             <b className="text-white">Email preferences.</b> If you turn on the weekly summary or
-            watchlist alerts, we store your account's confirmed email address for that. Turning either
-            off deletes the stored address.
+            watchlist alerts, we store your account's confirmed email address for that. For alerts we
+            also keep which of your stocks were last alerted, so each move is mailed only once. Turning
+            either off deletes the stored address (and, for alerts, that history).
           </li>
           <li>
             <b className="text-white">Product events.</b> For accounts that confirmed they are 18 or
             older, the app records which features are used (for example "simulation started"), with
-            the account id and the date. These events never include your holdings, the stocks you
+            the account id and the time. These events never include your holdings, the stocks you
             chose, your name or your email.
           </li>
           <li>
@@ -46,9 +47,20 @@ export default function Privacy({ standalone = false }) {
 
       <Section title="In your browser">
         <p>
-          Your sign-in session, the random id above and a few display settings (for example a collapsed
-          sidebar or the tab you last opened) are saved in your browser's local storage. Signing out
-          ends the session; clearing your browser's site data removes the rest.
+          Saved in your browser's local storage, on this device only:
+        </p>
+        <List>
+          <li>your sign-in session and the random id above;</li>
+          <li>display settings, such as a collapsed sidebar, the tabs you last opened and whether you answered the email prompt;</li>
+          <li>
+            what you typed into the tools, so it is still there when you come back: the stocks, weights,
+            amounts and dates in the Simulator (with your last backtest result), in Portfolio Lab
+            (Optimize, Simulate, Portfolio Test) and in Advanced (Risk, Options).
+          </li>
+        </List>
+        <p>
+          Tool inputs are sent to our server only when you run that tool. Signing out ends the session
+          but does not clear the tool inputs; clearing your browser's site data removes everything above.
         </p>
       </Section>
 
@@ -60,8 +72,9 @@ export default function Privacy({ standalone = false }) {
             something to report.
           </li>
           <li>
-            Watchlist alerts, only if you turned them on: when a stock on your own watchlist moves past
-            the threshold you set, at most once per stock every 6 hours.
+            Watchlist alerts, only if you turned them on: one email when a stock on your own watchlist
+            crosses the threshold you set. The same stock can alert again only after its move has come
+            back inside the threshold.
           </li>
         </List>
         <p>Summaries and alerts go only to your own confirmed address. You can turn them off at any time.</p>
@@ -84,7 +97,7 @@ export default function Privacy({ standalone = false }) {
       <Section title="How long we keep it">
         <List>
           <li>Account data, what you create and product events: until you delete your account.</li>
-          <li>Email addresses for summaries and alerts: until you turn them off.</li>
+          <li>Email addresses for summaries and alerts, and the alert history: until you turn them off or delete your account.</li>
         </List>
       </Section>
 
@@ -93,13 +106,15 @@ export default function Privacy({ standalone = false }) {
           <li>See and change your data in the app.</li>
           <li>
             <b className="text-white">Delete your account</b> from the sidebar. This erases your watchlist,
-            holdings, simulations, theses, share links, email settings, product events and sign-in at once,
+            holdings, simulations, theses, share links, email settings, alert history, product events and sign-in at once,
             and cannot be undone. One record stays: a log of the app's own portfolio warnings keeps only a
             one-way hash of a portfolio, which cannot be linked back to you once your holdings are deleted.
           </li>
           <li>
             <b className="text-white">Share links</b> show a simulated portfolio's holdings, weights and
-            returns to anyone with the link, never your email or rupee amounts. You can revoke a link at any time.
+            returns to anyone with the link, never your email or rupee amounts. To end a link, press the
+            share icon on that simulation and choose Stop sharing; deleting the simulation or your account
+            also ends it.
           </li>
         </List>
       </Section>

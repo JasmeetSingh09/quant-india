@@ -159,11 +159,11 @@ def send_all_digests() -> dict:
             if "skip" in d:
                 skipped.append(uid[:8]); continue
 
-            # HARD STOP. We do not store per-user email addresses — the address
-            # only exists inside a request's JWT. Calling send_email without an
-            # explicit recipient falls back to GMAIL_RECEIVER, which would post
-            # every user's holdings to a single inbox. That is a privacy breach,
-            # not a delivery bug, so the batch refuses rather than guessing.
+            # HARD STOP. Only users who opted in have a stored address
+            # (user_prefs). Without one there is nobody to send to: send_email
+            # has no fallback inbox any more (GMAIL_RECEIVER is no longer read,
+            # 19 Nov 2026), and guessing would post someone's holdings to the
+            # wrong inbox — a privacy breach, not a delivery bug.
             addr = _address_for(uid)
             if not addr:
                 no_address.append(uid[:8]); continue

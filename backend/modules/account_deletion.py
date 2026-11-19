@@ -9,6 +9,9 @@ What is deleted: every row keyed by the user's id in the tables below, then the
 Supabase sign-in record itself (auth.users), all in ONE transaction, so a
 failure part-way leaves nothing half-deleted.
 
+Also deleted, after the transaction: the alerts job's per-user history in the
+server's local SQLite file (alerts.alert_log_user, see alerts.forget_user).
+
 What is kept, and why:
   * advice_log stores only a hash of (holdings, user id), never the holdings
     or the id themselves (advice_log.portfolio_key). Recomputing it needs the
@@ -82,4 +85,13 @@ def delete_account(user_id: str) -> dict:
         raise
     finally:
         conn.close()
+    # The alerts job's per-user history (which stocks were alerted, when) lives
+    # in the server's local SQLite file, outside the transaction above
+    # (19 Nov 2026). The account is already gone, so a failure here is
+    # reported in the counts rather than undoing anything.
+    try:
+        from alerts import forget_user
+        counts["alert_log_user"] = forget_user(user_id)
+    except Exception as e:
+        counts["alert_log_user"] = f"not deleted ({type(e).__name__})"
     return {"status": "deleted", "rows_deleted": counts}

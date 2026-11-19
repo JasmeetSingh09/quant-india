@@ -6,7 +6,7 @@ import Spinner from '../components/Spinner'
 import PortfolioCoach from '../components/PortfolioCoach'
 import ShockLab from '../components/ShockLab'
 import ErrorBoundary from '../components/ErrorBoundary'
-import { trackEvent, createShare } from '../api'
+import { trackEvent, createShare, revokeShare } from '../api'
 import StarterHelp from '../components/StarterHelp'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend, BarChart, Bar, Cell, ReferenceLine } from 'recharts'
 import { InfoTip } from '../components/Term'
@@ -230,14 +230,25 @@ export default function Simulator() {
   // Sharing is opt-in per simulation: the link only exists once the owner asks
   // for it, and the copied URL is the public page, not an API path.
   const [sharedLink, setSharedLink] = useState(null)
+  const [sharedSim, setSharedSim] = useState(null)
+  const [shareStopped, setShareStopped] = useState(false)
   const shareMut = useMutation({
     mutationFn: createShare,
-    onSuccess: d => {
+    onSuccess: (d, simName) => {
       const url = `${window.location.origin}/s/${d.token}`
-      setSharedLink(url)
-      try { navigator.clipboard?.writeText(url) } catch { /* clipboard may be blocked */ }
+      setSharedLink(url); setSharedSim(simName); setShareStopped(false)
+      // writeText returns a promise that rejects when the browser blocks the
+      // clipboard; the link is shown on screen either way.
+      try { navigator.clipboard?.writeText(url)?.catch(() => {}) } catch { /* clipboard may be blocked */ }
       trackEvent('portfolio_shared')
     },
+  })
+
+  // Stop sharing (19 Nov 2026): the share icon shows the existing link again,
+  // and this ends it — the public page then shows nothing.
+  const unshareMut = useMutation({
+    mutationFn: revokeShare,
+    onSuccess: () => { setSharedLink(null); setShareStopped(true) },
   })
 
   const deleteMut = useMutation({
@@ -338,9 +349,11 @@ export default function Simulator() {
                   <div className="flex items-center gap-2 shrink-0">
                   <button onClick={e => { e.stopPropagation(); shareMut.mutate(s.name) }}
                     title="Get a public link to this portfolio"
-                    className="text-gray-600 hover:text-green-400"><Share2 size={13}/></button>
+                    aria-label={`Share ${s.name}`}
+                    className="p-1.5 -m-1 rounded text-gray-600 hover:text-green-400"><Share2 size={13}/></button>
                   <button onClick={e => { e.stopPropagation(); deleteMut.mutate(s.name) }}
-                    className="text-gray-600 hover:text-red-400"><Trash2 size={13}/></button>
+                    aria-label={`Delete ${s.name}`}
+                    className="p-1.5 -m-1 rounded text-gray-600 hover:text-red-400"><Trash2 size={13}/></button>
                   </div>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">₹{s.initial_value?.toLocaleString('en-IN')} · Started {s.started_at?.slice(0,10)}</p>
@@ -357,7 +370,15 @@ export default function Simulator() {
                   Anyone with this link sees the holdings and returns — never your
                   name, email or amounts.
                 </p>
+                <button onClick={() => unshareMut.mutate(sharedSim)} disabled={unshareMut.isPending}
+                  className="btn-ghost text-xs mt-2">
+                  {unshareMut.isPending ? 'Stopping…' : 'Stop sharing'}
+                </button>
+                {unshareMut.isError && <p className="text-[11px] text-red-400 mt-1" role="alert">Could not stop sharing. Try again.</p>}
               </div>
+            )}
+            {shareStopped && !sharedLink && (
+              <p className="text-xs text-gray-400" role="status">Sharing stopped. The link no longer opens this portfolio.</p>
             )}
             {shareMut.isError && <p className="banner-error text-xs">{String(shareMut.error)}</p>}
 

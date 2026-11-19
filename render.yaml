@@ -6,7 +6,6 @@
 ##        FRONTEND_URL        = https://quant-india-frontend.onrender.com   ← your real frontend URL
 ##        GMAIL_ADDRESS       = (optional, for email alerts)
 ##        GMAIL_APP_PASSWORD  = (optional)
-##        GMAIL_RECEIVER      = (optional)
 ##   2. In the quant-india-frontend service → Environment:
 ##        VITE_API_URL        = https://quant-india-backend.onrender.com    ← your real backend URL
 ##
@@ -31,8 +30,6 @@ services:
       - key: GMAIL_ADDRESS
         sync: false
       - key: GMAIL_APP_PASSWORD
-        sync: false
-      - key: GMAIL_RECEIVER
         sync: false
     disk:
       name: quant-india-data

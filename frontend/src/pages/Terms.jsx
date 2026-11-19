@@ -56,8 +56,9 @@ export default function Terms({ standalone = false }) {
 
       <Section title="Shared portfolios">
         <p>
-          A share link shows your simulated portfolio to anyone who has the link. You can revoke it at any
-          time. Do not share anything you would not want public.
+          A share link shows your simulated portfolio to anyone who has the link. To end it, press the
+          share icon on that simulation and choose Stop sharing; deleting the simulation or your account
+          also ends it. Do not share anything you would not want public.
         </p>
       </Section>
 

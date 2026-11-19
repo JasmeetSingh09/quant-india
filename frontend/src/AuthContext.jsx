@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { ageConfirmationMetadata } from './ageGate'
@@ -13,7 +13,12 @@ const resetRedirect = () => `${window.location.origin}/reset-password`
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
+  // navigate changes on every route change under BrowserRouter; kept in a ref
+  // so the auth subscription below is made once, not again per navigation
+  // (review fix, 19 Nov 2026).
   const navigate = useNavigate()
+  const navigateRef = useRef(navigate)
+  navigateRef.current = navigate
 
   useEffect(() => {
     // Load any persisted session on first mount…
@@ -28,11 +33,11 @@ export function AuthProvider({ children }) {
       // password. If the link landed anywhere else (Supabase falls back to
       // the Site URL when the redirect is not allowed), take them there.
       if (event === 'PASSWORD_RECOVERY' && window.location.pathname !== '/reset-password') {
-        navigate('/reset-password', { replace: true })
+        navigateRef.current('/reset-password', { replace: true })
       }
     })
     return () => sub.subscription.unsubscribe()
-  }, [navigate])
+  }, [])
 
   const value = {
     session,

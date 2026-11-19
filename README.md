@@ -108,7 +108,6 @@ Frontend is live at `http://localhost:5173`. The Vite dev server proxies `/api` 
 | `NEWS_API_KEY` | Yes | [newsapi.org](https://newsapi.org) free key |
 | `GMAIL_ADDRESS` | No | Gmail address for price/signal alerts |
 | `GMAIL_APP_PASSWORD` | No | Gmail app password (not your main password) |
-| `GMAIL_RECEIVER` | No | Email address to receive alerts |
 | `FRONTEND_URL` | No | Set in production for CORS (your Vercel URL) |
 
 ---

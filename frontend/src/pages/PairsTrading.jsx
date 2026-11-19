@@ -21,14 +21,14 @@ function TickerList({ tickers, setTickers }) {
   return (
     <div>
       <div className="flex gap-2 mb-2">
-        <input className="input" placeholder="Add ticker" value={t} onChange={e=>setT(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()} />
-        <button onClick={add} className="btn-ghost"><Plus size={14}/></button>
+        <input className="input" placeholder="Add ticker" aria-label="Add ticker to scan" value={t} onChange={e=>setT(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()} />
+        <button onClick={add} className="btn-ghost" aria-label="Add ticker"><Plus size={14}/></button>
       </div>
       <div className="flex flex-wrap gap-2">
         {tickers.map(x => (
           <span key={x} className="flex items-center gap-1 px-2 py-1 bg-gray-800 rounded text-xs font-mono text-green-400">
             {x.replace('.NS','')}
-            <button onClick={()=>setTickers(p=>p.filter(y=>y!==x))} className="hover:text-red-400 ml-1">×</button>
+            <button onClick={()=>setTickers(p=>p.filter(y=>y!==x))} className="hover:text-red-400 ml-1" aria-label={`Remove ${x.replace('.NS','')}`}>×</button>
           </span>
         ))}
       </div>
@@ -45,14 +45,16 @@ export default function PairsTrading() {
   const ana  = useMutation({ mutationFn: analyzePair })
   const bt   = useMutation({ mutationFn: backtestPair })
 
-  const actionColor = act => act==='long'?'text-green-400':act==='short'?'text-red-400':'text-gray-400'
+  // One neutral accent for a stretched spread, either way: green/red read as
+  // buy/sell, and this panel describes the spread (19 Nov 2026).
+  const actionColor = act => (act==='long'||act==='short') ? 'text-amber-300' : 'text-gray-300'
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2"><GitCompareArrows size={24} className="text-green-400"/> Pairs Trading</h1>
         <p className="text-gray-400 text-sm mt-0.5">
-          Statistical arbitrage — market-neutral. Find cointegrated pairs, then trade their spread when it diverges.
+          Statistical arbitrage — market-neutral. Find cointegrated pairs and see how far their spread has moved from its average.
         </p>
       </div>
 
@@ -86,12 +88,12 @@ export default function PairsTrading() {
           <div className="card">
             <div className="flex items-end gap-2 mb-4">
               <div className="flex-1">
-                <label className="label">Stock A</label>
-                <input className="input" value={a} onChange={e=>setA(e.target.value.toUpperCase())} />
+                <label className="label" htmlFor="pair-a">Stock A</label>
+                <input className="input" id="pair-a" value={a} onChange={e=>setA(e.target.value.toUpperCase())} />
               </div>
               <div className="flex-1">
-                <label className="label">Stock B</label>
-                <input className="input" value={b} onChange={e=>setB(e.target.value.toUpperCase())} />
+                <label className="label" htmlFor="pair-b">Stock B</label>
+                <input className="input" id="pair-b" value={b} onChange={e=>setB(e.target.value.toUpperCase())} />
               </div>
               <button className="btn-primary" onClick={()=>ana.mutate({ stock_a:a, stock_b:b })} disabled={ana.isPending}>Analyse</button>
               <button className="btn-ghost" onClick={()=>bt.mutate({ stock_a:a, stock_b:b })} disabled={bt.isPending}>Backtest</button>
@@ -106,11 +108,11 @@ export default function PairsTrading() {
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   <div className="card-sm"><p className="stat-label">Hedge ratio<InfoTip k="hedge_ratio" /></p><p className="stat-value">{ana.data.hedge_ratio}</p></div>
                   <div className="card-sm"><p className="stat-label">Linkage test<InfoTip k="cointegration" /></p><p className="stat-value">{ana.data.cointegration_pvalue}</p>
-                    <p className={`text-xs ${ana.data.is_cointegrated?'positive':'negative'}`}>{ana.data.is_cointegrated?'linked ✓ (tradeable)':'not linked'}</p></div>
+                    <p className={`text-xs ${ana.data.is_cointegrated?'positive':'negative'}`}>{ana.data.is_cointegrated?'linked ✓ (cointegrated)':'not linked'}</p></div>
                   <div className="card-sm"><p className="stat-label">Snap-back time<InfoTip k="half_life" /></p><p className="stat-value">{ana.data.half_life_days ?? '∞'}<span className="text-xs text-gray-500"> d</span></p></div>
                   <div className="card-sm"><p className="stat-label">Gap stretch<InfoTip k="zscore" /></p><p className="stat-value">{ana.data.current_zscore}</p></div>
                 </div>
-                <div className={`p-3 rounded-lg border ${ana.data.action==='long'?'border-green-700 bg-green-900/20':ana.data.action==='short'?'border-red-700 bg-red-900/20':'border-gray-700 bg-gray-800'}`}>
+                <div className={`p-3 rounded-lg border ${(ana.data.action==='long'||ana.data.action==='short')?'border-amber-700/70 bg-amber-900/10':'border-gray-700 bg-gray-800'}`}>
                   <p className={`font-semibold ${actionColor(ana.data.action)}`}>{ana.data.signal}</p>
                   <p className="text-xs text-gray-400 mt-1">{ana.data.interpretation}</p>
                 </div>
@@ -121,8 +123,8 @@ export default function PairsTrading() {
                     <XAxis dataKey="date" stroke="#6b7280" fontSize={9} tick={{fontSize:9}} minTickGap={40} />
                     <YAxis stroke="#6b7280" fontSize={10} domain={[-4,4]} />
                     <Tooltip contentStyle={{background:'#111827',border:'1px solid #374151',borderRadius:8}} />
-                    <ReferenceLine y={2}  stroke="#dc2626" strokeDasharray="4 4" label={{value:'+2σ short',fill:'#dc2626',fontSize:9}} />
-                    <ReferenceLine y={-2} stroke="#16a34a" strokeDasharray="4 4" label={{value:'-2σ long',fill:'#16a34a',fontSize:9}} />
+                    <ReferenceLine y={2}  stroke="#9ca3af" strokeDasharray="4 4" label={{value:'+2σ',fill:'#9ca3af',fontSize:9}} />
+                    <ReferenceLine y={-2} stroke="#9ca3af" strokeDasharray="4 4" label={{value:'−2σ',fill:'#9ca3af',fontSize:9}} />
                     <ReferenceLine y={0}  stroke="#6b7280" />
                     <Line type="monotone" dataKey="z" stroke="#eab308" dot={false} strokeWidth={1.5} />
                   </LineChart>

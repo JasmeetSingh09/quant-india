@@ -70,6 +70,24 @@ for uid, tid in ((A, 1), (B, 2)):
 conn.commit()
 conn.close()
 
+# The alerts job's per-user history lives in the server's local SQLite file,
+# outside USER_TABLES (19 Nov 2026). Seed one row each for A and B.
+import alerts                               # noqa: E402
+assert str(alerts._DB_PATH).startswith(TMP), alerts._DB_PATH
+alerts._init_alert_log()
+for uid in (A, B):
+    alerts._mark_alerted(uid, "INFY.NS")
+
+
+def _alert_rows(uid):
+    import sqlite3
+    c = sqlite3.connect(alerts._DB_PATH)
+    try:
+        return c.execute("SELECT COUNT(*) FROM alert_log_user WHERE user_id = ?", (uid,)).fetchone()[0]
+    finally:
+        c.close()
+
+
 print("\n1. COVERAGE: every per-user table is in the deletion")
 # The production schema's user_id tables (Supabase, 2026-10-29). A new one must
 # be added both here and to USER_TABLES.
@@ -94,6 +112,9 @@ for table, where in ad.USER_TABLES:
     ok(a_left == 0, f"{table}: none of A's rows remain", str(a_left))
     ok(b_left >= 1, f"{table}: B's rows remain", str(b_left))
 conn.close()
+ok(r["rows_deleted"].get("alert_log_user") == 1 and _alert_rows(A) == 0,
+   "A's alert history (local alert_log_user) is deleted", str(r["rows_deleted"].get("alert_log_user")))
+ok(_alert_rows(B) == 1, "B's alert history remains")
 
 print("\n3. ANONYMOUS, UNVERIFIED AND UNCONFIRMED CALLS ARE REFUSED")
 for uid in ("public", f"unverified:{B}", ""):

@@ -2855,9 +2855,16 @@ def me_alert_opt_in(me: dict = Depends(require_mail_identity)):
 
 @app.delete("/me/alert-pref")
 def me_alert_opt_out(user_id: str = Depends(current_user_id)):
-    """Opt out of watchlist alerts — deletes the stored address."""
+    """Opt out of watchlist alerts — deletes the stored address and the
+    alert history (which stocks were last alerted; review fix, 19 Nov 2026)."""
     from user_prefs import alert_opt_out
-    return alert_opt_out(user_id)
+    r = alert_opt_out(user_id)
+    try:
+        from alerts import forget_user
+        forget_user(user_id)
+    except Exception:
+        pass
+    return r
 
 
 @app.delete("/me/email-pref")

@@ -10,14 +10,17 @@ V4-02 option (a), and the "not investment advice" line in every e-mail).
   3. the alerts job mails only users who opted in to alerts, each about their
      own watchlist, each at their own stored address; the anonymous "public"
      list and unverified ids never cause mail; a 0% threshold never fires;
-     a per-user cooldown holds;
+     one alert per threshold crossing per user (re-armed only back inside);
   4. the alert opt-in is verified + confirmed only, never returns the address,
      and opting out deletes it; account deletion covers it;
   5. /events/track stores an event only for a verified account whose sign-up
      confirmed 18+ (user_metadata flag); anonymous, unverified and unflagged
      callers store nothing;
   6. every alert e-mail carries "Educational research tool, not investment
-     advice; not SEBI-registered."
+     advice; not SEBI-registered.";
+  7. pairs trading describes the spread, never "BUY/SELL/LONG/SHORT";
+  8. deleting a simulation deletes its share link, so a new simulation with
+     the same name never appears behind the old link; Stop sharing ends one.
 
 Offline: temporary SQLite, no network, no model, no mail leaves the process.
 
@@ -217,14 +220,50 @@ ok(SENT and NOT_ADVICE in SENT[0][1], "the alert e-mail says it is not investmen
 
 SENT.clear()
 res = alerts.run_watchlist_alert_check()
-ok(not SENT and any(r.get("status") == "skipped (cooldown)" for r in res),
-   "a second run within the cooldown sends nothing", res)
+ok(not SENT and any(r.get("status") == "skipped (already alerted for this move)" for r in res),
+   "a second run while the stock stays past its threshold sends nothing", res)
 
-# Bob opting in starts his own alerts; Alice's cooldown is hers alone.
+print("\n3b. ONCE PER CROSSING (re-armed only back inside the threshold)")
+# Hours pass with INFY still past its threshold: still no new mail (the old
+# 6-hour cooldown mailed again every 6 hours, around the clock).
+import sqlite3 as _sq              # noqa: E402
+_c = _sq.connect(alerts._DB_PATH)
+_c.execute("UPDATE alert_log_user SET last_sent_at = '2000-01-01T00:00:00'")
+_c.commit(); _c.close()
+SENT.clear()
+for _ in range(3):
+    alerts.run_watchlist_alert_check()
+ok(not SENT, "a stock that stays past its threshold is never mailed again, however long it stays", SENT)
+
+INFY = WATCHLISTS["u-alice"][0]
+# A check with no live price (change unknown) must not re-arm.
+INFY.update(alert_triggered=False, change_from_add_pct=None)
+alerts.run_watchlist_alert_check()
+ok(alerts._already_alerted("u-alice", "INFY.NS"), "a check without a live price does not re-arm")
+INFY.update(alert_triggered=True, change_from_add_pct=6.2)
+SENT.clear()
+alerts.run_watchlist_alert_check()
+ok(not SENT, "so the same move is still not mailed again after the gap")
+
+# Back inside the threshold on a live price: re-armed, nothing sent.
+INFY.update(alert_triggered=False, change_from_add_pct=2.0)
+SENT.clear()
+alerts.run_watchlist_alert_check()
+ok(not SENT and not alerts._already_alerted("u-alice", "INFY.NS"),
+   "back inside the threshold: re-armed, no mail")
+# Crosses again: one new alert.
+INFY.update(alert_triggered=True, change_from_add_pct=-5.5)
+SENT.clear()
+alerts.run_watchlist_alert_check()
+alerts.run_watchlist_alert_check()
+ok([s[0] for s in SENT] == ["alice@example.com"], "a new crossing sends exactly one new alert", [s[0] for s in SENT])
+ok(not hasattr(alerts, "_COOLDOWN_HOURS"), "no time-based cooldown remains")
+
+# Bob opting in starts his own alerts; Alice's alert state is hers alone.
 user_prefs.alert_opt_in("u-bob", "bob@example.com")
 SENT.clear()
 alerts.run_watchlist_alert_check()
-ok([s[0] for s in SENT] == ["bob@example.com"], "Bob's cooldown is separate from Alice's", [s[0] for s in SENT])
+ok([s[0] for s in SENT] == ["bob@example.com"], "Bob's alert state is separate from Alice's", [s[0] for s in SENT])
 
 r = user_prefs.alert_opt_out("u-bob")
 ok(r.get("deleted") is True and ("u-bob", "bob@example.com") not in user_prefs.alert_recipients(),
@@ -308,6 +347,76 @@ ok(SENT and NOT_ADVICE in SENT[0][1] and "sender@example.com" not in SENT[0][1].
 import inspect                  # noqa: E402
 import weekly_digest            # noqa: E402
 ok("_not_advice()" in inspect.getsource(weekly_digest.build_digest), "the weekly summary carries it")
+
+print("\n8. DELETING A SIMULATION ENDS ITS SHARE LINK (review fix, 19 Nov 2026)")
+import simulator                # noqa: E402
+import share                    # noqa: E402
+simulator._init_db(); share._init_db()
+
+
+def _sim(uid, name):
+    c = db.get_conn()
+    c.execute("INSERT INTO simulations (user_id, name, initial_value, started_at) VALUES (?,?,?,?)",
+              (uid, name, 100000, "2026-11-01T00:00:00"))
+    c.commit(); c.close()
+
+
+def _share(uid, name, tok):
+    c = db.get_conn()
+    c.execute("INSERT INTO shared_portfolios (token, user_id, sim_name, created_at) VALUES (?,?,?,?)",
+              (tok, uid, name, "2026-11-01T00:00:00"))
+    c.commit(); c.close()
+
+
+def _share_rows(uid, name):
+    c = db.get_conn()
+    try:
+        return c.execute("SELECT COUNT(*) FROM shared_portfolios WHERE user_id = ? AND sim_name = ?",
+                         (uid, name)).fetchone()[0]
+    finally:
+        c.close()
+
+
+_sim("u-alice", "Growth"); _share("u-alice", "Growth", "tok-alice-growth")
+_sim("u-bob", "Growth"); _share("u-bob", "Growth", "tok-bob-growth")
+r = simulator.delete_simulation("Growth", user_id="u-alice")
+ok(r.get("status") == "deleted" and _share_rows("u-alice", "Growth") == 0,
+   "deleting a simulation deletes its share link", r)
+ok(_share_rows("u-bob", "Growth") == 1, "another user's same-named simulation keeps its link")
+_sim("u-alice", "Growth")
+_c = db.get_conn()
+_tok = _c.execute("SELECT COUNT(*) FROM shared_portfolios WHERE token = 'tok-alice-growth'").fetchone()[0]
+_c.close()
+ok(_tok == 0 and "error" in share.get_shared("tok-alice-growth"),
+   "a new simulation with the same name is NOT reachable through the old link (the token is gone)")
+r = share.revoke_share("Growth", user_id="u-bob")
+ok(r.get("revoked") is True and "error" in share.get_shared("tok-bob-growth"),
+   "Stop sharing (revoke) ends a link")
+
+print("\n7. PAIRS: THE SPREAD IS DESCRIBED, NEVER AN INSTRUCTION (review fix, 19 Nov 2026)")
+import re                       # noqa: E402
+import numpy as np              # noqa: E402
+import pandas as pd             # noqa: E402
+import pairs_trading            # noqa: E402
+
+_rng = np.random.default_rng(7)
+_idx = pd.bdate_range("2025-01-01", periods=260)
+_b = pd.Series(100 + np.cumsum(_rng.normal(0, 1, 260)), index=_idx)
+_noise = _rng.normal(0, 0.5, 260)
+IMPERATIVE = re.compile(r"\b(BUY|SELL|LONG|SHORT|CLOSE|HOLD|trade)\b", re.I)
+for push, word in ((+6.0, "above"), (-6.0, "below"), (0.0, None)):
+    _a = _b * 1.0 + _noise
+    _a.iloc[-1] = _b.iloc[-1] + push
+    pairs_trading._prices = lambda t, s, e, _a=_a: pd.DataFrame({"AAA.NS": _a, "BBB.NS": _b})
+    r = pairs_trading.analyze_pair("AAA.NS", "BBB.NS")
+    text = r.get("signal", "") + " " + r.get("interpretation", "")
+    ok("error" not in r and not IMPERATIVE.search(text),
+       f"spread {word or 'near its mean'}: no buy/sell/long/short/trade words", text[:140])
+    if word:
+        ok(f"{word} its average" in r["signal"] and "AAA.NS" in r["signal"] and "σ" in r["signal"],
+           f"spread {word}: says where the spread is, with the size in σ", r["signal"])
+        ok(r["current_zscore"] is not None and r["hedge_ratio"] is not None,
+           f"spread {word}: the statistics are kept")
 
 print("\n" + "=" * 60)
 print(f"passed {len(PASS)}, failed {len(FAIL)}")

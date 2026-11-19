@@ -159,10 +159,12 @@ def analyze_pair(
     exit_z:  float = 0.5,
 ) -> dict:
     """
-    Analyse a pair and return the current trading signal.
+    Analyse a pair and describe where its spread stands now.
 
-    Computes hedge ratio, spread, z-score, cointegration p-value, half-life,
-    and tells you what the strategy says to do RIGHT NOW.
+    Computes hedge ratio, spread, z-score, cointegration p-value and half-life.
+    The `signal` text DESCRIBES the spread; it never tells anyone to buy or sell
+    (neutral wording, 19 Nov 2026). `action` keeps its machine codes
+    (long/short/flat/hold) for the band the spread is in.
     """
     from statsmodels.tsa.stattools import coint
 
@@ -188,18 +190,22 @@ def analyze_pair(
 
     half_life = _half_life(spread)
 
-    # Current signal
+    # Where the spread stands — a description, never an instruction
+    # (decided 19 Nov 2026: no buy/sell imperatives in the app's wording).
     if current_z > entry_z:
-        signal = f"SHORT spread: SELL {stock_a}, BUY {stock_b}"
+        signal = (f"Spread is {current_z:.1f}σ above its average: {stock_a} has run "
+                  f"ahead of {stock_b} compared with their history")
         action = "short"
     elif current_z < -entry_z:
-        signal = f"LONG spread: BUY {stock_a}, SELL {stock_b}"
+        signal = (f"Spread is {abs(current_z):.1f}σ below its average: {stock_a} has "
+                  f"fallen behind {stock_b} compared with their history")
         action = "long"
     elif abs(current_z) < exit_z:
-        signal = "CLOSE / FLAT — spread near its mean"
+        signal = "Spread is near its average"
         action = "flat"
     else:
-        signal = "HOLD — spread between entry and exit bands"
+        signal = (f"Spread is {abs(current_z):.1f}σ {'above' if current_z > 0 else 'below'} "
+                  f"its average, between the ±{exit_z}σ and ±{entry_z}σ bands")
         action = "hold"
 
     # z-score history for charting
@@ -228,8 +234,9 @@ def analyze_pair(
             f"{'above' if current_z > 0 else 'below'} its mean. "
             + (f"This pair reverts halfway to its mean in ~{half_life:.0f} trading days. "
                if half_life != float('inf') else "")
-            + (f"Signal: {signal}." if action in ('long','short') else
-               "No trade right now — wait for the spread to stretch past the entry band.")
+            + (f"That is past the ±{entry_z}σ band; the backtest shows how a rule "
+               f"acting at that band would have done in the past." if action in ('long', 'short') else
+               f"That is inside the ±{entry_z}σ band.")
         ),
         "disclaimer": "Signal model only, not financial advice.",
     }

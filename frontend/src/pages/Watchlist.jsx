@@ -24,9 +24,9 @@ function AlertEmails() {
         <div className="min-w-0">
           <h2 className="font-semibold">Email alerts {isLoading ? '' : on ? 'are on' : 'are off'}</h2>
           <p className="text-sm text-gray-400 mt-1 leading-relaxed">
-            Get an email when a stock on this watchlist moves past its alert threshold, at most once per
-            stock every 6 hours. It goes to your account's confirmed email address; turning alerts off
-            deletes that address.
+            Get one email when a stock on this watchlist crosses its alert threshold. It can alert again
+            only after its move has come back inside the threshold. It goes to your account's confirmed
+            email address; turning alerts off deletes that address.
           </p>
           {mut.isError && (
             <p className="text-sm text-red-400 mt-2" role="alert">
