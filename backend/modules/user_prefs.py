@@ -100,3 +100,85 @@ def address_for(user_id: str):
         return row[0] if row else None
     except Exception:
         return None
+
+
+# ---------------------------------------------------------------------------
+# Watchlist price alerts: a separate, explicit opt-in (V4-04 / R4, 19 Nov 2026)
+# ---------------------------------------------------------------------------
+# Consenting to the weekly summary is not consenting to price alerts, so alerts
+# have their own row. Same rules as above: the address comes only from the
+# caller's verified token and the account's confirmed e-mail
+# (auth.require_mail_identity), opting out deletes the row, and the automatic
+# alert job (alerts.run_watchlist_alert_check) mails nobody else.
+
+def _init_alert_db():
+    conn = get_conn()
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS alert_emails (
+            user_id     TEXT PRIMARY KEY,
+            email       TEXT NOT NULL,
+            opted_in_at TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+
+def _real_user(user_id) -> bool:
+    return (isinstance(user_id, str) and bool(user_id) and user_id != "public"
+            and not user_id.startswith("unverified:"))
+
+
+def alert_opt_in(user_id: str, email: str) -> dict:
+    """Record consent to watchlist alerts. Email from the verified identity only."""
+    if not _real_user(user_id):
+        return {"error": "Sign in first."}
+    if not email or "@" not in email:
+        return {"error": "We could not read a confirmed email for your account."}
+    _init_alert_db()
+    now = datetime.now().isoformat()
+    conn = get_conn()
+    if IS_POSTGRES:
+        conn.execute(
+            "INSERT INTO alert_emails (user_id, email, opted_in_at) VALUES (?,?,?) "
+            "ON CONFLICT (user_id) DO UPDATE SET email = EXCLUDED.email, "
+            "opted_in_at = EXCLUDED.opted_in_at", (user_id, email, now))
+    else:
+        conn.execute(
+            "INSERT OR REPLACE INTO alert_emails (user_id, email, opted_in_at) "
+            "VALUES (?,?,?)", (user_id, email, now))
+    conn.commit()
+    conn.close()
+    return {"alerts": True}
+
+
+def alert_opt_out(user_id: str) -> dict:
+    """Delete the row: no alerts, and the address is gone."""
+    _init_alert_db()
+    conn = get_conn()
+    cur = conn.execute("DELETE FROM alert_emails WHERE user_id = ?", (user_id,))
+    conn.commit()
+    n = cur.rowcount
+    conn.close()
+    return {"alerts": False, "deleted": bool(n)}
+
+
+def get_alert_pref(user_id: str) -> dict:
+    """Whether this user gets watchlist alerts. Never returns the address."""
+    if not _real_user(user_id):
+        return {"alerts": False}
+    _init_alert_db()
+    conn = get_conn()
+    row = conn.execute("SELECT opted_in_at FROM alert_emails WHERE user_id = ?",
+                       (user_id,)).fetchone()
+    conn.close()
+    return {"alerts": bool(row), "since": row[0] if row else None}
+
+
+def alert_recipients() -> list:
+    """[(user_id, email)] of every user who opted in to alerts, real ids only."""
+    _init_alert_db()
+    conn = get_conn()
+    rows = conn.execute("SELECT user_id, email FROM alert_emails").fetchall()
+    conn.close()
+    return [(r[0], r[1]) for r in rows if _real_user(r[0]) and r[1] and "@" in r[1]]

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, Link } from 'react-router-dom'
 import {
   LayoutDashboard, Search, PlayCircle,
   TrendingUp, BarChart3, FlaskConical,
@@ -209,6 +209,10 @@ export default function Sidebar({ isMobile, open, collapsed, onClose, onToggleCo
             <div>
               <p className="text-[11px] text-gray-600">Data: Yahoo Finance, NSE, news publishers</p>
               <p className="text-[11px] text-gray-600 mt-0.5">Not financial advice</p>
+              <p className="text-[11px] mt-1.5 flex gap-3">
+                <Link to="/privacy" className="text-gray-400 hover:text-gray-200">Privacy</Link>
+                <Link to="/terms" className="text-gray-400 hover:text-gray-200">Terms</Link>
+              </p>
             </div>
           )}
         </div>

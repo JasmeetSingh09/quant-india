@@ -1,8 +1,9 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getScanStatus, getFactorEvidence } from '../api'
 import { EVIDENCE_CLASS, evidenceKey } from '../evidenceStatus'
 import { Zap } from 'lucide-react'
+import NotAdvice from '../components/NotAdvice'
 
 // Written as steps a user takes, not tools we own. The old list named the
 // machinery ("4-Factor Alpha Model", "FinBERT Sentiment"), which sold a
@@ -192,6 +193,7 @@ export default function Landing() {
             <a href="#features" className="btn-ghost">See what's inside</a>
           </div>
           <p className="mt-4 text-xs text-gray-400">Signals &amp; research only — not financial advice.</p>
+          <NotAdvice className="mt-1" />
         </div>
         <div className="xl:col-span-7">
           {hasEvidence ? <EvidenceList data={evidence} /> : <EvidenceShell busy={evidenceLoading} />}
@@ -275,6 +277,12 @@ export default function Landing() {
       <footer className="border-t border-gray-800">
         <p className={`${GRID} py-6 text-xs text-gray-400`}>
           Quant India · Data: Yahoo Finance, NSE &amp; news publishers · Not financial advice
+          <span className="block sm:inline mt-2 sm:mt-0">
+            <span className="hidden sm:inline"> · </span>
+            <Link to="/privacy" className="text-gray-300 hover:text-white underline underline-offset-4">Privacy</Link>
+            {' · '}
+            <Link to="/terms" className="text-gray-300 hover:text-white underline underline-offset-4">Terms</Link>
+          </span>
         </p>
       </footer>
     </div>

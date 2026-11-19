@@ -10,6 +10,8 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [pw, setPw]       = useState('')
   const [showPw, setShowPw] = useState(false)
+  // 18+ confirmation, sign-up only (V4-02, 19 Nov 2026)
+  const [adult, setAdult] = useState(false)
   const [busy, setBusy]   = useState(false)
   const [msg, setMsg]     = useState(null)
   const [err, setErr]     = useState(null)
@@ -23,6 +25,7 @@ export default function Login() {
   const submit = async e => {
     e.preventDefault()
     if (blocked) { setErr('Please choose a stronger password.'); return }
+    if (isSignup && !adult) { setErr('Confirm that you are 18 or older to create an account.'); return }
     setBusy(true); setErr(null); setMsg(null)
     try {
       if (mode === 'signup') {
@@ -131,13 +134,41 @@ export default function Login() {
             )}
           </div>
 
-          {err && <p className="text-sm text-red-400">{err}</p>}
-          {msg && <p className="text-sm text-green-400">{msg}</p>}
+          {isSignup && (
+            <div className="space-y-2">
+              <label htmlFor="login-adult" className="flex items-start gap-2 text-sm text-gray-300 cursor-pointer">
+                <input
+                  id="login-adult" type="checkbox" required checked={adult}
+                  onChange={e => setAdult(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-green-700"
+                />
+                <span>I am 18 or older</span>
+              </label>
+              <p className="text-xs text-gray-400">
+                Read the{' '}
+                <Link to="/privacy" className="text-gray-300 hover:text-white underline underline-offset-4">Privacy notice</Link>
+                {' '}and{' '}
+                <Link to="/terms" className="text-gray-300 hover:text-white underline underline-offset-4">Terms</Link>
+                {' '}before you create an account.
+              </p>
+            </div>
+          )}
 
-          <button type="submit" disabled={busy || blocked} className="btn-primary w-full">
+          {err && <p className="text-sm text-red-400" role="alert">{err}</p>}
+          {msg && <p className="text-sm text-green-400" role="status">{msg}</p>}
+
+          <button type="submit" disabled={busy || blocked || (isSignup && !adult)} className="btn-primary w-full">
             {busy ? 'Please wait…' : isSignup ? 'Create account' : 'Sign in'}
           </button>
         </form>
+
+        {!isSignup && (
+          <div className="text-center -mt-1">
+            <Link to="/forgot-password" className="text-sm text-gray-300 hover:text-white underline underline-offset-4">
+              Forgot your password?
+            </Link>
+          </div>
+        )}
 
         <div className="text-center text-sm text-gray-400">
           {mode === 'signup' ? 'Already have an account?' : "Don't have an account?"}{' '}
@@ -149,8 +180,10 @@ export default function Login() {
           </button>
         </div>
 
-        <div className="text-center">
-          <Link to="/" className="text-xs text-gray-500 hover:text-gray-300">← Back to home</Link>
+        <div className="flex items-center justify-center gap-4 text-xs">
+          <Link to="/" className="text-gray-400 hover:text-gray-200">← Back to home</Link>
+          <Link to="/privacy" className="text-gray-400 hover:text-gray-200">Privacy</Link>
+          <Link to="/terms" className="text-gray-400 hover:text-gray-200">Terms</Link>
         </div>
       </div>
     </div>

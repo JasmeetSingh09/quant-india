@@ -14,6 +14,7 @@ import Spinner from '../components/Spinner'
 import { SignalEvidenceNote } from '../components/Evidence'
 import SignalHistory from '../components/SignalHistory'
 import WhySignal from '../components/WhySignal'
+import NotAdvice from '../components/NotAdvice'
 import SixFactor from '../components/SixFactor'
 import FactorInputs from '../components/FactorInputs'
 import EvidencePanel from '../components/EvidencePanel'
@@ -1050,6 +1051,7 @@ function StockDetail({ ticker, onBack }) {
               panels cannot split; these groups came out within about 150px. */}
           <div className="space-y-3">
             <h2 className="font-semibold text-sm text-gray-400 uppercase tracking-wider">Signal analysis</h2>
+            <NotAdvice />
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
               <div className="space-y-6 min-w-0">
                 {/* Renders nothing until the universe scan has recorded this

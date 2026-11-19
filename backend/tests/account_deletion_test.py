@@ -75,7 +75,9 @@ print("\n1. COVERAGE: every per-user table is in the deletion")
 # be added both here and to USER_TABLES.
 PROD_USER_ID_TABLES = {"portfolio_holdings", "portfolios", "product_events", "shared_portfolios",
                        "sim_positions", "sim_snapshots", "simulations", "theses",
-                       "user_emails", "watchlist"}
+                       "user_emails", "watchlist",
+                       # created by user_prefs at runtime from the 19 Nov 2026 alerts opt-in
+                       "alert_emails"}
 covered = {t for t, _ in ad.USER_TABLES}
 ok(PROD_USER_ID_TABLES <= covered, "all production user_id tables are deleted",
    str(PROD_USER_ID_TABLES - covered))

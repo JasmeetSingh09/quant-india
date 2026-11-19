@@ -6,6 +6,7 @@ import Explainer from '../components/Explainer'
 import CapTierPicks from '../components/CapTierPicks'
 import Leaderboard from '../components/Leaderboard'
 import EmailOptIn from '../components/EmailOptIn'
+import NotAdvice from '../components/NotAdvice'
 import { TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, RefreshCw, History } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import ErrorBoundary from '../components/ErrorBoundary'
@@ -627,6 +628,7 @@ export default function Dashboard() {
           <p className="text-gray-400 text-sm mt-0.5">
             {new Date().toLocaleDateString('en-IN', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}
           </p>
+          <NotAdvice className="mt-1" />
         </div>
         {risk?.state && !riskLoading && (
           <div className="text-right">

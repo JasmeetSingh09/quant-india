@@ -296,6 +296,33 @@ def require_mail_identity(authorization: str | None = Header(default=None)) -> d
     return _MailIdentity(user_id=sub, email=email)
 
 
+# 18+ confirmation (V4-02, decided 19 Nov 2026). Sign-up stores this flag in
+# the new account's Supabase user_metadata (frontend AuthContext.signUp), so
+# no database column or live change is needed. Existing accounts were not
+# backfilled; they simply have no flag. It is the user's own statement, which
+# is exactly what it records, so user_metadata (user-editable) is the right
+# place for it — unlike the e-mail address above, nothing is sent on its word.
+AGE_FLAG = "age_18_confirmed"
+
+
+def adult_confirmed_claims(payload: dict | None) -> bool:
+    """True only when a verified token's user_metadata carries the flag."""
+    meta = (payload or {}).get("user_metadata") or {}
+    return isinstance(meta, dict) and meta.get(AGE_FLAG) is True
+
+
+def events_allowed(authorization: str | None = Header(default=None)) -> bool:
+    """
+    FastAPI dependency for /events/track: product events are recorded only for
+    a signed-in account whose token VERIFIES and which confirmed it is 18 or
+    older at sign-up. Anonymous, unverified and unconfirmed callers: nothing is
+    stored (fails closed when verification is not configured).
+    """
+    token = _bearer(authorization)
+    payload = _decode_payload(token) if token else None
+    return bool(payload and payload.get("sub") and adult_confirmed_claims(payload))
+
+
 def _email_from_claims(payload: dict) -> str | None:
     """Where Supabase actually puts the address, in the order it tends to."""
     for value in (payload.get("email"),

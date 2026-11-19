@@ -21,6 +21,12 @@ const Advanced      = lazy(() => import('./pages/Advanced'))
 import Login from './pages/Login'
 import Landing from './pages/Landing'
 const SharedPortfolio = lazy(() => import('./pages/SharedPortfolio'))
+// Interim privacy notice + terms (V4-01) and the password reset pages (V4-07),
+// 19 Nov 2026. Reachable signed in or out.
+const Privacy        = lazy(() => import('./pages/Privacy'))
+const Terms          = lazy(() => import('./pages/Terms'))
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
+const ResetPassword  = lazy(() => import('./pages/ResetPassword'))
 import { useAuth } from './AuthContext'
 
 // Shown for the moment a page's code is being fetched the first time it opens.
@@ -65,6 +71,18 @@ export default function App() {
     )
   }
 
+  // The reset link signs the person in, so this page must render whatever the
+  // auth state, and outside the app layout: its one job is the new password.
+  if (location.pathname === '/reset-password') {
+    return (
+      <ErrorBoundary name="page">
+      <Suspense fallback={<PageLoading />}>
+        <ResetPassword />
+      </Suspense>
+      </ErrorBoundary>
+    )
+  }
+
   // Anonymous visitors get the public, crawlable landing page (+ the login
   // route). The actual app tools stay gated — you must sign in to reach them.
   if (!user) {
@@ -73,6 +91,9 @@ export default function App() {
       <Suspense fallback={<PageLoading />}>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/privacy" element={<Privacy standalone />} />
+        <Route path="/terms"   element={<Terms standalone />} />
         {/* A shared link must open for someone with no account — demanding a
             login before showing anything defeats the entire point. The token
             is the credential, so there is nothing to sign in to. */}
@@ -133,6 +154,9 @@ export default function App() {
           <Route path="/advanced"    element={<Advanced />} />
           <Route path="/markets"     element={<Markets />} />
           <Route path="/calculators" element={<Calculators />} />
+          <Route path="/privacy"     element={<Privacy />} />
+          <Route path="/terms"       element={<Terms />} />
+          <Route path="/forgot-password" element={<Navigate to="/reset-password" replace />} />
 
           {/* Options Lab and Research now live inside the Advanced Centre.
               Keep the old paths working — they are bookmarked and linked. */}

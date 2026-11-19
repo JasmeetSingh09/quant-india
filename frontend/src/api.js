@@ -1,5 +1,6 @@
 ﻿import axios from 'axios'
 import { supabase } from './supabaseClient'
+import { isAdultConfirmed } from './ageGate'
 
 // In local dev, calls go to '/api' (Vite proxies to localhost:8000).
 // In production, set VITE_API_URL to your deployed backend URL (e.g. Render/Railway).
@@ -121,13 +122,26 @@ export const getEmailPref  = () => api.get('/me/email-pref')
 export const optInEmail    = () => api.post('/me/email-pref')
 export const optOutEmail   = () => api.delete('/me/email-pref')
 export const deleteAccount = () => api.delete('/me/account', { data: { confirm: 'DELETE' } })
+// Watchlist price alerts: their own opt-in (V4-04 / R4, 19 Nov 2026)
+export const getAlertPref  = () => api.get('/me/alert-pref')
+export const optInAlerts   = () => api.post('/me/alert-pref')
+export const optOutAlerts  = () => api.delete('/me/alert-pref')
 
 export const createShare = sim_name => api.post('/share/create', { sim_name })
 export const revokeShare = sim_name => api.post('/share/revoke', { sim_name })
 export const getShared   = token => api.get(`/share/${encodeURIComponent(token)}`)
 
+// Only for an account that confirmed it is 18 or older at sign-up (V4-02,
+// 19 Nov 2026); the server enforces the same rule and stores nothing otherwise.
 export const trackEvent = (event, props = {}) => {
-  try { api.post('/events/track', { event, props }).catch(() => {}) } catch { /* ignore */ }
+  try {
+    supabase.auth.getSession()
+      .then(({ data }) => {
+        if (!isAdultConfirmed(data?.session?.user)) return
+        api.post('/events/track', { event, props }).catch(() => {})
+      })
+      .catch(() => {})
+  } catch { /* ignore */ }
 }
 
 export const suggestFix        = body => api.post('/portfolio/suggest-fix', body, { timeout: 180000 })

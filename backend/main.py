@@ -26,7 +26,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 load_dotenv(Path(__file__).parent / ".env")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
@@ -55,6 +55,7 @@ from watchlist import add_to_watchlist, remove_from_watchlist, get_watchlist
 from auth import current_user_id, current_user_email   # per-user data (returns 'public'/None when anonymous)
 from auth import require_admin   # owner-only actions; fails closed when no admin is configured
 from auth import require_mail_identity   # sends mail / stores an address: verified + confirmed only
+from auth import events_allowed   # product events: verified + 18+ confirmed only (V4-02, 19 Nov 2026)
 from alerts import send_test_alert, send_multi_signal_alert, start_alert_scheduler, run_watchlist_alert_check
 from alpha_model import compute_alpha_score, scan_alpha, retrain_weights, explain_signal, top_picks, warm_top_picks
 from prediction_tracker import snapshot as log_predictions_snapshot, evaluate as evaluate_predictions
@@ -409,7 +410,9 @@ async def startup():
 
 class WatchlistAddRequest(BaseModel):
     ticker: str
-    price_alert_pct: float = 5.0
+    # Above 0 and finite: a 0% threshold fired on every 30-minute check
+    # (V4-04 / R4, 19 Nov 2026). The alerts job refuses one too.
+    price_alert_pct: float = Field(5.0, gt=0, allow_inf_nan=False)
     sentiment_alert: bool = True
 
 
@@ -2513,8 +2516,14 @@ class TrackEventRequest(BaseModel):
 
 
 @app.post("/events/track")
-def events_track(req: TrackEventRequest, user_id: str = Depends(current_user_id)):
-    """Record one product event. Fire-and-forget: never fails the caller."""
+def events_track(req: TrackEventRequest, user_id: str = Depends(current_user_id),
+                 allowed: bool = Depends(events_allowed)):
+    """Record one product event. Fire-and-forget: never fails the caller.
+
+    Only for a verified account that confirmed it is 18 or older at sign-up
+    (V4-02, 19 Nov 2026); anything else is answered but not stored."""
+    if not allowed:
+        return {"ok": False, "recorded": False}
     from analytics import track
     return track(req.event, user_id=user_id, **(req.props or {}))
 
@@ -2822,6 +2831,33 @@ def me_email_opt_in(me: dict = Depends(require_mail_identity)):
     if "error" in r:
         raise HTTPException(status_code=400, detail=r["error"])
     return r
+
+
+@app.get("/me/alert-pref")
+def me_alert_pref(user_id: str = Depends(current_user_id)):
+    """Has this user opted in to watchlist price alerts by e-mail?"""
+    from user_prefs import get_alert_pref
+    return get_alert_pref(user_id)
+
+
+@app.post("/me/alert-pref")
+def me_alert_opt_in(me: dict = Depends(require_mail_identity)):
+    """Opt in to watchlist alerts (V4-04 / R4, 19 Nov 2026). Same rule as the
+    weekly summary: the address is the account's own confirmed e-mail from a
+    verified token. The alerts job mails only users with this row, about their
+    own watchlist."""
+    from user_prefs import alert_opt_in
+    r = alert_opt_in(me["user_id"], me["email"])
+    if "error" in r:
+        raise HTTPException(status_code=400, detail=r["error"])
+    return r
+
+
+@app.delete("/me/alert-pref")
+def me_alert_opt_out(user_id: str = Depends(current_user_id)):
+    """Opt out of watchlist alerts — deletes the stored address."""
+    from user_prefs import alert_opt_out
+    return alert_opt_out(user_id)
 
 
 @app.delete("/me/email-pref")

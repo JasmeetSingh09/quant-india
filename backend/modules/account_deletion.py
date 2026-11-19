@@ -37,6 +37,7 @@ USER_TABLES = [
     ("shared_portfolios",  "user_id = ?"),   # also kills any public share links
     ("product_events",     "user_id = ?"),
     ("user_emails",        "user_id = ?"),
+    ("alert_emails",       "user_id = ?"),   # watchlist-alert opt-in (19 Nov 2026)
 ]
 
 

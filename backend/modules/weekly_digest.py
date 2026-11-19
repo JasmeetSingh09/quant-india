@@ -22,6 +22,15 @@ def _fmt_pct(v):
     return f"{'+' if (v or 0) >= 0 else ''}{v:.2f}%"
 
 
+def _not_advice() -> str:
+    """The line every alert and summary e-mail carries (19 Nov 2026)."""
+    try:
+        from alerts import NOT_ADVICE
+        return NOT_ADVICE
+    except Exception:
+        return "Educational research tool, not investment advice; not SEBI-registered."
+
+
 def build_digest(user_id: str = "public") -> dict:
     """
     Compose one user's digest. Returns {"skip": reason} when there is nothing
@@ -95,6 +104,7 @@ def build_digest(user_id: str = "public") -> dict:
         Paper trading only — no real money moved. Open the simulator to change a
         weight and see what it would have done differently.
       </p>
+      <p style="color:#6b7280;font-size:12px;margin-top:8px">{_not_advice()}</p>
     </div>"""
 
     return {

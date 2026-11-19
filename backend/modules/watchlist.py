@@ -85,6 +85,16 @@ def _get_company_name(ticker: str) -> str:
         return ticker.replace(".NS", "")
 
 
+def _threshold_ok(pct) -> bool:
+    """Above 0% and finite. A 0% threshold fired on every check; the alerts job
+    refuses one too (V4-04 / R4, 19 Nov 2026)."""
+    try:
+        v = float(pct)
+    except (TypeError, ValueError):
+        return False
+    return v == v and v not in (float("inf"), float("-inf")) and v > 0
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -104,6 +114,8 @@ def add_to_watchlist(
 
     Returns the created watchlist entry or an error dict.
     """
+    if not _threshold_ok(price_alert_pct):
+        return {"error": "The alert threshold must be a number above 0%."}
     _init_db()
 
     ticker = ticker.upper()
@@ -236,6 +248,8 @@ def update_alert_settings(
     user_id: str = "public",
 ) -> dict:
     """Update alert thresholds for an existing watchlist entry."""
+    if price_alert_pct is not None and not _threshold_ok(price_alert_pct):
+        return {"error": "The alert threshold must be a number above 0%."}
     _init_db()
     ticker = ticker.upper()
 

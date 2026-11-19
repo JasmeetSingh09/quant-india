@@ -257,9 +257,12 @@ export default function WhySignal({ ticker }) {
           `This signal applies to the stated ${horizon}-day horizon and is not a long-term investment recommendation.`}
       </p>
       <p className="text-[11px] text-gray-600 leading-relaxed">
-        {alpha.action_note || (buy
+        {/* Neutral wording, no instruction (19 Nov 2026). The backend's
+            action_note ("read it as avoid or reduce") belongs to the frozen
+            v1.6.0 output, so it is left there and not shown. */}
+        {buy
           ? 'The model expects outperformance over this horizon.'
-          : 'The model expects underperformance — read as avoid or reduce.')}
+          : 'The model expects underperformance over this horizon. It does not model short selling.'}
         {' '}Signal model only. Not financial advice.
       </p>
     </div>
